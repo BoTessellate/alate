@@ -7,8 +7,12 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@notionhq/client": "^5.4.0",
     "@sparticuz/chromium": "^141.0.0",
+    "@supabase/supabase-js": "^2.87.1",
     "@vercel/node": "^3.0.0",
+    "dotenv": "^17.2.3",
     "puppeteer-core": "^24.30.0"
   },
   "devDependencies": {
