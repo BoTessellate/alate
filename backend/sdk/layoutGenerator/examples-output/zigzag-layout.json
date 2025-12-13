@@ -1,0 +1,83 @@
+{
+  "layout_type": "ZigZagStaggered",
+  "canvas_size": {
+    "width": 1200,
+    "height": 1600
+  },
+  "elements": [
+    {
+      "type": "image",
+      "src": "https://example.com/ikat-cushion.jpg",
+      "position": {
+        "x": 180,
+        "y": 80
+      },
+      "size": {
+        "width": 350,
+        "height": 350
+      },
+      "zIndex": 0
+    },
+    {
+      "type": "label",
+      "text": "Amala Earth",
+      "position": {
+        "x": 190,
+        "y": 450
+      },
+      "style": "label",
+      "zIndex": 100
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/ceramic-vase.jpg",
+      "position": {
+        "x": 670,
+        "y": 330
+      },
+      "size": {
+        "width": 350,
+        "height": 350
+      },
+      "zIndex": 1
+    },
+    {
+      "type": "label",
+      "text": "Studio Pottery",
+      "position": {
+        "x": 680,
+        "y": 700
+      },
+      "style": "label",
+      "zIndex": 101
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/cotton-kurta.jpg",
+      "position": {
+        "x": 180,
+        "y": 580
+      },
+      "size": {
+        "width": 350,
+        "height": 350
+      },
+      "zIndex": 2
+    },
+    {
+      "type": "label",
+      "text": "FabIndia",
+      "position": {
+        "x": 190,
+        "y": 950
+      },
+      "style": "label",
+      "zIndex": 102
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-13T07:20:39.493Z",
+    "product_count": 3,
+    "archetype_description": "Alternating zigzag pattern with staggered heights"
+  }
+}

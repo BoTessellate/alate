@@ -1,0 +1,198 @@
+{
+  "layout_type": "GridWithOverlap",
+  "canvas_size": {
+    "width": 1200,
+    "height": 1200
+  },
+  "elements": [
+    {
+      "type": "image",
+      "src": "https://example.com/ikat-cushion.jpg",
+      "position": {
+        "x": 210,
+        "y": 210
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 0
+    },
+    {
+      "type": "text",
+      "text": "Amala Earth",
+      "position": {
+        "x": 220,
+        "y": 480
+      },
+      "style": "caption",
+      "zIndex": 100
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/ceramic-vase.jpg",
+      "position": {
+        "x": 470,
+        "y": 210
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 1
+    },
+    {
+      "type": "text",
+      "text": "Studio Pottery",
+      "position": {
+        "x": 480,
+        "y": 480
+      },
+      "style": "caption",
+      "zIndex": 101
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/cotton-kurta.jpg",
+      "position": {
+        "x": 730,
+        "y": 210
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 2
+    },
+    {
+      "type": "text",
+      "text": "FabIndia",
+      "position": {
+        "x": 740,
+        "y": 480
+      },
+      "style": "caption",
+      "zIndex": 102
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/wooden-blocks.jpg",
+      "position": {
+        "x": 210,
+        "y": 470
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 3
+    },
+    {
+      "type": "text",
+      "text": "Kinder Toys",
+      "position": {
+        "x": 220,
+        "y": 740
+      },
+      "style": "caption",
+      "zIndex": 103
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/silk-saree.jpg",
+      "position": {
+        "x": 470,
+        "y": 470
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 4
+    },
+    {
+      "type": "text",
+      "text": "Sabyasachi",
+      "position": {
+        "x": 480,
+        "y": 740
+      },
+      "style": "caption",
+      "zIndex": 104
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/jute-rug.jpg",
+      "position": {
+        "x": 730,
+        "y": 470
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 5
+    },
+    {
+      "type": "text",
+      "text": "HomeCraft",
+      "position": {
+        "x": 740,
+        "y": 740
+      },
+      "style": "caption",
+      "zIndex": 105
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/brass-lamp.jpg",
+      "position": {
+        "x": 210,
+        "y": 730
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 6
+    },
+    {
+      "type": "text",
+      "text": "Artisan Lighting",
+      "position": {
+        "x": 220,
+        "y": 1000
+      },
+      "style": "caption",
+      "zIndex": 106
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/linen-curtains.jpg",
+      "position": {
+        "x": 470,
+        "y": 730
+      },
+      "size": {
+        "width": 300,
+        "height": 300
+      },
+      "zIndex": 7
+    },
+    {
+      "type": "text",
+      "text": "Threads",
+      "position": {
+        "x": 480,
+        "y": 1000
+      },
+      "style": "caption",
+      "zIndex": 107
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-13T07:20:39.496Z",
+    "product_count": 8,
+    "archetype_description": "Grid layout with intentional overlaps"
+  }
+}

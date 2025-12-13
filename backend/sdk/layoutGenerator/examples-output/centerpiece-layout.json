@@ -1,0 +1,133 @@
+{
+  "layout_type": "LayeredCenterpiece",
+  "canvas_size": {
+    "width": 1200,
+    "height": 1200
+  },
+  "elements": [
+    {
+      "type": "image",
+      "src": "https://example.com/ikat-cushion.jpg",
+      "position": {
+        "x": 375,
+        "y": 375
+      },
+      "size": {
+        "width": 450,
+        "height": 450
+      },
+      "zIndex": 10
+    },
+    {
+      "type": "label",
+      "text": "Amala Earth",
+      "position": {
+        "x": 550,
+        "y": 855
+      },
+      "style": "label",
+      "zIndex": 20
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/ceramic-vase.jpg",
+      "position": {
+        "x": 850,
+        "y": 500
+      },
+      "size": {
+        "width": 200,
+        "height": 200
+      },
+      "zIndex": 0,
+      "rotation": 3.664207579227856
+    },
+    {
+      "type": "text",
+      "text": "Studio Pottery",
+      "position": {
+        "x": 860,
+        "y": 715
+      },
+      "style": "caption",
+      "zIndex": 100
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/cotton-kurta.jpg",
+      "position": {
+        "x": 500,
+        "y": 850
+      },
+      "size": {
+        "width": 200,
+        "height": 200
+      },
+      "zIndex": 1,
+      "rotation": 5.496417581065646
+    },
+    {
+      "type": "text",
+      "text": "FabIndia",
+      "position": {
+        "x": 510,
+        "y": 1065
+      },
+      "style": "caption",
+      "zIndex": 101
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/wooden-blocks.jpg",
+      "position": {
+        "x": 150,
+        "y": 500
+      },
+      "size": {
+        "width": 200,
+        "height": 200
+      },
+      "zIndex": 2,
+      "rotation": -5.88070218755133
+    },
+    {
+      "type": "text",
+      "text": "Kinder Toys",
+      "position": {
+        "x": 160,
+        "y": 715
+      },
+      "style": "caption",
+      "zIndex": 102
+    },
+    {
+      "type": "image",
+      "src": "https://example.com/silk-saree.jpg",
+      "position": {
+        "x": 499.9999999999999,
+        "y": 150
+      },
+      "size": {
+        "width": 200,
+        "height": 200
+      },
+      "zIndex": 3,
+      "rotation": 2.3307875660434796
+    },
+    {
+      "type": "text",
+      "text": "Sabyasachi",
+      "position": {
+        "x": 509.9999999999999,
+        "y": 365
+      },
+      "style": "caption",
+      "zIndex": 103
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-12-13T07:20:39.496Z",
+    "product_count": 5,
+    "archetype_description": "Central hero image with layered supporting products"
+  }
+}
