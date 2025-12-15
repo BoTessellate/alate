@@ -233,11 +233,8 @@ npm run build
 ## 📖 Documentation
 
 - [API Testing Guide](backend/sdk/API_TESTING_GUIDE.md) - Complete API reference with curl examples
-- [Advanced Features Summary](backend/sdk/DAYS_8-12_COMPLETE.md) - AI, themes, composition & social
-- [Product Enrichment Guide](backend/sdk/DAY1_COMPLETION_SUMMARY.md) - AI-powered product tagging
-- [Export Engine Guide](backend/sdk/exportEngine/DAY5_COMPLETION_SUMMARY.md) - Image rendering
-- [Plugin Bridge Guide](backend/sdk/pluginBridge/DAY6_COMPLETION_SUMMARY.md) - Platform integrations
-- [Plugin Sync Guide](backend/sdk/pluginSync/DAY7_COMPLETION_SUMMARY.md) - Product import
+- [Implementation Summary](TML_BACKEND_COMPLETE_SUMMARY.md) - Status, pending tasks, plan deviations
+- Individual SDK READMEs in `backend/sdk/[sdk-name]/README.md`
 
 ## 🎨 Layout Archetypes
 
@@ -294,5 +291,5 @@ For questions or support, please open an issue on GitHub.
 ---
 
 **Status**: ✅ Production Ready - All SDKs Complete
-**Last Updated**: December 13, 2025
+**Last Updated**: December 15, 2025
 **Version**: 1.0.0
