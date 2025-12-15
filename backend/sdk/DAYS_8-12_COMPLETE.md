@@ -11,15 +11,15 @@ All final Claude SDK tasks (Days 8-12) have been successfully implemented, compl
 **Status**: COMPLETE
 
 **Files Created:**
-- `layoutAI/visionClient.ts` - Vision model integration (Claude 3.5 Sonnet with vision)
+- `layoutAI/visionClient.ts` - Vision model integration (Claude Opus 4.5)
 - `layoutAI/generateSmartLabels.ts` - Smart label placement logic
 - `layoutAI/routes/api/smartLabel.ts` - API endpoint
 - `layoutAI/index.ts` - Module exports
 
 **Features:**
-- Vision-guided label placement using Claude 3.5 Sonnet
+- Vision-guided label placement using Claude Opus 4.5
+- Intelligent aesthetic overlap detection (allows intentional overlaps, avoids problematic ones)
 - Fallback rule-based positioning when vision model unavailable
-- No image overlap detection
 - Design best practices integration
 - Supports multiple placement preferences (above, below, beside, auto)
 
@@ -306,7 +306,7 @@ Export (PNG/JSON/Draft) → Social Sharing/Link Creation
 - Node.js + TypeScript
 - Express.js for REST APIs
 - Supabase (PostgreSQL) for database
-- Anthropic Claude AI (3.5 Sonnet) for enrichment and vision
+- Anthropic Claude AI (Opus 4.5) for enrichment, search, and label placement
 - node-canvas for image rendering
 - bcrypt for password hashing
 - csv-parse for CSV processing

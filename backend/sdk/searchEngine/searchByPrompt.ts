@@ -15,7 +15,7 @@ export class PromptSearchEngine {
   constructor(
     anthropicApiKey: string,
     tagSearchEngine: TagSearchEngine,
-    model: string = 'claude-3-5-sonnet-20241022'
+    model: string = process.env.SEARCH_MODEL || 'claude-opus-4-5-20251101'
   ) {
     this.anthropic = new Anthropic({ apiKey: anthropicApiKey });
     this.tagSearchEngine = tagSearchEngine;

@@ -240,8 +240,9 @@ curl -X POST http://localhost:3000/api/social/share \
 ## 🎯 Key Features Verified
 
 ### Layout AI (Smart Label Placement)
-- ✅ Vision client using Claude 3.5 Sonnet
-- ✅ Smart label placement with fallback
+- ✅ Vision client using Claude Opus 4.5
+- ✅ Smart label placement with aesthetic overlap detection
+- ✅ Fallback rule-based placement
 - ✅ API endpoint ready
 
 ### Theme Tokens (Design Token Generation)

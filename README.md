@@ -32,7 +32,7 @@ TML/
 
 ### For Brands
 - 🔄 **Multi-Platform Sync**: Import products from Shopify, WooCommerce, Wix, or CSV
-- 🤖 **AI Enrichment**: Automatic tagging, categorization, and metadata extraction using Claude AI
+- 🤖 **AI Enrichment**: Automatic tagging, categorization, and metadata extraction using Claude Opus 4.5
 - 📊 **Dashboard**: Track sync status, upload history, and product analytics
 - 🔐 **Secure Authentication**: Brand registration and login with encrypted passwords
 
@@ -173,7 +173,7 @@ Board Composition → Export (PNG/JSON) → Social Sharing
 - **Framework**: Express.js
 - **Language**: TypeScript
 - **Database**: PostgreSQL (Supabase)
-- **AI**: Anthropic Claude 3.5 Sonnet
+- **AI**: Anthropic Claude Opus 4.5 (configurable via environment variables)
 - **Image Processing**: node-canvas
 - **Authentication**: bcrypt + JWT
 

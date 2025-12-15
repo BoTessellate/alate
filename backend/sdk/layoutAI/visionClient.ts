@@ -48,7 +48,7 @@ export class VisionClient {
       const prompt = this.buildVisionPrompt(request);
 
       const message = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+        model: process.env.LABEL_PLACEMENT_MODEL || 'claude-opus-4-5-20251101',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -89,10 +89,17 @@ ${image_positions.map((pos, i) =>
 Label style: ${label_style.font_size}px, color ${label_style.color}, preference: ${label_style.placement_preference || 'auto'}
 
 Task: Determine optimal label placement for each product that:
-1. Doesn't overlap with images
-2. Maintains visual balance
-3. Is easily readable
-4. Follows design best practices
+1. Avoids UNSIGHTLY overlaps with images (artistic/intentional overlaps are OK if they enhance the design)
+2. Maintains visual hierarchy and balance
+3. Is easily readable with good contrast
+4. Follows modern moodboard design best practices (labels can be positioned creatively)
+5. Considers the overall aesthetic - some strategic overlaps can create visual interest
+
+Note: Moodboards often have intentional, aesthetic overlaps. Avoid only those overlaps that would:
+- Obscure important product details
+- Make text unreadable
+- Create visual confusion
+- Break the design hierarchy
 
 Return ONLY a JSON array in this exact format:
 [

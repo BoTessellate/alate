@@ -33,7 +33,7 @@ export class ProductEnrichmentEngine {
       config.supabaseKey
     );
 
-    this.model = config.model || 'claude-3-5-sonnet-20241022';
+    this.model = config.model || process.env.ENRICHMENT_MODEL || 'claude-opus-4-5-20251101';
   }
 
   /**
