@@ -285,7 +285,7 @@ Query: "${prompt}"
             ...(parsedQuery.style_tags || [])
           ].filter(Boolean);
 
-          const allTerms = [...new Set([...searchTerms, ...aiTerms])];
+          const allTerms = Array.from(new Set([...searchTerms, ...aiTerms]));
           const enhancedResults = await keywordSearch(supabase, allTerms, limit);
 
           // Merge results, preferring higher scores
