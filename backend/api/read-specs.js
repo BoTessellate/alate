@@ -70,7 +70,7 @@ async function readNotionSpecs() {
     content += await readBlock(pageId);
 
     // Save to file
-    const outputPath = 'C:\\Users\\mailt\\Documents\\stel\\notion-specs.md';
+    const outputPath = 'C:\\Users\\mailt\\Documents\\TML\\notion-specs.md';
     fs.writeFileSync(outputPath, content);
 
     console.log('Content saved to:', outputPath);

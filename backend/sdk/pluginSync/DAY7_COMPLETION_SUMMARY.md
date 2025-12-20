@@ -493,6 +493,6 @@ The sync SDK makes Mood Layer **plugin-ready and scalable** for brand onboarding
 ---
 
 *Generated: 2025-12-13*
-*Project: Mood Layer (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 7: Plugin Sync SDK*
 *Status: ✅ Complete*

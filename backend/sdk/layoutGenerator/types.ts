@@ -30,6 +30,32 @@ export interface BoundingBox {
 }
 
 /**
+ * Fit tags for layout placement priority
+ * Imported from productEnrichment types
+ */
+export type FitTag = 'bulky' | 'flat' | 'delicate' | 'lightweight' | 'oversized';
+
+/**
+ * Product variant for layout
+ */
+export interface ProductVariant {
+  id?: string;
+  color?: string;
+  size?: string;
+  url: string;
+  image_url?: string;
+}
+
+/**
+ * Physical dimensions for layout consideration
+ */
+export interface ProductDimensions {
+  width?: number;
+  height?: number;
+  depth?: number;
+}
+
+/**
  * Product input for layout generation
  */
 export interface ProductInput {
@@ -38,6 +64,15 @@ export interface ProductInput {
   tags?: string[];
   product_name?: string;
   price?: number;
+
+  // Variant support - used to display variant options
+  variants?: ProductVariant[];
+
+  // Dimensions affect layout placement
+  dimensions?: ProductDimensions;
+
+  // Fit tags determine placement priority
+  fit_tags?: FitTag[];
 }
 
 /**

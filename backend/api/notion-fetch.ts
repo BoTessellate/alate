@@ -1,6 +1,12 @@
 import { Client } from '@notionhq/client';
 
-const notion = new Client({ auth: 'ntn_h7843339239bj4WOTI5Fct4RjbqPpf1EFScIR5OOb5D2TQ' });
+// SECURITY: Token must be in environment variables, never hardcoded
+const notionToken = process.env.NOTION_API_KEY;
+if (!notionToken) {
+  throw new Error('NOTION_API_KEY environment variable is required');
+}
+
+const notion = new Client({ auth: notionToken });
 
 async function fetchNotionData() {
   try {

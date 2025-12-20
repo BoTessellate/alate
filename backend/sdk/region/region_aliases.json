@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "description": "Region aliases for geographic matching in product search",
+
+  "aliases": {
+    "Bali": ["Indonesia", "APAC", "Southeast Asia"],
+    "Jakarta": ["Indonesia", "APAC", "Southeast Asia"],
+    "Mumbai": ["India", "South Asia", "APAC"],
+    "Delhi": ["India", "South Asia", "APAC"],
+    "Jaipur": ["India", "South Asia", "APAC"],
+    "Bangalore": ["India", "South Asia", "APAC"],
+    "Chennai": ["India", "South Asia", "APAC"],
+    "Kolkata": ["India", "South Asia", "APAC"],
+    "Goa": ["India", "South Asia", "APAC"],
+    "Tokyo": ["Japan", "East Asia", "APAC"],
+    "Kyoto": ["Japan", "East Asia", "APAC"],
+    "Seoul": ["South Korea", "East Asia", "APAC"],
+    "Bangkok": ["Thailand", "Southeast Asia", "APAC"],
+    "Chiang Mai": ["Thailand", "Southeast Asia", "APAC"],
+    "Singapore": ["Singapore", "Southeast Asia", "APAC"],
+    "Kuala Lumpur": ["Malaysia", "Southeast Asia", "APAC"],
+    "Vietnam": ["Vietnam", "Southeast Asia", "APAC"],
+    "Hanoi": ["Vietnam", "Southeast Asia", "APAC"],
+    "Ho Chi Minh": ["Vietnam", "Southeast Asia", "APAC"],
+    "Philippines": ["Philippines", "Southeast Asia", "APAC"],
+    "Manila": ["Philippines", "Southeast Asia", "APAC"],
+    "London": ["UK", "Europe", "Western Europe"],
+    "Paris": ["France", "Europe", "Western Europe"],
+    "Milan": ["Italy", "Europe", "Western Europe"],
+    "Florence": ["Italy", "Europe", "Western Europe"],
+    "Barcelona": ["Spain", "Europe", "Western Europe"],
+    "Madrid": ["Spain", "Europe", "Western Europe"],
+    "Berlin": ["Germany", "Europe", "Western Europe"],
+    "Amsterdam": ["Netherlands", "Europe", "Western Europe"],
+    "Copenhagen": ["Denmark", "Europe", "Scandinavia"],
+    "Stockholm": ["Sweden", "Europe", "Scandinavia"],
+    "Oslo": ["Norway", "Europe", "Scandinavia"],
+    "Helsinki": ["Finland", "Europe", "Scandinavia"],
+    "New York": ["USA", "North America", "Americas"],
+    "Los Angeles": ["USA", "North America", "Americas"],
+    "San Francisco": ["USA", "North America", "Americas"],
+    "Miami": ["USA", "North America", "Americas"],
+    "Chicago": ["USA", "North America", "Americas"],
+    "Toronto": ["Canada", "North America", "Americas"],
+    "Vancouver": ["Canada", "North America", "Americas"],
+    "Mexico City": ["Mexico", "Latin America", "Americas"],
+    "Tulum": ["Mexico", "Latin America", "Americas"],
+    "Sao Paulo": ["Brazil", "Latin America", "Americas"],
+    "Rio": ["Brazil", "Latin America", "Americas"],
+    "Buenos Aires": ["Argentina", "Latin America", "Americas"],
+    "Sydney": ["Australia", "Oceania", "APAC"],
+    "Melbourne": ["Australia", "Oceania", "APAC"],
+    "Auckland": ["New Zealand", "Oceania", "APAC"],
+    "Dubai": ["UAE", "Middle East", "MENA"],
+    "Abu Dhabi": ["UAE", "Middle East", "MENA"],
+    "Marrakech": ["Morocco", "North Africa", "MENA"],
+    "Cairo": ["Egypt", "North Africa", "MENA"],
+    "Istanbul": ["Turkey", "Middle East", "MENA"],
+    "Cape Town": ["South Africa", "Africa"],
+    "Johannesburg": ["South Africa", "Africa"],
+    "Nairobi": ["Kenya", "Africa", "East Africa"],
+    "Lagos": ["Nigeria", "Africa", "West Africa"]
+  },
+
+  "regions": {
+    "India": {
+      "parent": "South Asia",
+      "keywords": ["indian", "desi", "bharatiya", "kurta", "saree", "sari", "lehenga", "ikat", "block print", "bandhani", "kalamkari"]
+    },
+    "Indonesia": {
+      "parent": "Southeast Asia",
+      "keywords": ["indonesian", "balinese", "batik", "javanese", "rattan", "teak"]
+    },
+    "Japan": {
+      "parent": "East Asia",
+      "keywords": ["japanese", "zen", "wabi-sabi", "minimalist", "muji", "kimono", "origami"]
+    },
+    "South Korea": {
+      "parent": "East Asia",
+      "keywords": ["korean", "k-fashion", "hanbok", "seoul style"]
+    },
+    "Thailand": {
+      "parent": "Southeast Asia",
+      "keywords": ["thai", "silk", "elephant", "tropical"]
+    },
+    "UK": {
+      "parent": "Europe",
+      "keywords": ["british", "english", "scottish", "welsh", "tartan", "tweed"]
+    },
+    "France": {
+      "parent": "Europe",
+      "keywords": ["french", "parisian", "provencal", "toile", "linen"]
+    },
+    "Italy": {
+      "parent": "Europe",
+      "keywords": ["italian", "tuscan", "venetian", "leather", "ceramics"]
+    },
+    "USA": {
+      "parent": "North America",
+      "keywords": ["american", "californian", "southwestern", "new england", "boho"]
+    },
+    "Mexico": {
+      "parent": "Latin America",
+      "keywords": ["mexican", "oaxacan", "artesanal", "talavera", "otomi"]
+    },
+    "Morocco": {
+      "parent": "North Africa",
+      "keywords": ["moroccan", "berber", "kilim", "zellige", "riad"]
+    },
+    "Australia": {
+      "parent": "Oceania",
+      "keywords": ["australian", "coastal", "outback", "aboriginal"]
+    },
+    "Scandinavia": {
+      "parent": "Europe",
+      "keywords": ["scandinavian", "nordic", "danish", "swedish", "norwegian", "finnish", "hygge", "lagom"]
+    }
+  },
+
+  "hierarchies": {
+    "Global": ["APAC", "Europe", "Americas", "MENA", "Africa"],
+    "APAC": ["South Asia", "East Asia", "Southeast Asia", "Oceania"],
+    "Europe": ["Western Europe", "Eastern Europe", "Scandinavia"],
+    "Americas": ["North America", "Latin America"],
+    "MENA": ["Middle East", "North Africa"],
+    "South Asia": ["India", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal"],
+    "East Asia": ["Japan", "South Korea", "China", "Taiwan", "Hong Kong"],
+    "Southeast Asia": ["Indonesia", "Thailand", "Vietnam", "Malaysia", "Singapore", "Philippines", "Myanmar", "Cambodia"],
+    "Western Europe": ["UK", "France", "Italy", "Spain", "Germany", "Netherlands", "Belgium", "Portugal"],
+    "Scandinavia": ["Denmark", "Sweden", "Norway", "Finland", "Iceland"]
+  }
+}

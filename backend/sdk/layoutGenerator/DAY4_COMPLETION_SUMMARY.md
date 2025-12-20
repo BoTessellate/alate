@@ -412,6 +412,6 @@ The layout generator is ready to power Mood Layer's intelligent moodboard creati
 ---
 
 *Generated: 2025-12-13*
-*Project: Mood Layer (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 4: Layout Generator SDK*
 *Status: ✅ Complete*

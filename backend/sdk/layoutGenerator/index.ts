@@ -12,8 +12,15 @@ export { generateLayoutHandler, setupLayoutRoutes } from './routes/api/generateL
 export { createLayoutGenerator, LayoutGenerator } from './generateLayout';
 export {
   LAYOUT_ARCHETYPES,
+  ARCHETYPE_DISPLAY_NAMES,
   getArchetype,
   getAllArchetypes,
   findArchetypesForProductCount,
-  getRecommendedArchetype
+  getRecommendedArchetype,
+  getArchetypeDisplayName,
+  getArchetypeByDisplayName,
+  getArchetypeNamesInOrder,
+  getNextArchetype,
+  getPreviousArchetype,
+  getRandomArchetype
 } from './layoutArchetypes';

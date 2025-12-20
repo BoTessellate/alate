@@ -12,9 +12,22 @@ import {
   Size,
   BoundingBox,
   LayoutConfig,
-  LayoutArchetypeName
+  LayoutArchetypeName,
+  FitTag
 } from './types';
 import { getArchetype } from './layoutArchetypes';
+
+/**
+ * Fit tag priority for layout placement
+ * Lower number = placed earlier/more prominently
+ */
+const FIT_TAG_PRIORITY: Record<FitTag, number> = {
+  bulky: 1,       // Large items placed first (hero position)
+  oversized: 2,   // Also large, secondary
+  flat: 3,        // Medium priority
+  delicate: 4,    // Careful placement, often smaller
+  lightweight: 5, // Can be placed anywhere, flexible
+};
 
 /**
  * Default layout configuration
@@ -58,10 +71,13 @@ export class LayoutGenerator {
       );
     }
 
+    // Sort products by fit tags for optimal placement
+    const sortedProducts = this.sortByFitTags(input.products);
+
     // Generate layout elements based on archetype
     const elements = await this.generateArchetypeLayout(
       input.layout_type,
-      input.products,
+      sortedProducts,
       canvasSize,
       input.show_labels !== false,
       input.show_prices === true
@@ -77,6 +93,87 @@ export class LayoutGenerator {
         archetype_description: archetype.description
       }
     };
+  }
+
+  /**
+   * Sort products by fit tags for optimal layout placement
+   * Bulky/oversized items are placed first (hero positions)
+   * Delicate/lightweight items are placed in supporting positions
+   */
+  private sortByFitTags(products: ProductInput[]): ProductInput[] {
+    return [...products].sort((a, b) => {
+      const priorityA = this.getFitTagPriority(a.fit_tags);
+      const priorityB = this.getFitTagPriority(b.fit_tags);
+      return priorityA - priorityB;
+    });
+  }
+
+  /**
+   * Get priority score for a product based on its fit tags
+   * Lower score = higher priority (placed first)
+   */
+  private getFitTagPriority(fitTags?: FitTag[]): number {
+    if (!fitTags || fitTags.length === 0) {
+      return 10; // Default: no tags = lowest priority
+    }
+
+    // Return lowest priority among all tags
+    return Math.min(...fitTags.map(tag => FIT_TAG_PRIORITY[tag] || 10));
+  }
+
+  /**
+   * Calculate image size based on product dimensions and fit tags
+   * Bulky items get larger display, delicate items get smaller
+   */
+  private calculateDimensionAwareSize(
+    product: ProductInput,
+    baseSize: number,
+    minSize: number = 200,
+    maxSize: number = 500
+  ): number {
+    let sizeMultiplier = 1.0;
+
+    // Adjust based on fit tags
+    if (product.fit_tags) {
+      if (product.fit_tags.includes('bulky') || product.fit_tags.includes('oversized')) {
+        sizeMultiplier = 1.3; // 30% larger
+      } else if (product.fit_tags.includes('delicate')) {
+        sizeMultiplier = 0.8; // 20% smaller
+      } else if (product.fit_tags.includes('lightweight')) {
+        sizeMultiplier = 0.9; // 10% smaller
+      }
+    }
+
+    // Adjust based on physical dimensions if available
+    if (product.dimensions) {
+      const { width, height, depth } = product.dimensions;
+      const volume = (width || 0) * (height || 0) * (depth || 1);
+
+      // Scale based on relative volume (assuming typical products are ~1000-5000 cm³)
+      if (volume > 10000) {
+        sizeMultiplier *= 1.2; // Large items
+      } else if (volume < 500) {
+        sizeMultiplier *= 0.85; // Small items
+      }
+    }
+
+    // Calculate final size with bounds
+    const calculatedSize = baseSize * sizeMultiplier;
+    return Math.max(minSize, Math.min(maxSize, calculatedSize));
+  }
+
+  /**
+   * Check if product has "delicate" fit tag (requires careful placement)
+   */
+  private isDelicateProduct(product: ProductInput): boolean {
+    return product.fit_tags?.includes('delicate') ?? false;
+  }
+
+  /**
+   * Check if product is bulky (should be prominent)
+   */
+  private isBulkyProduct(product: ProductInput): boolean {
+    return product.fit_tags?.includes('bulky') || product.fit_tags?.includes('oversized') || false;
   }
 
   /**

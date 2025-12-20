@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import { applyMiddleware, validateUrl } from '../sdk/shared/middleware';
+import { createModuleLogger } from '../sdk/shared/logger';
+
+const log = createModuleLogger('scraper');
 
 interface ScrapedData {
   title?: string;
@@ -100,8 +104,7 @@ class ProductExtractor {
     const ogCurrency = this.extractMeta('property', 'og:price:currency') ||
                       this.extractMeta('property', 'product:price:currency');
 
-    console.log('[META] Raw ogPrice:', ogPrice);
-    console.log('[META] Raw ogCurrency:', ogCurrency);
+    log.debug({ ogPrice, ogCurrency }, 'Meta tag price data');
 
     // Clean price - remove commas
     if (ogPrice) {
@@ -188,7 +191,7 @@ class ProductExtractor {
               result.currency = currencyMap[currencyMatch[1]] || '';
             }
 
-            console.log('[HTML] Found price in HTML patterns:', result.price, result.currency);
+            log.debug({ price: result.price, currency: result.currency }, 'Found price in HTML patterns');
 
             // If we found a valid price, break
             if (result.price) break;
@@ -246,23 +249,23 @@ class ProductExtractor {
   public extract(): ScrapedData {
     // Layer 1: JSON-LD (highest priority)
     const jsonLD = this.extractFromJSONLD();
-    console.log('[LAYER 1 - JSON-LD]', jsonLD);
+    log.debug({ layer: 'JSON-LD', data: jsonLD }, 'Extraction layer 1 complete');
 
     // Layer 2: Meta tags
     const metaTags = this.extractFromMetaTags();
-    console.log('[LAYER 2 - Meta Tags]', metaTags);
+    log.debug({ layer: 'Meta Tags', data: metaTags }, 'Extraction layer 2 complete');
 
     // Layer 2.5: JavaScript data
     const jsData = this.extractFromJavaScript();
-    console.log('[LAYER 2.5 - JavaScript]', jsData);
+    log.debug({ layer: 'JavaScript', data: jsData }, 'Extraction layer 2.5 complete');
 
     // Layer 3: HTML patterns
     const htmlPatterns = this.extractFromHTMLPatterns();
-    console.log('[LAYER 3 - HTML Patterns]', htmlPatterns);
+    log.debug({ layer: 'HTML Patterns', data: htmlPatterns }, 'Extraction layer 3 complete');
 
     // Layer 4: URL fallbacks
     const urlData = this.extractFromURL();
-    console.log('[LAYER 4 - URL]', urlData);
+    log.debug({ layer: 'URL', data: urlData }, 'Extraction layer 4 complete');
 
     // Merge data with priority: JSON-LD > JavaScript > Meta Tags > HTML Patterns > URL
     const merged: ScrapedData = {
@@ -273,7 +276,7 @@ class ProductExtractor {
       imageUrl: jsonLD.imageUrl || metaTags.imageUrl || '',
     };
 
-    console.log('[FINAL MERGED]', merged);
+    log.info({ merged }, 'Final merged extraction result');
 
     return merged;
   }
@@ -283,7 +286,7 @@ class ProductExtractor {
 async function fetchWithPuppeteer(url: string): Promise<string> {
   let browser;
   try {
-    console.log('[PUPPETEER] Launching browser...');
+    log.info({ url }, 'Launching Puppeteer browser');
 
     browser = await puppeteer.launch({
       args: chromium.args,
@@ -298,7 +301,7 @@ async function fetchWithPuppeteer(url: string): Promise<string> {
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-    console.log('[PUPPETEER] Navigating to:', url);
+    log.debug({ url }, 'Navigating to URL');
     await page.goto(url, {
       waitUntil: 'networkidle2',
       timeout: 30000
@@ -308,11 +311,11 @@ async function fetchWithPuppeteer(url: string): Promise<string> {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const html = await page.content();
-    console.log('[PUPPETEER] Successfully fetched HTML, length:', html.length);
+    log.info({ url, htmlLength: html.length }, 'Successfully fetched HTML with Puppeteer');
 
     return html;
   } catch (error) {
-    console.error('[PUPPETEER] Error:', error);
+    log.error({ url, error }, 'Puppeteer fetch failed');
     throw error;
   } finally {
     if (browser) {
@@ -325,17 +328,9 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // CORS headers
-  const origin = req.headers.origin || 'https://app-aag5b4bz6fu.canva-apps.com';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Authorization, Origin');
-  res.setHeader('Access-Control-Max-Age', '86400');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  // Apply CORS, rate limiting, and security headers
+  const handled = applyMiddleware(req, res);
+  if (handled) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -345,6 +340,12 @@ export default async function handler(
 
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'URL is required' });
+  }
+
+  // SSRF protection: validate URL before scraping
+  const urlValidation = validateUrl(url);
+  if (!urlValidation.valid) {
+    return res.status(400).json({ error: urlValidation.error });
   }
 
   let html: string;
@@ -368,9 +369,11 @@ export default async function handler(
       redirect: 'follow'
     });
 
-    console.log('[FETCH] Status:', response.status);
-    console.log('[FETCH] Final URL:', response.url);
-    console.log('[FETCH] Content-Type:', response.headers.get('content-type'));
+    log.debug({
+      status: response.status,
+      finalUrl: response.url,
+      contentType: response.headers.get('content-type')
+    }, 'Fetch response received');
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -389,7 +392,7 @@ export default async function handler(
     const wasRedirected = urlObj.hostname === responseUrlObj.hostname && requestedPath !== responsePath && responsePath === '';
 
     if (wasRedirected) {
-      console.log('[REDIRECT DETECTED] Retrying with Puppeteer...');
+      log.info({ url }, 'Redirect detected, retrying with Puppeteer');
       html = await fetchWithPuppeteer(url);
       usedPuppeteer = true;
     }
@@ -398,13 +401,12 @@ export default async function handler(
     const extractor = new ProductExtractor(html, url);
     const scrapedData = extractor.extract();
 
-    console.log('Scraped data for', url, ':', JSON.stringify(scrapedData, null, 2));
+    log.info({ url, scrapedData }, 'Scraping completed');
 
     // Debug: check if price tags exist in HTML
     const hasPriceAmount = html.includes('og:price:amount');
     const hasPriceCurrency = html.includes('og:price:currency');
-    console.log('[DEBUG] HTML contains og:price:amount:', hasPriceAmount);
-    console.log('[DEBUG] HTML contains og:price:currency:', hasPriceCurrency);
+    log.debug({ hasPriceAmount, hasPriceCurrency }, 'HTML price tag presence');
 
     return res.status(200).json({
       ...scrapedData,
@@ -419,7 +421,7 @@ export default async function handler(
       }
     });
   } catch (error) {
-    console.error('Error scraping URL:', error);
+    log.error({ url, error }, 'Error scraping URL');
     return res.status(500).json({
       error: 'Failed to scrape URL',
       message: error instanceof Error ? error.message : 'Unknown error'

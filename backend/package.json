@@ -4,11 +4,14 @@
   "description": "Backend API for moodboard URL scraping",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@notionhq/client": "^5.4.0",
+    "@pinecone-database/pinecone": "^6.1.3",
     "@sparticuz/chromium": "^141.0.0",
     "@supabase/supabase-js": "^2.87.1",
     "@vercel/node": "^3.0.0",
@@ -17,11 +20,21 @@
     "canvas": "^3.2.0",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
+    "express": "^4.21.0",
     "multer": "^2.0.2",
-    "puppeteer-core": "^24.30.0"
+    "openai": "^4.104.0",
+    "pino": "^9.14.0",
+    "pino-pretty": "^13.1.3",
+    "puppeteer-core": "^24.30.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.0.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.4.5"
+    "pg": "^8.16.3",
+    "typescript": "^5.4.5",
+    "vitest": "^2.0.0"
   }
 }

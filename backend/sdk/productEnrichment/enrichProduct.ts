@@ -17,6 +17,11 @@ import {
   sanitizeProductName,
   normalizeCategory
 } from './validateProduct';
+import {
+  normalizeTags,
+  validateCategory as validateTaxonomyCategory,
+  NormalizationResult
+} from '../taxonomy';
 
 export class ProductEnrichmentEngine {
   private anthropic: Anthropic;
@@ -64,14 +69,45 @@ export class ProductEnrichmentEngine {
       throw new Error(`Invalid enrichment output: ${enrichmentValidation.errors.join(', ')}`);
     }
 
-    // Step 5: Merge and return enriched product
+    // Step 5: Normalize tags using taxonomy
+    const tagNormalization = this.normalizeProductTags(
+      enrichedFields.tags || [],
+      sanitized.category
+    );
+
+    // Step 6: Merge and return enriched product
     const enrichedProduct: EnrichedProduct = {
       ...sanitized,
       ...enrichedFields,
+      tags: tagNormalization.canonical_tags,
+      canonical_tags: tagNormalization.canonical_tags,
       enriched_at: new Date().toISOString()
     };
 
     return enrichedProduct;
+  }
+
+  /**
+   * Normalizes product tags against the taxonomy
+   * @param tags - Raw tags from enrichment
+   * @param category - Product category for scoped normalization
+   * @returns Normalization result with canonical tags
+   */
+  private normalizeProductTags(tags: string[], category?: string): NormalizationResult {
+    // Validate category against taxonomy
+    const validCategory = category ? validateTaxonomyCategory(category) : undefined;
+
+    // Normalize tags using taxonomy
+    const result = normalizeTags(tags, validCategory || undefined);
+
+    // Log unmatched tags for monitoring (could be sent to analytics)
+    if (result.unmatched_tags.length > 0) {
+      console.warn(
+        `Unmatched tags during enrichment: ${result.unmatched_tags.join(', ')}`
+      );
+    }
+
+    return result;
   }
 
   /**

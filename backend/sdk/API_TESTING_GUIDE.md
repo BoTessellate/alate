@@ -16,7 +16,7 @@
 ### Option 1: Using the Test Script (File Structure Only)
 
 ```bash
-cd C:\Users\mailt\Documents\stel\backend\sdk
+cd C:\Users\mailt\Documents\TML\backend\sdk
 node testDays8-12Simple.js
 ```
 
@@ -34,7 +34,7 @@ Since these are TypeScript files, you need to either:
 **A. Use ts-node to run TypeScript directly:**
 
 ```bash
-cd C:\Users\mailt\Documents\stel\backend
+cd C:\Users\mailt\Documents\TML\backend
 npm install -D ts-node typescript @types/node
 npx ts-node sdk/moodboardComposer/composeBoard.ts
 ```
@@ -50,7 +50,7 @@ Create a test server file that imports and uses the SDKs.
 You can test specific utility functions that don't require database:
 
 ```bash
-cd C:\Users\mailt\Documents\stel\backend\sdk
+cd C:\Users\mailt\Documents\TML\backend\sdk
 node
 
 # Then in Node REPL:

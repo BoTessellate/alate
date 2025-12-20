@@ -463,6 +463,6 @@ The bridge SDK transforms Mood Layer into a **platform-agnostic backend brain** 
 ---
 
 *Generated: 2025-12-13*
-*Project: Mood Layer (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 6: Plugin Bridge SDK*
 *Status: ✅ Complete*

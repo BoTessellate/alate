@@ -231,9 +231,9 @@ Dependencies are already installed from Day 1:
 
 Ensure your `.env` file has:
 ```env
-SUPABASE_URL=https://ancuwmmivgdvommzigwv.supabase.co
-SUPABASE_KEY=eyJhbG...  # Service role key
-ANTHROPIC_API_KEY=sk-ant-api03-...  # For prompt search
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your_service_role_key
+ANTHROPIC_API_KEY=your_anthropic_key  # For prompt search
 ```
 
 ### 3. Test Tag Search (No API Key Needed)
@@ -443,6 +443,6 @@ The search engine will power Mood Layer's product discovery and enable users to 
 ---
 
 *Generated: 2025-12-13*
-*Project: Mood Layer (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 3: Search Engine SDK*
 *Status: ✅ Complete*

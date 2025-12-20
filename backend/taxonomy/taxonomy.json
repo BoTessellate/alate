@@ -1,0 +1,168 @@
+{
+  "home": {
+    "description": "Home goods, decor, and living essentials",
+    "subcategories": ["decor", "storage", "bedding", "lighting", "furniture", "kitchen", "bathroom", "outdoor"],
+    "tags": [
+      "natural", "bohemian", "minimalist", "sustainable", "vintage", "modern",
+      "rustic", "scandinavian", "industrial", "coastal", "farmhouse", "mid-century",
+      "eclectic", "traditional", "contemporary", "artisan", "handmade", "organic",
+      "eco-friendly", "upcycled", "recycled", "cozy", "luxurious", "functional"
+    ],
+    "aliases": {
+      "boho": "bohemian",
+      "scandi": "scandinavian",
+      "midcentury": "mid-century",
+      "mid century": "mid-century",
+      "hand made": "handmade",
+      "hand-made": "handmade",
+      "eco friendly": "eco-friendly",
+      "environmentally friendly": "eco-friendly"
+    }
+  },
+  "fashion": {
+    "description": "Clothing, accessories, and wearable items",
+    "subcategories": ["womenswear", "menswear", "kidswear", "accessories", "footwear", "jewelry", "bags"],
+    "tags": [
+      "organic", "formal", "festival", "everyday", "homegrown", "casual",
+      "streetwear", "athleisure", "vintage", "retro", "preppy", "bohemian",
+      "minimalist", "maximalist", "sustainable", "ethical", "luxury", "budget",
+      "workwear", "loungewear", "activewear", "evening", "bridal", "maternity",
+      "plus-size", "petite", "tall", "unisex", "gender-neutral"
+    ],
+    "aliases": {
+      "boho": "bohemian",
+      "smart casual": "casual",
+      "work wear": "workwear",
+      "lounge wear": "loungewear",
+      "active wear": "activewear",
+      "plus size": "plus-size",
+      "gender neutral": "gender-neutral"
+    }
+  },
+  "beauty": {
+    "description": "Skincare, makeup, and personal care",
+    "subcategories": ["skincare", "makeup", "haircare", "fragrance", "bodycare", "nailcare", "tools"],
+    "tags": [
+      "natural", "organic", "vegan", "cruelty-free", "clean", "clinical",
+      "luxury", "drugstore", "korean", "japanese", "french", "indie",
+      "sensitive", "anti-aging", "hydrating", "mattifying", "brightening",
+      "sustainable", "refillable", "plastic-free", "fragrance-free", "hypoallergenic"
+    ],
+    "aliases": {
+      "k-beauty": "korean",
+      "j-beauty": "japanese",
+      "anti aging": "anti-aging",
+      "cruelty free": "cruelty-free",
+      "fragrance free": "fragrance-free",
+      "plastic free": "plastic-free"
+    }
+  },
+  "art": {
+    "description": "Artwork, prints, and creative pieces",
+    "subcategories": ["prints", "paintings", "photography", "sculptures", "digital", "mixed-media", "textiles"],
+    "tags": [
+      "abstract", "figurative", "landscape", "portrait", "botanical", "geometric",
+      "minimalist", "maximalist", "contemporary", "modern", "vintage", "retro",
+      "black-and-white", "colorful", "monochrome", "limited-edition", "original",
+      "framed", "unframed", "canvas", "paper", "metal", "wood"
+    ],
+    "aliases": {
+      "b&w": "black-and-white",
+      "black and white": "black-and-white",
+      "b/w": "black-and-white",
+      "limited edition": "limited-edition",
+      "mixed media": "mixed-media"
+    }
+  },
+  "food": {
+    "description": "Food products, beverages, and culinary items",
+    "subcategories": ["snacks", "beverages", "pantry", "fresh", "frozen", "specialty", "gifts"],
+    "tags": [
+      "organic", "vegan", "vegetarian", "gluten-free", "dairy-free", "nut-free",
+      "sugar-free", "low-carb", "keto", "paleo", "whole30", "artisan",
+      "small-batch", "local", "imported", "fair-trade", "single-origin",
+      "gourmet", "everyday", "healthy", "indulgent", "sustainable"
+    ],
+    "aliases": {
+      "gluten free": "gluten-free",
+      "dairy free": "dairy-free",
+      "nut free": "nut-free",
+      "sugar free": "sugar-free",
+      "low carb": "low-carb",
+      "fair trade": "fair-trade",
+      "single origin": "single-origin",
+      "small batch": "small-batch"
+    }
+  },
+  "kids": {
+    "description": "Products for children and babies",
+    "subcategories": ["toys", "clothing", "nursery", "feeding", "gear", "books", "games"],
+    "tags": [
+      "educational", "wooden", "plastic-free", "organic", "sustainable", "montessori",
+      "waldorf", "sensory", "developmental", "creative", "outdoor", "indoor",
+      "newborn", "infant", "toddler", "preschool", "school-age", "tween",
+      "gender-neutral", "handmade", "personalized", "safety-certified"
+    ],
+    "aliases": {
+      "eco": "sustainable",
+      "gender neutral": "gender-neutral",
+      "plastic free": "plastic-free",
+      "hand made": "handmade",
+      "safety certified": "safety-certified"
+    }
+  },
+  "tech": {
+    "description": "Electronics, gadgets, and digital products",
+    "subcategories": ["audio", "wearables", "accessories", "smart-home", "gaming", "photography", "computing"],
+    "tags": [
+      "wireless", "bluetooth", "smart", "minimalist", "premium", "budget",
+      "portable", "desktop", "professional", "consumer", "gaming", "creative",
+      "productivity", "sustainable", "refurbished", "modular", "compact", "powerful"
+    ],
+    "aliases": {
+      "smart home": "smart-home",
+      "pro": "professional"
+    }
+  },
+  "wellness": {
+    "description": "Health, fitness, and self-care products",
+    "subcategories": ["fitness", "yoga", "meditation", "supplements", "aromatherapy", "massage", "sleep"],
+    "tags": [
+      "natural", "organic", "holistic", "therapeutic", "relaxing", "energizing",
+      "recovery", "performance", "beginner", "advanced", "portable", "home",
+      "studio", "outdoor", "sustainable", "vegan", "plant-based", "adaptogenic"
+    ],
+    "aliases": {
+      "plant based": "plant-based"
+    }
+  },
+  "pets": {
+    "description": "Products for pets and animals",
+    "subcategories": ["dogs", "cats", "birds", "fish", "small-animals", "accessories", "food"],
+    "tags": [
+      "natural", "organic", "grain-free", "limited-ingredient", "sustainable",
+      "durable", "interactive", "calming", "training", "grooming", "outdoor",
+      "indoor", "travel", "premium", "budget", "eco-friendly", "handmade"
+    ],
+    "aliases": {
+      "grain free": "grain-free",
+      "limited ingredient": "limited-ingredient",
+      "eco friendly": "eco-friendly",
+      "small animals": "small-animals"
+    }
+  },
+  "stationery": {
+    "description": "Paper goods, writing supplies, and office items",
+    "subcategories": ["notebooks", "pens", "planners", "cards", "art-supplies", "office", "giftwrap"],
+    "tags": [
+      "minimalist", "colorful", "sustainable", "recycled", "handmade", "letterpress",
+      "foil", "illustrated", "typography", "vintage", "modern", "professional",
+      "creative", "functional", "decorative", "personalized", "eco-friendly"
+    ],
+    "aliases": {
+      "eco friendly": "eco-friendly",
+      "art supplies": "art-supplies",
+      "gift wrap": "giftwrap"
+    }
+  }
+}

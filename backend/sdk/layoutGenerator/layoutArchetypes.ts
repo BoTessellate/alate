@@ -175,3 +175,143 @@ export function getRecommendedArchetype(count: number): LayoutArchetype {
     return currentDiff < bestDiff ? current : best;
   });
 }
+
+/**
+ * Human-friendly display names for archetypes
+ * Maps internal names to UI-friendly labels
+ */
+export const ARCHETYPE_DISPLAY_NAMES: Record<LayoutArchetypeName, string> = {
+  ZigZagStaggered: 'ZigZag Flow',
+  LayeredCenterpiece: 'Hero Grid',
+  MinimalSplit: 'Minimal Split',
+  GridWithOverlap: 'Grid Overlap',
+  DiagonalCascade: 'Diagonal Overlap',
+  SymmetricBalance: 'Balanced Grid',
+  AsymmetricFlow: 'Layered Spread',
+  CollageStyle: 'Floating Canvas'
+};
+
+/**
+ * Get display name for archetype
+ */
+export function getArchetypeDisplayName(name: LayoutArchetypeName): string {
+  return ARCHETYPE_DISPLAY_NAMES[name] || name;
+}
+
+/**
+ * Get archetype by display name
+ */
+export function getArchetypeByDisplayName(displayName: string): LayoutArchetype | undefined {
+  const entry = Object.entries(ARCHETYPE_DISPLAY_NAMES).find(
+    ([_, display]) => display === displayName
+  );
+  if (entry) {
+    return LAYOUT_ARCHETYPES[entry[0] as LayoutArchetypeName];
+  }
+  return undefined;
+}
+
+/**
+ * Get all archetype names in order for remixing
+ */
+export function getArchetypeNamesInOrder(): LayoutArchetypeName[] {
+  return Object.keys(LAYOUT_ARCHETYPES) as LayoutArchetypeName[];
+}
+
+/**
+ * Get next archetype in cycle (for remix)
+ * @param current - Current archetype name
+ * @param productCount - Number of products (to filter compatible archetypes)
+ * @returns Next archetype in cycle
+ */
+export function getNextArchetype(
+  current: LayoutArchetypeName,
+  productCount?: number
+): LayoutArchetype {
+  const allNames = getArchetypeNamesInOrder();
+
+  // Filter to compatible archetypes if product count provided
+  let compatibleNames = allNames;
+  if (productCount !== undefined) {
+    compatibleNames = allNames.filter(name => {
+      const arch = LAYOUT_ARCHETYPES[name];
+      return productCount >= arch.minItems && productCount <= arch.maxItems;
+    });
+
+    // Fallback to all if none compatible
+    if (compatibleNames.length === 0) {
+      compatibleNames = allNames;
+    }
+  }
+
+  const currentIndex = compatibleNames.indexOf(current);
+  const nextIndex = (currentIndex + 1) % compatibleNames.length;
+
+  return LAYOUT_ARCHETYPES[compatibleNames[nextIndex]];
+}
+
+/**
+ * Get previous archetype in cycle (for remix backward)
+ * @param current - Current archetype name
+ * @param productCount - Number of products (to filter compatible archetypes)
+ * @returns Previous archetype in cycle
+ */
+export function getPreviousArchetype(
+  current: LayoutArchetypeName,
+  productCount?: number
+): LayoutArchetype {
+  const allNames = getArchetypeNamesInOrder();
+
+  let compatibleNames = allNames;
+  if (productCount !== undefined) {
+    compatibleNames = allNames.filter(name => {
+      const arch = LAYOUT_ARCHETYPES[name];
+      return productCount >= arch.minItems && productCount <= arch.maxItems;
+    });
+
+    if (compatibleNames.length === 0) {
+      compatibleNames = allNames;
+    }
+  }
+
+  const currentIndex = compatibleNames.indexOf(current);
+  const prevIndex = currentIndex <= 0 ? compatibleNames.length - 1 : currentIndex - 1;
+
+  return LAYOUT_ARCHETYPES[compatibleNames[prevIndex]];
+}
+
+/**
+ * Get random archetype (for shuffle remix)
+ * @param exclude - Archetype to exclude (current one)
+ * @param productCount - Number of products (to filter compatible archetypes)
+ * @returns Random different archetype
+ */
+export function getRandomArchetype(
+  exclude?: LayoutArchetypeName,
+  productCount?: number
+): LayoutArchetype {
+  let candidates = getAllArchetypes();
+
+  // Filter by product count
+  if (productCount !== undefined) {
+    const filtered = candidates.filter(
+      arch => productCount >= arch.minItems && productCount <= arch.maxItems
+    );
+    if (filtered.length > 0) {
+      candidates = filtered;
+    }
+  }
+
+  // Exclude current
+  if (exclude) {
+    candidates = candidates.filter(arch => arch.name !== exclude);
+  }
+
+  // If no candidates left, return CollageStyle as fallback
+  if (candidates.length === 0) {
+    return LAYOUT_ARCHETYPES.CollageStyle;
+  }
+
+  const randomIndex = Math.floor(Math.random() * candidates.length);
+  return candidates[randomIndex];
+}

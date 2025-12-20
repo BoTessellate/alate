@@ -603,6 +603,6 @@ Products → Enrichment → Search → Layout → Export → Share!
 ---
 
 *Generated: 2025-12-13*
-*Project: Mood Layer (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 5: Export Engine SDK*
 *Status: ✅ Complete*

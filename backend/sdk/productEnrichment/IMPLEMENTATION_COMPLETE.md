@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Product Enrichment SDK for the Lifestyle Curator Moodboard (SteL) app has been **fully implemented and tested**. All database operations are working perfectly, and the system is ready for AI enrichment once the Anthropic API key is configured.
+The Product Enrichment SDK for the TML (The Mood Layer) app has been **fully implemented and tested**. All database operations are working perfectly, and the system is ready for AI enrichment once the Anthropic API key is configured.
 
 ---
 
@@ -39,8 +39,8 @@ All TypeScript modules have been implemented with full type safety:
 ### 2. Database Setup ✅
 
 #### Supabase Configuration
-- **URL**: https://ancuwmmivgdvommzigwv.supabase.co
-- **Service Role Key**: Configured and working
+- **URL**: Set in `.env` as `SUPABASE_URL`
+- **Service Role Key**: Set in `.env` as `SUPABASE_KEY`
 - **Table**: `enriched_products`
 
 #### Table Schema
@@ -319,5 +319,5 @@ Once the API key is added, run `npx ts-node testEnrichment.ts` to verify end-to-
 ---
 
 *Generated: 2025-12-12*
-*Project: Lifestyle Curator Moodboard (SteL)*
+*Project: TML (The Mood Layer)*
 *Day 1 Backend Implementation: Product Enrichment SDK*
