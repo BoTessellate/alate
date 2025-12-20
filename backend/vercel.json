@@ -1,6 +1,19 @@
 {
   "version": 2,
-  "buildCommand": "echo 'Skipping build'",
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "builds": [
+    {
+      "src": "api/**/*.ts",
+      "use": "@vercel/node@3.2.0"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
