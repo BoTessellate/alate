@@ -2,6 +2,7 @@
  * Search API - Vercel Serverless Function
  * Hybrid search: Fast keyword matching + optional AI enhancement
  * Prioritizes exact matches for speed and relevance
+ * v2.0 - Force redeploy
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
