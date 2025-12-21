@@ -3,7 +3,7 @@
  * OAuth flow, token encryption, HMAC verification
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import type { ShopifyConfig, OAuthTokenResponse, ShopifySession } from './types';
 
 // ============================================================================

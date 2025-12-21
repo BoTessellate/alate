@@ -12,6 +12,9 @@ import type {
   ProductDimensions,
 } from './types';
 
+// Re-export for convenience
+export type { TransformedProduct } from './types';
+
 // ============================================================================
 // Weight Conversion
 // ============================================================================
