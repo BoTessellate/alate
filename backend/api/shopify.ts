@@ -264,14 +264,16 @@ async function handleTestSession(req: VercelRequest, res: VercelResponse) {
     results.steps.push({ step: 'generate_uuid', status: 'ok', id: sessionId });
 
     // Step 3: Try to insert a test session
+    const testShopDomain = `test-${Date.now()}.myshopify.com`;
     const { data: insertData, error: insertError } = await supabase
       .from('shopify_sessions')
-      .insert({
-        id: sessionId,
-        shop_domain: `test-${Date.now()}.myshopify.com`,
+      .upsert({
+        shop_domain: testShopDomain,
         access_token: 'test-token-encrypted',
         scope: 'read_products',
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'shop_domain',
       })
       .select();
 
@@ -285,7 +287,7 @@ async function handleTestSession(req: VercelRequest, res: VercelResponse) {
       const { error: deleteError } = await supabase
         .from('shopify_sessions')
         .delete()
-        .eq('id', sessionId);
+        .eq('shop_domain', testShopDomain);
 
       if (deleteError) {
         results.steps.push({ step: 'delete_test_session', status: 'error', error: deleteError });

@@ -65,18 +65,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[CALLBACK] Saving session to database...');
 
-    // First, try to delete any existing session for this shop
-    await supabase.from('shopify_sessions').delete().eq('shop_domain', shopDomain);
-
-    // Then insert a new session with a generated UUID
-    const sessionId = crypto.randomUUID();
-    const { error: insertError, data: insertData } = await supabase.from('shopify_sessions').insert({
-      id: sessionId,
-      shop_domain: shopDomain,
-      access_token: encryptedToken,
-      scope: tokenResponse.scope,
-      updated_at: new Date().toISOString(),
-    }).select();
+    // Use upsert to handle both new and existing sessions
+    const { error: insertError, data: insertData } = await supabase
+      .from('shopify_sessions')
+      .upsert({
+        shop_domain: shopDomain,
+        access_token: encryptedToken,
+        scope: tokenResponse.scope,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'shop_domain',
+      })
+      .select();
 
     console.log('[CALLBACK] Insert result:', { error: insertError, data: insertData });
     const upsertError = insertError;
