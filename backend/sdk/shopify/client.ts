@@ -264,6 +264,9 @@ export class ShopifyGraphQLClient {
     query: string,
     variables?: Record<string, unknown>
   ): Promise<ShopifyApiResponse<T>> {
+    const startTime = Date.now();
+    console.log('[ShopifyClient] API call to', this.endpoint);
+
     const response = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -273,26 +276,34 @@ export class ShopifyGraphQLClient {
       body: JSON.stringify({ query, variables }),
     });
 
+    console.log('[ShopifyClient] API response status:', response.status, 'in', Date.now() - startTime, 'ms');
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[ShopifyClient] API error response:', errorText);
       throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    return response.json() as Promise<ShopifyApiResponse<T>>;
   }
 
   /**
    * Get total product count
    */
   async getProductCount(): Promise<number> {
+    console.log('[ShopifyClient] Getting product count...');
     const result = await this.execute<{ productsCount: { count: number } }>(
       PRODUCTS_COUNT_QUERY
     );
 
     if (result.errors) {
+      console.error('[ShopifyClient] Product count errors:', result.errors);
       throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
     }
 
-    return result.data?.productsCount.count ?? 0;
+    const count = result.data?.productsCount.count ?? 0;
+    console.log('[ShopifyClient] Product count:', count);
+    return count;
   }
 
   /**
@@ -331,12 +342,21 @@ export class ShopifyGraphQLClient {
   async getAllProducts(
     onProgress?: (fetched: number, total: number) => void
   ): Promise<ShopifyGraphQLProduct[]> {
+    console.log('[ShopifyClient] getAllProducts started');
     const total = await this.getProductCount();
+    console.log('[ShopifyClient] Total products to fetch:', total);
+
     const allProducts: ShopifyGraphQLProduct[] = [];
     let cursor: string | undefined;
+    let pageNum = 0;
 
     do {
+      pageNum++;
+      console.log('[ShopifyClient] Fetching page', pageNum, 'cursor:', cursor ? cursor.slice(0, 20) + '...' : 'none');
+
       const { products, hasNextPage, endCursor } = await this.getProducts(250, cursor);
+      console.log('[ShopifyClient] Page', pageNum, 'returned', products.length, 'products, hasNextPage:', hasNextPage);
+
       allProducts.push(...products);
 
       if (onProgress) {
@@ -345,12 +365,14 @@ export class ShopifyGraphQLClient {
 
       cursor = hasNextPage ? endCursor : undefined;
 
-      // Rate limiting: wait 500ms between requests
+      // Rate limiting: wait 100ms between requests (reduced for faster sync)
       if (cursor) {
-        await new Promise((r) => setTimeout(r, 500));
+        console.log('[ShopifyClient] Waiting 100ms before next page...');
+        await new Promise((r) => setTimeout(r, 100));
       }
     } while (cursor);
 
+    console.log('[ShopifyClient] getAllProducts complete, total fetched:', allProducts.length);
     return allProducts;
   }
 

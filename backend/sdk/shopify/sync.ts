@@ -146,21 +146,19 @@ async function enrichProductBatch(
 // ============================================================================
 
 /**
- * Upsert products to database
+ * Upsert products to database (batch operation for performance)
  */
 async function upsertProducts(
   supabase: SupabaseClient,
   products: TransformedProduct[],
   enrichments: Map<string, EnrichmentResult>
 ): Promise<{ success: number; failed: number }> {
-  let success = 0;
-  let failed = 0;
-
-  for (const product of products) {
+  // Prepare all products for batch upsert
+  const dbProducts = products.map((product) => {
     const enrichment = enrichments.get(product.external_id);
     const fitTags = generateFitTags(product);
 
-    const dbProduct = {
+    return {
       product_name: product.product_name,
       brand: product.brand,
       category: product.category,
@@ -183,23 +181,22 @@ async function upsertProducts(
       enriched_at: enrichment ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     };
+  });
 
-    const { error } = await supabase
-      .from('enriched_products')
-      .upsert(dbProduct, {
-        onConflict: 'shop_domain,external_id',
-        ignoreDuplicates: false,
-      });
+  // Batch upsert all products at once
+  const { error } = await supabase
+    .from('enriched_products')
+    .upsert(dbProducts, {
+      onConflict: 'shop_domain,external_id',
+      ignoreDuplicates: false,
+    });
 
-    if (error) {
-      console.error(`Failed to upsert product ${product.external_id}:`, error);
-      failed++;
-    } else {
-      success++;
-    }
+  if (error) {
+    console.error('Failed to upsert products batch:', error);
+    return { success: 0, failed: products.length };
   }
 
-  return { success, failed };
+  return { success: products.length, failed: 0 };
 }
 
 /**
@@ -238,15 +235,25 @@ export async function syncShopProducts(
   shopDomain: string,
   options: SyncOptions
 ): Promise<SyncResult> {
+  console.log('[syncShopProducts] Started for shop:', shopDomain);
+  console.log('[syncShopProducts] Options:', {
+    hasProductIds: !!options.productIds?.length,
+    skipEnrichment: options.skipEnrichment
+  });
+
   const startTime = Date.now();
   const syncId = `sync_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const errors: SyncError[] = [];
 
   const supabase = createClient(options.supabaseUrl, options.supabaseKey);
   const config = getShopifyConfig();
+  console.log('[syncShopProducts] Config loaded, API version:', config.apiVersion);
 
   // Get shop session
+  console.log('[syncShopProducts] Getting shop session...');
   const session = await getShopSession(supabase, shopDomain);
+  console.log('[syncShopProducts] Session result:', session ? 'found' : 'not found');
+
   if (!session) {
     return {
       success: false,
@@ -262,25 +269,31 @@ export async function syncShopProducts(
     };
   }
 
+  console.log('[syncShopProducts] Creating Shopify client...');
   const client = createClientFromSession(session, config.encryptionKey, config.apiVersion);
+  console.log('[syncShopProducts] Client created');
 
   // Fetch products
+  console.log('[syncShopProducts] Starting product fetch...');
   options.onProgress?.('fetch', 0, 100);
   let shopifyProducts;
   try {
     if (options.productIds?.length) {
-      // Fetch specific products
+      console.log('[syncShopProducts] Fetching specific products:', options.productIds);
       shopifyProducts = await Promise.all(
         options.productIds.map((id) => client.getProductById(id))
       );
       shopifyProducts = shopifyProducts.filter((p) => p !== null);
     } else {
-      // Fetch all products
+      console.log('[syncShopProducts] Fetching ALL products...');
       shopifyProducts = await client.getAllProducts((fetched, total) => {
+        console.log(`[syncShopProducts] Fetch progress: ${fetched}/${total}`);
         options.onProgress?.('fetch', fetched, total);
       });
     }
+    console.log('[syncShopProducts] Fetch complete, got', shopifyProducts.length, 'products');
   } catch (error) {
+    console.error('[syncShopProducts] Fetch ERROR:', error);
     return {
       success: false,
       sync_id: syncId,
@@ -302,26 +315,36 @@ export async function syncShopProducts(
   }
 
   // Transform products
+  console.log('[syncShopProducts] Transforming products...');
   options.onProgress?.('transform', 0, shopifyProducts.length);
   const transformed = transformShopifyProducts(shopifyProducts as any, {
     shopDomain,
     includeVariants: true,
     includeDimensions: true,
   });
+  console.log('[syncShopProducts] Transform complete, got', transformed.length, 'products');
   options.onProgress?.('transform', transformed.length, shopifyProducts.length);
 
   // Enrich products (unless skipped)
   let enrichments = new Map<string, EnrichmentResult>();
   if (!options.skipEnrichment) {
+    console.log('[syncShopProducts] Starting enrichment...');
     options.onProgress?.('enrich', 0, transformed.length);
     enrichments = await enrichProductBatch(transformed, 5);
+    console.log('[syncShopProducts] Enrichment complete, enriched', enrichments.size, 'products');
     options.onProgress?.('enrich', enrichments.size, transformed.length);
+  } else {
+    console.log('[syncShopProducts] Skipping enrichment');
   }
 
   // Save to database
+  console.log('[syncShopProducts] Saving to database...');
   options.onProgress?.('save', 0, transformed.length);
   const { success, failed } = await upsertProducts(supabase, transformed, enrichments);
+  console.log('[syncShopProducts] Save complete, success:', success, 'failed:', failed);
   options.onProgress?.('save', success, transformed.length);
+
+  console.log('[syncShopProducts] Sync complete in', Date.now() - startTime, 'ms');
 
   return {
     success: failed === 0,

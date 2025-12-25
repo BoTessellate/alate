@@ -75,7 +75,8 @@ export function generateStateNonce(): string {
  */
 export function buildAuthUrl(config: ShopifyConfig, shop: string, state: string): string {
   const { apiKey, scopes, appUrl } = config;
-  const redirectUri = `${appUrl}/api/shopify/callback`;
+  const cleanAppUrl = appUrl.trim();
+  const redirectUri = `${cleanAppUrl}/api/shopify-callback`;
 
   const params = new URLSearchParams({
     client_id: apiKey,
@@ -114,7 +115,7 @@ export async function exchangeCodeForToken(
     throw new Error(`Failed to exchange code for token: ${error}`);
   }
 
-  return response.json();
+  return response.json() as Promise<OAuthTokenResponse>;
 }
 
 // ============================================================================
@@ -219,7 +220,7 @@ export function getShopifyConfig(): ShopifyConfig {
   const apiKey = process.env.SHOPIFY_API_KEY;
   const apiSecret = process.env.SHOPIFY_SECRET;
   const apiVersion = process.env.SHOPIFY_API_VERSION || '2024-01';
-  const scopes = (process.env.SHOPIFY_SCOPES || 'read_products').split(',');
+  const scopes = (process.env.SHOPIFY_SCOPES || 'read_products,read_product_listings,read_inventory').split(',');
   const appUrl = process.env.APP_URL;
   const encryptionKey = process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY;
 
