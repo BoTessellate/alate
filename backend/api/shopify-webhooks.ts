@@ -82,34 +82,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`Inventory update for ${shopDomain}: item ${body.inventory_item_id} now has ${body.available} units`);
         break;
       case 'app/uninstalled':
-        console.log(`App uninstalled webhook for ${shopDomain}`);
-        const supabase = createClient(supabaseUrl, supabaseKey);
-
-        // Check if session was updated recently (within 60 seconds) - if so, don't delete
-        // This prevents race condition where reinstall creates session before old uninstall webhook arrives
-        const { data: existingSession } = await supabase
-          .from('shopify_sessions')
-          .select('updated_at')
-          .eq('shop_domain', shopDomain)
-          .single();
-
-        if (existingSession?.updated_at) {
-          const sessionAge = Date.now() - new Date(existingSession.updated_at).getTime();
-          if (sessionAge < 60000) { // Less than 60 seconds old
-            console.log(`Session for ${shopDomain} is only ${sessionAge}ms old, skipping delete (likely reinstall)`);
-            break;
-          }
-        }
-
-        const { error: deleteError } = await supabase
-          .from('shopify_sessions')
-          .delete()
-          .eq('shop_domain', shopDomain);
-        if (deleteError) {
-          console.error(`Failed to delete session for ${shopDomain}:`, deleteError);
-        } else {
-          console.log(`Session deleted for ${shopDomain}`);
-        }
+        // TEMPORARILY DISABLED: Session deletion was causing race conditions
+        // The uninstall webhook often arrives after reinstall, deleting the new session
+        // TODO: Re-enable with longer grace period or different approach once OAuth is stable
+        console.log(`App uninstalled webhook for ${shopDomain} - session deletion DISABLED for debugging`);
         break;
       default:
         console.log(`Unhandled webhook topic: ${topic}`);
