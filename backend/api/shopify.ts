@@ -48,6 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleWebhooks(req, res);
       case 'health':
         return handleHealth(req, res);
+      case 'test-session':
+        return handleTestSession(req, res);
       case 'app':
       default:
         return handleApp(req, res);
@@ -240,6 +242,73 @@ async function handleHealth(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(200).json(diagnostics);
+}
+
+// ============================================================================
+// Test Session Handler (for debugging)
+// ============================================================================
+async function handleTestSession(req: VercelRequest, res: VercelResponse) {
+  const shop = req.query.shop as string || 'test-store.myshopify.com';
+  const results: Record<string, any> = { shop, steps: [] };
+
+  try {
+    // Step 1: Create Supabase client
+    const supabaseUrl = process.env.SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    results.steps.push({ step: 'supabase_client', status: 'ok' });
+
+    // Step 2: Generate test session ID
+    const crypto = await import('crypto');
+    const sessionId = crypto.randomUUID();
+    results.steps.push({ step: 'generate_uuid', status: 'ok', id: sessionId });
+
+    // Step 3: Try to insert a test session
+    const { data: insertData, error: insertError } = await supabase
+      .from('shopify_sessions')
+      .insert({
+        id: sessionId,
+        shop_domain: `test-${Date.now()}.myshopify.com`,
+        access_token: 'test-token-encrypted',
+        scope: 'read_products',
+        updated_at: new Date().toISOString(),
+      })
+      .select();
+
+    if (insertError) {
+      results.steps.push({ step: 'insert_session', status: 'error', error: insertError });
+      results.success = false;
+    } else {
+      results.steps.push({ step: 'insert_session', status: 'ok', data: insertData });
+
+      // Step 4: Delete the test session
+      const { error: deleteError } = await supabase
+        .from('shopify_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (deleteError) {
+        results.steps.push({ step: 'delete_test_session', status: 'error', error: deleteError });
+      } else {
+        results.steps.push({ step: 'delete_test_session', status: 'ok' });
+      }
+
+      results.success = true;
+    }
+
+    // Step 5: Count existing sessions
+    const { count } = await supabase
+      .from('shopify_sessions')
+      .select('*', { count: 'exact', head: true });
+    results.existing_sessions = count;
+
+  } catch (e) {
+    results.success = false;
+    results.error = e instanceof Error ? e.message : 'Unknown error';
+    results.stack = e instanceof Error ? e.stack : '';
+  }
+
+  return res.status(200).json(results);
 }
 
 // ============================================================================
