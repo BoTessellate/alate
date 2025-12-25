@@ -518,6 +518,47 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
   const shop = req.query.shop as string || '';
   const host = req.query.host as string || '';
 
+  // If no shop provided, show error
+  if (!shop) {
+    return res.status(400).send(`
+      <html><body style="font-family: sans-serif; padding: 40px; text-align: center;">
+        <h1>Missing Shop Parameter</h1>
+        <p>This app must be accessed from your Shopify admin.</p>
+      </body></html>
+    `);
+  }
+
+  const shopDomain = sanitizeShopDomain(shop);
+  console.log('[APP] Loading app for shop:', shopDomain);
+
+  // Check if we have a valid session for this shop
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { data: session, error: sessionError } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain, scope, updated_at')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  console.log('[APP] Session lookup result:', { hasSession: !!session, error: sessionError?.message });
+
+  // If no session, redirect to OAuth
+  if (!session || sessionError) {
+    console.log('[APP] No session found, redirecting to OAuth...');
+    const config = getShopifyConfig();
+    const state = generateStateNonce();
+    const authUrl = buildAuthUrl(config, shopDomain, state);
+
+    // Store state for verification
+    res.setHeader('Set-Cookie', `shopify_state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+
+    return res.redirect(302, authUrl);
+  }
+
+  console.log('[APP] Session found, rendering dashboard');
+
   const html = `
 <!DOCTYPE html>
 <html lang="en">
