@@ -217,12 +217,12 @@ export function sanitizeShopDomain(shop: string): string {
  * Get Shopify config from environment variables
  */
 export function getShopifyConfig(): ShopifyConfig {
-  const apiKey = process.env.SHOPIFY_API_KEY;
-  const apiSecret = process.env.SHOPIFY_SECRET;
-  const apiVersion = process.env.SHOPIFY_API_VERSION || '2024-01';
-  const scopes = (process.env.SHOPIFY_SCOPES || 'read_products,read_product_listings,read_inventory').split(',');
-  const appUrl = process.env.APP_URL;
-  const encryptionKey = process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY;
+  const apiKey = process.env.SHOPIFY_API_KEY?.trim();
+  const apiSecret = process.env.SHOPIFY_SECRET?.trim();
+  const apiVersion = process.env.SHOPIFY_API_VERSION?.trim() || '2024-01';
+  const scopes = (process.env.SHOPIFY_SCOPES || 'read_products,read_product_listings,read_inventory').split(',').map(s => s.trim());
+  const appUrl = process.env.APP_URL?.trim();
+  const encryptionKey = process.env.SHOPIFY_TOKEN_ENCRYPTION_KEY?.trim();
 
   if (!apiKey || !apiSecret || !appUrl || !encryptionKey) {
     throw new Error(
