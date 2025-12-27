@@ -8,6 +8,26 @@
   },
   "headers": [
     {
+      "source": "/api/shopify",
+      "has": [
+        {
+          "type": "query",
+          "key": "action",
+          "value": "app"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    },
+    {
       "source": "/api/(.*)",
       "headers": [
         {

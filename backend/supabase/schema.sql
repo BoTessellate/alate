@@ -180,6 +180,73 @@ COMMENT ON COLUMN enriched_products.canonical_tags IS 'Taxonomy-normalized canon
 COMMENT ON COLUMN enriched_products.image_urls IS 'CDN URLs for product images: original, thumb (256px), preview (768px), large (1440px)';
 COMMENT ON COLUMN enriched_products.image_url IS 'Legacy single image URL. Use image_urls for CDN variants.';
 
+-- =============================================================================
+-- VISION AI ENRICHMENT COLUMNS
+-- =============================================================================
+-- These columns store vision model extracted data for hybrid search
+
+-- Vision-extracted colors (more accurate than text-based)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_colors JSONB DEFAULT '[]'::jsonb;
+
+-- Vision-extracted textures (e.g., smooth, rough, woven, knitted)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_textures TEXT[] DEFAULT '{}';
+
+-- Vision-extracted patterns (e.g., striped, floral, geometric, solid)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_patterns TEXT[] DEFAULT '{}';
+
+-- Vision-extracted materials (detected from image, e.g., leather, wood, metal)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_materials TEXT[] DEFAULT '{}';
+
+-- Vision-extracted style tags (e.g., modern, vintage, bohemian, minimalist)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_style_tags TEXT[] DEFAULT '{}';
+
+-- Vision model confidence score (0-1)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_confidence DECIMAL(3,2);
+
+-- Timestamp when vision analysis was performed
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_analyzed_at TIMESTAMPTZ;
+
+-- Vision embedding vector (for visual similarity search)
+-- Note: This will be indexed in Pinecone, stored here for reference
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS vision_embedding_id TEXT;
+
+-- Smart predicted tags (AI-predicted beyond user/sync tags)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS predicted_tags TEXT[] DEFAULT '{}';
+
+-- Related product IDs (cached for performance)
+ALTER TABLE enriched_products
+ADD COLUMN IF NOT EXISTS related_product_ids TEXT[] DEFAULT '{}';
+
+-- Indexes for vision columns
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_colors ON enriched_products USING GIN (vision_colors);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_textures ON enriched_products USING GIN (vision_textures);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_patterns ON enriched_products USING GIN (vision_patterns);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_materials ON enriched_products USING GIN (vision_materials);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_style_tags ON enriched_products USING GIN (vision_style_tags);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_predicted_tags ON enriched_products USING GIN (predicted_tags);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vision_analyzed ON enriched_products(vision_analyzed_at) WHERE vision_analyzed_at IS NOT NULL;
+
+-- Comments for vision columns
+COMMENT ON COLUMN enriched_products.vision_colors IS 'Vision AI extracted colors with hex codes and names: [{hex, name, percentage}]';
+COMMENT ON COLUMN enriched_products.vision_textures IS 'Vision AI detected textures: smooth, rough, woven, knitted, etc.';
+COMMENT ON COLUMN enriched_products.vision_patterns IS 'Vision AI detected patterns: striped, floral, geometric, solid, etc.';
+COMMENT ON COLUMN enriched_products.vision_materials IS 'Vision AI detected materials: leather, wood, metal, fabric, etc.';
+COMMENT ON COLUMN enriched_products.vision_style_tags IS 'Vision AI style classification: modern, vintage, bohemian, minimalist, etc.';
+COMMENT ON COLUMN enriched_products.vision_confidence IS 'Vision model confidence score (0.00-1.00)';
+COMMENT ON COLUMN enriched_products.vision_analyzed_at IS 'Timestamp of last vision analysis';
+COMMENT ON COLUMN enriched_products.vision_embedding_id IS 'Reference to Pinecone vector for visual similarity';
+COMMENT ON COLUMN enriched_products.predicted_tags IS 'AI-predicted tags beyond user-provided tags';
+COMMENT ON COLUMN enriched_products.related_product_ids IS 'Cached related product IDs for quick lookup';
+
 
 -- =============================================================================
 -- HELPER FUNCTIONS
