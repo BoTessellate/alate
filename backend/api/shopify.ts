@@ -6,7 +6,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   getShopifyConfig,
   buildAuthUrl,
@@ -15,12 +15,15 @@ import {
   verifyCallbackHmac,
   verifyWebhookHmac,
   encryptToken,
+  decryptToken,
   sanitizeShopDomain,
   isValidShopDomain,
   getShopSyncStatus,
   syncShopProducts,
+  updateLastSyncTime,
   handleProductWebhook,
   handleProductDeleteWebhook,
+  getISTTimestamp,
 } from '../sdk/shopify';
 
 // Increase function timeout (requires Pro plan for >10s, hobby plan maxes at 10s)
@@ -30,8 +33,46 @@ export const config = {
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://frontend-ramsaptamis-projects.vercel.app';
 const APP_NAME = 'The Mood Layer';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+// Cached Supabase client for performance (reused across invocations in warm functions)
+let _supabaseClient: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient {
+  if (!_supabaseClient) {
+    const supabaseUrl = process.env.SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_KEY!;
+    _supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return _supabaseClient;
+}
+
+/**
+ * Set security headers on response
+ */
+function setSecurityHeaders(res: VercelResponse): void {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Allow Shopify iframe embedding
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Set security headers on all responses
+  setSecurityHeaders(res);
+
+  // Handle CORS preflight for all actions
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.status(200).end();
+  }
+
   const action = req.query.action as string || 'app';
 
   try {
@@ -44,12 +85,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleStatus(req, res);
       case 'sync':
         return handleSync(req, res);
+      case 'sync-redirect':
+        return handleSyncRedirect(req, res);
+      case 'enrich':
+        return handleEnrich(req, res);
       case 'webhooks':
         return handleWebhooks(req, res);
       case 'health':
+        // Health check allowed in all environments
         return handleHealth(req, res);
       case 'test-session':
-        return handleTestSession(req, res);
+      case 'test-product':
+      case 'debug-sessions':
+        // Debug endpoints disabled in production for security
+        if (IS_PRODUCTION) {
+          return res.status(404).json({ error: 'Not found' });
+        }
+        if (action === 'test-session') return handleTestSession(req, res);
+        if (action === 'test-product') return handleTestProduct(req, res);
+        return handleDebugSessions(req, res);
       case 'app':
       default:
         return handleApp(req, res);
@@ -58,7 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error(`Shopify ${action} error:`, error);
     return res.status(500).json({
       error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      // Don't expose error details in production
+      message: IS_PRODUCTION ? 'An error occurred' : (error instanceof Error ? error.message : 'Unknown error'),
     });
   }
 }
@@ -136,16 +191,14 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
   // Encrypt and store the token
   const encryptedToken = encryptToken(tokenResponse.access_token, config.encryptionKey);
 
-  const supabaseUrl = process.env.SUPABASE_URL!;
-  const supabaseKey = process.env.SUPABASE_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = getSupabase();
 
   const { error: upsertError } = await supabase.from('shopify_sessions').upsert(
     {
       shop_domain: shopDomain,
       access_token: encryptedToken,
       scope: tokenResponse.scope,
-      updated_at: new Date().toISOString(),
+      updated_at: getISTTimestamp(),
     },
     { onConflict: 'shop_domain' }
   );
@@ -186,9 +239,7 @@ async function handleHealth(req: VercelRequest, res: VercelResponse) {
 
   // Test Supabase connection
   try {
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabase();
 
     // Check if we can query the sessions table
     const { data, error, count } = await supabase
@@ -253,9 +304,7 @@ async function handleTestSession(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Step 1: Create Supabase client
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabase();
     results.steps.push({ step: 'supabase_client', status: 'ok' });
 
     // Step 2: Generate test session ID
@@ -271,7 +320,7 @@ async function handleTestSession(req: VercelRequest, res: VercelResponse) {
         shop_domain: testShopDomain,
         access_token: 'test-token-encrypted',
         scope: 'read_products',
-        updated_at: new Date().toISOString(),
+        updated_at: getISTTimestamp(),
       }, {
         onConflict: 'shop_domain',
       })
@@ -314,6 +363,158 @@ async function handleTestSession(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// Debug Sessions Handler (list all sessions)
+// ============================================================================
+async function handleDebugSessions(req: VercelRequest, res: VercelResponse) {
+  const supabase = getSupabase();
+  const config = getShopifyConfig();
+
+  const { data: sessions, error } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain, access_token, scope, created_at, updated_at')
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  // Test decrypt and API call for first session
+  let tokenTest = null;
+  if (sessions && sessions.length > 0) {
+    const session = sessions[0];
+    try {
+      const decryptedToken = decryptToken(session.access_token, config.encryptionKey);
+      // Test a simple API call
+      const testResponse = await fetch(`https://${session.shop_domain}/admin/api/2024-01/shop.json`, {
+        headers: {
+          'X-Shopify-Access-Token': decryptedToken,
+          'Content-Type': 'application/json',
+        },
+      });
+      tokenTest = {
+        shop: session.shop_domain,
+        decrypted: true,
+        tokenPreview: decryptedToken.substring(0, 10) + '...',
+        apiTest: {
+          status: testResponse.status,
+          ok: testResponse.ok,
+          body: !testResponse.ok ? await testResponse.text() : undefined,
+        },
+      };
+    } catch (e) {
+      tokenTest = {
+        shop: session.shop_domain,
+        decrypted: false,
+        error: e instanceof Error ? e.message : 'Unknown error',
+      };
+    }
+  }
+
+  return res.status(200).json({
+    count: sessions?.length || 0,
+    sessions: sessions?.map(s => ({
+      shop_domain: s.shop_domain,
+      scope: s.scope,
+      created_at: s.created_at,
+      updated_at: s.updated_at,
+      token_format: s.access_token?.includes(':') ? 'encrypted' : 'plain',
+    })) || [],
+    tokenTest,
+    encryptionKeyConfigured: !!config.encryptionKey,
+  });
+}
+
+// ============================================================================
+// Test Product Insert Handler
+// ============================================================================
+async function handleTestProduct(req: VercelRequest, res: VercelResponse) {
+  const results: Record<string, any> = { steps: [] };
+
+  const supabaseKey = process.env.SUPABASE_KEY!;
+
+  // Check what type of key we're using
+  const keyType = supabaseKey.startsWith('eyJ') ? 'JWT (anon/user)' :
+                  supabaseKey.includes('service_role') ? 'service_role' :
+                  'unknown (length: ' + supabaseKey.length + ')';
+  results.key_info = { type: keyType, prefix: supabaseKey.substring(0, 10) + '...' };
+
+  const supabase = getSupabase();
+
+  const testUserId = '00000000-0000-0000-0000-000000000001';
+  const testExternalId = `test-${Date.now()}`;
+
+  // Test inserting a minimal product with user_id
+  const testProduct = {
+    user_id: testUserId,
+    product_name: 'TEST PRODUCT - DELETE ME',
+    brand: 'Test Brand',
+    category: 'Test',
+    price: 1.00,
+    image_url: 'https://example.com/test.jpg',
+    external_id: testExternalId,
+    platform: 'shopify',
+    shop_domain: 'test.myshopify.com',
+    updated_at: getISTTimestamp(),
+  };
+
+  results.test_product = testProduct;
+  results.steps.push({ step: 'created_test_product', data: testProduct });
+
+  // Method 1: Standard insert
+  const { data, error } = await supabase
+    .from('enriched_products')
+    .insert(testProduct)
+    .select();
+
+  if (error) {
+    results.steps.push({ step: 'insert_failed', error: error });
+    results.success = false;
+    results.error = `${error.code}: ${error.message} - ${error.details || ''}`;
+
+    // Method 2: Try raw SQL via rpc if standard insert fails
+    results.steps.push({ step: 'trying_raw_sql' });
+    const { data: rpcData, error: rpcError } = await supabase.rpc('exec_sql', {
+      sql: `INSERT INTO enriched_products (user_id, product_name, brand, category, price, external_id, platform, shop_domain, updated_at)
+            VALUES ('${testUserId}', 'TEST RAW SQL', 'Test', 'Test', 1.00, '${testExternalId}-raw', 'shopify', 'test.myshopify.com', NOW())
+            RETURNING id, user_id;`
+    });
+
+    if (rpcError) {
+      results.steps.push({ step: 'raw_sql_failed', error: rpcError.message });
+    } else {
+      results.steps.push({ step: 'raw_sql_success', data: rpcData });
+    }
+  } else {
+    results.steps.push({ step: 'insert_success', data: data });
+    results.success = true;
+
+    // Verify what was actually inserted
+    const { data: verifyData } = await supabase
+      .from('enriched_products')
+      .select('id, user_id, product_name')
+      .eq('external_id', testExternalId)
+      .single();
+
+    results.steps.push({ step: 'verify_inserted', data: verifyData });
+    results.user_id_check = {
+      sent: testUserId,
+      received: verifyData?.user_id,
+      match: verifyData?.user_id === testUserId
+    };
+
+    // Clean up - delete the test product
+    const { error: deleteError } = await supabase
+      .from('enriched_products')
+      .delete()
+      .eq('external_id', testExternalId);
+
+    results.steps.push({ step: 'cleanup', deleted: !deleteError });
+  }
+
+  return res.status(200).json(results);
+}
+
+// ============================================================================
 // Status Handler
 // ============================================================================
 async function handleStatus(req: VercelRequest, res: VercelResponse) {
@@ -343,7 +544,7 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
 
   const status = await getShopSyncStatus(supabaseUrl, supabaseKey, shopDomain);
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = getSupabase();
   const { data: recentSyncs } = await supabase
     .from('shopify_sync_logs')
     .select('sync_id, status, products_synced, started_at, completed_at, duration_ms')
@@ -361,7 +562,17 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
 // Sync Handler
 // ============================================================================
 async function handleSync(req: VercelRequest, res: VercelResponse) {
-  console.log('[SYNC] Handler started');
+  console.log('[SYNC] Handler started, method:', req.method);
+
+  // Add CORS headers for embedded app requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -384,7 +595,7 @@ async function handleSync(req: VercelRequest, res: VercelResponse) {
   const supabaseKey = process.env.SUPABASE_KEY!;
 
   console.log('[SYNC] Checking session...');
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = getSupabase();
   const { data: session, error: sessionError } = await supabase
     .from('shopify_sessions')
     .select('shop_domain')
@@ -407,7 +618,7 @@ async function handleSync(req: VercelRequest, res: VercelResponse) {
     sync_id: syncId,
     shop_domain: shopDomain,
     status: 'started',
-    started_at: new Date().toISOString(),
+    started_at: getISTTimestamp(),
   });
 
   console.log('[SYNC] Starting syncShopProducts...');
@@ -448,6 +659,226 @@ async function handleSync(req: VercelRequest, res: VercelResponse) {
     products_failed: result.products_failed,
     duration_ms: result.duration_ms,
     errors: result.errors.length > 0 ? result.errors : undefined,
+  });
+}
+
+// ============================================================================
+// Sync Redirect Handler (for embedded apps - bypasses CSP)
+// ============================================================================
+async function handleSyncRedirect(req: VercelRequest, res: VercelResponse) {
+  console.log('[SYNC-REDIRECT] Handler started');
+
+  const shop = req.query.shop as string;
+  if (!shop) {
+    return res.status(400).send('Missing shop parameter');
+  }
+
+  const shopDomain = sanitizeShopDomain(shop);
+  const config = getShopifyConfig();
+  const supabaseUrl = process.env.SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_KEY!;
+
+  // Check session exists
+  const supabase = getSupabase();
+  const { data: session } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  if (!session) {
+    return res.redirect(302, `${config.appUrl}/api/shopify?action=auth&shop=${encodeURIComponent(shopDomain)}`);
+  }
+
+  // Do the sync
+  console.log('[SYNC-REDIRECT] Starting sync for:', shopDomain);
+  const result = await syncShopProducts(shopDomain, {
+    supabaseUrl,
+    supabaseKey,
+    skipEnrichment: true,
+  });
+
+  console.log('[SYNC-REDIRECT] Sync complete:', result.success, result.products_synced, 'products');
+
+  // Update last sync time
+  if (result.success) {
+    await updateLastSyncTime(supabaseUrl, supabaseKey, shopDomain);
+  }
+
+  // Redirect back to embedded app with results
+  const storeName = shopDomain.replace('.myshopify.com', '');
+  const resultParams = new URLSearchParams({
+    synced: result.products_synced.toString(),
+    success: result.success.toString(),
+    duration: result.duration_ms.toString(),
+  });
+
+  // Redirect back to Shopify admin embedded app
+  const redirectUrl = `https://admin.shopify.com/store/${storeName}/apps/the-mood-layer?${resultParams.toString()}`;
+  console.log('[SYNC-REDIRECT] Redirecting to:', redirectUrl);
+
+  return res.redirect(302, redirectUrl);
+}
+
+// ============================================================================
+// Enrich Handler - Enriches existing products with AI-generated attributes
+// ============================================================================
+async function handleEnrich(req: VercelRequest, res: VercelResponse) {
+  console.log('[ENRICH] Handler started, method:', req.method);
+
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const shop = (req.method === 'POST' ? req.body?.shop : req.query.shop) as string;
+  const limit = parseInt((req.method === 'POST' ? req.body?.limit : req.query.limit) as string || '10', 10);
+  const productIds = req.method === 'POST' ? req.body?.product_ids : undefined;
+
+  if (!shop || typeof shop !== 'string') {
+    return res.status(400).json({
+      error: 'Missing shop parameter',
+      message: 'Request must include "shop" field',
+    });
+  }
+
+  const shopDomain = sanitizeShopDomain(shop);
+  const supabase = getSupabase();
+
+  // Check session exists
+  const { data: session } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  if (!session) {
+    return res.status(401).json({
+      error: 'Shop not connected',
+      message: `No active connection for ${shopDomain}`,
+    });
+  }
+
+  // Find products that need enrichment (no enriched_at timestamp or specific IDs)
+  let query = supabase
+    .from('enriched_products')
+    .select('id, product_name, brand, category, price, image_url, external_id, shop_domain')
+    .eq('shop_domain', shopDomain)
+    .is('enriched_at', null)
+    .limit(limit);
+
+  if (productIds && Array.isArray(productIds) && productIds.length > 0) {
+    query = supabase
+      .from('enriched_products')
+      .select('id, product_name, brand, category, price, image_url, external_id, shop_domain')
+      .eq('shop_domain', shopDomain)
+      .in('external_id', productIds)
+      .limit(limit);
+  }
+
+  const { data: products, error: fetchError } = await query;
+
+  if (fetchError) {
+    console.error('[ENRICH] Failed to fetch products:', fetchError);
+    return res.status(500).json({ error: 'Failed to fetch products', details: fetchError.message });
+  }
+
+  if (!products || products.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: 'No products need enrichment',
+      enriched_count: 0,
+    });
+  }
+
+  console.log('[ENRICH] Found', products.length, 'products to enrich');
+
+  // Import the enrichment function from sync
+  const { callClaude, parseJSONFromResponse } = await import('../sdk/shared/secureAI');
+
+  const enriched: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+
+  for (const product of products) {
+    try {
+      console.log('[ENRICH] Enriching:', product.product_name);
+
+      const prompt = `Analyze this product and extract style attributes. Return JSON only.
+
+Product: ${product.product_name}
+Brand: ${product.brand || 'Unknown'}
+Category: ${product.category || 'General'}
+Price: ${product.price || 'N/A'}
+
+Return this exact JSON structure:
+{
+  "color_palette": ["color1", "color2", "color3"],
+  "tags": ["style1", "style2", "style3"],
+  "texture": "texture_type",
+  "material": "material_type",
+  "tone": "aesthetic_mood",
+  "flags": ["special_attribute"],
+  "fit_tags": ["layout_hint"]
+}`;
+
+      const response = await callClaude(prompt, { maxTokens: 512 });
+
+      if (!response.success || !response.text) {
+        throw new Error(response.error || 'Claude call failed');
+      }
+
+      const enrichment = parseJSONFromResponse(response.text);
+      if (!enrichment) {
+        throw new Error('Failed to parse enrichment response');
+      }
+
+      // Update the product with enrichment data
+      const { error: updateError } = await supabase
+        .from('enriched_products')
+        .update({
+          color_palette: enrichment.color_palette,
+          tags: enrichment.tags,
+          texture: enrichment.texture,
+          material: enrichment.material,
+          tone: enrichment.tone,
+          flags: enrichment.flags,
+          fit_tags: enrichment.fit_tags,
+          canonical_tags: enrichment.tags, // Use tags as canonical for now
+          enriched_at: getISTTimestamp(),
+        })
+        .eq('id', product.id);
+
+      if (updateError) {
+        throw new Error(`Database update failed: ${updateError.message}`);
+      }
+
+      enriched.push(product.external_id);
+      console.log('[ENRICH] Successfully enriched:', product.product_name);
+    } catch (error) {
+      console.error('[ENRICH] Failed to enrich', product.product_name, error);
+      failed.push({
+        id: product.external_id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    shop_domain: shopDomain,
+    total_found: products.length,
+    enriched_count: enriched.length,
+    failed_count: failed.length,
+    enriched_ids: enriched,
+    failed: failed.length > 0 ? failed : undefined,
   });
 }
 
@@ -502,8 +933,7 @@ async function handleWebhooks(req: VercelRequest, res: VercelResponse) {
         // For now, we log it - full sync will catch inventory changes
         break;
       case 'app/uninstalled':
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        await supabase.from('shopify_sessions').delete().eq('shop_domain', shopDomain);
+        await getSupabase().from('shopify_sessions').delete().eq('shop_domain', shopDomain);
         break;
     }
   } catch (error) {
@@ -517,6 +947,7 @@ async function handleWebhooks(req: VercelRequest, res: VercelResponse) {
 async function handleApp(req: VercelRequest, res: VercelResponse) {
   const shop = req.query.shop as string || '';
   const host = req.query.host as string || '';
+  const idToken = req.query.id_token as string || '';
 
   // If no shop provided, show error
   if (!shop) {
@@ -529,13 +960,66 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
   }
 
   const shopDomain = sanitizeShopDomain(shop);
-  console.log('[APP] Loading app for shop:', shopDomain);
+  const config = getShopifyConfig();
+  console.log('[APP] Loading app for shop:', shopDomain, 'hasIdToken:', !!idToken);
 
-  // Check if we have a valid session for this shop
   const supabaseUrl = process.env.SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabase = getSupabase();
 
+  // If we have an id_token (embedded app session token), exchange it for an access token
+  if (idToken) {
+    console.log('[APP] Exchanging session token for access token...');
+    try {
+      // Token exchange: exchange the session token for an offline access token
+      const tokenExchangeResponse = await fetch(`https://${shopDomain}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: config.apiKey,
+          client_secret: config.apiSecret,
+          grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+          subject_token: idToken,
+          subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          requested_token_type: 'urn:shopify:params:oauth:token-type:offline-access-token',
+          scope: config.scopes.join(' '),
+        }),
+      });
+
+      const tokenResponseText = await tokenExchangeResponse.text();
+      console.log('[APP] Token exchange response:', tokenExchangeResponse.status, tokenResponseText.substring(0, 200));
+
+      if (tokenExchangeResponse.ok) {
+        const tokenData = JSON.parse(tokenResponseText);
+        console.log('[APP] Token exchange successful, scope:', tokenData.scope, 'token_type:', tokenData.token_type);
+
+        // Store the new access token
+        const encryptedToken = encryptToken(tokenData.access_token, config.encryptionKey);
+        const { error: upsertError } = await supabase.from('shopify_sessions').upsert(
+          {
+            shop_domain: shopDomain,
+            access_token: encryptedToken,
+            scope: tokenData.scope,
+            updated_at: getISTTimestamp(),
+          },
+          { onConflict: 'shop_domain' }
+        );
+
+        if (upsertError) {
+          console.error('[APP] Failed to store exchanged token:', upsertError);
+        } else {
+          console.log('[APP] Exchanged token stored successfully');
+        }
+      } else {
+        // tokenResponseText already contains the error response body
+        console.error('[APP] Token exchange failed:', tokenExchangeResponse.status, tokenResponseText);
+      }
+    } catch (e) {
+      console.error('[APP] Token exchange error:', e);
+    }
+  }
+
+  // Check if we have a valid session for this shop
   const { data: session, error: sessionError } = await supabase
     .from('shopify_sessions')
     .select('shop_domain, scope, updated_at')
@@ -547,7 +1031,6 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
   // If no session, redirect to OAuth
   if (!session || sessionError) {
     console.log('[APP] No session found, redirecting to OAuth...');
-    const config = getShopifyConfig();
     const state = generateStateNonce();
     const authUrl = buildAuthUrl(config, shopDomain, state);
 
@@ -559,6 +1042,22 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
 
   console.log('[APP] Session found, rendering dashboard');
 
+  // Fetch stats server-side
+  const status = await getShopSyncStatus(supabaseUrl, supabaseKey, shopDomain);
+  const productCount = status.total_products || 0;
+  const lastSyncFormatted = status.last_sync_at ? formatLastSync(new Date(status.last_sync_at)) : 'Never';
+  const connectionStatus = status.is_connected ? 'Connected' : 'Not connected';
+
+  function formatLastSync(d: Date): string {
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'Just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    if (s < 172800) return 'Yesterday';
+    // Show IST date for older syncs
+    return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+  }
+
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -566,257 +1065,485 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${APP_NAME}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f6f6f7;
-      color: #202223;
-      line-height: 1.5;
-      padding: 20px;
+
+    :root {
+      --color-sage: #8b9a7d;
+      --color-sage-dark: #6b7a5d;
+      --color-sage-light: #c5cebf;
+      --color-cream: #faf9f7;
+      --color-warm: #f5f3ef;
+      --color-charcoal: #2c2c2c;
+      --color-stone: #8c8c8c;
+      --color-success: #7d9a6b;
+      --color-error: #c17b7b;
+      --font-serif: 'Playfair Display', Georgia, serif;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    .container { max-width: 800px; margin: 0 auto; }
+
+    body {
+      font-family: var(--font-sans);
+      background: linear-gradient(180deg, var(--color-cream) 0%, var(--color-warm) 100%);
+      min-height: 100vh;
+      color: var(--color-charcoal);
+      line-height: 1.6;
+      padding: 24px;
+    }
+
+    .container { max-width: 720px; margin: 0 auto; }
+
     .card {
       background: white;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+      border: 1px solid rgba(0,0,0,0.04);
     }
-    .hero { text-align: center; padding: 40px 24px; }
-    .hero-icon {
-      width: 64px; height: 64px;
-      background: linear-gradient(135deg, #4c7031 0%, #6b8f4a 100%);
+
+    .hero { text-align: center; padding: 48px 32px; position: relative; overflow: hidden; }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 20%, rgba(139, 154, 125, 0.08) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(139, 154, 125, 0.05) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: var(--color-warm);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--color-sage-dark);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: var(--color-sage);
+      border-radius: 50%;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 32px;
+      font-weight: 500;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      color: var(--color-charcoal);
+    }
+
+    .subtitle {
+      color: var(--color-stone);
+      font-size: 15px;
+      margin-bottom: 36px;
+      font-weight: 400;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 20px 16px;
+      background: linear-gradient(135deg, var(--color-warm) 0%, rgba(255,255,255,0.5) 100%);
       border-radius: 16px;
-      display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 20px;
+      border: 1px solid rgba(139, 154, 125, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .hero-icon svg { width: 32px; height: 32px; color: white; }
-    h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
-    .subtitle { color: #6d7175; font-size: 15px; margin-bottom: 24px; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat { text-align: center; padding: 16px; background: #f9fafb; border-radius: 8px; }
-    .stat-value { font-size: 28px; font-weight: 600; color: #4c7031; }
-    .stat-label { font-size: 13px; color: #6d7175; margin-top: 4px; }
-    .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    .stat:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    .stat-value {
+      font-family: var(--font-serif);
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--color-sage-dark);
+      line-height: 1.2;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--color-stone);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 500;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
     .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500;
-      text-decoration: none; cursor: pointer; border: none; transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 28px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
     }
-    .btn-primary { background: #4c7031; color: white; }
-    .btn-primary:hover { background: #3d5a27; }
-    .btn-secondary { background: white; color: #202223; border: 1px solid #c9cccf; }
-    .btn-secondary:hover { background: #f6f6f7; }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .message { padding: 12px 16px; border-radius: 8px; margin-top: 16px; display: none; }
-    .message.success { background: #e8f0e3; color: #2d5016; }
-    .message.error { background: #fbeae5; color: #d72c0d; }
-    .progress-container { display: none; margin-top: 20px; text-align: left; }
-    .progress-bar-wrapper { background: #e4e5e7; border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 12px; }
-    .progress-bar { background: linear-gradient(90deg, #4c7031 0%, #6b8f4a 100%); height: 100%; width: 0%; transition: width 0.3s ease; }
-    .progress-steps { list-style: none; }
-    .progress-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; color: #6d7175; }
-    .progress-step.active { color: #202223; font-weight: 500; }
-    .progress-step.done { color: #4c7031; }
-    .progress-step .icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-    .progress-step.pending .icon { background: #e4e5e7; }
-    .progress-step.active .icon { background: #4c7031; color: white; }
-    .progress-step.done .icon { background: #e8f0e3; color: #4c7031; }
-    .spinner { animation: spin 1s linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
-    .feature-list { display: grid; gap: 12px; }
-    .feature { display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--color-sage) 0%, var(--color-sage-dark) 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(139, 154, 125, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(139, 154, 125, 0.4);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background: white;
+      color: var(--color-charcoal);
+      border: 1.5px solid var(--color-sage-light);
+    }
+
+    .btn-secondary:hover {
+      background: var(--color-warm);
+      border-color: var(--color-sage);
+    }
+
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+
+    .message {
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-top: 24px;
+      display: none;
+      font-size: 14px;
+      font-weight: 500;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.success {
+      background: linear-gradient(135deg, rgba(125, 154, 107, 0.12) 0%, rgba(125, 154, 107, 0.06) 100%);
+      color: var(--color-sage-dark);
+      border: 1px solid rgba(125, 154, 107, 0.2);
+    }
+
+    .message.error {
+      background: linear-gradient(135deg, rgba(193, 123, 123, 0.12) 0%, rgba(193, 123, 123, 0.06) 100%);
+      color: #8b5555;
+      border: 1px solid rgba(193, 123, 123, 0.2);
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--color-sage-light) 50%, transparent 100%);
+      margin: 32px 0;
+      opacity: 0.5;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--color-charcoal);
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--color-sage-light) 0%, transparent 100%);
+    }
+
+    .feature-list { display: grid; gap: 16px; }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--color-warm) 0%, rgba(255,255,255,0.8) 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(139, 154, 125, 0.08);
+      transition: all 0.25s ease;
+    }
+
+    .feature:hover {
+      background: linear-gradient(135deg, rgba(139, 154, 125, 0.08) 0%, var(--color-warm) 100%);
+      border-color: rgba(139, 154, 125, 0.15);
+    }
+
     .feature-icon {
-      width: 40px; height: 40px; background: #e8f0e3; border-radius: 8px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      background: white;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
-    .feature-icon svg { width: 20px; height: 20px; color: #4c7031; }
-    .feature-content h3 { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
-    .feature-content p { font-size: 13px; color: #6d7175; }
+
+    .feature-icon svg {
+      width: 22px;
+      height: 22px;
+      color: var(--color-sage);
+    }
+
+    .feature-content h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--color-charcoal);
+    }
+
+    .feature-content p {
+      font-size: 13px;
+      color: var(--color-stone);
+      line-height: 1.5;
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-stone);
+      margin-top: 24px;
+      opacity: 0.7;
+    }
+
     @media (max-width: 600px) {
-      .stats { grid-template-columns: 1fr; }
+      body { padding: 16px; }
+      .card { padding: 24px; border-radius: 16px; }
+      .hero { padding: 32px 20px; }
+      h1 { font-size: 26px; }
+      .stats { grid-template-columns: 1fr; gap: 10px; }
+      .stat { padding: 16px; }
+      .stat-value { font-size: 22px; }
       .actions { flex-direction: column; }
-      .btn { width: 100%; justify-content: center; }
+      .btn { width: 100%; justify-content: center; padding: 16px 24px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card hero">
-      <div class="hero-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      </div>
-      <h1>Welcome to ${APP_NAME}</h1>
-      <p class="subtitle">Transform your products into stunning moodboards</p>
+      <div class="hero-badge">${status.is_connected ? 'Shopify Connected' : 'Setup Required'}</div>
+      <h1>${APP_NAME}</h1>
+      <p class="subtitle">Transform your products into stunning visual stories</p>
+
       <div class="stats">
-        <div class="stat"><div class="stat-value" id="productCount">--</div><div class="stat-label">Products</div></div>
-        <div class="stat"><div class="stat-value" id="lastSync">--</div><div class="stat-label">Last Sync</div></div>
-        <div class="stat"><div class="stat-value" id="status">--</div><div class="stat-label">Status</div></div>
+        <div class="stat">
+          <div class="stat-value">${productCount}</div>
+          <div class="stat-label">Products</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${lastSyncFormatted}</div>
+          <div class="stat-label">Last Sync</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${connectionStatus}</div>
+          <div class="stat-label">Status</div>
+        </div>
       </div>
+
       <div class="actions">
         <button class="btn btn-primary" id="syncBtn" onclick="syncProducts()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           <span id="syncText">Sync Products</span>
         </button>
+        <button class="btn btn-secondary" id="enrichBtn" onclick="enrichProducts()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+          </svg>
+          <span id="enrichText">Enrich with AI</span>
+        </button>
         <a href="${FRONTEND_URL}" target="_blank" class="btn btn-secondary">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           Open Editor
         </a>
       </div>
+
       <div class="message" id="message"></div>
-      <div class="progress-container" id="progressContainer">
-        <div class="progress-bar-wrapper"><div class="progress-bar" id="progressBar"></div></div>
-        <ul class="progress-steps" id="progressSteps">
-          <li class="progress-step pending" data-step="connect"><span class="icon">1</span>Connecting to Shopify...</li>
-          <li class="progress-step pending" data-step="fetch"><span class="icon">2</span>Fetching product catalog...</li>
-          <li class="progress-step pending" data-step="process"><span class="icon">3</span>Processing products...</li>
-          <li class="progress-step pending" data-step="save"><span class="icon">4</span>Saving to database...</li>
-          <li class="progress-step pending" data-step="complete"><span class="icon">5</span>Sync complete!</li>
-        </ul>
-      </div>
     </div>
+
     <div class="card">
-      <h2 class="section-title">Features</h2>
+      <div class="section-header">
+        <h2 class="section-title">What you can do</h2>
+        <div class="section-line"></div>
+      </div>
+
       <div class="feature-list">
         <div class="feature">
-          <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
-          <div class="feature-content"><h3>Create Moodboards</h3><p>Drag and drop products onto beautiful canvases</p></div>
+          <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div class="feature-content">
+            <h3>Create Moodboards</h3>
+            <p>Drag and drop your products onto beautiful canvases with intuitive controls</p>
+          </div>
         </div>
+
         <div class="feature">
-          <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg></div>
-          <div class="feature-content"><h3>AI Enrichment</h3><p>Products auto-tagged with style and mood attributes</p></div>
+          <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+            </svg>
+          </div>
+          <div class="feature-content">
+            <h3>AI-Powered Enrichment</h3>
+            <p>Products are automatically tagged with style, mood, and aesthetic attributes</p>
+          </div>
         </div>
+
         <div class="feature">
-          <div class="feature-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></div>
-          <div class="feature-content"><h3>Share Everywhere</h3><p>Export for Instagram, Pinterest, or your website</p></div>
+          <div class="feature-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+          </div>
+          <div class="feature-content">
+            <h3>Share Everywhere</h3>
+            <p>Export your creations for Instagram, Pinterest, or embed on your website</p>
+          </div>
         </div>
       </div>
     </div>
+
+    <p class="footer-note">Crafted for creative merchants</p>
   </div>
   <script>
-    const shop = '${shop}';
-    const apiBase = window.location.origin;
-    async function loadStats() {
-      try {
-        const r = await fetch(apiBase + '/api/shopify?action=status&shop=' + encodeURIComponent(shop));
-        const d = await r.json();
-        document.getElementById('productCount').textContent = d.products_count || 0;
-        document.getElementById('lastSync').textContent = d.last_sync ? formatTime(new Date(d.last_sync)) : 'Never';
-        document.getElementById('status').textContent = d.connected ? 'Connected' : 'Not connected';
-      } catch (e) { console.error(e); }
-    }
-    const steps = ['connect', 'fetch', 'process', 'save', 'complete'];
-    let currentStep = 0;
+    const shop = '${shopDomain}';
+    const apiBase = '${config.appUrl}';
 
-    function updateProgress(stepName, status, detail) {
-      const container = document.getElementById('progressContainer');
-      const bar = document.getElementById('progressBar');
-      const stepEl = document.querySelector('[data-step="' + stepName + '"]');
-
-      container.style.display = 'block';
-
-      // Update step status
-      if (stepEl) {
-        stepEl.className = 'progress-step ' + status;
-        if (detail) {
-          stepEl.innerHTML = '<span class="icon">' + (status === 'active' ? '<span class="spinner">↻</span>' : status === 'done' ? '✓' : (steps.indexOf(stepName) + 1)) + '</span>' + detail;
-        }
-      }
-
-      // Update progress bar
-      const stepIndex = steps.indexOf(stepName);
-      const progress = status === 'done' ? ((stepIndex + 1) / steps.length) * 100 : (stepIndex / steps.length) * 100;
-      bar.style.width = progress + '%';
+    function syncProducts() {
+      window.top.location.href = apiBase + '/api/shopify?action=sync-redirect&shop=' + encodeURIComponent(shop);
     }
 
-    function resetProgress() {
-      steps.forEach((s, i) => {
-        const el = document.querySelector('[data-step="' + s + '"]');
-        if (el) {
-          el.className = 'progress-step pending';
-          const labels = ['Connecting to Shopify...', 'Fetching product catalog...', 'Processing products...', 'Saving to database...', 'Sync complete!'];
-          el.innerHTML = '<span class="icon">' + (i + 1) + '</span>' + labels[i];
-        }
-      });
-      document.getElementById('progressBar').style.width = '0%';
-    }
-
-    async function syncProducts() {
-      const btn = document.getElementById('syncBtn');
-      const text = document.getElementById('syncText');
+    async function enrichProducts() {
+      const btn = document.getElementById('enrichBtn');
+      const text = document.getElementById('enrichText');
       const msg = document.getElementById('message');
+
       btn.disabled = true;
-      text.textContent = 'Syncing...';
+      text.textContent = 'Enriching...';
       msg.style.display = 'none';
-      resetProgress();
 
       try {
-        // Step 1: Connect
-        updateProgress('connect', 'active', 'Connecting to Shopify...');
-        await new Promise(r => setTimeout(r, 500));
-        updateProgress('connect', 'done', 'Connected to Shopify');
-
-        // Step 2: Fetch
-        updateProgress('fetch', 'active', 'Fetching product catalog...');
-
-        const r = await fetch(apiBase + '/api/shopify?action=sync', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop: shop, skip_enrichment: true })
+        const response = await fetch(apiBase + '/api/shopify?action=enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shop: shop, limit: 20 })
         });
-        const d = await r.json();
 
-        if (d.success) {
-          updateProgress('fetch', 'done', 'Found ' + d.products_synced + ' products');
+        const result = await response.json();
 
-          // Step 3: Process
-          updateProgress('process', 'active', 'Processing ' + d.products_synced + ' products...');
-          await new Promise(r => setTimeout(r, 300));
-          updateProgress('process', 'done', 'Processed ' + d.products_synced + ' products');
-
-          // Step 4: Save
-          updateProgress('save', 'active', 'Saving to database...');
-          await new Promise(r => setTimeout(r, 300));
-          updateProgress('save', 'done', 'Saved to database');
-
-          // Step 5: Complete
-          updateProgress('complete', 'done', 'Sync complete! ' + d.products_synced + ' products ready');
-
+        if (result.success) {
           msg.className = 'message success';
-          msg.textContent = 'Successfully synced ' + d.products_synced + ' products in ' + (d.duration_ms / 1000).toFixed(1) + 's';
-          loadStats();
+          if (result.enriched_count === 0) {
+            msg.textContent = 'All products are already enriched';
+          } else {
+            msg.textContent = 'Enriched ' + result.enriched_count + ' product' + (result.enriched_count !== 1 ? 's' : '') + ' with AI';
+          }
         } else {
-          throw new Error(d.message || d.error || 'Sync failed');
+          msg.className = 'message error';
+          msg.textContent = result.error || 'Enrichment failed';
         }
-      } catch (e) {
+        msg.style.display = 'block';
+      } catch (error) {
         msg.className = 'message error';
-        msg.textContent = 'Error: ' + e.message;
-        document.getElementById('progressContainer').style.display = 'none';
+        msg.textContent = 'Failed to enrich products';
+        msg.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        text.textContent = 'Enrich with AI';
+      }
+    }
+
+    // Check for sync results in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const synced = urlParams.get('synced');
+    const syncSuccess = urlParams.get('success');
+    const syncDuration = urlParams.get('duration');
+
+    if (synced !== null) {
+      const msg = document.getElementById('message');
+      const count = parseInt(synced);
+      if (syncSuccess === 'true') {
+        msg.className = 'message success';
+        if (count === 0) {
+          msg.textContent = 'Your catalog is up to date — no changes detected';
+        } else {
+          msg.textContent = 'Synced ' + count + ' product' + (count !== 1 ? 's' : '') + (syncDuration ? ' in ' + (parseInt(syncDuration) / 1000).toFixed(1) + 's' : '');
+        }
+      } else {
+        msg.className = 'message error';
+        msg.textContent = 'Sync failed. Please try again.';
       }
       msg.style.display = 'block';
-      btn.disabled = false;
-      text.textContent = 'Sync Products';
+
+      // Clear URL params so message doesn't show on refresh
+      const cleanUrl = window.location.pathname + '?shop=' + encodeURIComponent(shop);
+      window.history.replaceState({}, '', cleanUrl);
     }
-    function formatTime(d) {
-      const s = Math.floor((new Date() - d) / 1000);
-      if (s < 60) return 'Just now';
-      if (s < 3600) return Math.floor(s / 60) + 'm ago';
-      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-      return Math.floor(s / 86400) + 'd ago';
-    }
-    if (shop) loadStats();
   </script>
 </body>
 </html>`.trim();
 
   res.setHeader('Content-Type', 'text/html');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.status(200).send(html);
 }
