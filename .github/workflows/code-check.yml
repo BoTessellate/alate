@@ -1,0 +1,155 @@
+# Code Quality Checks
+# Runs on all PRs to main/master branch
+# Ensures TypeScript compiles and critical patterns are not broken
+
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  # ============================================================================
+  # Backend Checks
+  # ============================================================================
+  backend-typecheck:
+    name: Backend TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  backend-critical-patterns:
+    name: Backend Critical Pattern Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for double .text() calls on Response objects
+        run: |
+          echo "Checking for potential double .text() calls..."
+          # Look for patterns where .text() might be called twice on same response
+          if grep -rn "\.text()" api/ sdk/ --include="*.ts" | grep -v "tokenResponseText" | grep -c "await.*\.text().*await.*\.text()" > /dev/null 2>&1; then
+            echo "WARNING: Potential double .text() call detected. Review carefully."
+            echo "See shopify.ts header comments for ISSUE #2 explanation."
+          fi
+          echo "Pattern check complete."
+
+      - name: Check X-Frame-Options not re-added to Shopify endpoint
+        run: |
+          echo "Checking X-Frame-Options is not set for Shopify..."
+          if grep -n "X-Frame-Options" api/shopify.ts | grep -v "removeHeader" | grep -v "// " | grep -v "DO NOT" > /dev/null 2>&1; then
+            echo "ERROR: X-Frame-Options may be re-added to shopify.ts!"
+            echo "This will break Shopify iframe embedding."
+            echo "See shopify.ts header comments for ISSUE #1 explanation."
+            exit 1
+          fi
+          echo "X-Frame-Options check passed."
+
+      - name: Check timeout exists in secureAI
+        run: |
+          echo "Checking AbortController timeout exists..."
+          if ! grep -q "AbortController" sdk/shared/secureAI.ts; then
+            echo "ERROR: AbortController timeout removed from secureAI.ts!"
+            echo "This will cause enrichment to hang indefinitely."
+            echo "See secureAI.ts header comments for ISSUE #1 explanation."
+            exit 1
+          fi
+          echo "Timeout check passed."
+
+      - name: Check Anthropic fallback exists
+        run: |
+          echo "Checking Anthropic direct API fallback exists..."
+          if ! grep -q "callAnthropicDirect" sdk/shared/secureAI.ts; then
+            echo "ERROR: Anthropic direct API fallback removed from secureAI.ts!"
+            echo "This will break enrichment when SECURE_API_URL is not configured."
+            echo "See secureAI.ts header comments for explanation."
+            exit 1
+          fi
+          echo "Anthropic fallback check passed."
+
+      - name: Count API functions (max 12 for Hobby plan)
+        run: |
+          echo "Counting API functions..."
+          count=$(ls -1 api/*.ts 2>/dev/null | wc -l)
+          echo "Current count: $count / 12"
+          if [ "$count" -gt 12 ]; then
+            echo "ERROR: Too many API functions ($count > 12)!"
+            echo "Vercel Hobby plan limits to 12 serverless functions."
+            echo "See shopify.ts header comments for ISSUE #3 explanation."
+            exit 1
+          fi
+          echo "Function count check passed."
+
+  # ============================================================================
+  # Frontend Checks
+  # ============================================================================
+  frontend-typecheck:
+    name: Frontend TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  frontend-build:
+    name: Frontend Build Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://backend-tml.vercel.app
