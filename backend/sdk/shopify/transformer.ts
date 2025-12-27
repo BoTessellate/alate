@@ -174,6 +174,7 @@ export function transformShopifyProduct(
     price,
     currency: 'USD', // Default, can be overridden per shop
     image_url: primaryImage,
+    product_url: `https://${shopDomain}/products/${product.handle}`,
     external_id: externalId,
     platform: 'shopify',
     shop_domain: shopDomain,

@@ -210,6 +210,7 @@ export interface TransformedProduct {
   price: number;
   currency: string;
   image_url?: string;
+  product_url: string;
   external_id: string;
   platform: 'shopify';
   shop_domain: string;

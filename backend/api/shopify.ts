@@ -3,6 +3,67 @@
  * Handles all Shopify routes: /api/shopify?action=auth|callback|status|sync|webhooks|app
  *
  * This consolidates multiple endpoints into one to stay within Vercel's function limits
+ *
+ * ============================================================================
+ * CRITICAL ARCHITECTURE NOTES - DO NOT REMOVE
+ * ============================================================================
+ *
+ * ISSUE #1: X-Frame-Options blocking Shopify iframe (Dec 2025)
+ * ------------------------------------------------------------
+ * Problem: Shopify embedded apps load in an iframe, but Vercel adds
+ * "X-Frame-Options: SAMEORIGIN" by default, causing "refused to connect" error.
+ *
+ * Solution (in handleApp function, around line 1540):
+ * 1. Set Content-Security-Policy with frame-ancestors for Shopify domains
+ * 2. Call res.removeHeader('X-Frame-Options') to remove Vercel's default
+ * 3. Also configured in vercel.json with empty X-Frame-Options for /api/shopify
+ *
+ * DO NOT:
+ * - Remove the CSP frame-ancestors header
+ * - Remove res.removeHeader('X-Frame-Options')
+ * - Add X-Frame-Options back to this endpoint
+ *
+ * ISSUE #2: Token exchange "stream already consumed" error (Dec 2025)
+ * -------------------------------------------------------------------
+ * Problem: In handleApp(), calling response.text() twice on the same response
+ * caused "body stream already read" error.
+ *
+ * Location: handleApp() function, around line 976-1002
+ *
+ * Original buggy code:
+ *   const tokenResponseText = await tokenExchangeResponse.text();  // First call
+ *   ...
+ *   } else {
+ *     console.error('[APP] Token exchange failed:', await tokenExchangeResponse.text());  // BUG: Second call!
+ *   }
+ *
+ * Fix: Reuse the tokenResponseText variable in the else block:
+ *   } else {
+ *     console.error('[APP] Token exchange failed:', tokenExchangeResponse.status, tokenResponseText);
+ *   }
+ *
+ * DO NOT:
+ * - Call .text(), .json(), or .body on a Response object more than once
+ * - Store the result in a variable and reuse it
+ *
+ * ISSUE #3: Vercel Hobby Plan 12 Function Limit (Dec 2025)
+ * --------------------------------------------------------
+ * Problem: Vercel Hobby plan limits deployments to 12 serverless functions.
+ *
+ * Solution: Consolidated multiple Shopify endpoints into this single file
+ * using ?action= query parameter routing.
+ *
+ * Current function count: 11/12
+ * - enrich.ts, layout.ts, moodboards.ts, related-products.ts, scrape.ts
+ * - search.ts, shopify.ts, shopify-callback.ts, shopify-webhooks.ts
+ * - smart-labels.ts, vision-enrich.ts
+ *
+ * Removed: theme.ts (dark/light mode - not needed)
+ *
+ * DO NOT:
+ * - Add new API files without removing/consolidating others
+ * - Split this file back into separate endpoints
+ * ============================================================================
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -1528,9 +1589,18 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
 </body>
 </html>`.trim();
 
+  // Set headers for Shopify iframe embedding
+  // Override Vercel's default X-Frame-Options to allow Shopify admin iframe
   res.setHeader('Content-Type', 'text/html');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+
+  // Critical: Allow embedding in Shopify's iframe
+  // Content-Security-Policy frame-ancestors is the modern replacement for X-Frame-Options
+  res.setHeader('Content-Security-Policy', "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
+  // Remove X-Frame-Options completely to allow iframe (CSP takes precedence in modern browsers)
+  res.removeHeader('X-Frame-Options');
+
   res.status(200).send(html);
 }

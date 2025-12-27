@@ -35,6 +35,8 @@ export {
 export {
   syncShopProducts,
   getShopSyncStatus,
+  updateLastSyncTime,
   handleProductWebhook,
   handleProductDeleteWebhook,
+  getISTTimestamp,
 } from './sync';

@@ -60,8 +60,6 @@ const PRODUCTS_QUERY = `
                   name
                   value
                 }
-                weight
-                weightUnit
                 image {
                   src
                 }
@@ -114,8 +112,6 @@ const PRODUCT_BY_ID_QUERY = `
               name
               value
             }
-            weight
-            weightUnit
             image {
               src
             }
@@ -128,7 +124,7 @@ const PRODUCT_BY_ID_QUERY = `
 
 const PRODUCTS_COUNT_QUERY = `
   query GetProductsCount {
-    productsCount {
+    productsCount(limit: null) {
       count
     }
   }

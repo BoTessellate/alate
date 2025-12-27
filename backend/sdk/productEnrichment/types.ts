@@ -63,7 +63,9 @@ export interface EnrichedProductFields {
   texture: string;
   material: string;
   tone: string;
-  flags?: string[];
+  flags?: string[];  // e.g., ["fragile", "handmade", "limited-edition", "eco-friendly"]
+  fit_tags?: FitTag[];  // For layout placement: bulky, flat, delicate, etc.
+  product_dimensions?: ProductDimensions;  // Parsed/inferred dimensions
 }
 
 export interface EnrichedProduct extends RawProductInput, EnrichedProductFields {
@@ -74,6 +76,27 @@ export interface EnrichedProduct extends RawProductInput, EnrichedProductFields 
 
   // Canonical tags (normalized against taxonomy)
   canonical_tags?: string[];
+
+  // Image URL for the product (used for display and vision analysis)
+  image_url?: string;
+
+  // Vision analysis data (populated by GPT-4V or Gemini)
+  vision_analysis?: VisionAnalysisResult;
+}
+
+/**
+ * Vision analysis result from GPT-4V or Gemini
+ * This is populated separately from text enrichment
+ */
+export interface VisionAnalysisResult {
+  analyzed_at?: string;
+  model_used?: 'gpt-4-vision' | 'gemini-pro-vision' | 'gemini-1.5-flash';
+  dominant_colors?: string[];  // Colors detected in the actual image
+  detected_objects?: string[];  // Objects/items visible in the image
+  style_attributes?: string[];  // Visual style: modern, vintage, rustic, etc.
+  quality_score?: number;  // Image quality 0-100
+  background_type?: 'white' | 'lifestyle' | 'studio' | 'outdoor' | 'transparent';
+  composition_notes?: string;  // Brief description of image composition
 }
 
 export interface ClaudeEnrichmentResponse {
@@ -82,6 +105,14 @@ export interface ClaudeEnrichmentResponse {
   texture: string;
   material: string;
   tone: string;
+  flags?: string[];
+  fit_tags?: FitTag[];
+  inferred_dimensions?: {
+    width_cm?: number;
+    height_cm?: number;
+    depth_cm?: number;
+    size_category?: 'small' | 'medium' | 'large' | 'oversized';
+  };
 }
 
 export interface ValidationResult {

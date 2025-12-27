@@ -290,9 +290,9 @@ async function fetchWithPuppeteer(url: string): Promise<string> {
 
     browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: (chromium as any).defaultViewport ?? { width: 1920, height: 1080 },
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: (chromium as any).headless ?? true,
     });
 
     const page = await browser.newPage();

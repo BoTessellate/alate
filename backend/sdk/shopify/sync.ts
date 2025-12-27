@@ -10,6 +10,50 @@ import { decryptToken, getShopifyConfig } from './auth';
 import type { SyncResult, SyncError, SyncStatus, ShopifySession } from './types';
 import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
 
+/**
+ * Get current time in IST as ISO string
+ */
+export function getISTTimestamp(): string {
+  // IST is UTC+5:30
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in ms
+  const istTime = new Date(now.getTime() + istOffset);
+  return istTime.toISOString().replace('Z', '+05:30');
+}
+
+/**
+ * Generate a deterministic UUID from a shop domain
+ * This creates a consistent "virtual user" for each Shopify shop
+ * Uses a simple hash approach that works in all environments
+ * TODO: Replace with proper user auth integration
+ */
+function generateShopUserId(shopDomain: string): string {
+  // Create a deterministic UUID from shop domain using multiple hash rounds
+  const str = `shopify-user-${shopDomain}`;
+
+  // Generate multiple hash values to fill UUID
+  const hashes: number[] = [];
+  for (let round = 0; round < 4; round++) {
+    let hash = round * 12345;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char + round;
+      hash = hash & hash;
+    }
+    hashes.push(Math.abs(hash));
+  }
+
+  // Convert to hex strings
+  const hex1 = hashes[0].toString(16).padStart(8, '0').slice(0, 8);
+  const hex2 = hashes[1].toString(16).padStart(8, '0').slice(0, 4);
+  const hex3 = hashes[2].toString(16).padStart(8, '0').slice(0, 3);
+  const hex4 = hashes[3].toString(16).padStart(8, '0').slice(0, 3);
+  const hex5 = (hashes[0] ^ hashes[1] ^ hashes[2] ^ hashes[3]).toString(16).padStart(12, '0').slice(0, 12);
+
+  // Format: xxxxxxxx-xxxx-4xxx-axxx-xxxxxxxxxxxx (UUID v4-like, deterministic)
+  return `${hex1}-${hex2}-4${hex3}-a${hex4}-${hex5}`;
+}
+
 // ============================================================================
 // Session Management
 // ============================================================================
@@ -152,19 +196,42 @@ async function upsertProducts(
   supabase: SupabaseClient,
   products: TransformedProduct[],
   enrichments: Map<string, EnrichmentResult>
-): Promise<{ success: number; failed: number }> {
-  // Prepare all products for batch upsert
+): Promise<{ success: number; failed: number; errorMessage?: string }> {
+  // Get the shop domain from the first product to generate user_id
+  console.log('[upsertProducts] products count:', products.length);
+  console.log('[upsertProducts] First product keys:', products[0] ? Object.keys(products[0]) : 'no products');
+
+  const productShopDomain = products[0]?.shop_domain;
+  console.log('[upsertProducts] productShopDomain:', productShopDomain);
+
+  let userId: string | null = null;
+  if (productShopDomain) {
+    try {
+      userId = generateShopUserId(productShopDomain);
+      console.log('[upsertProducts] Generated user_id:', userId);
+    } catch (err) {
+      console.error('[upsertProducts] Error generating user_id:', err);
+    }
+  } else {
+    console.error('[upsertProducts] No shop_domain found on products!');
+  }
+
+  // Prepare all products for batch insert
   const dbProducts = products.map((product) => {
     const enrichment = enrichments.get(product.external_id);
     const fitTags = generateFitTags(product);
+    // Generate user_id from shop_domain
+    const productUserId = product.shop_domain ? generateShopUserId(product.shop_domain) : userId;
 
     return {
+      user_id: productUserId,
       product_name: product.product_name,
       brand: product.brand,
       category: product.category,
       price: product.price,
-      currency: product.currency,
+      // Note: currency column not in DB schema, store in metadata if needed
       image_url: product.image_url,
+      product_url: product.product_url,
       external_id: product.external_id,
       platform: product.platform,
       shop_domain: product.shop_domain,
@@ -177,25 +244,47 @@ async function upsertProducts(
       material: enrichment?.material || null,
       texture: enrichment?.texture || null,
       tone: enrichment?.tone || null,
-      // Metadata
-      enriched_at: enrichment ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
+      // Metadata (timestamps in IST)
+      enriched_at: enrichment ? getISTTimestamp() : null,
+      updated_at: getISTTimestamp(),
     };
   });
 
-  // Batch upsert all products at once
-  const { error } = await supabase
-    .from('enriched_products')
-    .upsert(dbProducts, {
-      onConflict: 'shop_domain,external_id',
-      ignoreDuplicates: false,
-    });
+  // Delete existing products for this shop first, then insert fresh
+  // This is simpler than upsert when there's no unique constraint
+  console.log('[upsertProducts] Attempting to save', dbProducts.length, 'products');
+  console.log('[upsertProducts] FULL FIRST PRODUCT:', JSON.stringify(dbProducts[0]));
 
-  if (error) {
-    console.error('Failed to upsert products batch:', error);
-    return { success: 0, failed: products.length };
+  const deleteShopDomain = dbProducts[0]?.shop_domain;
+  if (deleteShopDomain) {
+    console.log('[upsertProducts] Deleting existing products for shop:', deleteShopDomain);
+    const { error: deleteError } = await supabase
+      .from('enriched_products')
+      .delete()
+      .eq('shop_domain', deleteShopDomain);
+
+    if (deleteError) {
+      console.error('[upsertProducts] Delete failed:', deleteError);
+      // Continue anyway - we'll try to insert
+    }
   }
 
+  // Now insert all products
+  console.log('[upsertProducts] Inserting', dbProducts.length, 'products');
+  const { error, data } = await supabase
+    .from('enriched_products')
+    .insert(dbProducts)
+    .select();
+
+  if (error) {
+    console.error('[upsertProducts] FAILED:', JSON.stringify(error, null, 2));
+    console.error('[upsertProducts] Error code:', error.code);
+    console.error('[upsertProducts] Error message:', error.message);
+    console.error('[upsertProducts] Error details:', error.details);
+    return { success: 0, failed: products.length, errorMessage: `${error.code}: ${error.message} - ${error.details || ''}` };
+  }
+
+  console.log('[upsertProducts] SUCCESS, inserted:', data?.length || 0, 'products');
   return { success: products.length, failed: 0 };
 }
 
@@ -340,9 +429,14 @@ export async function syncShopProducts(
   // Save to database
   console.log('[syncShopProducts] Saving to database...');
   options.onProgress?.('save', 0, transformed.length);
-  const { success, failed } = await upsertProducts(supabase, transformed, enrichments);
-  console.log('[syncShopProducts] Save complete, success:', success, 'failed:', failed);
+  const { success, failed, errorMessage } = await upsertProducts(supabase, transformed, enrichments);
+  console.log('[syncShopProducts] Save complete, success:', success, 'failed:', failed, 'error:', errorMessage);
   options.onProgress?.('save', success, transformed.length);
+
+  // Add database error to errors array if present
+  if (errorMessage) {
+    errors.push({ product_id: '', error: errorMessage, stage: 'save' });
+  }
 
   console.log('[syncShopProducts] Sync complete in', Date.now() - startTime, 'ms');
 
@@ -370,8 +464,12 @@ export async function getShopSyncStatus(
 ): Promise<SyncStatus> {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Check session exists
-  const session = await getShopSession(supabase, shopDomain);
+  // Check session exists and get last_sync_at
+  const { data: session } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain, last_sync_at')
+    .eq('shop_domain', shopDomain)
+    .single();
 
   // Count synced products
   const { count: syncedCount } = await supabase
@@ -385,7 +483,23 @@ export async function getShopSyncStatus(
     total_products: syncedCount || 0,
     synced_products: syncedCount || 0,
     pending_sync: false,
+    last_sync_at: session?.last_sync_at || null,
   };
+}
+
+/**
+ * Update last sync time for a shop
+ */
+export async function updateLastSyncTime(
+  supabaseUrl: string,
+  supabaseKey: string,
+  shopDomain: string
+): Promise<void> {
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  await supabase
+    .from('shopify_sessions')
+    .update({ last_sync_at: getISTTimestamp() })
+    .eq('shop_domain', shopDomain);
 }
 
 /**

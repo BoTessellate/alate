@@ -12,6 +12,7 @@ import {
   verifyCallbackHmac,
   encryptToken,
   sanitizeShopDomain,
+  getISTTimestamp,
 } from '../sdk/shopify';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -72,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         shop_domain: shopDomain,
         access_token: encryptedToken,
         scope: tokenResponse.scope,
-        updated_at: new Date().toISOString(),
+        updated_at: getISTTimestamp(),
       }, {
         onConflict: 'shop_domain',
       })
@@ -104,10 +105,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `);
     }
 
-    // Redirect to the app dashboard
-    const appUrl = `${config.appUrl.trim()}/api/shopify?shop=${encodeURIComponent(shopDomain)}`;
-    console.log('[CALLBACK] Redirecting to:', appUrl);
-    return res.redirect(302, appUrl);
+    // Redirect to the embedded app in Shopify admin
+    // Extract store name from shop domain (e.g., "store-1-2352745" from "store-1-2352745.myshopify.com")
+    const storeName = shopDomain.replace('.myshopify.com', '');
+    const embeddedAppUrl = `https://admin.shopify.com/store/${storeName}/apps/the-mood-layer`;
+    console.log('[CALLBACK] Redirecting to embedded app:', embeddedAppUrl);
+    return res.redirect(302, embeddedAppUrl);
   } catch (error) {
     console.error('[CALLBACK] Error:', error);
     // Show error details in HTML for easier debugging

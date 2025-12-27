@@ -1,176 +1,111 @@
-import React from 'react';
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import {
-  Button,
-  Rows,
-  Text,
-  Title,
-  Box,
-  Badge,
-} from '@canva/app-ui-kit';
-import { addElementAtPoint } from '@canva/design';
-import { ImageBrandData } from '../types';
-import { getTaggedImageCount, FREE_TIER_LIMIT } from '../utils/storage';
+  Home,
+  LayoutGrid,
+  Heart,
+  Compass,
+  Settings,
+} from 'lucide-react';
 
-interface SidebarProps {
-  selectedImageData?: ImageBrandData;
-  onEditTag: () => void;
-  onExport: () => void;
-  allBrandData: ImageBrandData[];
-}
+const navigationItems = [
+  { name: 'Home', href: '/', icon: Home },
+  { name: 'Discover', href: '/discover', icon: Compass },
+  { name: 'My Looks', href: '/looks', icon: LayoutGrid },
+  { name: 'Collections', href: '/collections', icon: Heart },
+  { name: 'Settings', href: '/settings', icon: Settings },
+];
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  selectedImageData,
-  onEditTag,
-  onExport,
-  allBrandData
-}) => {
-  const taggedCount = getTaggedImageCount();
-  const remainingFree = Math.max(0, FREE_TIER_LIMIT - taggedCount);
-
-  const handleAddBrandNameToCanvas = async () => {
-    if (!selectedImageData) return;
-
-    await addElementAtPoint({
-      type: 'text',
-      children: [selectedImageData.brandTag.brandName],
-      top: 0,
-      left: 0,
-    });
-  };
+export default function Sidebar() {
+  const pathname = usePathname();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <Rows spacing="2u">
-      <Box>
-        <Title size="medium">Moodboard Tags</Title>
-      </Box>
-
-      <Box paddingTop="1u" paddingBottom="1u">
-        <Rows spacing="0.5u">
-          <Text size="small" tone="tertiary">
-            Tagged images: {taggedCount} / {FREE_TIER_LIMIT} (Free)
-          </Text>
-          {remainingFree <= 3 && remainingFree > 0 && (
-            <Badge tone="warn" text={`${remainingFree} tags remaining`} />
-          )}
-          {remainingFree === 0 && (
-            <Badge tone="critical" text="Free limit reached" />
-          )}
-        </Rows>
-      </Box>
-
-      {selectedImageData ? (
-        <Rows spacing="1.5u">
-          <Box>
-            <Title size="small">Selected Image</Title>
-          </Box>
-
-          <Rows spacing="0.5u">
-            <Text size="small" tone="tertiary">Brand</Text>
-            <Text size="medium">
-              {selectedImageData.brandTag.brandName}
-            </Text>
-          </Rows>
-
-          {selectedImageData.brandTag.productName && (
-            <Rows spacing="0.5u">
-              <Text size="small" tone="tertiary">Product</Text>
-              <Text size="small">{selectedImageData.brandTag.productName}</Text>
-            </Rows>
-          )}
-
-          {selectedImageData.brandTag.productUrl && (
-            <Rows spacing="0.5u">
-              <Text size="small" tone="tertiary">URL</Text>
-              <Text size="xsmall" tone="tertiary">
-                {selectedImageData.brandTag.productUrl.substring(0, 40)}...
-              </Text>
-            </Rows>
-          )}
-
-          {selectedImageData.brandTag.tags.length > 0 && (
-            <Rows spacing="0.5u">
-              <Text size="small" tone="tertiary">Tags</Text>
-              <Box>
-                {selectedImageData.brandTag.tags.map((tag, index) => (
-                  <Badge key={index} text={tag} tone="info" />
-                ))}
-              </Box>
-            </Rows>
-          )}
-
-          {selectedImageData.brandTag.price && (
-            <Rows spacing="0.5u">
-              <Text size="small" tone="tertiary">Price</Text>
-              <Text size="small">
-                {selectedImageData.brandTag.currency
-                  ? `${selectedImageData.brandTag.currency} ${selectedImageData.brandTag.price}`
-                  : selectedImageData.brandTag.price
-                }
-              </Text>
-            </Rows>
-          )}
-
-          {selectedImageData.brandTag.notes && (
-            <Rows spacing="0.5u">
-              <Text size="small" tone="tertiary">Notes</Text>
-              <Text size="small">{selectedImageData.brandTag.notes}</Text>
-            </Rows>
-          )}
-
-          <Button
-            variant="secondary"
-            onClick={onEditTag}
-            stretch
-          >
-            Edit Tag
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={handleAddBrandNameToCanvas}
-            stretch
-          >
-            Add Brand Name to Canvas
-          </Button>
-        </Rows>
-      ) : (
-        <Box paddingTop="2u">
-          <Text size="small" tone="tertiary" alignment="center">
-            Select a tagged image to view details
-          </Text>
-        </Box>
-      )}
-
-      <Box paddingTop="2u">
-        <Button
-          variant="primary"
-          onClick={onExport}
-          disabled={allBrandData.length === 0}
-          stretch
+    <aside
+      className="fixed left-0 top-0 h-full transition-all duration-300 ease-in-out z-40"
+      style={{
+        width: isExpanded ? 'var(--sidebar-expanded)' : 'var(--sidebar-width)',
+        backgroundColor: 'var(--background-tertiary)',
+        borderRight: '1px solid var(--border)',
+      }}
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+    >
+      {/* Logo */}
+      <div
+        className="flex items-center px-3 border-b"
+        style={{
+          height: 'var(--topbar-height)',
+          borderColor: 'var(--border)',
+        }}
+      >
+        {/* Custom logo: cream circle with green pill */}
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: '#f6e9cf' }}
         >
-          Export Moodboard Data
-        </Button>
-      </Box>
+          <div
+            className="w-4 h-1.5 rounded-full"
+            style={{ backgroundColor: '#4a7c4e' }}
+          />
+        </div>
+        {isExpanded && (
+          <span
+            className="ml-3 font-semibold text-sm whitespace-nowrap"
+            style={{ color: 'var(--foreground)' }}
+          >
+            The Mood Layer
+          </span>
+        )}
+      </div>
 
-      {allBrandData.length > 0 && (
-        <Box paddingTop="1u">
-          <Rows spacing="1u">
-            <Title size="small">All Brands ({allBrandData.length})</Title>
-            {allBrandData.map((data) => (
-              <Box key={data.imageId}>
-                <Text size="small">
-                  {data.brandTag.brandName}
-                </Text>
-                {data.brandTag.productName && (
-                  <Text size="xsmall" tone="tertiary">
-                    {data.brandTag.productName}
-                  </Text>
-                )}
-              </Box>
-            ))}
-          </Rows>
-        </Box>
-      )}
-    </Rows>
+      {/* Navigation */}
+      <nav className="py-4">
+        <ul className="space-y-1">
+          {navigationItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+
+            return (
+              <li key={item.href} className="px-2">
+                <Link
+                  href={item.href}
+                  className="flex items-center rounded-md transition-all duration-200 group relative"
+                  style={{
+                    backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+                    color: isActive ? 'white' : 'var(--foreground-secondary)',
+                    height: '40px',
+                    paddingLeft: isExpanded ? '12px' : '0',
+                    justifyContent: isExpanded ? 'flex-start' : 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--surface)';
+                      e.currentTarget.style.color = 'var(--foreground)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--foreground-secondary)';
+                    }
+                  }}
+                >
+                  <Icon size={20} className="flex-shrink-0" />
+                  {isExpanded && (
+                    <span className="ml-3 text-sm font-medium whitespace-nowrap">
+                      {item.name}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </aside>
   );
-};
+}

@@ -140,7 +140,7 @@ function calculateSimilarity(source: Product, target: Product): { score: number;
  * Find related products for a given product
  */
 async function findRelatedProducts(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   productId: string,
   limit: number = 10,
   useCache: boolean = true
@@ -150,18 +150,18 @@ async function findRelatedProducts(
     .from('enriched_products')
     .select('*')
     .eq('id', productId)
-    .single();
+    .single() as { data: Product | null; error: any };
 
   if (sourceError || !sourceProduct) {
     throw new Error(`Product not found: ${productId}`);
   }
 
   // Check cache first
-  if (useCache && sourceProduct.related_product_ids?.length > 0) {
+  if (useCache && sourceProduct.related_product_ids && sourceProduct.related_product_ids.length > 0) {
     const { data: cachedProducts } = await supabase
       .from('enriched_products')
       .select('*')
-      .in('id', sourceProduct.related_product_ids.slice(0, limit));
+      .in('id', sourceProduct.related_product_ids.slice(0, limit)) as { data: Product[] | null; error: any };
 
     if (cachedProducts && cachedProducts.length > 0) {
       log.info({ productId, cachedCount: cachedProducts.length }, 'Using cached related products');
@@ -173,20 +173,26 @@ async function findRelatedProducts(
     }
   }
 
-  // Build query for candidate products
-  let query = supabase
+  // Build query for candidate products - fetch all and filter in memory to avoid type issues
+  const { data: allCandidates, error: candidateError } = await supabase
     .from('enriched_products')
     .select('*')
     .neq('id', productId)
-    .limit(200); // Get a larger pool to score
+    .limit(200) as { data: Product[] | null; error: any }; // Get a larger pool to score
 
-  // Pre-filter by category if available
-  if (sourceProduct.category) {
-    // Get products in same or related categories
-    query = query.or(`category.eq.${sourceProduct.category},tags.cs.{${sourceProduct.category}}`);
+  // Filter by category in memory if available
+  let candidates = allCandidates;
+  if (candidates && sourceProduct.category) {
+    const sourceCategory = sourceProduct.category.toLowerCase();
+    candidates = candidates.filter((p: Product) =>
+      (p.category && p.category.toLowerCase() === sourceCategory) ||
+      (p.tags && p.tags.some(t => t.toLowerCase() === sourceCategory))
+    );
+    // If filtering reduced too much, fall back to all candidates
+    if (candidates.length < 10 && allCandidates) {
+      candidates = allCandidates;
+    }
   }
-
-  const { data: candidates, error: candidateError } = await query;
 
   if (candidateError) {
     throw new Error(`Failed to fetch candidates: ${candidateError.message}`);
@@ -215,7 +221,7 @@ async function findRelatedProducts(
     const relatedIds = scored.map((p: ScoredProduct) => p.id);
     await supabase
       .from('enriched_products')
-      .update({ related_product_ids: relatedIds })
+      .update({ related_product_ids: relatedIds } as any)
       .eq('id', productId);
 
     log.info({ productId, relatedCount: relatedIds.length }, 'Cached related product IDs');

@@ -75,14 +75,25 @@ export class ProductEnrichmentEngine {
       sanitized.category
     );
 
-    // Step 6: Merge and return enriched product
+    // Step 6: Map inferred dimensions to product_dimensions if not already set
+    const productDimensions = sanitized.product_dimensions || (enrichedFields.inferred_dimensions ? {
+      width: enrichedFields.inferred_dimensions.width_cm,
+      height: enrichedFields.inferred_dimensions.height_cm,
+      depth: enrichedFields.inferred_dimensions.depth_cm,
+    } : undefined);
+
+    // Step 7: Merge and return enriched product
     const enrichedProduct: EnrichedProduct = {
       ...sanitized,
       ...enrichedFields,
       tags: tagNormalization.canonical_tags,
       canonical_tags: tagNormalization.canonical_tags,
+      product_dimensions: productDimensions,
       enriched_at: new Date().toISOString()
     };
+
+    // Remove the inferred_dimensions field (it's mapped to product_dimensions)
+    delete (enrichedProduct as { inferred_dimensions?: unknown }).inferred_dimensions;
 
     return enrichedProduct;
   }
@@ -160,6 +171,9 @@ Given the product below, analyze and enrich it with the following:
 - **texture**: A single descriptive word for the surface quality (e.g., "woven", "matte", "glossy", "smooth")
 - **material**: The primary material class (e.g., "cotton", "ceramic", "wood", "linen")
 - **tone**: The overall aesthetic or mood (e.g., "earthy", "playful", "minimalist", "luxury")
+- **flags**: Special product attributes (e.g., ["handmade", "fragile", "limited-edition", "eco-friendly", "vintage", "artisan"])
+- **fit_tags**: Physical characteristics for layout placement. Choose from: "bulky", "flat", "delicate", "lightweight", "oversized"
+- **inferred_dimensions**: Estimate typical dimensions based on product type
 
 **Product Details:**
 - Product Name: "${product.product_name}"
@@ -168,13 +182,17 @@ Given the product below, analyze and enrich it with the following:
 ${product.price ? `- Price: ${product.price}` : ''}
 ${product.region ? `- Region: ${product.region}` : ''}
 ${product.dimensions ? `- Dimensions: ${product.dimensions}` : ''}
+${product.product_dimensions ? `- Structured Dimensions: ${JSON.stringify(product.product_dimensions)}` : ''}
 
 **Important Instructions:**
 1. Base your analysis on the product name, brand, and category
 2. Use specific, descriptive terms (avoid vague words like "nice", "good", "normal")
 3. Ensure colors are realistic and relevant to the product type
 4. Tags should capture style, aesthetic, and use case
-5. Return ONLY valid JSON without any markdown formatting or explanations
+5. Flags should highlight special characteristics (handmade, fragile, eco-friendly, etc.)
+6. fit_tags help with moodboard layout - think about how the item would be photographed/displayed
+7. For dimensions, infer typical sizes based on product category (e.g., a cushion is ~45x45cm)
+8. Return ONLY valid JSON without any markdown formatting or explanations
 
 **Output Format (JSON only):**
 {
@@ -182,7 +200,15 @@ ${product.dimensions ? `- Dimensions: ${product.dimensions}` : ''}
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
   "texture": "texture_description",
   "material": "material_type",
-  "tone": "aesthetic_mood"
+  "tone": "aesthetic_mood",
+  "flags": ["flag1", "flag2"],
+  "fit_tags": ["flat", "lightweight"],
+  "inferred_dimensions": {
+    "width_cm": 45,
+    "height_cm": 45,
+    "depth_cm": 10,
+    "size_category": "medium"
+  }
 }`;
   }
 

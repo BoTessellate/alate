@@ -202,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         throw new Error(`Failed to fetch products: ${error.message}`);
       }
 
-      productIds = (products || []).map(p => p.id);
+      productIds = (products || []).map((p: any) => p.id);
     }
 
     if (productIds.length === 0) {
