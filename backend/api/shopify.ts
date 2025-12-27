@@ -1557,5 +1557,11 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+
+  // Critical: Allow Shopify to embed this app in an iframe
+  // Must be set right before sending to override any defaults
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "frame-ancestors https://*.myshopify.com https://admin.shopify.com");
+
   res.status(200).send(html);
 }
