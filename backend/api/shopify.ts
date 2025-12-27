@@ -53,17 +53,29 @@ function getSupabase(): SupabaseClient {
 
 /**
  * Set security headers on response
+ * Note: X-Frame-Options is NOT set here because Shopify embedded apps
+ * must be loaded in an iframe from admin.shopify.com
  */
-function setSecurityHeaders(res: VercelResponse): void {
+function setSecurityHeaders(res: VercelResponse, allowShopifyFrame: boolean = false): void {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Allow Shopify iframe embedding
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  if (allowShopifyFrame) {
+    // Allow Shopify admin to embed this page in an iframe
+    res.setHeader('Content-Security-Policy', "frame-ancestors https://*.myshopify.com https://admin.shopify.com");
+  } else {
+    // For non-embedded endpoints, deny framing
+    res.setHeader('X-Frame-Options', 'DENY');
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Set security headers on all responses
-  setSecurityHeaders(res);
+  const action = req.query.action as string || 'app';
+
+  // Set security headers - allow Shopify iframe for 'app' action
+  const allowShopifyFrame = action === 'app';
+  setSecurityHeaders(res, allowShopifyFrame);
 
   // Handle CORS preflight for all actions
   if (req.method === 'OPTIONS') {
@@ -72,8 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     return res.status(200).end();
   }
-
-  const action = req.query.action as string || 'app';
 
   try {
     switch (action) {
