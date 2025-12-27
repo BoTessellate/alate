@@ -90,6 +90,7 @@ export type TextStyle = 'label' | 'caption' | 'price' | 'heading';
  */
 export interface LayoutElement {
   type: ElementType;
+  id?: string;               // Unique identifier for element
   src?: string;              // For images
   text?: string;             // For text/labels
   position: Position;

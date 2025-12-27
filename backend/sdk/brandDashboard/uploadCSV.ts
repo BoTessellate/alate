@@ -7,6 +7,22 @@ import { parse } from 'csv-parse/sync';
 import { ProductEnricher } from '../productEnrichment/enrichProduct';
 import { createClient } from '@supabase/supabase-js';
 
+// CSV row type for parsed records
+interface CSVRow {
+  product_name?: string;
+  brand?: string;
+  category?: string;
+  price?: string;
+  tags?: string;
+  color_palette?: string;
+  region?: string;
+  material?: string;
+  texture?: string;
+  tone?: string;
+  sku?: string;
+  [key: string]: string | undefined;
+}
+
 export interface CSVUploadRequest {
   csv_content: string; // CSV file content as string
   brand_id: string;
@@ -75,7 +91,7 @@ export class CSVUploadHandler {
         skip_empty_lines: true,
         trim: true,
         relax_column_count: true
-      });
+      }) as CSVRow[];
 
       if (records.length === 0) {
         errors.push('CSV file is empty');
@@ -89,7 +105,7 @@ export class CSVUploadHandler {
       }
 
       // Get columns
-      const columns = Object.keys(records[0]);
+      const columns = Object.keys(records[0] as object);
 
       // Check required columns
       const requiredColumns = ['product_name', 'category'];
@@ -183,7 +199,7 @@ export class CSVUploadHandler {
         skip_empty_lines: true,
         trim: true,
         relax_column_count: true
-      });
+      }) as CSVRow[];
 
       response.total_rows = records.length;
 

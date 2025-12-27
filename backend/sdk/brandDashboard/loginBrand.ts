@@ -134,7 +134,7 @@ export class BrandAuthenticator {
         email: brand.email,
         access_token: authData.session?.access_token,
         refresh_token: authData.session?.refresh_token,
-        expires_at: authData.session?.expires_at
+        expires_at: authData.session?.expires_at ? String(authData.session.expires_at) : undefined
       };
     } catch (error) {
       console.error('Login error:', error);
@@ -226,7 +226,7 @@ export class BrandAuthenticator {
         email: brand.email,
         access_token: authData.session?.access_token,
         refresh_token: authData.session?.refresh_token,
-        expires_at: authData.session?.expires_at
+        expires_at: authData.session?.expires_at ? String(authData.session.expires_at) : undefined
       };
     } catch (error) {
       console.error('Registration error:', error);

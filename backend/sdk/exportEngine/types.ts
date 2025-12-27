@@ -5,6 +5,9 @@
 
 import { LayoutOutput } from '../layoutGenerator/types';
 
+// Re-export LayoutOutput for use by other modules
+export { LayoutOutput };
+
 /**
  * Export format types
  */

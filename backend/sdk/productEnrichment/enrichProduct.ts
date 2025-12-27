@@ -301,3 +301,38 @@ ${product.product_dimensions ? `- Structured Dimensions: ${JSON.stringify(produc
 export function createEnrichmentEngine(config: EnrichmentConfig): ProductEnrichmentEngine {
   return new ProductEnrichmentEngine(config);
 }
+
+/**
+ * Simple ProductEnricher wrapper for backward compatibility
+ * Used by CSV upload and other simple use cases
+ */
+export class ProductEnricher {
+  private engine: ProductEnrichmentEngine;
+
+  constructor(anthropicApiKey: string) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials not configured');
+    }
+
+    this.engine = new ProductEnrichmentEngine({
+      anthropicApiKey,
+      supabaseUrl,
+      supabaseKey
+    });
+  }
+
+  async enrichAndSave(product: RawProductInput): Promise<{ success: boolean; product_id?: string; error?: string }> {
+    try {
+      const enriched = await this.engine.enrichAndSave(product);
+      return { success: true, product_id: enriched.id };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Enrichment failed'
+      };
+    }
+  }
+}
