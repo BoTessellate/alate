@@ -63,6 +63,8 @@ function setSecurityHeaders(res: VercelResponse, allowShopifyFrame: boolean = fa
 
   if (allowShopifyFrame) {
     // Allow Shopify admin to embed this page in an iframe
+    // Must explicitly remove X-Frame-Options as Vercel/browsers may add defaults
+    res.removeHeader('X-Frame-Options');
     res.setHeader('Content-Security-Policy', "frame-ancestors https://*.myshopify.com https://admin.shopify.com");
   } else {
     // For non-embedded endpoints, deny framing
