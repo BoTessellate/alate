@@ -8,19 +8,6 @@
   },
   "headers": [
     {
-      "source": "/api/shopify",
-      "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.vercel.app"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": ""
-        }
-      ]
-    },
-    {
       "source": "/api/(.*)",
       "headers": [
         {
