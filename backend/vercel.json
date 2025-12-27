@@ -8,22 +8,11 @@
   },
   "headers": [
     {
-      "source": "/api/shopify",
-      "has": [
-        {
-          "type": "query",
-          "key": "action",
-          "value": "app"
-        }
-      ],
+      "source": "/api/shopify(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
+          "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com https://*.vercel.app"
         }
       ]
     },
