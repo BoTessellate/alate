@@ -17,6 +17,11 @@ export interface Product {
   texture?: string;
   tone?: string;
   canonical_tags?: string[];
+  // Fields for user-uploaded products
+  size?: string;
+  source?: 'upload' | 'scrape' | 'api';
+  original_image_url?: string;
+  uploaded_at?: string;
 }
 
 // Collection with saved products

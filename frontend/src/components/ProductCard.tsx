@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Heart, Bookmark, ExternalLink } from 'lucide-react';
+import { Heart, Bookmark, ExternalLink, Shirt } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductUrl } from '@/utils/placeholder';
 import SaveToCollectionModal from './SaveToCollectionModal';
+import VirtualTryOnModal from './VirtualTryOnModal';
 import type { Product } from '@/types';
 
 interface ProductCardProps {
@@ -28,6 +29,7 @@ const normalizeText = (text: string): string => {
 export default function ProductCard({ product, onExternalLink }: ProductCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showTryOnModal, setShowTryOnModal] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const { isProductInAnyCollection } = useCollectionsStore();
   const { format } = usePriceFormatter();
@@ -54,6 +56,11 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
       const url = getProductUrl(product.brand, product.product_name);
       window.open(url, '_blank', 'noopener,noreferrer');
     }
+  };
+
+  const handleTryOnClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowTryOnModal(true);
   };
 
   return (
@@ -98,7 +105,7 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
             {/* Favorite Button */}
             <button
               onClick={handleFavoriteClick}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
               style={{
                 backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)',
               }}
@@ -114,7 +121,7 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
             <button
               ref={saveButtonRef}
               onClick={handleSaveClick}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
               style={{
                 backgroundColor: isInCollection
                   ? 'var(--primary)'
@@ -127,20 +134,20 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
                 style={{ color: 'white' }}
               />
             </button>
+
+            {/* Virtual Try-On Button */}
+            <button
+              onClick={handleTryOnClick}
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
+              style={{
+                backgroundColor: 'rgba(0,0,0,0.5)',
+              }}
+              title="Virtual Try-On"
+            >
+              <Shirt size={16} style={{ color: 'white' }} />
+            </button>
           </div>
 
-          {/* Collection indicator badge */}
-          {isInCollection && (
-            <div
-              className="absolute bottom-3 left-3 px-2 py-1 rounded text-xs font-medium"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-              }}
-            >
-              Saved
-            </div>
-          )}
         </div>
 
         {/* Product Info */}
@@ -163,7 +170,7 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
             </p>
             <button
               onClick={handleExternalClick}
-              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
               style={{ color: 'var(--foreground-muted)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -178,24 +185,6 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
               <ExternalLink size={14} />
             </button>
           </div>
-
-          {/* Tags */}
-          {product.tags && product.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
-              {product.tags.slice(0, 3).map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-0.5 rounded text-xs"
-                  style={{
-                    backgroundColor: 'var(--background-secondary)',
-                    color: 'var(--foreground-secondary)',
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -205,6 +194,13 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         anchorRef={saveButtonRef}
+      />
+
+      {/* Virtual Try-On Modal */}
+      <VirtualTryOnModal
+        product={product}
+        isOpen={showTryOnModal}
+        onClose={() => setShowTryOnModal(false)}
       />
     </>
   );

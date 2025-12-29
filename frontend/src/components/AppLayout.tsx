@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
+import FloatingActionButton from './FloatingActionButton';
+import PhotoUploadModal from './PhotoUploadModal';
 import { useUserStore } from '@/stores/useUserStore';
 import { Loader2 } from 'lucide-react';
 
@@ -88,6 +90,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {children}
           </main>
         </div>
+
+        {/* Floating Action Button - Upload Product Photo */}
+        <FloatingActionButton />
+
+        {/* Photo Upload Modal */}
+        <PhotoUploadModal />
       </div>
     </ThemeProvider>
   );

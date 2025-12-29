@@ -36,10 +36,14 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div
-        className="flex items-center px-3 border-b"
+        className="flex items-center border-b relative transition-all duration-300"
         style={{
           height: 'var(--topbar-height)',
           borderColor: 'var(--border)',
+          // Center logo when collapsed, left-align when expanded
+          justifyContent: isExpanded ? 'flex-start' : 'center',
+          paddingLeft: isExpanded ? '12px' : '0',
+          paddingRight: isExpanded ? '12px' : '0',
         }}
       >
         {/* Custom logo: cream circle with green pill */}
@@ -52,14 +56,19 @@ export default function Sidebar() {
             style={{ backgroundColor: '#4a7c4e' }}
           />
         </div>
-        {isExpanded && (
-          <span
-            className="ml-3 font-semibold text-sm whitespace-nowrap"
-            style={{ color: 'var(--foreground)' }}
-          >
-            The Mood Layer
-          </span>
-        )}
+        {/* Text - absolutely positioned to not affect icon centering */}
+        <span
+          className="ml-3 font-semibold text-sm whitespace-nowrap transition-all duration-300 ease-in-out absolute"
+          style={{
+            color: 'var(--foreground)',
+            opacity: isExpanded ? 1 : 0,
+            transform: isExpanded ? 'translateX(0)' : 'translateX(-8px)',
+            left: '52px', // 12px padding + 32px logo + 8px gap
+            pointerEvents: isExpanded ? 'auto' : 'none',
+          }}
+        >
+          The Mood Layer
+        </span>
       </div>
 
       {/* Navigation */}
@@ -70,16 +79,18 @@ export default function Sidebar() {
             const Icon = item.icon;
 
             return (
-              <li key={item.href} className="px-2">
+              <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="flex items-center rounded-md transition-all duration-200 group relative"
+                  className="flex items-center rounded-md transition-all duration-200 group relative mx-2"
                   style={{
                     backgroundColor: isActive ? 'var(--primary)' : 'transparent',
                     color: isActive ? 'white' : 'var(--foreground-secondary)',
                     height: '40px',
-                    paddingLeft: isExpanded ? '12px' : '0',
+                    // Center icons when collapsed, left-align when expanded
                     justifyContent: isExpanded ? 'flex-start' : 'center',
+                    paddingLeft: isExpanded ? '12px' : '0',
+                    paddingRight: isExpanded ? '12px' : '0',
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
@@ -95,11 +106,18 @@ export default function Sidebar() {
                   }}
                 >
                   <Icon size={20} className="flex-shrink-0" />
-                  {isExpanded && (
-                    <span className="ml-3 text-sm font-medium whitespace-nowrap">
-                      {item.name}
-                    </span>
-                  )}
+                  {/* Text - absolutely positioned to not affect icon centering */}
+                  <span
+                    className="text-sm font-medium whitespace-nowrap transition-all duration-300 ease-in-out absolute"
+                    style={{
+                      opacity: isExpanded ? 1 : 0,
+                      transform: isExpanded ? 'translateX(0)' : 'translateX(-8px)',
+                      left: '44px', // 8px margin + 12px padding + 20px icon + 4px gap
+                      pointerEvents: isExpanded ? 'auto' : 'none',
+                    }}
+                  >
+                    {item.name}
+                  </span>
                 </Link>
               </li>
             );
