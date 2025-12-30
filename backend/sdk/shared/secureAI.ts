@@ -185,8 +185,9 @@ export async function callClaude(
   prompt: string,
   options?: { model?: string; maxTokens?: number }
 ): Promise<{ success: boolean; text?: string; error?: string }> {
-  // Use Sonnet by default for faster responses, Opus for complex tasks
-  const defaultModel = process.env.ENRICHMENT_MODEL || 'claude-sonnet-4-20250514';
+  // Use Claude 3.5 Sonnet by default for faster responses
+  // Model options: claude-3-5-sonnet-20241022, claude-sonnet-4-20250514, claude-opus-4-5-20251101
+  const defaultModel = process.env.ENRICHMENT_MODEL || 'claude-3-5-sonnet-20241022';
   const model = options?.model || defaultModel;
   const maxTokens = options?.maxTokens || 1024;
 

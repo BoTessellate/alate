@@ -77,7 +77,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* Floating Search Bar - Only the bar floats */}
-      <div className="sticky top-3 z-30 px-8">
+      <div className="sticky z-20 px-8" style={{ top: 'calc(var(--topbar-height) + 24px)' }}>
         <form onSubmit={handleSearch} className="max-w-7xl mx-auto">
           <div
             className="flex items-center gap-3 rounded-xl border focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[var(--primary)]/20"

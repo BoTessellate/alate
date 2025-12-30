@@ -53,31 +53,33 @@ export const applyTheme = (theme: Theme) => {
   const effectiveTheme = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
 
   if (effectiveTheme === 'light') {
-    // Light theme colors
-    root.style.setProperty('--background', '#f8f6f3');
-    root.style.setProperty('--background-secondary', '#f0ebe4');
-    root.style.setProperty('--background-tertiary', '#e8e2d9');
-    root.style.setProperty('--surface', '#ffffff');
-    root.style.setProperty('--surface-light', '#f5f3f0');
-    root.style.setProperty('--surface-elevated', '#fafafa');
-    root.style.setProperty('--foreground', '#222222');
-    root.style.setProperty('--foreground-secondary', '#555555');
-    root.style.setProperty('--foreground-muted', '#888888');
-    root.style.setProperty('--border', '#e0dcd5');
-    root.style.setProperty('--border-light', '#d0ccc5');
+    // Light theme colors - warm brand tones (cream/green)
+    root.style.setProperty('--background', '#e8dcc8');
+    root.style.setProperty('--background-secondary', '#ddd0ba');
+    root.style.setProperty('--background-tertiary', '#d2c4ac');
+    root.style.setProperty('--surface', '#f5ebe0');
+    root.style.setProperty('--surface-light', '#ebe0d4');
+    root.style.setProperty('--surface-elevated', '#faf6f0');
+    root.style.setProperty('--foreground', '#2d3a24');
+    root.style.setProperty('--foreground-secondary', '#4a5a3d');
+    root.style.setProperty('--foreground-muted', '#6b7a5e');
+    root.style.setProperty('--border', '#c4b8a0');
+    root.style.setProperty('--border-light', '#b8a890');
+    root.style.setProperty('--topbar-bg', 'rgba(76, 112, 49, 0.92)');
   } else {
-    // Dark theme colors (default)
-    root.style.setProperty('--background', '#1a1a1a');
-    root.style.setProperty('--background-secondary', '#222222');
-    root.style.setProperty('--background-tertiary', '#111111');
-    root.style.setProperty('--surface', '#2a2a2a');
-    root.style.setProperty('--surface-light', '#3a3a3a');
-    root.style.setProperty('--surface-elevated', '#4a4a4a');
+    // Dark theme colors (default) - deeper, richer tones
+    root.style.setProperty('--background', '#0d0d0d');
+    root.style.setProperty('--background-secondary', '#151515');
+    root.style.setProperty('--background-tertiary', '#0a0a0a');
+    root.style.setProperty('--surface', '#1a1a1a');
+    root.style.setProperty('--surface-light', '#252525');
+    root.style.setProperty('--surface-elevated', '#303030');
     root.style.setProperty('--foreground', '#f6e9cf');
     root.style.setProperty('--foreground-secondary', '#d4c9b0');
     root.style.setProperty('--foreground-muted', '#9a9080');
-    root.style.setProperty('--border', '#3a3a3a');
-    root.style.setProperty('--border-light', '#4a4a4a');
+    root.style.setProperty('--border', '#2a2a2a');
+    root.style.setProperty('--border-light', '#3a3a3a');
+    root.style.setProperty('--topbar-bg', 'rgba(76, 112, 49, 0.92)');
   }
 
   // Store the applied theme for reference

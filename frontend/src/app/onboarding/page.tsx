@@ -137,7 +137,7 @@ export default function OnboardingPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-8"
+      className="min-h-screen flex flex-col items-center justify-center p-8 pb-12 overflow-y-auto"
       style={{ backgroundColor: 'var(--background)' }}
     >
       {/* Logo */}

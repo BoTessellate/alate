@@ -29,17 +29,18 @@ const themeScript = `
     var root = document.documentElement;
 
     if (effectiveTheme === 'light') {
-      root.style.setProperty('--background', '#f8f6f3');
-      root.style.setProperty('--background-secondary', '#f0ebe4');
-      root.style.setProperty('--background-tertiary', '#e8e2d9');
-      root.style.setProperty('--surface', '#ffffff');
-      root.style.setProperty('--surface-light', '#f5f3f0');
-      root.style.setProperty('--surface-elevated', '#fafafa');
-      root.style.setProperty('--foreground', '#222222');
-      root.style.setProperty('--foreground-secondary', '#555555');
-      root.style.setProperty('--foreground-muted', '#888888');
-      root.style.setProperty('--border', '#e0dcd5');
-      root.style.setProperty('--border-light', '#d0ccc5');
+      root.style.setProperty('--background', '#e8dcc8');
+      root.style.setProperty('--background-secondary', '#ddd0ba');
+      root.style.setProperty('--background-tertiary', '#d2c4ac');
+      root.style.setProperty('--surface', '#f5ebe0');
+      root.style.setProperty('--surface-light', '#ebe0d4');
+      root.style.setProperty('--surface-elevated', '#faf6f0');
+      root.style.setProperty('--foreground', '#2d3a24');
+      root.style.setProperty('--foreground-secondary', '#4a5a3d');
+      root.style.setProperty('--foreground-muted', '#6b7a5e');
+      root.style.setProperty('--border', '#c4b8a0');
+      root.style.setProperty('--border-light', '#b8a890');
+      root.style.setProperty('--topbar-bg', 'rgba(76, 112, 49, 0.92)');
     }
     root.setAttribute('data-theme', effectiveTheme);
   } catch (e) {}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { X, Check, Plus, FolderPlus } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import type { Product } from '@/types';
@@ -31,10 +31,11 @@ export default function SaveToCollectionModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Position modal near anchor element
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  // Position modal near anchor element - use useLayoutEffect to calculate before paint
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  useEffect(() => {
+  // useLayoutEffect runs synchronously before browser paint, preventing visual shift
+  useLayoutEffect(() => {
     if (isOpen && anchorRef?.current) {
       const rect = anchorRef.current.getBoundingClientRect();
       const modalWidth = 280;
@@ -54,6 +55,9 @@ export default function SaveToCollectionModal({
       }
 
       setPosition({ top, left });
+    } else if (!isOpen) {
+      // Reset position when closed so it recalculates on next open
+      setPosition(null);
     }
   }, [isOpen, anchorRef]);
 
@@ -126,7 +130,8 @@ export default function SaveToCollectionModal({
     }
   };
 
-  if (!isOpen) return null;
+  // Don't render until open AND position is calculated (prevents flash at 0,0)
+  if (!isOpen || !position) return null;
 
   return (
     <div
@@ -181,7 +186,7 @@ export default function SaveToCollectionModal({
               <button
                 key={collection.id}
                 onClick={() => handleToggleCollection(collection.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-5 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-5 transition-colors text-left cursor-pointer"
                 style={{
                   backgroundColor: isInCollection
                     ? 'rgba(76, 112, 49, 0.1)'
@@ -283,10 +288,19 @@ export default function SaveToCollectionModal({
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded text-sm font-medium transition-colors hover:opacity-80"
+            className="w-full flex items-center justify-center gap-2 py-2 rounded text-sm font-medium transition-colors cursor-pointer"
             style={{
-              backgroundColor: 'var(--primary)',
-              color: 'white',
+              backgroundColor: 'transparent',
+              color: 'var(--foreground-secondary)',
+              border: '1px dashed var(--border)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--foreground-muted)';
+              e.currentTarget.style.color = 'var(--foreground)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.color = 'var(--foreground-secondary)';
             }}
           >
             <Plus size={16} />

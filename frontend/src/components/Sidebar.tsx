@@ -25,15 +25,21 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full transition-all duration-300 ease-in-out z-40"
+      className="fixed left-0 top-0 h-full transition-all duration-300 ease-in-out z-40 flex"
       style={{
-        width: isExpanded ? 'var(--sidebar-expanded)' : 'var(--sidebar-width)',
-        backgroundColor: 'var(--background-tertiary)',
-        borderRight: '1px solid var(--border)',
+        width: isExpanded ? 'calc(var(--sidebar-expanded) + 20px)' : 'calc(var(--sidebar-width) + 20px)',
       }}
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
     >
+      {/* Main sidebar content */}
+      <div
+        className="h-full transition-all duration-300 ease-in-out"
+        style={{
+          width: isExpanded ? 'var(--sidebar-expanded)' : 'var(--sidebar-width)',
+          backgroundColor: 'var(--background-tertiary)',
+        }}
+      >
       {/* Logo */}
       <div
         className="flex items-center border-b relative transition-all duration-300"
@@ -124,6 +130,17 @@ export default function Sidebar() {
           })}
         </ul>
       </nav>
+      </div>
+
+      {/* Curved right edge - vertical arc bulging outward */}
+      <div
+        className="h-full transition-all duration-300 ease-in-out"
+        style={{
+          width: '20px',
+          backgroundColor: 'var(--background-tertiary)',
+          borderRadius: '0 100% 100% 0 / 0 50% 50% 0',
+        }}
+      />
     </aside>
   );
 }

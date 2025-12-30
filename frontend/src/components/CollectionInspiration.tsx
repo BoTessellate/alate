@@ -17,7 +17,7 @@ export default function CollectionInspiration({
   isFilterActive,
 }: CollectionInspirationProps) {
   const { collections, getAggregatedMetadata } = useCollectionsStore();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Default expanded for visibility
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -62,20 +62,26 @@ export default function CollectionInspiration({
 
   return (
     <div
-      className="border-b"
-      style={{ borderColor: 'var(--border)' }}
+      className="border-b border-l-4 mx-2 my-2 rounded-lg overflow-hidden"
+      style={{
+        borderColor: 'var(--border)',
+        borderLeftColor: 'var(--primary)',
+        backgroundColor: 'rgba(76, 112, 49, 0.05)',
+      }}
     >
-      {/* Header - Collapsible */}
+      {/* Header - Collapsible (no hover effect to avoid double highlight) */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-3 py-2.5 flex items-center justify-between transition-colors"
-        style={{ backgroundColor: 'transparent' }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface-light)')}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+        className="w-full px-3 py-3 flex items-center justify-between cursor-pointer"
       >
         <div className="flex items-center gap-2">
-          <Sparkles size={14} style={{ color: 'var(--primary)' }} />
-          <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: 'var(--primary)' }}
+          >
+            <Sparkles size={12} style={{ color: 'white' }} />
+          </div>
+          <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
             Use Collections as Inspiration
           </span>
           {isFilterActive && (
@@ -108,19 +114,11 @@ export default function CollectionInspiration({
                 <button
                   key={collection.id}
                   onClick={() => toggleCollection(collection.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    isSelected ? '' : 'hover:bg-[var(--surface-light)]'
+                  }`}
                   style={{
-                    backgroundColor: isSelected ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
+                    backgroundColor: isSelected ? 'rgba(76, 112, 49, 0.15)' : 'transparent',
                   }}
                 >
                   {/* Checkbox */}
@@ -197,7 +195,7 @@ export default function CollectionInspiration({
             {(selectedCollectionIds.length > 0 || isFilterActive) && (
               <button
                 onClick={handleClearAll}
-                className="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                className="px-3 py-1.5 rounded text-xs font-medium transition-colors cursor-pointer"
                 style={{
                   backgroundColor: 'var(--surface-light)',
                   color: 'var(--foreground)',

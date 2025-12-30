@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
 import FloatingActionButton from './FloatingActionButton';
@@ -66,30 +65,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <ThemeProvider>
-      <div className="flex h-screen w-screen overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
-        {/* Sidebar */}
-        <Sidebar />
+      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
+        {/* Top bar with navigation */}
+        <TopBar />
 
-        {/* Main content area */}
-        <div
-          className="flex flex-col flex-1 min-w-0"
+        {/* Scrollable content */}
+        <main
+          className="flex-1 overflow-y-auto"
           style={{
-            marginLeft: 'var(--sidebar-width)',
+            marginTop: 'calc(var(--topbar-height) + 20px)', // 20px for curved bottom
           }}
         >
-          {/* Top bar */}
-          <TopBar />
-
-          {/* Scrollable content */}
-          <main
-            className="flex-1 overflow-y-auto min-w-0"
-            style={{
-              marginTop: 'var(--topbar-height)',
-            }}
-          >
-            {children}
-          </main>
-        </div>
+          {children}
+        </main>
 
         {/* Floating Action Button - Upload Product Photo */}
         <FloatingActionButton />

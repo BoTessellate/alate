@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquare } from 'lucide-react';
+import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquare, Home, Compass, LayoutGrid, Heart, Settings } from 'lucide-react';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLooksStore, parseSlugId } from '@/stores/useLooksStore';
@@ -19,10 +19,16 @@ interface Product {
 
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
+const navigationItems = [
+  { name: 'Discover', href: '/discover', icon: Compass },
+  { name: 'My Looks', href: '/looks', icon: LayoutGrid },
+  { name: 'Collections', href: '/collections', icon: Heart },
+];
+
 export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { aiModeEnabled, setAiMode, currencyDisplayMode, localCurrency } = useSettingsStore();
+  const { aiModeEnabled, setAiMode, currencyDisplayMode, localCurrency, setCurrencyDisplayMode, setLocalCurrency } = useSettingsStore();
   const { getLookById, saveStatus } = useLooksStore();
 
   const [showSearch, setShowSearch] = useState(false);
@@ -210,50 +216,141 @@ export default function TopBar() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // State for user dropdown
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // State for currency dropdown
+  const [showCurrencyMenu, setShowCurrencyMenu] = useState(false);
+  const currencyMenuRef = useRef<HTMLDivElement>(null);
+
+  const currencies: Array<'USD' | 'EUR' | 'GBP' | 'INR' | 'JPY' | 'AUD' | 'CAD'> = [
+    'USD', 'EUR', 'GBP', 'INR', 'JPY', 'AUD', 'CAD'
+  ];
+
+  // Close user menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  // Close currency menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
+        setShowCurrencyMenu(false);
+      }
+    };
+
+    if (showCurrencyMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCurrencyMenu]);
+
+  // State for topbar expansion
+  const [isTopBarExpanded, setIsTopBarExpanded] = useState(false);
+
   return (
     <header
-      className="fixed top-0 right-0 z-30 flex items-center justify-between px-4"
-      style={{
-        height: 'var(--topbar-height)',
-        left: 'var(--sidebar-width)',
-        backgroundColor: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-      }}
+      className="fixed top-0 left-0 right-0 z-30 transition-all duration-300 ease-out"
+      onMouseEnter={() => setIsTopBarExpanded(true)}
+      onMouseLeave={() => setIsTopBarExpanded(false)}
     >
-      {/* Left side - Breadcrumbs (Supabase style) */}
-      <div className="flex items-center gap-1">
-        {breadcrumbs.map((crumb, index) => (
-          <div key={crumb.href} className="flex items-center">
-            {index > 0 && (
-              <ChevronRight size={14} style={{ color: 'var(--foreground-muted)' }} className="mx-1" />
-            )}
-            {crumb.isLast ? (
-              <span
-                className="text-sm font-medium px-2 py-1"
-                style={{ color: 'var(--foreground)' }}
-              >
-                {crumb.name}
-              </span>
-            ) : (
-              <Link
-                href={crumb.href}
-                className="text-sm font-medium px-2 py-1 rounded transition-colors"
-                style={{ color: 'var(--foreground-secondary)' }}
+      {/* Main TopBar content */}
+      <div
+        className="flex items-center justify-between px-4 backdrop-blur-md transition-all duration-300 ease-out relative z-10"
+        style={{
+          height: isTopBarExpanded ? 'calc(var(--topbar-height) + 28px)' : 'var(--topbar-height)',
+          backgroundColor: 'var(--topbar-bg)',
+        }}
+      >
+      {/* Left side - Logo */}
+      <div className="flex items-center">
+        {/* Clickable Logo */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+        >
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: '#f6e9cf' }}
+          >
+            <div
+              className="w-4 h-1.5 rounded-full"
+              style={{ backgroundColor: '#4a7c4e' }}
+            />
+          </div>
+          <span
+            className="font-semibold text-sm"
+            style={{ color: '#f6e9cf' }}
+          >
+            The Mood Layer
+          </span>
+        </Link>
+      </div>
+
+      {/* Center - Navigation Icons */}
+      <nav className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8">
+        {navigationItems.map((item) => {
+          const isActive = pathname === item.href ||
+            (item.href !== '/' && pathname.startsWith(item.href));
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="relative group flex flex-col items-center"
+            >
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
+                style={{
+                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.25)' : 'transparent',
+                  color: isActive ? 'white' : 'rgba(255, 255, 255, 0.75)',
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                  e.currentTarget.style.color = 'var(--foreground)';
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                    e.currentTarget.style.color = 'white';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
+                  }
                 }}
               >
-                {crumb.name}
-              </Link>
-            )}
-          </div>
-        ))}
-      </div>
+                <Icon size={20} />
+              </div>
+              {/* Tooltip text - appears below on hover */}
+              <span
+                className="absolute top-full mt-1 text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                style={{
+                  color: 'rgba(255, 255, 255, 0.7)',
+                }}
+              >
+                {item.name}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Right side - Search and actions */}
       <div className="flex items-center gap-2">
@@ -262,8 +359,8 @@ export default function TopBar() {
           <div
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
             style={{
-              backgroundColor: 'var(--surface-light)',
-              color: saveStatus === 'saved' ? 'var(--primary)' : 'var(--foreground-muted)',
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              color: saveStatus === 'saved' ? 'white' : 'rgba(255, 255, 255, 0.7)',
             }}
           >
             {saveStatus === 'saving' && (
@@ -280,7 +377,7 @@ export default function TopBar() {
             )}
             {saveStatus === 'unsaved' && (
               <>
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--warning, #f59e0b)' }} />
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
                 <span>Unsaved changes</span>
               </>
             )}
@@ -292,16 +389,14 @@ export default function TopBar() {
           <form onSubmit={handleSearchSubmit}>
             <div
               onClick={() => !showSearch && setShowSearch(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-text"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-text"
               style={{
-                backgroundColor: 'var(--background)',
-                borderColor: showSearch ? 'var(--primary)' : 'var(--border)',
+                backgroundColor: showSearch ? 'var(--background)' : 'rgba(255, 255, 255, 0.15)',
                 width: showSearch ? '256px' : 'auto',
-                transition: 'width 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out',
-                boxShadow: showSearch ? '0 0 0 1px var(--primary)' : 'none',
+                transition: 'width 200ms ease-out, background-color 200ms ease-out',
               }}
             >
-              <Search size={14} style={{ color: 'var(--foreground-muted)', flexShrink: 0 }} />
+              <Search size={14} style={{ color: showSearch ? 'var(--foreground-muted)' : 'rgba(255, 255, 255, 0.7)', flexShrink: 0 }} />
               {showSearch ? (
                 <>
                   <input
@@ -333,12 +428,12 @@ export default function TopBar() {
                 </>
               ) : (
                 <>
-                  <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>Search...</span>
+                  <span className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Search...</span>
                   <kbd
                     className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs ml-auto"
                     style={{
-                      backgroundColor: 'var(--surface-light)',
-                      color: 'var(--foreground-muted)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                      color: 'rgba(255, 255, 255, 0.7)',
                     }}
                   >
                     <span className="text-xs">⌘</span>K
@@ -389,53 +484,101 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Currency Indicator */}
-        <Link
-          href="/settings"
-          className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
-          style={{
-            backgroundColor: currencyDisplayMode === 'local' ? 'rgba(76, 112, 49, 0.15)' : 'var(--surface-light)',
-            color: currencyDisplayMode === 'local' ? 'var(--primary)' : 'var(--foreground-muted)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--surface-elevated)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = currencyDisplayMode === 'local' ? 'rgba(76, 112, 49, 0.15)' : 'var(--surface-light)';
-          }}
-          title={currencyDisplayMode === 'local' ? `Showing approximate prices in ${localCurrency} for today` : 'Showing original currencies'}
-        >
-          <span className="text-sm font-medium">
-            {currencyDisplayMode === 'local' ? getCurrencySymbol(localCurrency) : '$'}
-          </span>
-          {currencyDisplayMode === 'local' && (
-            <span className="text-xs">{localCurrency}</span>
+        {/* Currency Dropdown */}
+        <div ref={currencyMenuRef} className="relative">
+          <button
+            onClick={() => setShowCurrencyMenu(!showCurrencyMenu)}
+            className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              color: 'white',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            }}
+          >
+            <span className="text-sm font-medium">
+              {currencyDisplayMode === 'local' ? getCurrencySymbol(localCurrency) : 'Original'}
+            </span>
+          </button>
+
+          {/* Currency Dropdown Menu */}
+          {showCurrencyMenu && (
+            <div
+              className="absolute top-full right-0 mt-2 py-1 rounded-lg border shadow-lg overflow-hidden z-50"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+                minWidth: '100px',
+              }}
+            >
+              {/* Original prices option */}
+              {currencyDisplayMode !== 'original' && (
+                <button
+                  onClick={() => {
+                    setCurrencyDisplayMode('original');
+                    setShowCurrencyMenu(false);
+                  }}
+                  className="w-full px-3 py-1.5 text-sm text-left transition-colors"
+                  style={{ color: 'var(--foreground-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                    e.currentTarget.style.color = 'var(--foreground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-muted)';
+                  }}
+                >
+                  Original
+                </button>
+              )}
+              {/* Currency options */}
+              {currencies.map((code) => (
+                <button
+                  key={code}
+                  onClick={() => {
+                    setCurrencyDisplayMode('local');
+                    setLocalCurrency(code);
+                    setShowCurrencyMenu(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors"
+                  style={{
+                    backgroundColor: currencyDisplayMode === 'local' && localCurrency === code ? 'var(--surface-light)' : 'transparent',
+                    color: currencyDisplayMode === 'local' && localCurrency === code ? 'var(--foreground)' : 'var(--foreground-muted)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                    e.currentTarget.style.color = 'var(--foreground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = currencyDisplayMode === 'local' && localCurrency === code ? 'var(--surface-light)' : 'transparent';
+                    e.currentTarget.style.color = currencyDisplayMode === 'local' && localCurrency === code ? 'var(--foreground)' : 'var(--foreground-muted)';
+                  }}
+                >
+                  <span>{getCurrencySymbol(code)}</span>
+                  <span>{code}</span>
+                </button>
+              ))}
+            </div>
           )}
-        </Link>
+        </div>
 
         {/* AI Mode Toggle - Logo style icon */}
         <button
           className="w-8 h-8 rounded-full flex items-center justify-center transition-all group"
           style={{
-            backgroundColor: aiModeEnabled ? '#4a7c4e' : 'var(--surface-light)',
-            border: aiModeEnabled ? 'none' : '1px solid var(--border)',
+            backgroundColor: aiModeEnabled ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
           }}
           onClick={() => setAiMode(!aiModeEnabled)}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = aiModeEnabled ? '#5a8c5e' : '#4a7c4e';
-            if (!aiModeEnabled) {
-              e.currentTarget.style.borderColor = '#4a7c4e';
-              const pill = e.currentTarget.querySelector('.ai-pill') as HTMLElement;
-              if (pill) pill.style.backgroundColor = 'white';
-            }
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = aiModeEnabled ? '#4a7c4e' : 'var(--surface-light)';
-            if (!aiModeEnabled) {
-              e.currentTarget.style.borderColor = 'var(--border)';
-              const pill = e.currentTarget.querySelector('.ai-pill') as HTMLElement;
-              if (pill) pill.style.backgroundColor = '#4a7c4e';
-            }
+            e.currentTarget.style.backgroundColor = aiModeEnabled ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)';
           }}
           aria-label="AI Mode"
           aria-pressed={aiModeEnabled}
@@ -445,7 +588,7 @@ export default function TopBar() {
           <div
             className="ai-pill w-4 h-1.5 rounded-full transition-colors"
             style={{
-              backgroundColor: aiModeEnabled ? 'white' : '#4a7c4e',
+              backgroundColor: aiModeEnabled ? 'white' : 'rgba(255, 255, 255, 0.6)',
             }}
           />
         </button>
@@ -453,14 +596,14 @@ export default function TopBar() {
         {/* Help */}
         <button
           className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-          style={{ color: 'var(--foreground-secondary)' }}
+          style={{ color: 'rgba(255, 255, 255, 0.75)' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-            e.currentTarget.style.color = 'var(--foreground)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = 'white';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--foreground-secondary)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
           }}
           aria-label="Help"
         >
@@ -470,40 +613,106 @@ export default function TopBar() {
         {/* Feedback */}
         <button
           className="h-8 rounded-full flex items-center justify-center px-3 transition-colors"
-          style={{ color: 'var(--foreground-secondary)' }}
+          style={{ color: 'rgba(255, 255, 255, 0.75)' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-            e.currentTarget.style.color = 'var(--foreground)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = 'white';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--foreground-secondary)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
           }}
           aria-label="Feedback"
         >
           <span className="text-xs font-medium">Feedback</span>
         </button>
 
-        {/* User */}
-        <div className="pl-2" style={{ borderLeft: '1px solid var(--border)' }}>
+        {/* User Menu with Dropdown */}
+        <div ref={userMenuRef} className="pl-2 relative" style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <button
             className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
             style={{
-              backgroundColor: 'var(--primary)',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
               color: 'white',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--primary)';
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
             }}
+            onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="User menu"
+            aria-expanded={showUserMenu}
           >
             <User size={14} />
           </button>
+
+          {/* User Dropdown Menu */}
+          {showUserMenu && (
+            <div
+              className="absolute top-full right-0 mt-2 w-48 rounded-lg border shadow-lg overflow-hidden z-50"
+              style={{
+                backgroundColor: 'var(--surface)',
+                borderColor: 'var(--border)',
+              }}
+            >
+              <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
+                <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                  {userName}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                  user@example.com
+                </p>
+              </div>
+              <div className="py-1">
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-2 px-3 py-2 text-sm transition-colors"
+                  style={{ color: 'var(--foreground-secondary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                    e.currentTarget.style.color = 'var(--foreground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  }}
+                  onClick={() => setShowUserMenu(false)}
+                >
+                  <Settings size={16} />
+                  <span>Settings</span>
+                </Link>
+              </div>
+              <div className="py-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                <button
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left"
+                  style={{ color: 'var(--error)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span>Sign out</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      </div>
+
+      {/* Curved bottom edge - gentle arc */}
+      <div
+        className="w-full backdrop-blur-md"
+        style={{
+          height: '16px',
+          backgroundColor: 'var(--topbar-bg)',
+          borderRadius: '0 0 100% 100% / 0 0 100% 100%',
+        }}
+      />
     </header>
   );
 }

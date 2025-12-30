@@ -20,6 +20,8 @@ import {
   Trash2,
   Copy,
   ArrowDown,
+  Wand2,
+  Download,
 } from 'lucide-react';
 import { useLooksStore, parseSlugId, generateLookPath, CanvasItem } from '@/stores/useLooksStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
@@ -73,11 +75,17 @@ export default function LookEditorPage() {
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const [applyingLayout, setApplyingLayout] = useState(false);
 
+  // AI Composition state
+  const [aiComposedImage, setAiComposedImage] = useState<string | null>(null);
+  const [showAiPreview, setShowAiPreview] = useState(false);
+  const [aiComposeError, setAiComposeError] = useState<string | null>(null);
+
   // Collection inspiration filter state
   const [isCollectionFilterActive, setIsCollectionFilterActive] = useState(false);
 
   // Available layout types
   const layoutTypes = [
+    { type: 'ai', name: 'AI Compose', icon: Wand2, description: 'OpenAI visual moodboard', isAi: true },
     { type: 'grid', name: 'Grid', icon: Grid3X3, description: 'Clean, evenly spaced' },
     { type: 'hero', name: 'Hero', icon: Sparkles, description: 'Featured item in center' },
     { type: 'scattered', name: 'Scattered', icon: Layers, description: 'Organic, overlapping style' },
@@ -389,9 +397,71 @@ export default function LookEditorPage() {
       .join(' ');
   };
 
+  // AI Compose function - calls OpenAI to generate visual moodboard
+  const handleAiCompose = async () => {
+    if (items.length === 0) return;
+
+    setApplyingLayout(true);
+    setShowLayoutMenu(false);
+    setAiComposeError(null);
+
+    try {
+      // Get image URLs from items
+      const productImages = items
+        .filter((item) => item.type === 'image' && item.src)
+        .map((item) => ({ url: item.src! }));
+
+      if (productImages.length === 0) {
+        setAiComposeError('No product images to compose');
+        setApplyingLayout(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/image-ai?action=compose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productImages,
+          arrangement: 'organic',
+          canvasSize: '1024x1024',
+          lookId: lookId,
+          style: {
+            aesthetic: 'modern moodboard',
+            mood: 'curated',
+            lighting: 'natural',
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && (data.moodboard?.imageUrl || data.moodboard?.imageBase64)) {
+        const imageUrl = data.moodboard.imageUrl ||
+          `data:image/png;base64,${data.moodboard.imageBase64}`;
+        setAiComposedImage(imageUrl);
+        setShowAiPreview(true);
+      } else if (data._demo) {
+        setAiComposeError('Demo mode active - AI composition requires API credits');
+      } else {
+        setAiComposeError(data.error || 'Failed to generate composition');
+      }
+    } catch (error) {
+      console.error('AI compose error:', error);
+      setAiComposeError('Failed to connect to AI service');
+    } finally {
+      setApplyingLayout(false);
+    }
+  };
+
   // Client-side layout algorithms
   const applyLayout = (layoutType: string) => {
     if (items.length === 0) return;
+
+    // Handle AI compose separately
+    if (layoutType === 'ai') {
+      handleAiCompose();
+      return;
+    }
 
     setApplyingLayout(true);
     setShowLayoutMenu(false);
@@ -625,7 +695,7 @@ export default function LookEditorPage() {
           >
             <button
               onClick={addTextToCanvas}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer"
               style={{ color: 'var(--foreground-secondary)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -645,7 +715,7 @@ export default function LookEditorPage() {
               <button
                 onClick={() => setShowLayoutMenu(!showLayoutMenu)}
                 disabled={items.length === 0 || applyingLayout}
-                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-40 cursor-pointer"
                 style={{
                   color: showLayoutMenu ? 'var(--primary)' : 'var(--foreground-secondary)',
                   backgroundColor: showLayoutMenu ? 'var(--surface-light)' : 'transparent',
@@ -685,29 +755,50 @@ export default function LookEditorPage() {
                       Auto Layout
                     </p>
                   </div>
-                  {layoutTypes.map((layout) => {
+                  {layoutTypes.map((layout, idx) => {
                     const Icon = layout.icon;
+                    const isAiOption = 'isAi' in layout && layout.isAi;
                     return (
-                      <button
-                        key={layout.type}
-                        onClick={() => applyLayout(layout.type)}
-                        className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
-                        style={{ color: 'var(--foreground)' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <Icon size={16} style={{ color: 'var(--primary)' }} />
-                        <div>
-                          <p className="text-sm font-medium">{layout.name}</p>
-                          <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                            {layout.description}
-                          </p>
-                        </div>
-                      </button>
+                      <div key={layout.type}>
+                        {isAiOption && idx > 0 && (
+                          <div className="h-px mx-2" style={{ backgroundColor: 'var(--border)' }} />
+                        )}
+                        <button
+                          onClick={() => applyLayout(layout.type)}
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors cursor-pointer ${
+                            isAiOption ? 'border-l-2' : ''
+                          }`}
+                          style={{
+                            color: 'var(--foreground)',
+                            backgroundColor: isAiOption ? 'rgba(147, 51, 234, 0.05)' : 'transparent',
+                            borderLeftColor: isAiOption ? 'rgb(147, 51, 234)' : 'transparent',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isAiOption
+                              ? 'rgba(147, 51, 234, 0.1)'
+                              : 'var(--surface-light)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = isAiOption
+                              ? 'rgba(147, 51, 234, 0.05)'
+                              : 'transparent';
+                          }}
+                        >
+                          <Icon
+                            size={16}
+                            style={{ color: isAiOption ? 'rgb(147, 51, 234)' : 'var(--primary)' }}
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{layout.name}</p>
+                            <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                              {layout.description}
+                            </p>
+                          </div>
+                        </button>
+                        {isAiOption && (
+                          <div className="h-px mx-2" style={{ backgroundColor: 'var(--border)' }} />
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -922,6 +1013,13 @@ export default function LookEditorPage() {
             borderColor: 'var(--border)',
           }}
         >
+          {/* Collection Inspiration Panel - Moved to top for visibility */}
+          <CollectionInspiration
+            onApplyFilters={handleApplyCollectionFilters}
+            onClearFilters={handleClearCollectionFilters}
+            isFilterActive={isCollectionFilterActive}
+          />
+
           {/* Header with Search Status - Title and count on same line */}
           <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
@@ -974,13 +1072,6 @@ export default function LookEditorPage() {
               </div>
             )}
           </div>
-
-          {/* Collection Inspiration Panel */}
-          <CollectionInspiration
-            onApplyFilters={handleApplyCollectionFilters}
-            onClearFilters={handleClearCollectionFilters}
-            isFilterActive={isCollectionFilterActive}
-          />
 
           {/* Products Grid */}
           <div className="flex-1 overflow-y-auto p-3">
@@ -1086,6 +1177,108 @@ export default function LookEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Compose Preview Modal */}
+      {showAiPreview && aiComposedImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
+          onClick={() => setShowAiPreview(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full rounded-xl overflow-hidden"
+            style={{ backgroundColor: 'var(--surface)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-4 py-3 border-b"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Wand2 size={18} style={{ color: 'rgb(147, 51, 234)' }} />
+                <span className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                  AI Composed Moodboard
+                </span>
+              </div>
+              <button
+                onClick={() => setShowAiPreview(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                style={{ color: 'var(--foreground-secondary)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="p-4">
+              <img
+                src={aiComposedImage}
+                alt="AI Composed Moodboard"
+                className="w-full rounded-lg"
+                style={{ maxHeight: '70vh', objectFit: 'contain' }}
+              />
+            </div>
+
+            {/* Footer */}
+            <div
+              className="flex items-center justify-end gap-3 px-4 py-3 border-t"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <a
+                href={aiComposedImage}
+                download={`moodboard-${lookId}-${Date.now()}.png`}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--primary)',
+                  color: 'white',
+                }}
+              >
+                <Download size={16} />
+                Download
+              </a>
+              <button
+                onClick={() => setShowAiPreview(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: 'var(--surface-light)',
+                  color: 'var(--foreground)',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Compose Error Toast */}
+      {aiComposeError && (
+        <div
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--error)',
+          }}
+        >
+          <span className="text-sm" style={{ color: 'var(--foreground)' }}>
+            {aiComposeError}
+          </span>
+          <button
+            onClick={() => setAiComposeError(null)}
+            className="text-sm font-medium"
+            style={{ color: 'var(--primary)' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   );
 }

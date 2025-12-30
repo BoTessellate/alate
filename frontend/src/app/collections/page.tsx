@@ -125,7 +125,7 @@ export default function CollectionsPage() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors cursor-pointer"
           style={{
             backgroundColor: 'var(--primary)',
             color: 'white',
@@ -164,7 +164,7 @@ export default function CollectionsPage() {
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer"
             style={{
               backgroundColor: 'var(--primary)',
               color: 'white',
@@ -176,9 +176,9 @@ export default function CollectionsPage() {
         </div>
       )}
 
-      {/* Collections Grid */}
+      {/* Collections Grid - Compact cards */}
       {collections.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {collections.map((collection) => (
             <div
               key={collection.id}
@@ -195,9 +195,9 @@ export default function CollectionsPage() {
                 e.currentTarget.style.borderColor = 'var(--border)';
               }}
             >
-              {/* Cover Image Grid */}
+              {/* Cover Image Grid - Square aspect ratio for compactness */}
               <div
-                className="aspect-video relative"
+                className="aspect-square relative"
                 style={{
                   backgroundColor: 'var(--background-secondary)',
                 }}
@@ -225,32 +225,32 @@ export default function CollectionsPage() {
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <FolderPlus
-                      size={48}
+                      size={32}
                       style={{ color: 'var(--foreground-muted)', opacity: 0.5 }}
                     />
                   </div>
                 )}
 
                 {/* Menu Button */}
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-1.5 right-1.5">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveMenu(activeMenu === collection.id ? null : collection.id);
                     }}
-                    className="w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="w-7 h-7 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                     style={{
                       backgroundColor: 'rgba(0,0,0,0.6)',
                       color: 'white',
                     }}
                   >
-                    <MoreHorizontal size={18} />
+                    <MoreHorizontal size={14} />
                   </button>
 
                   {/* Dropdown Menu */}
                   {activeMenu === collection.id && (
                     <div
-                      className="absolute top-10 right-0 w-40 rounded-lg overflow-hidden shadow-lg z-10"
+                      className="absolute top-8 right-0 w-32 rounded-lg overflow-hidden shadow-lg z-10"
                       style={{
                         backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
@@ -262,7 +262,7 @@ export default function CollectionsPage() {
                           e.stopPropagation();
                           handleStartRename(collection);
                         }}
-                        className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                        className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors cursor-pointer"
                         style={{ color: 'var(--foreground)' }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -271,7 +271,7 @@ export default function CollectionsPage() {
                           e.currentTarget.style.backgroundColor = 'transparent';
                         }}
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={12} />
                         Rename
                       </button>
                       <button
@@ -279,7 +279,7 @@ export default function CollectionsPage() {
                           e.stopPropagation();
                           handleDeleteCollection(collection.id);
                         }}
-                        className="w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors"
+                        className="w-full px-3 py-2 text-left text-xs flex items-center gap-2 transition-colors cursor-pointer"
                         style={{ color: 'var(--error)' }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -288,7 +288,7 @@ export default function CollectionsPage() {
                           e.currentTarget.style.backgroundColor = 'transparent';
                         }}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={12} />
                         Delete
                       </button>
                     </div>
@@ -296,8 +296,8 @@ export default function CollectionsPage() {
                 </div>
               </div>
 
-              {/* Collection Info */}
-              <div className="p-4">
+              {/* Collection Info - Compact */}
+              <div className="p-2.5">
                 {editingId === collection.id ? (
                   <input
                     type="text"
@@ -312,7 +312,7 @@ export default function CollectionsPage() {
                       }
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    className="font-semibold mb-1 w-full bg-transparent border-b outline-none"
+                    className="font-medium text-sm mb-0.5 w-full bg-transparent border-b outline-none"
                     style={{
                       color: 'var(--foreground)',
                       borderColor: 'var(--primary)',
@@ -320,25 +320,16 @@ export default function CollectionsPage() {
                     autoFocus
                   />
                 ) : (
-                  <h3 className="font-semibold mb-1" style={{ color: 'var(--foreground)' }}>
+                  <h3
+                    className="font-medium text-sm mb-0.5 truncate"
+                    style={{ color: 'var(--foreground)' }}
+                  >
                     {collection.name}
                   </h3>
                 )}
-                {collection.description && (
-                  <p
-                    className="text-sm mb-3 line-clamp-2"
-                    style={{ color: 'var(--foreground-secondary)' }}
-                  >
-                    {collection.description}
-                  </p>
-                )}
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-xs">
                   <span style={{ color: 'var(--foreground-muted)' }}>
-                    {collection.products.length}{' '}
-                    {collection.products.length === 1 ? 'item' : 'items'}
-                  </span>
-                  <span style={{ color: 'var(--foreground-muted)' }}>
-                    Updated {formatDate(collection.updatedAt)}
+                    {collection.products.length} item{collection.products.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
@@ -419,7 +410,7 @@ export default function CollectionsPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="flex-1 py-2.5 rounded-lg font-medium transition-colors"
+                className="flex-1 py-2.5 rounded-lg font-medium transition-colors cursor-pointer"
                 style={{
                   backgroundColor: 'var(--surface-light)',
                   color: 'var(--foreground)',
