@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, X } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import type { Product } from '@/types';
 
@@ -16,6 +16,8 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const [showFloatingSearch, setShowFloatingSearch] = useState(false);
+  const floatingInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProducts = async (query: string = '') => {
     setLoading(true);
@@ -59,9 +61,21 @@ export default function DiscoverPage() {
     fetchProducts(urlQuery);
   }, [urlQuery]);
 
+  // Focus input when floating search opens
+  useEffect(() => {
+    if (showFloatingSearch && floatingInputRef.current) {
+      floatingInputRef.current.focus();
+    }
+  }, [showFloatingSearch]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchProducts(searchQuery);
+    setShowFloatingSearch(false);
+  };
+
+  const handleFloatingSearchClick = () => {
+    setShowFloatingSearch(true);
   };
 
   return (
@@ -76,47 +90,6 @@ export default function DiscoverPage() {
         </span>
       </div>
 
-      {/* Floating Search Bar - Only the bar floats */}
-      <div className="sticky z-20 px-8" style={{ top: 'calc(var(--topbar-height) + 24px)' }}>
-        <form onSubmit={handleSearch} className="max-w-7xl mx-auto">
-          <div
-            className="flex items-center gap-3 rounded-xl border focus-within:border-[var(--primary)] focus-within:ring-2 focus-within:ring-[var(--primary)]/20"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-              padding: '10px 16px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(12px)',
-            }}
-          >
-            <Search size={20} style={{ color: 'var(--foreground-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search for products... (e.g., 'blue sofa', 'vintage lamp')"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm"
-              style={{ color: 'var(--foreground)' }}
-            />
-            <button
-              type="submit"
-              className="rounded-md text-sm font-medium cursor-pointer px-4 py-2 transition-colors"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary)';
-              }}
-            >
-              Search
-            </button>
-          </div>
-        </form>
-      </div>
 
       {/* Content area */}
       <div className="px-8 pb-8 max-w-7xl mx-auto mt-6">
@@ -192,6 +165,96 @@ export default function DiscoverPage() {
           </>
         )}
       </div>
+
+      {/* Floating Search FAB - Always visible, positioned above Plus FAB */}
+      <button
+        onClick={handleFloatingSearchClick}
+        className="fixed z-50 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer"
+        style={{
+          bottom: '96px', // Above the Plus FAB (which is at 24px, plus 56px height + 16px gap)
+          right: '24px',
+          width: '56px',
+          height: '56px',
+          backgroundColor: 'var(--primary)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1)',
+          opacity: showFloatingSearch ? 0 : 1,
+          pointerEvents: showFloatingSearch ? 'none' : 'auto',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+          e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.backgroundColor = 'var(--primary)';
+        }}
+        onMouseDown={(e) => {
+          e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onMouseUp={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+        }}
+        title="Search Products"
+        aria-label="Search products"
+      >
+        <Search size={24} color="white" />
+      </button>
+
+      {/* Expanded Floating Search Modal */}
+      {showFloatingSearch && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowFloatingSearch(false)}
+          />
+
+          {/* Search Panel */}
+          <div
+            className="fixed z-50 left-4 right-4 md:left-auto md:right-6 md:w-[500px] rounded-2xl shadow-2xl"
+            style={{
+              bottom: '100px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <form onSubmit={handleSearch} className="p-4">
+              <div className="flex items-center gap-3">
+                <Search size={20} style={{ color: 'var(--foreground-muted)' }} />
+                <input
+                  ref={floatingInputRef}
+                  type="text"
+                  placeholder="Search for products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-base"
+                  style={{ color: 'var(--foreground)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowFloatingSearch(false)}
+                  className="p-2 rounded-full hover:bg-[var(--surface-light)] transition-colors"
+                  aria-label="Close search"
+                >
+                  <X size={20} style={{ color: 'var(--foreground-muted)' }} />
+                </button>
+              </div>
+              <div className="flex justify-end mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+                <button
+                  type="submit"
+                  className="rounded-lg text-sm font-medium px-6 py-2.5 transition-colors"
+                  style={{
+                    backgroundColor: 'var(--primary)',
+                    color: 'white',
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -137,9 +137,11 @@ export default function OnboardingPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-8 pb-12 overflow-y-auto"
+      className="min-h-screen overflow-y-auto"
       style={{ backgroundColor: 'var(--background)' }}
     >
+      {/* Fixed height container with scroll, explicit padding ensures skip button visibility */}
+      <div className="min-h-screen flex flex-col items-center justify-center px-8 py-16 pb-32">
       {/* Logo */}
       <div className="mb-8">
         <div
@@ -147,7 +149,7 @@ export default function OnboardingPage() {
           style={{ backgroundColor: '#f6e9cf' }}
         >
           <div
-            className="w-8 h-3 rounded-full"
+            className="w-8 h-3 rounded-full ai-pill-blink"
             style={{ backgroundColor: '#4a7c4e' }}
           />
         </div>
@@ -304,16 +306,17 @@ export default function OnboardingPage() {
         <ArrowRight size={18} />
       </button>
 
-      {/* Skip option for steps 1 and 2 */}
+      {/* Skip option for steps 1 and 2 - always visible with pb-32 on container */}
       {step < 3 && (
         <button
           onClick={handleSkip}
-          className="mt-4 text-sm transition-colors hover:underline"
+          className="mt-8 text-sm transition-colors hover:underline"
           style={{ color: 'var(--foreground-muted)' }}
         >
           Skip for now
         </button>
       )}
+      </div>
     </div>
   );
 }

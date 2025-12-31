@@ -126,6 +126,9 @@ export default function PhotoUploadModal() {
     >
       <div
         ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="photo-upload-modal-title"
         className="w-full max-w-lg rounded-xl overflow-hidden shadow-2xl"
         style={{ backgroundColor: 'var(--surface)', maxHeight: '90vh', overflowY: 'auto' }}
       >
@@ -134,12 +137,13 @@ export default function PhotoUploadModal() {
           className="flex items-center justify-between p-4 border-b"
           style={{ borderColor: 'var(--border)' }}
         >
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
+          <h2 id="photo-upload-modal-title" className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
             Upload Product Photo
           </h2>
           <button
             onClick={closeModal}
-            className="p-1 rounded-md transition-colors cursor-pointer"
+            aria-label="Close modal"
+            className="w-11 h-11 flex items-center justify-center rounded-md transition-colors cursor-pointer"
             style={{ color: 'var(--foreground-muted)' }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -148,7 +152,7 @@ export default function PhotoUploadModal() {
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
@@ -179,10 +183,11 @@ export default function PhotoUploadModal() {
                       e.stopPropagation();
                       setFile(null);
                     }}
-                    className="absolute top-2 right-2 p-1 rounded-full cursor-pointer"
+                    aria-label="Remove selected image"
+                    className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full cursor-pointer"
                     style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
                   >
-                    <X size={16} color="white" />
+                    <X size={16} color="white" aria-hidden="true" />
                   </button>
                 )}
                 {isProcessing && (
@@ -194,6 +199,7 @@ export default function PhotoUploadModal() {
                       size={32}
                       className="animate-spin mb-2"
                       style={{ color: 'var(--primary)' }}
+                      aria-hidden="true"
                     />
                     <p className="text-sm text-white">
                       {status === 'uploading' ? 'Uploading...' : 'Processing...'}
@@ -215,7 +221,7 @@ export default function PhotoUploadModal() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 cursor-pointer">
-                <Upload size={40} style={{ color: 'var(--foreground-muted)' }} />
+                <Upload size={40} style={{ color: 'var(--foreground-muted)' }} aria-hidden="true" />
                 <p className="mt-3 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
                   Drag & drop or click to upload
                 </p>
@@ -239,7 +245,7 @@ export default function PhotoUploadModal() {
               className="flex items-center gap-2 p-3 rounded-lg"
               style={{ backgroundColor: 'var(--error)', color: 'white' }}
             >
-              <AlertCircle size={18} />
+              <AlertCircle size={18} aria-hidden="true" />
               <p className="text-sm">{error}</p>
             </div>
           )}
@@ -250,7 +256,7 @@ export default function PhotoUploadModal() {
               className="flex items-center gap-2 p-3 rounded-lg"
               style={{ backgroundColor: 'var(--success)', color: 'white' }}
             >
-              <Check size={18} />
+              <Check size={18} aria-hidden="true" />
               <p className="text-sm">Product saved to collection!</p>
             </div>
           )}
@@ -305,10 +311,11 @@ export default function PhotoUploadModal() {
             <div className="space-y-4">
               {/* Brand */}
               <div>
-                <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                <label htmlFor="product-brand" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
                   Brand
                 </label>
                 <input
+                  id="product-brand"
                   type="text"
                   value={productData.brand || ''}
                   onChange={(e) => updateProductField('brand', e.target.value)}
@@ -324,10 +331,11 @@ export default function PhotoUploadModal() {
 
               {/* Product Name */}
               <div>
-                <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                <label htmlFor="product-name" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
                   Name
                 </label>
                 <input
+                  id="product-name"
                   type="text"
                   value={productData.product_name || ''}
                   onChange={(e) => updateProductField('product_name', e.target.value)}
@@ -343,10 +351,11 @@ export default function PhotoUploadModal() {
 
               {/* Size */}
               <div>
-                <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                <label htmlFor="product-size" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
                   Size
                 </label>
                 <input
+                  id="product-size"
                   type="text"
                   value={productData.size || ''}
                   onChange={(e) => updateProductField('size', e.target.value)}
@@ -363,10 +372,11 @@ export default function PhotoUploadModal() {
               {/* Price */}
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                  <label htmlFor="product-price" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
                     Price
                   </label>
                   <input
+                    id="product-price"
                     type="number"
                     value={productData.price || ''}
                     onChange={(e) => updateProductField('price', parseFloat(e.target.value) || 0)}
@@ -380,10 +390,11 @@ export default function PhotoUploadModal() {
                   />
                 </div>
                 <div className="w-24">
-                  <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                  <label htmlFor="product-currency" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
                     Currency
                   </label>
                   <select
+                    id="product-currency"
                     value={productData.currency || 'USD'}
                     onChange={(e) => updateProductField('currency', e.target.value)}
                     className="w-full px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
@@ -403,10 +414,10 @@ export default function PhotoUploadModal() {
 
               {/* AI Tags */}
               <div>
-                <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                <span id="product-tags-label" className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
                   Tags
-                </label>
-                <div className="flex flex-wrap gap-2">
+                </span>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="product-tags-label">
                   {(productData.tags || []).map((tag) => (
                     <span
                       key={tag}
@@ -419,9 +430,10 @@ export default function PhotoUploadModal() {
                       {tag}
                       <button
                         onClick={() => handleRemoveTag(tag)}
+                        aria-label={`Remove tag ${tag}`}
                         className="hover:opacity-70 cursor-pointer"
                       >
-                        <X size={12} />
+                        <X size={12} aria-hidden="true" />
                       </button>
                     </span>
                   ))}
@@ -430,13 +442,14 @@ export default function PhotoUploadModal() {
 
               {/* Collection Selection */}
               <div>
-                <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                <span id="collection-selection-label" className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
                   Save to Collection
-                </label>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
+                </span>
+                <div className="space-y-2 max-h-40 overflow-y-auto" role="group" aria-labelledby="collection-selection-label">
                   {collections.map((collection) => (
                     <label
                       key={collection.id}
+                      htmlFor={`collection-${collection.id}`}
                       className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
                       style={{
                         backgroundColor: selectedCollections.includes(collection.id)
@@ -445,6 +458,7 @@ export default function PhotoUploadModal() {
                       }}
                     >
                       <input
+                        id={`collection-${collection.id}`}
                         type="checkbox"
                         checked={selectedCollections.includes(collection.id)}
                         onChange={() => toggleCollection(collection.id)}
@@ -462,7 +476,11 @@ export default function PhotoUploadModal() {
 
                   {/* New Collection Input */}
                   <div className="flex items-center gap-2 pt-2">
+                    <label htmlFor="new-collection-name" className="sr-only">
+                      New collection name
+                    </label>
                     <input
+                      id="new-collection-name"
                       ref={newCollectionInputRef}
                       type="text"
                       placeholder="New collection name..."
@@ -480,13 +498,14 @@ export default function PhotoUploadModal() {
                     />
                     <button
                       onClick={handleCreateCollection}
-                      className="p-2 rounded-lg transition-colors cursor-pointer"
+                      aria-label="Create new collection"
+                      className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors cursor-pointer"
                       style={{
                         backgroundColor: 'var(--primary)',
                         color: 'white',
                       }}
                     >
-                      <Plus size={18} />
+                      <Plus size={18} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -516,7 +535,7 @@ export default function PhotoUploadModal() {
                 >
                   {isSaving ? (
                     <span className="flex items-center justify-center gap-2">
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                       Saving...
                     </span>
                   ) : (

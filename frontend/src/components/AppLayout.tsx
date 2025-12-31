@@ -66,12 +66,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <ThemeProvider>
       <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
+        {/* Skip link for keyboard users */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-medium"
+          style={{
+            backgroundColor: 'var(--primary)',
+            color: 'white',
+          }}
+        >
+          Skip to main content
+        </a>
+
         {/* Top bar with navigation */}
         <TopBar />
 
         {/* Scrollable content */}
         <main
-          className="flex-1 overflow-y-auto"
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto focus:outline-none"
           style={{
             marginTop: 'calc(var(--topbar-height) + 20px)', // 20px for curved bottom
           }}

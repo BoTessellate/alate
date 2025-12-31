@@ -101,19 +101,22 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
           )}
 
           {/* Action Buttons - Top Right */}
-          <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {/* Favorite Button */}
             <button
               onClick={handleFavoriteClick}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
               style={{
                 backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)',
               }}
+              aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-pressed={isFavorite}
             >
               <Heart
-                size={16}
+                size={18}
                 fill={isFavorite ? 'white' : 'none'}
                 style={{ color: 'white' }}
+                aria-hidden="true"
               />
             </button>
 
@@ -121,30 +124,32 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
             <button
               ref={saveButtonRef}
               onClick={handleSaveClick}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
               style={{
                 backgroundColor: isInCollection
                   ? 'var(--primary)'
                   : 'rgba(0,0,0,0.5)',
               }}
+              aria-label={isInCollection ? 'Manage collections' : 'Save to collection'}
             >
               <Bookmark
-                size={16}
+                size={18}
                 fill={isInCollection ? 'white' : 'none'}
                 style={{ color: 'white' }}
+                aria-hidden="true"
               />
             </button>
 
             {/* Virtual Try-On Button */}
             <button
               onClick={handleTryOnClick}
-              className="w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
               style={{
                 backgroundColor: 'rgba(0,0,0,0.5)',
               }}
-              title="Virtual Try-On"
+              aria-label="Virtual try-on"
             >
-              <Shirt size={16} style={{ color: 'white' }} />
+              <Shirt size={18} style={{ color: 'white' }} aria-hidden="true" />
             </button>
           </div>
 
@@ -170,7 +175,7 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
             </p>
             <button
               onClick={handleExternalClick}
-              className="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center transition-colors"
               style={{ color: 'var(--foreground-muted)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--surface-light)';
@@ -180,9 +185,9 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.color = 'var(--foreground-muted)';
               }}
-              title="Shop this product"
+              aria-label={`Shop ${normalizeText(product.product_name)} on external site`}
             >
-              <ExternalLink size={14} />
+              <ExternalLink size={16} aria-hidden="true" />
             </button>
           </div>
         </div>

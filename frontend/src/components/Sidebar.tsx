@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
   Home,
-  LayoutGrid,
-  Heart,
+  Layers2,
+  BookHeart,
   Compass,
   Settings,
 } from 'lucide-react';
@@ -14,8 +14,8 @@ import {
 const navigationItems = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Discover', href: '/discover', icon: Compass },
-  { name: 'My Looks', href: '/looks', icon: LayoutGrid },
-  { name: 'Collections', href: '/collections', icon: Heart },
+  { name: 'My Layers', href: '/looks', icon: Layers2 },
+  { name: 'Collections', href: '/collections', icon: BookHeart },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

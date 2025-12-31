@@ -118,7 +118,7 @@ export default function VirtualTryOnModal({
       // Convert base64 data URL to just the base64 part
       const base64Data = baseImage.split(',')[1];
 
-      const response = await fetch(`${BACKEND_URL}/api/image-ai?action=tryon`, {
+      const response = await fetch(`${BACKEND_URL}/api/ai?action=tryon`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,6 +182,9 @@ export default function VirtualTryOnModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div
         ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="virtual-tryon-modal-title"
         className="w-full max-w-2xl mx-4 rounded-xl shadow-2xl border overflow-hidden"
         style={{
           backgroundColor: 'var(--surface)',
@@ -195,6 +198,7 @@ export default function VirtualTryOnModal({
         >
           <div>
             <h2
+              id="virtual-tryon-modal-title"
               className="font-semibold text-lg"
               style={{ color: 'var(--foreground)' }}
             >
@@ -209,10 +213,11 @@ export default function VirtualTryOnModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
+            aria-label="Close modal"
+            className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-opacity-10 transition-colors"
             style={{ color: 'var(--foreground-secondary)' }}
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
@@ -222,7 +227,7 @@ export default function VirtualTryOnModal({
           <div className="flex gap-3 mb-6">
             <button
               onClick={() => setTryOnType('clothing')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all min-h-11 ${
                 tryOnType === 'clothing' ? 'border-2' : ''
               }`}
               style={{
@@ -231,12 +236,12 @@ export default function VirtualTryOnModal({
                 color: 'var(--foreground)',
               }}
             >
-              <Shirt size={20} />
+              <Shirt size={20} aria-hidden="true" />
               <span className="font-medium">Clothing</span>
             </button>
             <button
               onClick={() => setTryOnType('furniture')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all min-h-11 ${
                 tryOnType === 'furniture' ? 'border-2' : ''
               }`}
               style={{
@@ -245,7 +250,7 @@ export default function VirtualTryOnModal({
                 color: 'var(--foreground)',
               }}
             >
-              <Sofa size={20} />
+              <Sofa size={20} aria-hidden="true" />
               <span className="font-medium">Furniture</span>
             </button>
           </div>
@@ -275,9 +280,10 @@ export default function VirtualTryOnModal({
                     />
                     <button
                       onClick={handleReset}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                      aria-label="Remove uploaded image"
+                      className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 transition-colors"
                     >
-                      <X size={16} style={{ color: 'white' }} />
+                      <X size={16} style={{ color: 'white' }} aria-hidden="true" />
                     </button>
                   </>
                 ) : (
@@ -286,7 +292,7 @@ export default function VirtualTryOnModal({
                     className="w-full h-full flex flex-col items-center justify-center gap-3 hover:bg-opacity-5 transition-colors"
                     style={{ backgroundColor: 'var(--background-secondary)' }}
                   >
-                    <Upload size={32} style={{ color: 'var(--foreground-muted)' }} />
+                    <Upload size={32} style={{ color: 'var(--foreground-muted)' }} aria-hidden="true" />
                     <span
                       className="text-sm text-center px-4"
                       style={{ color: 'var(--foreground-muted)' }}
@@ -331,10 +337,11 @@ export default function VirtualTryOnModal({
                     />
                     <button
                       onClick={handleDownload}
-                      className="absolute bottom-2 right-2 p-2 rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
+                      aria-label="Download result image"
+                      className="absolute bottom-2 right-2 w-11 h-11 flex items-center justify-center rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
                       title="Download"
                     >
-                      <Download size={18} style={{ color: 'white' }} />
+                      <Download size={18} style={{ color: 'white' }} aria-hidden="true" />
                     </button>
                   </>
                 ) : (
@@ -368,20 +375,20 @@ export default function VirtualTryOnModal({
             {result && (
               <button
                 onClick={handleReset}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors min-h-11"
                 style={{
                   borderColor: 'var(--border)',
                   color: 'var(--foreground)',
                 }}
               >
-                <RefreshCw size={18} />
+                <RefreshCw size={18} aria-hidden="true" />
                 Try Again
               </button>
             )}
             <button
               onClick={handleGenerate}
               disabled={!baseImage || isGenerating}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all min-h-11"
               style={{
                 backgroundColor: baseImage && !isGenerating ? 'var(--primary)' : 'var(--surface-light)',
                 color: baseImage && !isGenerating ? 'white' : 'var(--foreground-muted)',
@@ -390,12 +397,12 @@ export default function VirtualTryOnModal({
             >
               {isGenerating ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Shirt size={18} />
+                  <Shirt size={18} aria-hidden="true" />
                   Generate Try-On
                 </>
               )}

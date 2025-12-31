@@ -136,6 +136,9 @@ export default function SaveToCollectionModal({
   return (
     <div
       ref={modalRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="save-to-collection-modal-title"
       className="fixed z-50 rounded-lg shadow-xl border overflow-hidden"
       style={{
         top: position.top,
@@ -151,6 +154,7 @@ export default function SaveToCollectionModal({
         style={{ borderColor: 'var(--border)' }}
       >
         <span
+          id="save-to-collection-modal-title"
           className="font-medium text-sm"
           style={{ color: 'var(--foreground)' }}
         >
@@ -158,10 +162,11 @@ export default function SaveToCollectionModal({
         </span>
         <button
           onClick={onClose}
-          className="p-1 rounded hover:bg-opacity-10 transition-colors"
+          aria-label="Close modal"
+          className="w-11 h-11 flex items-center justify-center rounded hover:bg-opacity-10 transition-colors"
           style={{ color: 'var(--foreground-secondary)' }}
         >
-          <X size={16} />
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
 
@@ -209,6 +214,7 @@ export default function SaveToCollectionModal({
                     <div className="col-span-2 row-span-2 flex items-center justify-center">
                       <FolderPlus
                         size={16}
+                        aria-hidden="true"
                         style={{ color: 'var(--foreground-muted)' }}
                       />
                     </div>
@@ -238,7 +244,7 @@ export default function SaveToCollectionModal({
                     className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: 'var(--primary)' }}
                   >
-                    <Check size={12} style={{ color: 'white' }} />
+                    <Check size={12} aria-hidden="true" style={{ color: 'white' }} />
                   </div>
                 )}
               </button>
@@ -288,7 +294,7 @@ export default function SaveToCollectionModal({
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded text-sm font-medium transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3 min-h-[44px] rounded text-sm font-medium transition-colors cursor-pointer"
             style={{
               backgroundColor: 'transparent',
               color: 'var(--foreground-secondary)',
@@ -303,7 +309,7 @@ export default function SaveToCollectionModal({
               e.currentTarget.style.color = 'var(--foreground-secondary)';
             }}
           >
-            <Plus size={16} />
+            <Plus size={16} aria-hidden="true" />
             Create Collection
           </button>
         )}

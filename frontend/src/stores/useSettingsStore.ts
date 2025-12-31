@@ -15,12 +15,17 @@ interface SettingsState {
   // Currency settings
   currencyDisplayMode: CurrencyDisplayMode;
   localCurrency: LocalCurrency;
+  // User settings (placeholder until auth is implemented)
+  userName: string | null;
+  isLoggedIn: boolean;
   setTheme: (theme: Theme) => void;
   setAiMode: (enabled: boolean) => void;
   setEmailNotifications: (enabled: boolean) => void;
   setPushNotifications: (enabled: boolean) => void;
   setCurrencyDisplayMode: (mode: CurrencyDisplayMode) => void;
   setLocalCurrency: (currency: LocalCurrency) => void;
+  setUserName: (name: string | null) => void;
+  setIsLoggedIn: (loggedIn: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -30,14 +35,18 @@ export const useSettingsStore = create<SettingsState>()(
       aiModeEnabled: false,
       emailNotifications: true,
       pushNotifications: false,
-      currencyDisplayMode: 'original',
-      localCurrency: 'USD',
+      currencyDisplayMode: 'local',
+      localCurrency: 'JPY',
+      userName: null,
+      isLoggedIn: false,
       setTheme: (theme) => set({ theme }),
       setAiMode: (enabled) => set({ aiModeEnabled: enabled }),
       setEmailNotifications: (enabled) => set({ emailNotifications: enabled }),
       setPushNotifications: (enabled) => set({ pushNotifications: enabled }),
       setCurrencyDisplayMode: (mode) => set({ currencyDisplayMode: mode }),
       setLocalCurrency: (currency) => set({ localCurrency: currency }),
+      setUserName: (name) => set({ userName: name }),
+      setIsLoggedIn: (loggedIn) => set({ isLoggedIn: loggedIn }),
     }),
     {
       name: 'mood-layer-settings',
@@ -76,7 +85,7 @@ export const applyTheme = (theme: Theme) => {
     root.style.setProperty('--surface-elevated', '#303030');
     root.style.setProperty('--foreground', '#f6e9cf');
     root.style.setProperty('--foreground-secondary', '#d4c9b0');
-    root.style.setProperty('--foreground-muted', '#9a9080');
+    root.style.setProperty('--foreground-muted', '#b0a090');
     root.style.setProperty('--border', '#2a2a2a');
     root.style.setProperty('--border-light', '#3a3a3a');
     root.style.setProperty('--topbar-bg', 'rgba(76, 112, 49, 0.92)');

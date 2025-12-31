@@ -101,7 +101,7 @@ export function usePhotoUpload() {
       setProgress(30);
 
       // Call the API
-      const response = await fetch(`${API_BASE_URL}/api/photo-upload`, {
+      const response = await fetch(`${API_BASE_URL}/api/image-processing?action=upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquare, Home, Compass, LayoutGrid, Heart, Settings } from 'lucide-react';
+import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquare, Home, Compass, Layers2, Settings, AlignHorizontalSpaceAround } from 'lucide-react';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLooksStore, parseSlugId } from '@/stores/useLooksStore';
+import BreadcrumbNav from './BreadcrumbNav';
 
 interface Product {
   id: string;
@@ -20,16 +21,16 @@ interface Product {
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
 const navigationItems = [
+  { name: 'Layers', href: '/looks', icon: Layers2 },
+  { name: 'Closet', href: '/closet', icon: AlignHorizontalSpaceAround },
   { name: 'Discover', href: '/discover', icon: Compass },
-  { name: 'My Looks', href: '/looks', icon: LayoutGrid },
-  { name: 'Collections', href: '/collections', icon: Heart },
 ];
 
 export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { aiModeEnabled, setAiMode, currencyDisplayMode, localCurrency, setCurrencyDisplayMode, setLocalCurrency } = useSettingsStore();
-  const { getLookById, saveStatus } = useLooksStore();
+  const { getMoodboardById, saveStatus } = useLooksStore();
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,16 +52,19 @@ export default function TopBar() {
 
   // Check if we're on a look editor page
   const isLookEditorPage = pathname.startsWith('/looks/') && pathname !== '/looks';
+
+  // Check if on My Looks page (not editor) for warm topbar
+  const isLooksListPage = pathname === '/looks';
   const pathSegments = pathname.split('/').filter(Boolean);
 
-  // Get look name if on editor page (only after hydration to avoid mismatch)
-  let lookName: string | null = null;
+  // Get moodboard name if on editor page (only after hydration to avoid mismatch)
+  let moodboardName: string | null = null;
   if (isHydrated && isLookEditorPage && pathSegments.length >= 2) {
     const slugId = pathSegments[1];
     const parsed = parseSlugId(slugId);
     if (parsed) {
-      const look = getLookById(parsed.id);
-      lookName = look?.name || null;
+      const moodboard = getMoodboardById(parsed.id);
+      moodboardName = moodboard?.name || null;
     }
   }
 
@@ -82,9 +86,9 @@ export default function TopBar() {
     // Determine display name
     let name = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ');
 
-    // If this is the look slug segment and we have a look name, use it
-    if (index === 1 && pathSegments[0] === 'looks' && lookName) {
-      name = lookName;
+    // If this is the moodboard slug segment and we have a moodboard name, use it
+    if (index === 1 && pathSegments[0] === 'looks' && moodboardName) {
+      name = moodboardName;
     }
 
     breadcrumbs.push({ name, href, isLast });
@@ -276,32 +280,29 @@ export default function TopBar() {
         className="flex items-center justify-between px-4 backdrop-blur-md transition-all duration-300 ease-out relative z-10"
         style={{
           height: isTopBarExpanded ? 'calc(var(--topbar-height) + 28px)' : 'var(--topbar-height)',
-          backgroundColor: 'var(--topbar-bg)',
+          backgroundColor: isLooksListPage ? 'var(--topbar-bg-warm)' : 'var(--topbar-bg)',
         }}
       >
-      {/* Left side - Logo */}
-      <div className="flex items-center">
-        {/* Clickable Logo */}
+      {/* Left side - Logo + Breadcrumb Navigation */}
+      <div className="flex items-center gap-3">
+        {/* Logo Icon */}
         <Link
           href="/"
-          className="flex items-center gap-2 transition-opacity hover:opacity-80"
+          className="flex items-center transition-opacity hover:opacity-80"
         >
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: '#f6e9cf' }}
+            style={{ backgroundColor: isLooksListPage ? '#4a7c4e' : '#f6e9cf' }}
           >
             <div
               className="w-4 h-1.5 rounded-full"
-              style={{ backgroundColor: '#4a7c4e' }}
+              style={{ backgroundColor: isLooksListPage ? '#f6e9cf' : '#4a7c4e' }}
             />
           </div>
-          <span
-            className="font-semibold text-sm"
-            style={{ color: '#f6e9cf' }}
-          >
-            The Mood Layer
-          </span>
         </Link>
+
+        {/* Breadcrumb Navigation */}
+        <BreadcrumbNav />
       </div>
 
       {/* Center - Navigation Icons */}
@@ -310,6 +311,12 @@ export default function TopBar() {
           const isActive = pathname === item.href ||
             (item.href !== '/' && pathname.startsWith(item.href));
           const Icon = item.icon;
+
+          // Colors based on topbar theme
+          const activeColor = isLooksListPage ? 'var(--charcoal)' : 'white';
+          const inactiveColor = isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.75)';
+          const activeBg = isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.25)';
+          const hoverBg = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
 
           return (
             <Link
@@ -320,19 +327,19 @@ export default function TopBar() {
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
                 style={{
-                  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.25)' : 'transparent',
-                  color: isActive ? 'white' : 'rgba(255, 255, 255, 0.75)',
+                  backgroundColor: isActive ? activeBg : 'transparent',
+                  color: isActive ? activeColor : inactiveColor,
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                    e.currentTarget.style.color = 'white';
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                    e.currentTarget.style.color = activeColor;
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
+                    e.currentTarget.style.color = inactiveColor;
                   }
                 }}
               >
@@ -342,7 +349,7 @@ export default function TopBar() {
               <span
                 className="absolute top-full mt-1 text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                 style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
+                  color: isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)',
                 }}
               >
                 {item.name}
@@ -357,6 +364,8 @@ export default function TopBar() {
         {/* Auto-save status indicator - only show on look editor page */}
         {isLookEditorPage && (
           <div
+            role="status"
+            aria-live="polite"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -391,12 +400,12 @@ export default function TopBar() {
               onClick={() => !showSearch && setShowSearch(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-text"
               style={{
-                backgroundColor: showSearch ? 'var(--background)' : 'rgba(255, 255, 255, 0.15)',
+                backgroundColor: showSearch ? 'var(--background)' : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)'),
                 width: showSearch ? '256px' : 'auto',
                 transition: 'width 200ms ease-out, background-color 200ms ease-out',
               }}
             >
-              <Search size={14} style={{ color: showSearch ? 'var(--foreground-muted)' : 'rgba(255, 255, 255, 0.7)', flexShrink: 0 }} />
+              <Search size={14} style={{ color: showSearch ? 'var(--foreground-muted)' : (isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)'), flexShrink: 0 }} />
               {showSearch ? (
                 <>
                   <input
@@ -428,16 +437,7 @@ export default function TopBar() {
                 </>
               ) : (
                 <>
-                  <span className="text-sm" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Search...</span>
-                  <kbd
-                    className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs ml-auto"
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                      color: 'rgba(255, 255, 255, 0.7)',
-                    }}
-                  >
-                    <span className="text-xs">⌘</span>K
-                  </kbd>
+                  <span className="text-sm" style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}>Search...</span>
                 </>
               )}
             </div>
@@ -488,16 +488,19 @@ export default function TopBar() {
         <div ref={currencyMenuRef} className="relative">
           <button
             onClick={() => setShowCurrencyMenu(!showCurrencyMenu)}
-            className="flex items-center gap-1 px-2 py-1 rounded-full transition-colors"
+            className="w-10 h-10 flex items-center justify-center gap-1 rounded-full transition-colors"
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              color: 'white',
+              backgroundColor: isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)',
+              color: isLooksListPage ? 'var(--charcoal)' : 'white',
             }}
+            aria-label="Select currency"
+            aria-expanded={showCurrencyMenu}
+            aria-haspopup="listbox"
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.25)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
             }}
           >
             <span className="text-sm font-medium">
@@ -514,28 +517,8 @@ export default function TopBar() {
                 borderColor: 'var(--border)',
                 minWidth: '100px',
               }}
+              role="listbox"
             >
-              {/* Original prices option */}
-              {currencyDisplayMode !== 'original' && (
-                <button
-                  onClick={() => {
-                    setCurrencyDisplayMode('original');
-                    setShowCurrencyMenu(false);
-                  }}
-                  className="w-full px-3 py-1.5 text-sm text-left transition-colors"
-                  style={{ color: 'var(--foreground-muted)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                    e.currentTarget.style.color = 'var(--foreground)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = 'var(--foreground-muted)';
-                  }}
-                >
-                  Original
-                </button>
-              )}
               {/* Currency options */}
               {currencies.map((code) => (
                 <button
@@ -550,6 +533,8 @@ export default function TopBar() {
                     backgroundColor: currencyDisplayMode === 'local' && localCurrency === code ? 'var(--surface-light)' : 'transparent',
                     color: currencyDisplayMode === 'local' && localCurrency === code ? 'var(--foreground)' : 'var(--foreground-muted)',
                   }}
+                  role="option"
+                  aria-selected={currencyDisplayMode === 'local' && localCurrency === code}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--surface-light)';
                     e.currentTarget.style.color = 'var(--foreground)';
@@ -563,94 +548,128 @@ export default function TopBar() {
                   <span>{code}</span>
                 </button>
               ))}
+              {/* Original prices option - at the end, italic style */}
+              <button
+                onClick={() => {
+                  setCurrencyDisplayMode('original');
+                  setShowCurrencyMenu(false);
+                }}
+                className="w-full px-3 py-1.5 text-sm text-left transition-colors italic border-t"
+                style={{
+                  color: currencyDisplayMode === 'original' ? 'var(--foreground)' : 'var(--foreground-muted)',
+                  backgroundColor: currencyDisplayMode === 'original' ? 'var(--surface-light)' : 'transparent',
+                  borderColor: 'var(--border)',
+                }}
+                role="option"
+                aria-selected={currencyDisplayMode === 'original'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  e.currentTarget.style.color = 'var(--foreground)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = currencyDisplayMode === 'original' ? 'var(--surface-light)' : 'transparent';
+                  e.currentTarget.style.color = currencyDisplayMode === 'original' ? 'var(--foreground)' : 'var(--foreground-muted)';
+                }}
+              >
+                Original
+              </button>
             </div>
           )}
         </div>
 
         {/* AI Mode Toggle - Logo style icon */}
         <button
-          className="w-8 h-8 rounded-full flex items-center justify-center transition-all group"
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-all group"
           style={{
-            backgroundColor: aiModeEnabled ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
+            backgroundColor: aiModeEnabled
+              ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
+              : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)'),
           }}
           onClick={() => setAiMode(!aiModeEnabled)}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = aiModeEnabled ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.backgroundColor = aiModeEnabled
+              ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
+              : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)');
           }}
-          aria-label="AI Mode"
+          aria-label={aiModeEnabled ? 'Disable AI Mode' : 'Enable AI Mode'}
           aria-pressed={aiModeEnabled}
-          title={aiModeEnabled ? 'AI Mode enabled' : 'Enable AI Mode'}
         >
           {/* Custom logo-style icon: pill bar inside circle */}
           <div
-            className="ai-pill w-4 h-1.5 rounded-full transition-colors"
+            className={`ai-pill w-4 h-1.5 rounded-full transition-colors ${aiModeEnabled ? 'ai-pill-blink' : ''}`}
             style={{
-              backgroundColor: aiModeEnabled ? 'white' : 'rgba(255, 255, 255, 0.6)',
+              backgroundColor: aiModeEnabled
+                ? (isLooksListPage ? 'var(--charcoal)' : 'white')
+                : (isLooksListPage ? 'rgba(34, 34, 34, 0.5)' : 'rgba(255, 255, 255, 0.6)'),
             }}
+            aria-hidden="true"
           />
         </button>
 
         {/* Help */}
         <button
-          className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-          style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+          style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = isLooksListPage ? 'var(--charcoal)' : 'white';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
+            e.currentTarget.style.color = isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)';
           }}
           aria-label="Help"
         >
-          <HelpCircle size={16} />
+          <HelpCircle size={18} aria-hidden="true" />
         </button>
 
         {/* Feedback */}
         <button
-          className="h-8 rounded-full flex items-center justify-center px-3 transition-colors"
-          style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+          className="h-10 rounded-full flex items-center justify-center px-4 transition-colors"
+          style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = 'white';
+            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = isLooksListPage ? 'var(--charcoal)' : 'white';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.75)';
+            e.currentTarget.style.color = isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)';
           }}
-          aria-label="Feedback"
+          aria-label="Send feedback"
         >
           <span className="text-xs font-medium">Feedback</span>
         </button>
 
         {/* User Menu with Dropdown */}
-        <div ref={userMenuRef} className="pl-2 relative" style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.2)' }}>
+        <div ref={userMenuRef} className="pl-2 relative" style={{ borderLeft: `1px solid ${isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.2)'}` }}>
           <button
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              color: 'white',
+              backgroundColor: isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.2)',
+              color: isLooksListPage ? 'var(--charcoal)' : 'white',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.3)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.2)';
             }}
             onClick={() => setShowUserMenu(!showUserMenu)}
             aria-label="User menu"
             aria-expanded={showUserMenu}
+            aria-haspopup="menu"
           >
-            <User size={14} />
+            <User size={16} aria-hidden="true" />
           </button>
 
           {/* User Dropdown Menu */}
           {showUserMenu && (
             <div
+              role="menu"
+              aria-label="User options"
               className="absolute top-full right-0 mt-2 w-48 rounded-lg border shadow-lg overflow-hidden z-50"
               style={{
                 backgroundColor: 'var(--surface)',
@@ -665,9 +684,10 @@ export default function TopBar() {
                   user@example.com
                 </p>
               </div>
-              <div className="py-1">
+              <div className="py-1" role="group">
                 <Link
                   href="/settings"
+                  role="menuitem"
                   className="flex items-center gap-2 px-3 py-2 text-sm transition-colors"
                   style={{ color: 'var(--foreground-secondary)' }}
                   onMouseEnter={(e) => {
@@ -680,12 +700,13 @@ export default function TopBar() {
                   }}
                   onClick={() => setShowUserMenu(false)}
                 >
-                  <Settings size={16} />
+                  <Settings size={16} aria-hidden="true" />
                   <span>Settings</span>
                 </Link>
               </div>
-              <div className="py-1 border-t" style={{ borderColor: 'var(--border)' }}>
+              <div className="py-1 border-t" role="group" style={{ borderColor: 'var(--border)' }}>
                 <button
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left"
                   style={{ color: 'var(--error)' }}
                   onMouseEnter={(e) => {
@@ -709,7 +730,7 @@ export default function TopBar() {
         className="w-full backdrop-blur-md"
         style={{
           height: '16px',
-          backgroundColor: 'var(--topbar-bg)',
+          backgroundColor: isLooksListPage ? 'var(--topbar-bg-warm)' : 'var(--topbar-bg)',
           borderRadius: '0 0 100% 100% / 0 0 100% 100%',
         }}
       />

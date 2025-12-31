@@ -22,6 +22,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { useSettingsStore, Theme, CurrencyDisplayMode, LocalCurrency } from '@/stores/useSettingsStore';
+import { Edit2 } from 'lucide-react';
 import { DISPLAY_CURRENCIES, getCurrencySymbol } from '@/utils/currency';
 
 type ModalType = 'email' | 'password' | 'delete' | null;
@@ -34,17 +35,23 @@ export default function SettingsPage() {
     pushNotifications,
     currencyDisplayMode,
     localCurrency,
+    userName,
+    isLoggedIn,
     setTheme,
     setEmailNotifications,
     setPushNotifications,
     setCurrencyDisplayMode,
     setLocalCurrency,
+    setUserName,
+    setIsLoggedIn,
   } = useSettingsStore();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(userName || '');
 
   // Form states
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -65,6 +72,17 @@ export default function SettingsPage() {
     createdAt: '2024-01-15',
     lastPasswordChange: null as string | null,
   });
+
+  const updateDisplayName = async () => {
+    if (!editedName.trim()) return;
+    setSaveStatus('saving');
+    setUserName(editedName.trim());
+    setIsLoggedIn(true); // Mark as logged in when name is set
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setSaveStatus('saved');
+    setIsEditingName(false);
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  };
 
   const updateTheme = async (newTheme: Theme) => {
     setSaveStatus('saving');
@@ -400,32 +418,119 @@ export default function SettingsPage() {
           </div>
 
           <div className="p-4 space-y-4">
+            {/* Display Name */}
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="font-medium" style={{ color: 'var(--foreground)' }}>
-                  Email
+                  Display Name
                 </p>
-                <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-                  {user.email}
-                </p>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      placeholder="Enter your name"
+                      className="flex-1 p-2 rounded-lg border outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] text-sm"
+                      style={{
+                        backgroundColor: 'var(--background)',
+                        borderColor: 'var(--border)',
+                        color: 'var(--foreground)',
+                      }}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') updateDisplayName();
+                        if (e.key === 'Escape') {
+                          setIsEditingName(false);
+                          setEditedName(userName || '');
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={updateDisplayName}
+                      className="px-3 py-1.5 rounded-md text-sm font-medium"
+                      style={{
+                        backgroundColor: 'var(--primary)',
+                        color: 'white',
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(false);
+                        setEditedName(userName || '');
+                      }}
+                      className="px-3 py-1.5 rounded-md text-sm"
+                      style={{
+                        backgroundColor: 'var(--surface-light)',
+                        color: 'var(--foreground)',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                    {userName || 'Not set - displays as "Guest" in navigation'}
+                  </p>
+                )}
               </div>
-              <button
-                data-testid="change-email-btn"
-                onClick={() => setActiveModal('email')}
-                className="px-3 py-1.5 rounded-md text-sm transition-colors"
-                style={{
-                  backgroundColor: 'var(--surface-light)',
-                  color: 'var(--foreground)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--surface-elevated)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                }}
-              >
-                Change
-              </button>
+              {!isEditingName && (
+                <button
+                  onClick={() => {
+                    setEditedName(userName || '');
+                    setIsEditingName(true);
+                  }}
+                  className="px-3 py-1.5 rounded-md text-sm transition-colors flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: 'var(--surface-light)',
+                    color: 'var(--foreground)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-elevated)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  }}
+                >
+                  <Edit2 size={14} />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <div
+              className="border-t pt-4"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium" style={{ color: 'var(--foreground)' }}>
+                    Email
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                    {user.email}
+                  </p>
+                </div>
+                <button
+                  data-testid="change-email-btn"
+                  onClick={() => setActiveModal('email')}
+                  className="px-3 py-1.5 rounded-md text-sm transition-colors"
+                  style={{
+                    backgroundColor: 'var(--surface-light)',
+                    color: 'var(--foreground)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-elevated)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  }}
+                >
+                  Change
+                </button>
+              </div>
             </div>
 
             <div
