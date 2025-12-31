@@ -13,6 +13,7 @@ export { createLayoutGenerator, LayoutGenerator } from './generateLayout';
 export {
   LAYOUT_ARCHETYPES,
   ARCHETYPE_DISPLAY_NAMES,
+  ARCHETYPE_CHARACTERISTICS,
   getArchetype,
   getAllArchetypes,
   findArchetypesForProductCount,
@@ -22,5 +23,6 @@ export {
   getArchetypeNamesInOrder,
   getNextArchetype,
   getPreviousArchetype,
-  getRandomArchetype
+  getRandomArchetype,
+  resolveLegacyArchetype
 } from './layoutArchetypes';

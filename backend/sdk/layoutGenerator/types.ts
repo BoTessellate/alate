@@ -102,17 +102,74 @@ export interface LayoutElement {
 }
 
 /**
- * Layout archetype names
+ * Layout archetype names - Simplified to 4 core types
+ * Vision AI selects and adapts these based on product analysis
  */
 export type LayoutArchetypeName =
-  | 'ZigZagStaggered'
-  | 'LayeredCenterpiece'
-  | 'MinimalSplit'
-  | 'GridWithOverlap'
-  | 'DiagonalCascade'
-  | 'SymmetricBalance'
-  | 'AsymmetricFlow'
-  | 'CollageStyle';
+  | 'Minimal'      // Clean, whitespace-focused (2-4 products)
+  | 'Hero'         // Central focus with supporting items (3-6 products)
+  | 'Dynamic'      // Flowing, editorial style (3-8 products)
+  | 'Collage';     // Organic, overlapping (4-12 products)
+
+/**
+ * Legacy archetype names - for backward compatibility
+ * Maps to new simplified archetypes
+ */
+export type LegacyArchetypeName =
+  | 'ZigZagStaggered'      // → Dynamic
+  | 'LayeredCenterpiece'   // → Hero
+  | 'MinimalSplit'         // → Minimal
+  | 'GridWithOverlap'      // → Collage
+  | 'DiagonalCascade'      // → Dynamic
+  | 'SymmetricBalance'     // → Minimal
+  | 'AsymmetricFlow'       // → Dynamic
+  | 'CollageStyle';        // → Collage
+
+/**
+ * Map legacy archetype names to new ones
+ */
+export const LEGACY_ARCHETYPE_MAP: Record<LegacyArchetypeName, LayoutArchetypeName> = {
+  ZigZagStaggered: 'Dynamic',
+  LayeredCenterpiece: 'Hero',
+  MinimalSplit: 'Minimal',
+  GridWithOverlap: 'Collage',
+  DiagonalCascade: 'Dynamic',
+  SymmetricBalance: 'Minimal',
+  AsymmetricFlow: 'Dynamic',
+  CollageStyle: 'Collage',
+};
+
+/**
+ * Vision AI layout hints - guides AI-driven placement decisions
+ */
+export interface VisionLayoutHint {
+  /** Product visual weight (0-1) based on size, color intensity */
+  visualWeight: number;
+  /** Recommended placement zone (0=top-left, 1=center, 2=bottom-right) */
+  placementZone: number;
+  /** Suggested scale factor (0.5-1.5) */
+  scaleFactor: number;
+  /** Whether product should be a focal point */
+  isFocalPoint: boolean;
+  /** Suggested rotation for dynamic feel (-15 to 15 degrees) */
+  suggestedRotation: number;
+}
+
+/**
+ * Vision AI analysis result for layout optimization
+ */
+export interface VisionLayoutAnalysis {
+  /** Overall composition score (0-100) */
+  aestheticScore: number;
+  /** Per-product placement hints */
+  productHints: Map<string, VisionLayoutHint>;
+  /** Recommended archetype based on product analysis */
+  recommendedArchetype: LayoutArchetypeName;
+  /** Suggested canvas aspect ratio */
+  suggestedAspectRatio: number;
+  /** Areas to avoid (brand logos, text) */
+  avoidanceZones: BoundingBox[];
+}
 
 /**
  * Layout archetype definition

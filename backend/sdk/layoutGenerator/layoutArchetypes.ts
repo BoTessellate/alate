@@ -1,53 +1,29 @@
 /**
- * Layout Archetypes Library (v3)
- * Predefined layout composition rules for moodboards
+ * Layout Archetypes Library (v4)
+ * Simplified to 4 core types - Vision AI selects and adapts
  */
 
-import { LayoutArchetype, LayoutArchetypeName } from './types';
+import {
+  LayoutArchetype,
+  LayoutArchetypeName,
+  LegacyArchetypeName,
+  LEGACY_ARCHETYPE_MAP
+} from './types';
 
 /**
- * Library of layout archetypes
- * Each defines rules for positioning products on a moodboard
+ * Library of layout archetypes - 4 core types
+ * Vision AI dynamically adjusts placement within these frameworks
  */
 export const LAYOUT_ARCHETYPES: Record<LayoutArchetypeName, LayoutArchetype> = {
   /**
-   * ZigZag Staggered
-   * Alternating left-right placement with vertical offset
-   * Best for: 3-7 products, storytelling flow
+   * Minimal
+   * Clean, whitespace-focused compositions
+   * Best for: 2-4 products, editorial/luxury aesthetic
+   * Vision AI focuses on: negative space balance, focal hierarchy
    */
-  ZigZagStaggered: {
-    name: 'ZigZagStaggered',
-    description: 'Alternating zigzag pattern with staggered heights',
-    minItems: 3,
-    maxItems: 7,
-    allowOverlap: false,
-    balanceRule: 'dynamic',
-    defaultCanvasSize: { width: 1200, height: 1600 }
-  },
-
-  /**
-   * Layered Centerpiece
-   * Central focus with supporting elements layered around
-   * Best for: 3-5 products, hero product showcase
-   */
-  LayeredCenterpiece: {
-    name: 'LayeredCenterpiece',
-    description: 'Central hero image with layered supporting products',
-    minItems: 3,
-    maxItems: 5,
-    allowOverlap: true,
-    balanceRule: 'symmetry',
-    defaultCanvasSize: { width: 1200, height: 1200 }
-  },
-
-  /**
-   * Minimal Split
-   * Clean split layout with negative space
-   * Best for: 2-4 products, minimalist aesthetic
-   */
-  MinimalSplit: {
-    name: 'MinimalSplit',
-    description: 'Clean split with generous whitespace',
+  Minimal: {
+    name: 'Minimal',
+    description: 'Clean compositions with generous whitespace and clear focal points',
     minItems: 2,
     maxItems: 4,
     allowOverlap: false,
@@ -56,75 +32,48 @@ export const LAYOUT_ARCHETYPES: Record<LayoutArchetypeName, LayoutArchetype> = {
   },
 
   /**
-   * Grid With Overlap
-   * Grid-based with slight overlaps for dynamic feel
-   * Best for: 4-9 products, catalog-style
+   * Hero
+   * Central focus with supporting elements
+   * Best for: 3-6 products, product spotlight
+   * Vision AI focuses on: identifying hero product, supporting hierarchy
    */
-  GridWithOverlap: {
-    name: 'GridWithOverlap',
-    description: 'Grid layout with intentional overlaps',
-    minItems: 4,
-    maxItems: 9,
+  Hero: {
+    name: 'Hero',
+    description: 'Central hero image with layered supporting products',
+    minItems: 3,
+    maxItems: 6,
     allowOverlap: true,
     balanceRule: 'symmetry',
     defaultCanvasSize: { width: 1200, height: 1200 }
   },
 
   /**
-   * Diagonal Cascade
-   * Diagonal flow from top-left to bottom-right
-   * Best for: 3-6 products, dynamic movement
+   * Dynamic
+   * Flowing, editorial-style compositions
+   * Best for: 3-8 products, storytelling/fashion
+   * Vision AI focuses on: visual flow, rhythm, movement
    */
-  DiagonalCascade: {
-    name: 'DiagonalCascade',
-    description: 'Diagonal flow with cascading elements',
+  Dynamic: {
+    name: 'Dynamic',
+    description: 'Flowing editorial layout with visual rhythm and movement',
     minItems: 3,
-    maxItems: 6,
+    maxItems: 8,
     allowOverlap: true,
     balanceRule: 'dynamic',
     defaultCanvasSize: { width: 1200, height: 1600 }
   },
 
   /**
-   * Symmetric Balance
-   * Perfect symmetry around vertical axis
-   * Best for: 4-8 products, formal compositions
+   * Collage
+   * Organic, magazine-style compositions
+   * Best for: 4-12 products, mood/lifestyle
+   * Vision AI focuses on: organic grouping, color harmony, texture mixing
    */
-  SymmetricBalance: {
-    name: 'SymmetricBalance',
-    description: 'Perfectly balanced symmetric layout',
+  Collage: {
+    name: 'Collage',
+    description: 'Organic collage with varied sizes, rotations, and overlaps',
     minItems: 4,
-    maxItems: 8,
-    allowOverlap: false,
-    balanceRule: 'symmetry',
-    defaultCanvasSize: { width: 1200, height: 1200 }
-  },
-
-  /**
-   * Asymmetric Flow
-   * Intentionally unbalanced for visual interest
-   * Best for: 3-7 products, editorial style
-   */
-  AsymmetricFlow: {
-    name: 'AsymmetricFlow',
-    description: 'Asymmetric composition with visual flow',
-    minItems: 3,
-    maxItems: 7,
-    allowOverlap: true,
-    balanceRule: 'negative-space',
-    defaultCanvasSize: { width: 1200, height: 1600 }
-  },
-
-  /**
-   * Collage Style
-   * Organic, magazine-style collage
-   * Best for: 5-10 products, casual/creative
-   */
-  CollageStyle: {
-    name: 'CollageStyle',
-    description: 'Organic collage with varied sizes and rotations',
-    minItems: 5,
-    maxItems: 10,
+    maxItems: 12,
     allowOverlap: true,
     balanceRule: 'dynamic',
     defaultCanvasSize: { width: 1400, height: 1400 }
@@ -132,10 +81,73 @@ export const LAYOUT_ARCHETYPES: Record<LayoutArchetypeName, LayoutArchetype> = {
 };
 
 /**
- * Get archetype by name
+ * Human-friendly display names for archetypes
  */
-export function getArchetype(name: LayoutArchetypeName): LayoutArchetype {
-  return LAYOUT_ARCHETYPES[name];
+export const ARCHETYPE_DISPLAY_NAMES: Record<LayoutArchetypeName, string> = {
+  Minimal: 'Minimal',
+  Hero: 'Hero Focus',
+  Dynamic: 'Dynamic Flow',
+  Collage: 'Collage'
+};
+
+/**
+ * Archetype characteristics for Vision AI decision making
+ */
+export const ARCHETYPE_CHARACTERISTICS = {
+  Minimal: {
+    whitespaceRatio: 0.5,      // Target 50%+ whitespace
+    maxRotation: 0,            // No rotation
+    overlapAllowed: false,
+    scalingRange: [0.3, 0.6],  // Smaller, more uniform sizes
+    focusStyle: 'distributed'  // Even visual weight
+  },
+  Hero: {
+    whitespaceRatio: 0.3,
+    maxRotation: 5,
+    overlapAllowed: true,
+    scalingRange: [0.2, 0.8],  // Wide range for hero emphasis
+    focusStyle: 'central'      // Central focal point
+  },
+  Dynamic: {
+    whitespaceRatio: 0.25,
+    maxRotation: 12,
+    overlapAllowed: true,
+    scalingRange: [0.25, 0.7],
+    focusStyle: 'flowing'      // Visual path through composition
+  },
+  Collage: {
+    whitespaceRatio: 0.15,
+    maxRotation: 15,
+    overlapAllowed: true,
+    scalingRange: [0.2, 0.6],
+    focusStyle: 'organic'      // Natural, scattered grouping
+  }
+};
+
+/**
+ * Resolve legacy archetype name to new simplified name
+ */
+export function resolveLegacyArchetype(name: string): LayoutArchetypeName {
+  // Check if it's already a new archetype name
+  if (name in LAYOUT_ARCHETYPES) {
+    return name as LayoutArchetypeName;
+  }
+
+  // Map legacy name to new
+  if (name in LEGACY_ARCHETYPE_MAP) {
+    return LEGACY_ARCHETYPE_MAP[name as LegacyArchetypeName];
+  }
+
+  // Default fallback
+  return 'Dynamic';
+}
+
+/**
+ * Get archetype by name (supports legacy names)
+ */
+export function getArchetype(name: string): LayoutArchetype {
+  const resolvedName = resolveLegacyArchetype(name);
+  return LAYOUT_ARCHETYPES[resolvedName];
 }
 
 /**
@@ -156,40 +168,22 @@ export function findArchetypesForProductCount(count: number): LayoutArchetype[] 
 
 /**
  * Get recommended archetype for product count
+ * Vision AI should override this with analysis-based recommendation
  */
 export function getRecommendedArchetype(count: number): LayoutArchetype {
   const suitable = findArchetypesForProductCount(count);
 
   if (suitable.length === 0) {
     // Default to most flexible archetype
-    return LAYOUT_ARCHETYPES.CollageStyle;
+    return LAYOUT_ARCHETYPES.Collage;
   }
 
-  // Prefer archetypes that are closer to their optimal range
-  return suitable.reduce((best, current) => {
-    const bestMid = (best.minItems + best.maxItems) / 2;
-    const currentMid = (current.minItems + current.maxItems) / 2;
-    const bestDiff = Math.abs(count - bestMid);
-    const currentDiff = Math.abs(count - currentMid);
-
-    return currentDiff < bestDiff ? current : best;
-  });
+  // Product count based recommendations
+  if (count <= 3) return LAYOUT_ARCHETYPES.Minimal;
+  if (count <= 5) return LAYOUT_ARCHETYPES.Hero;
+  if (count <= 7) return LAYOUT_ARCHETYPES.Dynamic;
+  return LAYOUT_ARCHETYPES.Collage;
 }
-
-/**
- * Human-friendly display names for archetypes
- * Maps internal names to UI-friendly labels
- */
-export const ARCHETYPE_DISPLAY_NAMES: Record<LayoutArchetypeName, string> = {
-  ZigZagStaggered: 'ZigZag Flow',
-  LayeredCenterpiece: 'Hero Grid',
-  MinimalSplit: 'Minimal Split',
-  GridWithOverlap: 'Grid Overlap',
-  DiagonalCascade: 'Diagonal Overlap',
-  SymmetricBalance: 'Balanced Grid',
-  AsymmetricFlow: 'Layered Spread',
-  CollageStyle: 'Floating Canvas'
-};
 
 /**
  * Get display name for archetype
@@ -220,9 +214,6 @@ export function getArchetypeNamesInOrder(): LayoutArchetypeName[] {
 
 /**
  * Get next archetype in cycle (for remix)
- * @param current - Current archetype name
- * @param productCount - Number of products (to filter compatible archetypes)
- * @returns Next archetype in cycle
  */
 export function getNextArchetype(
   current: LayoutArchetypeName,
@@ -230,7 +221,6 @@ export function getNextArchetype(
 ): LayoutArchetype {
   const allNames = getArchetypeNamesInOrder();
 
-  // Filter to compatible archetypes if product count provided
   let compatibleNames = allNames;
   if (productCount !== undefined) {
     compatibleNames = allNames.filter(name => {
@@ -238,7 +228,6 @@ export function getNextArchetype(
       return productCount >= arch.minItems && productCount <= arch.maxItems;
     });
 
-    // Fallback to all if none compatible
     if (compatibleNames.length === 0) {
       compatibleNames = allNames;
     }
@@ -252,9 +241,6 @@ export function getNextArchetype(
 
 /**
  * Get previous archetype in cycle (for remix backward)
- * @param current - Current archetype name
- * @param productCount - Number of products (to filter compatible archetypes)
- * @returns Previous archetype in cycle
  */
 export function getPreviousArchetype(
   current: LayoutArchetypeName,
@@ -282,9 +268,6 @@ export function getPreviousArchetype(
 
 /**
  * Get random archetype (for shuffle remix)
- * @param exclude - Archetype to exclude (current one)
- * @param productCount - Number of products (to filter compatible archetypes)
- * @returns Random different archetype
  */
 export function getRandomArchetype(
   exclude?: LayoutArchetypeName,
@@ -292,7 +275,6 @@ export function getRandomArchetype(
 ): LayoutArchetype {
   let candidates = getAllArchetypes();
 
-  // Filter by product count
   if (productCount !== undefined) {
     const filtered = candidates.filter(
       arch => productCount >= arch.minItems && productCount <= arch.maxItems
@@ -302,14 +284,12 @@ export function getRandomArchetype(
     }
   }
 
-  // Exclude current
   if (exclude) {
     candidates = candidates.filter(arch => arch.name !== exclude);
   }
 
-  // If no candidates left, return CollageStyle as fallback
   if (candidates.length === 0) {
-    return LAYOUT_ARCHETYPES.CollageStyle;
+    return LAYOUT_ARCHETYPES.Collage;
   }
 
   const randomIndex = Math.floor(Math.random() * candidates.length);

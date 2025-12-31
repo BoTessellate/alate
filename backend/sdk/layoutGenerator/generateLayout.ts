@@ -1,6 +1,7 @@
 /**
- * Layout Generation Engine
- * Generates moodboard layouts using predefined archetypes
+ * Layout Generation Engine (v4)
+ * Generates moodboard layouts using 4 simplified archetypes
+ * Vision AI can influence placement within each archetype framework
  */
 
 import {
@@ -13,9 +14,11 @@ import {
   BoundingBox,
   LayoutConfig,
   LayoutArchetypeName,
-  FitTag
+  FitTag,
+  VisionLayoutHint,
+  VisionLayoutAnalysis
 } from './types';
-import { getArchetype } from './layoutArchetypes';
+import { getArchetype, ARCHETYPE_CHARACTERISTICS, resolveLegacyArchetype } from './layoutArchetypes';
 
 /**
  * Fit tag priority for layout placement
@@ -46,16 +49,26 @@ const DEFAULT_CONFIG: LayoutConfig = {
  */
 export class LayoutGenerator {
   private config: LayoutConfig;
+  private visionAnalysis?: VisionLayoutAnalysis;
 
   constructor(config: Partial<LayoutConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
   /**
+   * Set Vision AI analysis to influence layout decisions
+   */
+  setVisionAnalysis(analysis: VisionLayoutAnalysis): void {
+    this.visionAnalysis = analysis;
+  }
+
+  /**
    * Generate layout from input
    */
   async generateLayout(input: LayoutInput): Promise<LayoutOutput> {
-    const archetype = getArchetype(input.layout_type);
+    // Resolve legacy archetype names to new ones
+    const resolvedType = resolveLegacyArchetype(input.layout_type);
+    const archetype = getArchetype(resolvedType);
     const canvasSize = input.canvas_size || archetype.defaultCanvasSize;
 
     // Validate product count
@@ -76,7 +89,7 @@ export class LayoutGenerator {
 
     // Generate layout elements based on archetype
     const elements = await this.generateArchetypeLayout(
-      input.layout_type,
+      resolvedType,
       sortedProducts,
       canvasSize,
       input.show_labels !== false,
@@ -84,7 +97,7 @@ export class LayoutGenerator {
     );
 
     return {
-      layout_type: input.layout_type,
+      layout_type: resolvedType,
       canvas_size: canvasSize,
       elements,
       metadata: {
@@ -97,8 +110,6 @@ export class LayoutGenerator {
 
   /**
    * Sort products by fit tags for optimal layout placement
-   * Bulky/oversized items are placed first (hero positions)
-   * Delicate/lightweight items are placed in supporting positions
    */
   private sortByFitTags(products: ProductInput[]): ProductInput[] {
     return [...products].sort((a, b) => {
@@ -110,70 +121,75 @@ export class LayoutGenerator {
 
   /**
    * Get priority score for a product based on its fit tags
-   * Lower score = higher priority (placed first)
    */
   private getFitTagPriority(fitTags?: FitTag[]): number {
     if (!fitTags || fitTags.length === 0) {
-      return 10; // Default: no tags = lowest priority
+      return 10;
     }
-
-    // Return lowest priority among all tags
     return Math.min(...fitTags.map(tag => FIT_TAG_PRIORITY[tag] || 10));
   }
 
   /**
-   * Calculate image size based on product dimensions and fit tags
-   * Bulky items get larger display, delicate items get smaller
+   * Get Vision AI hint for a product if available
    */
-  private calculateDimensionAwareSize(
+  private getVisionHint(productId: string): VisionLayoutHint | undefined {
+    return this.visionAnalysis?.productHints.get(productId);
+  }
+
+  /**
+   * Calculate image size based on Vision AI hints, fit tags, and dimensions
+   */
+  private calculateSize(
     product: ProductInput,
     baseSize: number,
-    minSize: number = 200,
-    maxSize: number = 500
+    archetype: LayoutArchetypeName
   ): number {
-    let sizeMultiplier = 1.0;
+    const characteristics = ARCHETYPE_CHARACTERISTICS[archetype];
+    const [minScale, maxScale] = characteristics.scalingRange;
+
+    // Start with Vision AI hint if available
+    const hint = product.product_name ? this.getVisionHint(product.product_name) : undefined;
+    let sizeMultiplier = hint?.scaleFactor || 1.0;
 
     // Adjust based on fit tags
     if (product.fit_tags) {
       if (product.fit_tags.includes('bulky') || product.fit_tags.includes('oversized')) {
-        sizeMultiplier = 1.3; // 30% larger
+        sizeMultiplier *= 1.2;
       } else if (product.fit_tags.includes('delicate')) {
-        sizeMultiplier = 0.8; // 20% smaller
+        sizeMultiplier *= 0.85;
       } else if (product.fit_tags.includes('lightweight')) {
-        sizeMultiplier = 0.9; // 10% smaller
+        sizeMultiplier *= 0.9;
       }
     }
 
-    // Adjust based on physical dimensions if available
-    if (product.dimensions) {
-      const { width, height, depth } = product.dimensions;
-      const volume = (width || 0) * (height || 0) * (depth || 1);
+    // Apply archetype scaling constraints
+    const scaledSize = baseSize * sizeMultiplier;
+    const minSize = baseSize * minScale;
+    const maxSize = baseSize * maxScale;
 
-      // Scale based on relative volume (assuming typical products are ~1000-5000 cm³)
-      if (volume > 10000) {
-        sizeMultiplier *= 1.2; // Large items
-      } else if (volume < 500) {
-        sizeMultiplier *= 0.85; // Small items
-      }
+    return Math.max(this.config.minImageSize, Math.min(this.config.maxImageSize,
+      Math.max(minSize, Math.min(maxSize, scaledSize))
+    ));
+  }
+
+  /**
+   * Get rotation for element based on Vision AI and archetype
+   */
+  private getRotation(product: ProductInput, archetype: LayoutArchetypeName): number {
+    if (!this.config.allowRotation) return 0;
+
+    const characteristics = ARCHETYPE_CHARACTERISTICS[archetype];
+    const maxRot = characteristics.maxRotation;
+
+    if (maxRot === 0) return 0;
+
+    // Check Vision AI hint
+    const hint = product.product_name ? this.getVisionHint(product.product_name) : undefined;
+    if (hint?.suggestedRotation !== undefined) {
+      return Math.max(-maxRot, Math.min(maxRot, hint.suggestedRotation));
     }
 
-    // Calculate final size with bounds
-    const calculatedSize = baseSize * sizeMultiplier;
-    return Math.max(minSize, Math.min(maxSize, calculatedSize));
-  }
-
-  /**
-   * Check if product has "delicate" fit tag (requires careful placement)
-   */
-  private isDelicateProduct(product: ProductInput): boolean {
-    return product.fit_tags?.includes('delicate') ?? false;
-  }
-
-  /**
-   * Check if product is bulky (should be prominent)
-   */
-  private isBulkyProduct(product: ProductInput): boolean {
-    return product.fit_tags?.includes('bulky') || product.fit_tags?.includes('oversized') || false;
+    return this.random(-maxRot, maxRot);
   }
 
   /**
@@ -187,84 +203,113 @@ export class LayoutGenerator {
     showPrices: boolean
   ): Promise<LayoutElement[]> {
     switch (archetype) {
-      case 'ZigZagStaggered':
-        return this.generateZigZagLayout(products, canvasSize, showLabels, showPrices);
+      case 'Minimal':
+        return this.generateMinimalLayout(products, canvasSize, showLabels, showPrices);
 
-      case 'LayeredCenterpiece':
-        return this.generateLayeredCenterpieceLayout(products, canvasSize, showLabels, showPrices);
+      case 'Hero':
+        return this.generateHeroLayout(products, canvasSize, showLabels, showPrices);
 
-      case 'MinimalSplit':
-        return this.generateMinimalSplitLayout(products, canvasSize, showLabels, showPrices);
+      case 'Dynamic':
+        return this.generateDynamicLayout(products, canvasSize, showLabels, showPrices);
 
-      case 'GridWithOverlap':
-        return this.generateGridWithOverlapLayout(products, canvasSize, showLabels, showPrices);
-
-      case 'DiagonalCascade':
-        return this.generateDiagonalCascadeLayout(products, canvasSize, showLabels, showPrices);
-
-      case 'SymmetricBalance':
-        return this.generateSymmetricBalanceLayout(products, canvasSize, showLabels, showPrices);
-
-      case 'AsymmetricFlow':
-        return this.generateAsymmetricFlowLayout(products, canvasSize, showLabels, showPrices);
-
-      case 'CollageStyle':
-        return this.generateCollageStyleLayout(products, canvasSize, showLabels, showPrices);
+      case 'Collage':
+        return this.generateCollageLayout(products, canvasSize, showLabels, showPrices);
 
       default:
-        throw new Error(`Unknown archetype: ${archetype}`);
+        // Fallback for any edge cases
+        return this.generateDynamicLayout(products, canvasSize, showLabels, showPrices);
     }
   }
 
   /**
-   * ZigZag Staggered Layout
-   * Alternating left-right with vertical offset
+   * Minimal Layout
+   * Clean, whitespace-focused with clear focal points
+   * No rotation, generous spacing, even visual weight distribution
    */
-  private generateZigZagLayout(
+  private generateMinimalLayout(
     products: ProductInput[],
     canvasSize: Size,
     showLabels: boolean,
     showPrices: boolean
   ): LayoutElement[] {
     const elements: LayoutElement[] = [];
-    const imageSize = 350;
-    const verticalSpacing = 250;
-    const horizontalMargin = this.config.padding + 100;
+    const baseSize = 350;
+    const spacing = 120;
 
-    products.forEach((product, i) => {
-      const isLeft = i % 2 === 0;
-      const x = isLeft ? horizontalMargin : canvasSize.width - horizontalMargin - imageSize;
-      const y = this.config.padding + i * verticalSpacing;
+    if (products.length === 2) {
+      // Side by side with generous space
+      const imageSize = this.calculateSize(products[0], baseSize, 'Minimal');
+      const totalWidth = imageSize * 2 + spacing;
+      const startX = (canvasSize.width - totalWidth) / 2;
+      const y = (canvasSize.height - imageSize) / 2;
 
-      // Image
-      elements.push({
-        type: 'image',
-        src: product.image_url,
-        position: { x, y },
-        size: { width: imageSize, height: imageSize },
-        zIndex: i
-      });
+      products.forEach((product, i) => {
+        const size = this.calculateSize(product, baseSize, 'Minimal');
+        const x = startX + i * (imageSize + spacing);
 
-      // Label
-      if (showLabels) {
         elements.push({
-          type: 'label',
-          text: product.brand,
-          position: { x: x + 10, y: y + imageSize + this.config.labelOffset },
-          style: 'label',
-          zIndex: i + 100
+          type: 'image',
+          id: `product-${i}`,
+          src: product.image_url,
+          position: { x, y },
+          size: { width: size, height: size },
+          zIndex: i
         });
-      }
-    });
+
+        if (showLabels) {
+          elements.push({
+            type: 'label',
+            text: product.brand,
+            position: { x: x + 10, y: y + size + this.config.labelOffset },
+            style: 'label',
+            zIndex: i + 100
+          });
+        }
+      });
+    } else {
+      // Centered vertical arrangement
+      const totalHeight = products.reduce((sum, p) => {
+        return sum + this.calculateSize(p, baseSize * 0.9, 'Minimal') + spacing;
+      }, -spacing);
+      const startY = (canvasSize.height - totalHeight) / 2;
+      let currentY = startY;
+
+      products.forEach((product, i) => {
+        const size = this.calculateSize(product, baseSize * 0.9, 'Minimal');
+        const x = (canvasSize.width - size) / 2;
+
+        elements.push({
+          type: 'image',
+          id: `product-${i}`,
+          src: product.image_url,
+          position: { x, y: currentY },
+          size: { width: size, height: size },
+          zIndex: i
+        });
+
+        if (showLabels) {
+          elements.push({
+            type: 'label',
+            text: product.brand,
+            position: { x: x + 10, y: currentY + size + this.config.labelOffset },
+            style: 'label',
+            zIndex: i + 100
+          });
+        }
+
+        currentY += size + spacing;
+      });
+    }
 
     return elements;
   }
 
   /**
-   * Layered Centerpiece Layout
-   * Central hero with supporting elements
+   * Hero Layout
+   * Central hero product with supporting items around it
+   * Slight rotation allowed, symmetrical balance
    */
-  private generateLayeredCenterpieceLayout(
+  private generateHeroLayout(
     products: ProductInput[],
     canvasSize: Size,
     showLabels: boolean,
@@ -274,10 +319,12 @@ export class LayoutGenerator {
     const centerX = canvasSize.width / 2;
     const centerY = canvasSize.height / 2;
 
-    // Hero image (first product)
-    const heroSize = 450;
+    // Hero image (first product - bulky items sorted first)
+    const heroSize = this.calculateSize(products[0], 450, 'Hero');
+
     elements.push({
       type: 'image',
+      id: 'product-hero',
       src: products[0].image_url,
       position: { x: centerX - heroSize / 2, y: centerY - heroSize / 2 },
       size: { width: heroSize, height: heroSize },
@@ -294,24 +341,26 @@ export class LayoutGenerator {
       });
     }
 
-    // Supporting products in a circle
-    const radius = 350;
+    // Supporting products arranged around hero
     const supportingProducts = products.slice(1);
+    const radius = Math.min(canvasSize.width, canvasSize.height) * 0.35;
     const angleStep = (2 * Math.PI) / supportingProducts.length;
+    const startAngle = -Math.PI / 2; // Start from top
 
     supportingProducts.forEach((product, i) => {
-      const angle = i * angleStep;
-      const size = 200;
+      const angle = startAngle + i * angleStep;
+      const size = this.calculateSize(product, 200, 'Hero');
       const x = centerX + radius * Math.cos(angle) - size / 2;
       const y = centerY + radius * Math.sin(angle) - size / 2;
 
       elements.push({
         type: 'image',
+        id: `product-${i + 1}`,
         src: product.image_url,
         position: { x, y },
         size: { width: size, height: size },
         zIndex: i,
-        rotation: this.config.allowRotation ? this.randomRotation() : 0
+        rotation: this.getRotation(product, 'Hero')
       });
 
       if (showLabels) {
@@ -329,309 +378,131 @@ export class LayoutGenerator {
   }
 
   /**
-   * Minimal Split Layout
-   * Clean split with whitespace
+   * Dynamic Layout
+   * Flowing editorial style with visual rhythm and movement
+   * Varied sizes, diagonal flow, intentional asymmetry
    */
-  private generateMinimalSplitLayout(
+  private generateDynamicLayout(
     products: ProductInput[],
     canvasSize: Size,
     showLabels: boolean,
     showPrices: boolean
   ): LayoutElement[] {
     const elements: LayoutElement[] = [];
-    const imageSize = 400;
-    const spacing = 150;
 
-    if (products.length === 2) {
-      // Side by side
-      const leftX = canvasSize.width / 2 - imageSize - spacing / 2;
-      const rightX = canvasSize.width / 2 + spacing / 2;
-      const y = canvasSize.height / 2 - imageSize / 2;
+    // Create a flowing path through the canvas
+    const pathPoints = this.generateFlowPath(products.length, canvasSize);
 
-      [leftX, rightX].forEach((x, i) => {
-        elements.push({
-          type: 'image',
-          src: products[i].image_url,
-          position: { x, y },
-          size: { width: imageSize, height: imageSize },
-          zIndex: i
-        });
+    products.forEach((product, i) => {
+      const point = pathPoints[i];
+      const size = this.calculateSize(product, point.baseSize, 'Dynamic');
 
-        if (showLabels) {
-          elements.push({
-            type: 'label',
-            text: products[i].brand,
-            position: { x: x + 10, y: y + imageSize + this.config.labelOffset },
-            style: 'label',
-            zIndex: i + 10
-          });
-        }
+      // Adjust position to keep within bounds
+      const x = Math.max(this.config.padding,
+        Math.min(canvasSize.width - size - this.config.padding, point.x - size / 2));
+      const y = Math.max(this.config.padding,
+        Math.min(canvasSize.height - size - this.config.padding, point.y - size / 2));
+
+      elements.push({
+        type: 'image',
+        id: `product-${i}`,
+        src: product.image_url,
+        position: { x, y },
+        size: { width: size, height: size },
+        zIndex: point.zIndex,
+        rotation: this.getRotation(product, 'Dynamic')
       });
-    } else {
-      // Vertical stack
-      const x = canvasSize.width / 2 - imageSize / 2;
-      const startY = (canvasSize.height - (products.length * (imageSize + spacing))) / 2;
 
-      products.forEach((product, i) => {
-        const y = startY + i * (imageSize + spacing);
-
+      if (showLabels) {
         elements.push({
-          type: 'image',
-          src: product.image_url,
-          position: { x, y },
-          size: { width: imageSize, height: imageSize },
-          zIndex: i
+          type: 'label',
+          text: product.brand,
+          position: { x: x + 10, y: y + size + 15 },
+          style: 'label',
+          zIndex: point.zIndex + 100
         });
+      }
+    });
 
-        if (showLabels) {
-          elements.push({
-            type: 'label',
-            text: product.brand,
-            position: { x: x + 10, y: y + imageSize + 20 },
-            style: 'label',
-            zIndex: i + 10
-          });
-        }
+    return elements;
+  }
+
+  /**
+   * Generate flow path points for Dynamic layout
+   */
+  private generateFlowPath(count: number, canvasSize: Size): Array<{x: number, y: number, baseSize: number, zIndex: number}> {
+    const points: Array<{x: number, y: number, baseSize: number, zIndex: number}> = [];
+    const padding = this.config.padding;
+
+    // Create a zigzag flow with some randomness
+    for (let i = 0; i < count; i++) {
+      const progress = i / (count - 1 || 1);
+      const isLeft = i % 2 === 0;
+
+      // Base position follows a diagonal with alternating sides
+      const baseX = isLeft
+        ? padding + canvasSize.width * 0.1 + this.random(0, canvasSize.width * 0.2)
+        : canvasSize.width * 0.6 + this.random(0, canvasSize.width * 0.2);
+
+      const baseY = padding + progress * (canvasSize.height - 2 * padding - 300);
+
+      // Size varies based on position (larger at start)
+      const baseSize = 380 - progress * 100 + this.random(-30, 30);
+
+      points.push({
+        x: baseX,
+        y: baseY,
+        baseSize: Math.max(250, baseSize),
+        zIndex: count - i // First items on top
       });
     }
 
-    return elements;
+    return points;
   }
 
   /**
-   * Grid With Overlap Layout
+   * Collage Layout
+   * Organic, magazine-style with varied sizes, rotations, and overlaps
+   * Maximum creative freedom within bounds
    */
-  private generateGridWithOverlapLayout(
+  private generateCollageLayout(
     products: ProductInput[],
     canvasSize: Size,
     showLabels: boolean,
     showPrices: boolean
   ): LayoutElement[] {
     const elements: LayoutElement[] = [];
-    const cols = Math.ceil(Math.sqrt(products.length));
-    const rows = Math.ceil(products.length / cols);
-
-    const imageSize = 300;
-    const overlapAmount = 40;
-    const gridWidth = cols * (imageSize - overlapAmount);
-    const gridHeight = rows * (imageSize - overlapAmount);
-
-    const startX = (canvasSize.width - gridWidth) / 2;
-    const startY = (canvasSize.height - gridHeight) / 2;
+    const placedBoxes: BoundingBox[] = [];
 
     products.forEach((product, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
+      const baseSize = this.random(280, 420);
+      const size = this.calculateSize(product, baseSize, 'Collage');
 
-      const x = startX + col * (imageSize - overlapAmount);
-      const y = startY + row * (imageSize - overlapAmount);
+      // Try to find a good position (allow some overlap)
+      let x: number, y: number;
+      let attempts = 0;
+      const maxAttempts = 30;
 
-      elements.push({
-        type: 'image',
-        src: product.image_url,
-        position: { x, y },
-        size: { width: imageSize, height: imageSize },
-        zIndex: i
-      });
+      do {
+        x = this.randomInt(this.config.padding, canvasSize.width - size - this.config.padding);
+        y = this.randomInt(this.config.padding, canvasSize.height - size - this.config.padding);
+        attempts++;
+      } while (
+        attempts < maxAttempts &&
+        this.hasExcessiveOverlap({ x, y, width: size, height: size }, placedBoxes)
+      );
 
-      if (showLabels) {
-        elements.push({
-          type: 'text',
-          text: product.brand,
-          position: { x: x + 10, y: y + imageSize - 30 },
-          style: 'caption',
-          zIndex: i + 100
-        });
-      }
-    });
-
-    return elements;
-  }
-
-  /**
-   * Diagonal Cascade Layout
-   */
-  private generateDiagonalCascadeLayout(
-    products: ProductInput[],
-    canvasSize: Size,
-    showLabels: boolean,
-    showPrices: boolean
-  ): LayoutElement[] {
-    const elements: LayoutElement[] = [];
-    const startX = this.config.padding;
-    const startY = this.config.padding;
-    const stepX = (canvasSize.width - 2 * this.config.padding - 300) / (products.length - 1);
-    const stepY = (canvasSize.height - 2 * this.config.padding - 300) / (products.length - 1);
-
-    products.forEach((product, i) => {
-      const size = 350 - i * 30; // Decreasing size
-      const x = startX + i * stepX;
-      const y = startY + i * stepY;
+      placedBoxes.push({ x, y, width: size, height: size });
 
       elements.push({
         type: 'image',
-        src: product.image_url,
-        position: { x, y },
-        size: { width: size, height: size },
-        zIndex: products.length - i, // Reverse z-index
-        rotation: this.config.allowRotation ? i * 3 : 0
-      });
-
-      if (showLabels) {
-        elements.push({
-          type: 'label',
-          text: product.brand,
-          position: { x: x + 10, y: y + size + 15 },
-          style: 'label',
-          zIndex: products.length + i
-        });
-      }
-    });
-
-    return elements;
-  }
-
-  /**
-   * Symmetric Balance Layout
-   */
-  private generateSymmetricBalanceLayout(
-    products: ProductInput[],
-    canvasSize: Size,
-    showLabels: boolean,
-    showPrices: boolean
-  ): LayoutElement[] {
-    const elements: LayoutElement[] = [];
-    const centerX = canvasSize.width / 2;
-    const imageSize = 280;
-    const spacing = 60;
-
-    const half = Math.ceil(products.length / 2);
-    const leftSide = products.slice(0, half);
-    const rightSide = products.slice(half);
-
-    // Left side
-    leftSide.forEach((product, i) => {
-      const x = centerX - spacing - imageSize - (i * 50);
-      const y = this.config.padding + i * (imageSize + spacing);
-
-      elements.push({
-        type: 'image',
-        src: product.image_url,
-        position: { x, y },
-        size: { width: imageSize, height: imageSize },
-        zIndex: i
-      });
-
-      if (showLabels) {
-        elements.push({
-          type: 'label',
-          text: product.brand,
-          position: { x: x + 10, y: y + imageSize + 15 },
-          style: 'label',
-          zIndex: i + 100
-        });
-      }
-    });
-
-    // Right side (mirror)
-    rightSide.forEach((product, i) => {
-      const x = centerX + spacing + (i * 50);
-      const y = this.config.padding + i * (imageSize + spacing);
-
-      elements.push({
-        type: 'image',
-        src: product.image_url,
-        position: { x, y },
-        size: { width: imageSize, height: imageSize },
-        zIndex: i
-      });
-
-      if (showLabels) {
-        elements.push({
-          type: 'label',
-          text: product.brand,
-          position: { x: x + 10, y: y + imageSize + 15 },
-          style: 'label',
-          zIndex: i + 100
-        });
-      }
-    });
-
-    return elements;
-  }
-
-  /**
-   * Asymmetric Flow Layout
-   */
-  private generateAsymmetricFlowLayout(
-    products: ProductInput[],
-    canvasSize: Size,
-    showLabels: boolean,
-    showPrices: boolean
-  ): LayoutElement[] {
-    const elements: LayoutElement[] = [];
-
-    // Varied positions with intentional imbalance
-    const positions = [
-      { x: 100, y: 100, size: 400 },
-      { x: 600, y: 200, size: 300 },
-      { x: 150, y: 600, size: 350 },
-      { x: 700, y: 650, size: 280 },
-      { x: 400, y: 350, size: 250 },
-      { x: 850, y: 100, size: 300 },
-      { x: 300, y: 950, size: 320 }
-    ];
-
-    products.forEach((product, i) => {
-      const pos = positions[i % positions.length];
-
-      elements.push({
-        type: 'image',
-        src: product.image_url,
-        position: { x: pos.x, y: pos.y },
-        size: { width: pos.size, height: pos.size },
-        zIndex: i,
-        rotation: this.config.allowRotation ? this.randomRotation() : 0
-      });
-
-      if (showLabels) {
-        elements.push({
-          type: 'label',
-          text: product.brand,
-          position: { x: pos.x + 10, y: pos.y + pos.size + 15 },
-          style: 'label',
-          zIndex: i + 100
-        });
-      }
-    });
-
-    return elements;
-  }
-
-  /**
-   * Collage Style Layout
-   */
-  private generateCollageStyleLayout(
-    products: ProductInput[],
-    canvasSize: Size,
-    showLabels: boolean,
-    showPrices: boolean
-  ): LayoutElement[] {
-    const elements: LayoutElement[] = [];
-
-    products.forEach((product, i) => {
-      const size = this.randomInt(250, 450);
-      const x = this.randomInt(this.config.padding, canvasSize.width - size - this.config.padding);
-      const y = this.randomInt(this.config.padding, canvasSize.height - size - this.config.padding);
-
-      elements.push({
-        type: 'image',
+        id: `product-${i}`,
         src: product.image_url,
         position: { x, y },
         size: { width: size, height: size },
         zIndex: i,
-        rotation: this.config.allowRotation ? this.randomRotation() : 0,
-        opacity: this.random(0.9, 1.0)
+        rotation: this.getRotation(product, 'Collage'),
+        opacity: this.random(0.92, 1.0)
       });
 
       if (showLabels) {
@@ -649,10 +520,33 @@ export class LayoutGenerator {
   }
 
   /**
-   * Helper: Random rotation within max range
+   * Check if a box has excessive overlap with placed boxes
+   * Some overlap is OK for Collage style, but avoid too much
    */
-  private randomRotation(): number {
-    return this.random(-this.config.maxRotation, this.config.maxRotation);
+  private hasExcessiveOverlap(box: BoundingBox, placedBoxes: BoundingBox[]): boolean {
+    for (const placed of placedBoxes) {
+      const overlap = this.calculateOverlapRatio(box, placed);
+      if (overlap > 0.4) { // Allow up to 40% overlap
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Calculate overlap ratio between two boxes (0-1)
+   */
+  private calculateOverlapRatio(box1: BoundingBox, box2: BoundingBox): number {
+    const xOverlap = Math.max(0,
+      Math.min(box1.x + box1.width, box2.x + box2.width) - Math.max(box1.x, box2.x)
+    );
+    const yOverlap = Math.max(0,
+      Math.min(box1.y + box1.height, box2.y + box2.height) - Math.max(box1.y, box2.y)
+    );
+    const overlapArea = xOverlap * yOverlap;
+    const smallerArea = Math.min(box1.width * box1.height, box2.width * box2.height);
+
+    return smallerArea > 0 ? overlapArea / smallerArea : 0;
   }
 
   /**
@@ -678,20 +572,6 @@ export class LayoutGenerator {
       box2.x + box2.width < box1.x ||
       box1.y + box1.height < box2.y ||
       box2.y + box2.height < box1.y
-    );
-  }
-
-  /**
-   * Helper: Check if element is within canvas bounds
-   */
-  private isWithinCanvas(element: LayoutElement, canvasSize: Size): boolean {
-    if (!element.size) return true;
-
-    return (
-      element.position.x >= 0 &&
-      element.position.y >= 0 &&
-      element.position.x + element.size.width <= canvasSize.width &&
-      element.position.y + element.size.height <= canvasSize.height
     );
   }
 }
