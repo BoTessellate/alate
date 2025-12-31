@@ -576,18 +576,18 @@ export default function TopBar() {
           aria-label={agentModeEnabled ? 'Disable Agent Mode' : 'Enable Agent Mode'}
           aria-pressed={agentModeEnabled}
         >
-          {/* Circle background */}
+          {/* Circle background - slightly larger than other icons */}
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
             style={{
               backgroundColor: agentModeEnabled
                 ? (effectiveTheme === 'dark' ? 'var(--primary-light)' : 'var(--cream)')
                 : (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)'),
             }}
           >
-            {/* Pill inside circle */}
+            {/* Pill inside circle - blinks like a human eye when active */}
             <div
-              className={`agent-pill w-3.5 h-1.5 rounded-full transition-colors ${agentModeEnabled ? 'agent-pill-blink' : ''}`}
+              className={`agent-pill w-4 h-2 rounded-full ${agentModeEnabled ? 'agent-pill-blink' : 'transition-colors'}`}
               style={{
                 backgroundColor: agentModeEnabled
                   ? (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)')
@@ -612,7 +612,7 @@ export default function TopBar() {
           }}
           aria-label="Help"
         >
-          <HelpCircle size={18} aria-hidden="true" />
+          <HelpCircle size={16} aria-hidden="true" />
         </button>
 
         {/* Feedback */}

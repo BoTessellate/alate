@@ -1,20 +1,51 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, LayoutGrid, BookHeart, Compass, ArrowRight, Sparkles } from 'lucide-react';
+import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
+import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 
 export default function Home() {
-  const stats = [
-    { label: 'Layers', value: '12', href: '/looks' },
-    { label: 'Collections', value: '5', href: '/collections' },
-    { label: 'Saved', value: '48', href: '/discover' },
-  ];
+  const { moodboards } = useLooksStore();
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const recentLayers = [
-    { id: 1, title: 'Summer Casual', items: 6, lastUpdated: '2h ago' },
-    { id: 2, title: 'Office Chic', items: 8, lastUpdated: '1d ago' },
-    { id: 3, title: 'Living Room Refresh', items: 5, lastUpdated: '3d ago' },
-  ];
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Get recent layers (up to 3, sorted by updatedAt)
+  const recentLayers = isHydrated
+    ? [...moodboards]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 3)
+    : [];
+
+  // Format relative time
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Get cover images from moodboard items (first 4 images)
+  const getCoverImages = (items: { type: string; src?: string }[]) => {
+    const images: string[] = [];
+    for (const item of items) {
+      if (item.type === 'image' && item.src && images.length < 4) {
+        images.push(item.src);
+      }
+      if (images.length >= 4) break;
+    }
+    return images;
+  };
 
   return (
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
@@ -74,73 +105,110 @@ export default function Home() {
 
         {/* Two column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Layers - takes 2 columns */}
+          {/* Curated Layers - takes 2 columns, only show if there are layers */}
           <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-medium uppercase tracking-wide" style={{ color: 'var(--foreground-muted)' }}>
-                Recent Layers
-              </h2>
-              <Link
-                href="/looks"
-                className="text-sm font-medium transition-all flex items-center gap-1"
-                style={{ color: 'var(--primary)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--primary-dark)';
-                  e.currentTarget.style.transform = 'translateX(2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--primary)';
-                  e.currentTarget.style.transform = 'translateX(0)';
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = 'translateX(1px) scale(0.98)';
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = 'translateX(2px)';
-                }}
-              >
-                View all
-                <ArrowRight size={14} />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {recentLayers.map((layer) => (
-                <Link
-                  key={layer.id}
-                  href={`/looks/${layer.id}`}
-                  className="group rounded-xl border overflow-hidden transition-all duration-200"
-                  style={{
-                    backgroundColor: 'var(--surface)',
-                    borderColor: 'var(--border)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                  }}
-                >
-                  <div
-                    className="aspect-[4/3]"
-                    style={{
-                      backgroundColor: 'var(--background-secondary)',
-                      backgroundImage: 'linear-gradient(135deg, var(--primary) 0%, var(--cream-dark) 100%)',
-                      opacity: 0.4,
+            {recentLayers.length > 0 ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-medium uppercase tracking-wide" style={{ color: 'var(--foreground-muted)' }}>
+                    Curated Layers
+                  </h2>
+                  <Link
+                    href="/looks"
+                    className="text-sm font-medium transition-all flex items-center gap-1"
+                    style={{ color: 'var(--primary)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = 'var(--primary-dark)';
+                      e.currentTarget.style.transform = 'translateX(2px)';
                     }}
-                  />
-                  <div className="p-3">
-                    <h3 className="font-medium text-sm mb-1 truncate" style={{ color: 'var(--foreground)' }}>
-                      {layer.title}
-                    </h3>
-                    <div className="flex items-center justify-between text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                      <span>{layer.items} items</span>
-                      <span>{layer.lastUpdated}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = 'var(--primary)';
+                      e.currentTarget.style.transform = 'translateX(0)';
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = 'translateX(1px) scale(0.98)';
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = 'translateX(2px)';
+                    }}
+                  >
+                    View all
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {recentLayers.map((layer) => {
+                    const coverImages = getCoverImages(layer.items);
+                    return (
+                      <Link
+                        key={layer.id}
+                        href={`/looks/${generateMoodboardPath(layer.name, layer.id)}`}
+                        className="group rounded-lg border overflow-hidden transition-all duration-200"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          borderColor: 'var(--border)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--border)';
+                        }}
+                      >
+                        {/* Cover Image Grid - Square aspect ratio (matches Layers page) */}
+                        <div
+                          className="aspect-square relative"
+                          style={{ backgroundColor: 'var(--background-secondary)' }}
+                        >
+                          {coverImages.length > 0 ? (
+                            <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                              {coverImages.slice(0, 4).map((img, idx) => (
+                                <div
+                                  key={idx}
+                                  className="w-full h-full bg-cover bg-center"
+                                  style={{ backgroundImage: `url(${img})` }}
+                                />
+                              ))}
+                              {/* Fill remaining slots if less than 4 images */}
+                              {Array.from({ length: Math.max(0, 4 - coverImages.length) }).map(
+                                (_, idx) => (
+                                  <div
+                                    key={`empty-${idx}`}
+                                    className="w-full h-full"
+                                    style={{ backgroundColor: 'var(--border)' }}
+                                  />
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Grid3X3
+                                size={32}
+                                style={{ color: 'var(--foreground-muted)', opacity: 0.5 }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {/* Moodboard Info - Compact (matches Layers page) */}
+                        <div className="p-2.5">
+                          <h3 className="font-medium text-sm mb-0.5 truncate" style={{ color: 'var(--foreground)' }}>
+                            {layer.name}
+                          </h3>
+                          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                            <span>{layer.items.length} item{layer.items.length !== 1 ? 's' : ''}</span>
+                            <span>{formatRelativeTime(layer.updatedAt)}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              // Empty state - show nothing, just take up space for layout
+              <div />
+            )}
           </div>
 
           {/* Sidebar - Quick actions */}
