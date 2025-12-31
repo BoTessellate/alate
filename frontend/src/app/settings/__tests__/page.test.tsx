@@ -8,7 +8,7 @@ let mockStoreState = {
   theme: 'system' as 'light' | 'dark' | 'system',
   emailNotifications: true,
   pushNotifications: false,
-  aiModeEnabled: false,
+  agentModeEnabled: false,
   currencyDisplayMode: 'original' as 'original' | 'local',
   localCurrency: 'USD' as string,
   userName: null as string | null,
@@ -24,8 +24,8 @@ const mockSetEmailNotifications = jest.fn((enabled) => {
 const mockSetPushNotifications = jest.fn((enabled) => {
   mockStoreState.pushNotifications = enabled;
 });
-const mockSetAiMode = jest.fn((enabled) => {
-  mockStoreState.aiModeEnabled = enabled;
+const mockSetAgentMode = jest.fn((enabled) => {
+  mockStoreState.agentModeEnabled = enabled;
 });
 const mockSetCurrencyDisplayMode = jest.fn();
 const mockSetLocalCurrency = jest.fn();
@@ -39,7 +39,7 @@ jest.mock('@/stores/useSettingsStore', () => ({
     setTheme: mockSetTheme,
     setEmailNotifications: mockSetEmailNotifications,
     setPushNotifications: mockSetPushNotifications,
-    setAiMode: mockSetAiMode,
+    setAgentMode: mockSetAgentMode,
     setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
     setLocalCurrency: mockSetLocalCurrency,
     setUserName: mockSetUserName,
@@ -62,7 +62,7 @@ describe('SettingsPage', () => {
       theme: 'system',
       emailNotifications: true,
       pushNotifications: false,
-      aiModeEnabled: false,
+      agentModeEnabled: false,
       currencyDisplayMode: 'original',
       localCurrency: 'USD',
       userName: null,

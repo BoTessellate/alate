@@ -96,7 +96,7 @@ stel/
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  IMAGE GENERATION                           │
+│                  IMAGE GENERATION  (AI)                     │
 ├─────────────────────────────────────────────────────────────┤
 │  Moodboard Composition: OpenAI GPT-image-1 → Gemini         │
 │  Virtual Try-On: Gemini → OpenAI (fallback)                 │
@@ -250,7 +250,7 @@ throw new ConfigurationError('API key missing');
 --primary-dark: #3D522D;      /* Darker green - headings, bold typefaces */
 
 /* Neutral palette */
---cream: #F4EFED;             /* Light orange parchment */
+--cream: #F4EFED;             /* Parchment */
 --charcoal: #222222;          /* Dark base */
 
 /* Semantic colors */
@@ -270,7 +270,7 @@ The TML logo consists of a **circle** and a **pill shape**. Color usage varies b
 | Dark Mode | charcoal (#222222) | primary-light (#546c22) |
 | Light Mode | cream (#F4EFED) | primary-light (#546c22) |
 
-**AI Mode Toggle:**
+**Agent Mode Toggle:**
 | Mode | Default State | Clicked/Active State |
 |------|---------------|---------------------|
 | Dark Mode | circle: cream, pill: primary-light | circle: primary-light, pill: cream |
@@ -280,7 +280,7 @@ The TML logo consists of a **circle** and a **pill shape**. Color usage varies b
 - `--primary-dark` (#3D522D) is used for headings and bold typefaces
 
 ### Reserved Color Combo (Secondary)
-When updating secondary color, consider this analogous palette:
+When updating secondary color, consider this:
 -- **#546c22** (deeper forest green)
 
 Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon

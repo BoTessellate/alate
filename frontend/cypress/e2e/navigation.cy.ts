@@ -288,26 +288,26 @@ describe('TopBar Navigation', () => {
     });
   });
 
-  describe('AI Mode Toggle', () => {
-    it('should display AI mode toggle', () => {
+  describe('Agent Mode Toggle', () => {
+    it('should display Agent mode toggle', () => {
       cy.visit('/');
 
-      // AI toggle button should exist
-      cy.get('header button[aria-label*="AI Mode"]').should('be.visible');
+      // Agent toggle button should exist
+      cy.get('header button[aria-label*="Agent Mode"]').should('be.visible');
     });
 
-    it('should toggle AI mode', () => {
+    it('should toggle Agent mode', () => {
       cy.visit('/');
 
       // Get initial state
-      cy.get('header button[aria-label*="AI Mode"]')
+      cy.get('header button[aria-label*="Agent Mode"]')
         .invoke('attr', 'aria-pressed')
         .then((initialState) => {
           // Click toggle
-          cy.get('header button[aria-label*="AI Mode"]').click();
+          cy.get('header button[aria-label*="Agent Mode"]').click();
 
           // State should change
-          cy.get('header button[aria-label*="AI Mode"]')
+          cy.get('header button[aria-label*="Agent Mode"]')
             .invoke('attr', 'aria-pressed')
             .should('not.eq', initialState);
         });

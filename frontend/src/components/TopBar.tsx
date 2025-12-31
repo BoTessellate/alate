@@ -29,7 +29,7 @@ const navigationItems = [
 export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { aiModeEnabled, setAiMode, currencyDisplayMode, localCurrency, setCurrencyDisplayMode, setLocalCurrency } = useSettingsStore();
+  const { agentModeEnabled, setAgentMode, currencyDisplayMode, localCurrency, setCurrencyDisplayMode, setLocalCurrency } = useSettingsStore();
   const { getMoodboardById, saveStatus } = useLooksStore();
 
   const [showSearch, setShowSearch] = useState(false);
@@ -577,31 +577,31 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* AI Mode Toggle - Logo style icon */}
+        {/* Agent Mode Toggle - Logo style icon */}
         <button
           className="w-10 h-10 rounded-full flex items-center justify-center transition-all group"
           style={{
-            backgroundColor: aiModeEnabled
+            backgroundColor: agentModeEnabled
               ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
               : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)'),
           }}
-          onClick={() => setAiMode(!aiModeEnabled)}
+          onClick={() => setAgentMode(!agentModeEnabled)}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = aiModeEnabled
+            e.currentTarget.style.backgroundColor = agentModeEnabled
               ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
               : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)');
           }}
-          aria-label={aiModeEnabled ? 'Disable AI Mode' : 'Enable AI Mode'}
-          aria-pressed={aiModeEnabled}
+          aria-label={agentModeEnabled ? 'Disable Agent Mode' : 'Enable Agent Mode'}
+          aria-pressed={agentModeEnabled}
         >
           {/* Custom logo-style icon: pill bar inside circle */}
           <div
-            className={`ai-pill w-4 h-1.5 rounded-full transition-colors ${aiModeEnabled ? 'ai-pill-blink' : ''}`}
+            className={`agent-pill w-4 h-1.5 rounded-full transition-colors ${agentModeEnabled ? 'agent-pill-blink' : ''}`}
             style={{
-              backgroundColor: aiModeEnabled
+              backgroundColor: agentModeEnabled
                 ? (isLooksListPage ? 'var(--charcoal)' : 'white')
                 : (isLooksListPage ? 'rgba(34, 34, 34, 0.5)' : 'rgba(255, 255, 255, 0.6)'),
             }}

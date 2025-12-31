@@ -9,7 +9,7 @@ export type LocalCurrency = 'USD' | 'EUR' | 'GBP' | 'INR' | 'JPY' | 'AUD' | 'CAD
 
 interface SettingsState {
   theme: Theme;
-  aiModeEnabled: boolean;
+  agentModeEnabled: boolean;
   emailNotifications: boolean;
   pushNotifications: boolean;
   // Currency settings
@@ -19,7 +19,7 @@ interface SettingsState {
   userName: string | null;
   isLoggedIn: boolean;
   setTheme: (theme: Theme) => void;
-  setAiMode: (enabled: boolean) => void;
+  setAgentMode: (enabled: boolean) => void;
   setEmailNotifications: (enabled: boolean) => void;
   setPushNotifications: (enabled: boolean) => void;
   setCurrencyDisplayMode: (mode: CurrencyDisplayMode) => void;
@@ -32,7 +32,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       theme: 'system',
-      aiModeEnabled: false,
+      agentModeEnabled: false,
       emailNotifications: true,
       pushNotifications: false,
       currencyDisplayMode: 'local',
@@ -40,7 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
       userName: null,
       isLoggedIn: false,
       setTheme: (theme) => set({ theme }),
-      setAiMode: (enabled) => set({ aiModeEnabled: enabled }),
+      setAgentMode: (enabled) => set({ agentModeEnabled: enabled }),
       setEmailNotifications: (enabled) => set({ emailNotifications: enabled }),
       setPushNotifications: (enabled) => set({ pushNotifications: enabled }),
       setCurrencyDisplayMode: (mode) => set({ currencyDisplayMode: mode }),

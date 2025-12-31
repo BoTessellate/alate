@@ -94,13 +94,13 @@ export default function MoodboardEditorPage() {
   const [showBackgroundMenu, setShowBackgroundMenu] = useState(false);
   const [backgroundIndex, setBackgroundIndex] = useState(0);
 
-  // Available layout types
+  // Available layout archetypes (simplified from 8 to 4)
   const layoutTypes = [
     { type: 'ai', name: 'AI Compose', icon: Wand2, description: 'OpenAI visual moodboard', isAi: true },
-    { type: 'grid', name: 'Grid', icon: Grid3X3, description: 'Clean, evenly spaced' },
-    { type: 'hero', name: 'Hero', icon: Sparkles, description: 'Featured item in center' },
-    { type: 'scattered', name: 'Scattered', icon: Layers, description: 'Organic, overlapping style' },
-    { type: 'masonry', name: 'Masonry', icon: LayoutGrid, description: 'Pinterest-style columns' },
+    { type: 'minimal', name: 'Minimal', icon: Grid3X3, description: 'Clean, balanced layout' },
+    { type: 'hero', name: 'Hero Focus', icon: Sparkles, description: 'Featured centerpiece' },
+    { type: 'dynamic', name: 'Dynamic Flow', icon: Layers, description: 'Organic, flowing arrangement' },
+    { type: 'collage', name: 'Collage', icon: LayoutGrid, description: 'Layered, overlapping style' },
   ];
 
   // Canvas background options
@@ -596,7 +596,7 @@ export default function MoodboardEditorPage() {
     let updatedItems: CanvasItem[] = [];
 
     switch (layoutType) {
-      case 'grid': {
+      case 'minimal': {
         const cols = count <= 2 ? count : count <= 4 ? 2 : count <= 6 ? 3 : 4;
         const rows = Math.ceil(count / cols);
         const cellWidth = (canvasWidth - padding * 2) / cols;
@@ -664,7 +664,7 @@ export default function MoodboardEditorPage() {
         break;
       }
 
-      case 'scattered': {
+      case 'dynamic': {
         const baseSize = count <= 3 ? 200 : count <= 5 ? 170 : count <= 7 ? 150 : 130;
         const usableWidth = canvasWidth - baseSize - padding * 2;
         const usableHeight = canvasHeight - baseSize - padding * 2;
@@ -703,7 +703,7 @@ export default function MoodboardEditorPage() {
         break;
       }
 
-      case 'masonry': {
+      case 'collage': {
         const cols = count <= 2 ? 2 : count <= 4 ? 2 : 3;
         const gap = 12;
         const colWidth = (canvasWidth - padding * 2 - gap * (cols - 1)) / cols;

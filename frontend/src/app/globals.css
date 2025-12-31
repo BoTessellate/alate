@@ -138,8 +138,8 @@ select,
   border: 1px solid var(--border);
 }
 
-/* AI Pill Blink Animation - human-like blink (~150ms blink, 4s interval) */
-@keyframes ai-blink {
+/* Agent Pill Blink Animation - human-like blink (~150ms blink, 4s interval) */
+@keyframes agent-blink {
   0%, 96% {
     opacity: 1;
     transform: scaleY(1);
@@ -154,15 +154,15 @@ select,
   }
 }
 
-.ai-pill-blink {
-  animation: ai-blink 4s linear infinite;
+.agent-pill-blink {
+  animation: agent-blink 4s linear infinite;
   will-change: opacity, transform;
   transform-origin: center;
 }
 
 /* Pause animation when user prefers reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .ai-pill-blink {
+  .agent-pill-blink {
     animation: none;
   }
 }

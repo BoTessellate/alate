@@ -149,7 +149,7 @@ export default function OnboardingPage() {
           style={{ backgroundColor: '#f6e9cf' }}
         >
           <div
-            className="w-8 h-3 rounded-full ai-pill-blink"
+            className="w-8 h-3 rounded-full agent-pill-blink"
             style={{ backgroundColor: '#4a7c4e' }}
           />
         </div>
