@@ -39,3 +39,10 @@ Thumbs.db
 
 # Canva
 .canva/
+
+# Binaries
+*.exe
+*.tar.gz
+
+# Generated files
+backend/sdk/productEnrichment/generated-images/
