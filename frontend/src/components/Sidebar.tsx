@@ -52,14 +52,14 @@ export default function Sidebar() {
           paddingRight: isExpanded ? '12px' : '0',
         }}
       >
-        {/* Custom logo: cream circle with green pill */}
+        {/* Custom logo: charcoal circle with green pill (light mode) */}
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: '#f6e9cf' }}
+          style={{ backgroundColor: '#222222' }}
         >
           <div
             className="w-4 h-1.5 rounded-full"
-            style={{ backgroundColor: '#4a7c4e' }}
+            style={{ backgroundColor: '#546c22' }}
           />
         </div>
         {/* Text - absolutely positioned to not affect icon centering */}

@@ -1,29 +1,30 @@
 @import "tailwindcss";
 
 :root {
+  /* Theme tokens - keep in sync with @/constants/theme.ts */
   /* TML Brand Colors */
   --primary: #4c7031;           /* Primary Green - logo, highlights, accent buttons */
-  --primary-light: #649341;
-  --primary-dark: #3d5a27;
+  --primary-light: #546c22;     /* Deeper forest green - logo pill */
+  --primary-dark: #3D522D;      /* Darker green - headings, bold typefaces */
 
-  --cream: #4fefed;             /* Cyan/Turquoise - backgrounds, accent contrast */
+  --cream: #F4EFED;             /* Parchment - logo background, accent contrast */
   --cream-dark: #e8d9b8;
 
   --charcoal: #222222;          /* Dark Charcoal - main text, headers, dark mode base */
   --charcoal-light: #333333;
   --charcoal-lighter: #444444;
 
-  /* Dark theme based on charcoal - deeper, richer tones */
-  --background: #0d0d0d;
-  --background-secondary: #151515;
-  --background-tertiary: #0a0a0a;
-  --surface: #1a1a1a;
-  --surface-light: #252525;
-  --surface-elevated: #303030;
+  /* Light theme based on sage/parchment */
+  --background: #E8EAE3;
+  --background-secondary: #DFE2DA;
+  --background-tertiary: #F0F2EB;
+  --surface: #FFFFFF;
+  --surface-light: #F5F6F2;
+  --surface-elevated: #FFFFFF;
 
-  --foreground: #f6e9cf;        /* Cream for text on dark */
-  --foreground-secondary: #d4c9b0;
-  --foreground-muted: #b0a090;
+  --foreground: #222222;        /* Dark text on light */
+  --foreground-secondary: #444444;
+  --foreground-muted: #666666;
 
   --secondary: #8b6b4a;         /* Warm brown accent */
   --accent: #4c7031;            /* Same as primary green */
@@ -34,8 +35,8 @@
   --error: #a84032;
   --info: #4a7c9b;
 
-  --border: #2a2a2a;
-  --border-light: #3a3a3a;
+  --border: #D0D3C9;
+  --border-light: #C5C8BE;
 
   --topbar-height: 56px;
 
@@ -78,12 +79,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: #B8BBB0;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-light);
+  background: #A0A396;
 }
 
 /* Focus outline */

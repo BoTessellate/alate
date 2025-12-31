@@ -603,7 +603,7 @@ export default function SettingsPage() {
                   Email notifications
                 </p>
                 <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-                  Receive updates about your looks and collections
+                  Receive updates about your layers and collections
                 </p>
               </div>
               <ToggleSwitch
@@ -851,7 +851,7 @@ export default function SettingsPage() {
                     {isExporting ? 'Exporting...' : 'Export your data'}
                   </p>
                   <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-                    Download all your looks, collections, and preferences
+                    Download all your layers, collections, and preferences
                   </p>
                 </div>
               </div>
@@ -1190,7 +1190,7 @@ export default function SettingsPage() {
 
             <ul className="mb-6 space-y-2 text-sm" style={{ color: 'var(--foreground-muted)' }}>
               <li className="flex items-center gap-2">
-                <span style={{ color: 'var(--error)' }}>•</span> All your looks and designs
+                <span style={{ color: 'var(--error)' }}>•</span> All your layers and designs
               </li>
               <li className="flex items-center gap-2">
                 <span style={{ color: 'var(--error)' }}>•</span> Your saved collections

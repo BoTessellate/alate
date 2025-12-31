@@ -7,18 +7,8 @@ import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquar
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLooksStore, parseSlugId } from '@/stores/useLooksStore';
+import { useProductSearch } from '@/hooks/useProductSearch';
 import BreadcrumbNav from './BreadcrumbNav';
-
-interface Product {
-  id: string;
-  product_name: string;
-  brand: string;
-  image_url: string;
-  price: number;
-  currency?: string;
-}
-
-const API_BASE_URL = 'https://backend-tml.vercel.app';
 
 const navigationItems = [
   { name: 'Layers', href: '/looks', icon: Layers2 },
@@ -29,26 +19,57 @@ const navigationItems = [
 export default function TopBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { agentModeEnabled, setAgentMode, currencyDisplayMode, localCurrency, setCurrencyDisplayMode, setLocalCurrency } = useSettingsStore();
-  const { getMoodboardById, saveStatus } = useLooksStore();
+  // Use selector pattern for better performance - only re-render when specific values change
+  const agentModeEnabled = useSettingsStore(state => state.agentModeEnabled);
+  const setAgentMode = useSettingsStore(state => state.setAgentMode);
+  const theme = useSettingsStore(state => state.theme);
+  const currencyDisplayMode = useSettingsStore(state => state.currencyDisplayMode);
+  const localCurrency = useSettingsStore(state => state.localCurrency);
+  const setCurrencyDisplayMode = useSettingsStore(state => state.setCurrencyDisplayMode);
+  const setLocalCurrency = useSettingsStore(state => state.setLocalCurrency);
+  const getMoodboardById = useLooksStore(state => state.getMoodboardById);
+  const saveStatus = useLooksStore(state => state.saveStatus);
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Use SWR-based search with automatic caching and deduplication
+  const { products: searchResults, isSearching } = useProductSearch(searchQuery, {
+    debounceMs: 300,
+    limit: 10,
+  });
 
   // Callback to update Look Editor products (will be set by Look Editor page)
   const onSearchSelect = useRef<((query: string) => void) | null>(null);
 
   // Track hydration to avoid SSR/client mismatch
   const [isHydrated, setIsHydrated] = useState(false);
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Track effective theme for agent mode colors
+  useEffect(() => {
+    const updateEffectiveTheme = () => {
+      if (theme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setEffectiveTheme(prefersDark ? 'dark' : 'light');
+      } else {
+        setEffectiveTheme(theme as 'light' | 'dark');
+      }
+    };
+    updateEffectiveTheme();
+
+    // Listen for system theme changes when in system mode
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', updateEffectiveTheme);
+    return () => mediaQuery.removeEventListener('change', updateEffectiveTheme);
+  }, [theme]);
 
   // Check if we're on a look editor page
   const isLookEditorPage = pathname.startsWith('/looks/') && pathname !== '/looks';
@@ -94,42 +115,10 @@ export default function TopBar() {
     breadcrumbs.push({ name, href, isLast });
   });
 
-  // Handle search - use GET endpoint with q parameter
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setSelectedResultIndex(-1);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}&limit=10`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.products || []);
-        setSelectedResultIndex(-1);
-      }
-    } catch (error) {
-      console.error('Search failed:', error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Debounced search
+  // Reset selected index when search results change
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery) {
-        handleSearch(searchQuery);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    setSelectedResultIndex(-1);
+  }, [searchResults]);
 
   // Focus search input when opened
   useEffect(() => {
@@ -143,8 +132,7 @@ export default function TopBar() {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowSearch(false);
-        setSearchQuery('');
-        setSearchResults([]);
+        setSearchQuery(''); // This will clear results via SWR hook
       }
     };
 
@@ -168,7 +156,6 @@ export default function TopBar() {
     }
     setShowSearch(false);
     setSearchQuery('');
-    setSearchResults([]);
     setSelectedResultIndex(-1);
   };
 
@@ -212,7 +199,6 @@ export default function TopBar() {
       if (e.key === 'Escape') {
         setShowSearch(false);
         setSearchQuery('');
-        setSearchResults([]);
       }
     };
 
@@ -292,11 +278,11 @@ export default function TopBar() {
         >
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: isLooksListPage ? '#4a7c4e' : '#f6e9cf' }}
+            style={{ backgroundColor: isLooksListPage ? '#F4EFED' : '#222222' }}
           >
             <div
               className="w-4 h-1.5 rounded-full"
-              style={{ backgroundColor: isLooksListPage ? '#f6e9cf' : '#4a7c4e' }}
+              style={{ backgroundColor: '#546c22' }}
             />
           </div>
         </Link>
@@ -427,7 +413,6 @@ export default function TopBar() {
                       e.stopPropagation();
                       setShowSearch(false);
                       setSearchQuery('');
-                      setSearchResults([]);
                     }}
                     className="flex-shrink-0 transition-opacity hover:opacity-70"
                     style={{ color: 'var(--foreground-muted)' }}
@@ -577,36 +562,40 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Agent Mode Toggle - Logo style icon */}
+        {/* Agent Mode Toggle - Logo style icon with circle + pill
+            Per CLAUDE.md:
+            Dark Mode Default: circle: cream, pill: primary-light
+            Dark Mode Active: circle: primary-light, pill: cream
+            Light Mode Default: circle: primary-dark, pill: cream
+            Light Mode Active: circle: cream, pill: primary-dark
+        */}
         <button
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-all group"
-          style={{
-            backgroundColor: agentModeEnabled
-              ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
-              : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)'),
-          }}
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
+          style={{ backgroundColor: 'transparent' }}
           onClick={() => setAgentMode(!agentModeEnabled)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.35)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = agentModeEnabled
-              ? (isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.3)')
-              : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)');
-          }}
           aria-label={agentModeEnabled ? 'Disable Agent Mode' : 'Enable Agent Mode'}
           aria-pressed={agentModeEnabled}
         >
-          {/* Custom logo-style icon: pill bar inside circle */}
+          {/* Circle background */}
           <div
-            className={`agent-pill w-4 h-1.5 rounded-full transition-colors ${agentModeEnabled ? 'agent-pill-blink' : ''}`}
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
             style={{
               backgroundColor: agentModeEnabled
-                ? (isLooksListPage ? 'var(--charcoal)' : 'white')
-                : (isLooksListPage ? 'rgba(34, 34, 34, 0.5)' : 'rgba(255, 255, 255, 0.6)'),
+                ? (effectiveTheme === 'dark' ? 'var(--primary-light)' : 'var(--cream)')
+                : (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)'),
             }}
-            aria-hidden="true"
-          />
+          >
+            {/* Pill inside circle */}
+            <div
+              className={`agent-pill w-3.5 h-1.5 rounded-full transition-colors ${agentModeEnabled ? 'agent-pill-blink' : ''}`}
+              style={{
+                backgroundColor: agentModeEnabled
+                  ? (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)')
+                  : (effectiveTheme === 'dark' ? 'var(--primary-light)' : 'var(--cream)'),
+              }}
+              aria-hidden="true"
+            />
+          </div>
         </button>
 
         {/* Help */}

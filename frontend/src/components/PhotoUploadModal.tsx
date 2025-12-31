@@ -118,7 +118,7 @@ export default function PhotoUploadModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-end justify-end p-4 pb-24 pr-6"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) closeModal();
@@ -129,8 +129,8 @@ export default function PhotoUploadModal() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="photo-upload-modal-title"
-        className="w-full max-w-lg rounded-xl overflow-hidden shadow-2xl"
-        style={{ backgroundColor: 'var(--surface)', maxHeight: '90vh', overflowY: 'auto' }}
+        className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl"
+        style={{ backgroundColor: 'var(--surface)', maxHeight: '70vh', overflowY: 'auto' }}
       >
         {/* Header */}
         <div

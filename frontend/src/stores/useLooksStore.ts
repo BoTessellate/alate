@@ -265,7 +265,7 @@ export const useLooksStore = create<LooksState>()(
           }
         }
 
-        return state as LooksState;
+        return state as unknown as LooksState;
       },
     }
   )

@@ -20,37 +20,14 @@ export default function Home() {
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Section */}
       <div className="px-8 pt-8 pb-6 max-w-6xl mx-auto">
-        {/* Header with inline stats */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--foreground)' }}>
-              Welcome back
-            </h1>
-            <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-              Ready to create something beautiful?
-            </p>
-          </div>
-
-          {/* Compact inline stats */}
-          <div className="flex items-center gap-6">
-            {stats.map((stat) => (
-              <Link
-                key={stat.label}
-                href={stat.href}
-                className="flex items-center gap-2 group"
-              >
-                <span className="text-xl font-semibold" style={{ color: 'var(--foreground)' }}>
-                  {stat.value}
-                </span>
-                <span
-                  className="text-sm transition-colors group-hover:text-[var(--primary)]"
-                  style={{ color: 'var(--foreground-muted)' }}
-                >
-                  {stat.label}
-                </span>
-              </Link>
-            ))}
-          </div>
+        {/* Page Header - inline pattern */}
+        <div className="flex items-baseline gap-3 mb-8">
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
+            Welcome back
+          </h1>
+          <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+            Ready to create something beautiful?
+          </span>
         </div>
 
         {/* Main CTA Card */}
@@ -80,7 +57,7 @@ export default function Home() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold mb-0.5" style={{ color: 'var(--foreground)' }}>
-                  Create a new look
+                  Create a new layer
                 </h2>
                 <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
                   Style an outfit, design a room, or curate a collection
@@ -105,8 +82,22 @@ export default function Home() {
               </h2>
               <Link
                 href="/looks"
-                className="text-sm font-medium transition-colors flex items-center gap-1"
+                className="text-sm font-medium transition-all flex items-center gap-1"
                 style={{ color: 'var(--primary)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--primary-dark)';
+                  e.currentTarget.style.transform = 'translateX(2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--primary)';
+                  e.currentTarget.style.transform = 'translateX(0)';
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = 'translateX(1px) scale(0.98)';
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = 'translateX(2px)';
+                }}
               >
                 View all
                 <ArrowRight size={14} />

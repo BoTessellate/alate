@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
 import FloatingActionButton from './FloatingActionButton';
-import PhotoUploadModal from './PhotoUploadModal';
 import { useUserStore } from '@/stores/useUserStore';
 import { Loader2 } from 'lucide-react';
+
+// Lazy load the photo upload modal - only needed when user clicks upload
+const PhotoUploadModal = dynamic(() => import('./PhotoUploadModal'), {
+  loading: () => null,
+});
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -16,7 +21,8 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { hasCompletedOnboarding } = useUserStore();
+  // Use selector pattern for better performance
+  const hasCompletedOnboarding = useUserStore(state => state.hasCompletedOnboarding);
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Handle hydration

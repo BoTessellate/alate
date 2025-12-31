@@ -1,0 +1,31 @@
+{
+  "frontend": {
+    "jest": {
+      "suites": 12,
+      "tests": 471,
+      "passed": 471,
+      "failed": 0,
+      "lastRun": "2025-12-31T12:53:07.894Z"
+    },
+    "cypress": {
+      "suites": 7,
+      "tests": 153,
+      "passed": 153,
+      "failed": 0,
+      "lastRun": "2025-12-31T12:53:07.894Z"
+    }
+  },
+  "backend": {
+    "vitest": {
+      "suites": 8,
+      "tests": 45,
+      "passed": 45,
+      "failed": 0,
+      "coverage": 72,
+      "lastRun": "2025-12-31T12:53:07.894Z"
+    }
+  },
+  "lastUpdated": "2025-12-31T12:53:07.894Z",
+  "gitBranch": "master",
+  "gitCommit": "7c58d76"
+}

@@ -17,28 +17,53 @@ import {
   Search,
   Image,
   Palette,
-  Bug,
-  Terminal,
-  Copy,
-  Check,
-  ChevronDown,
-  ChevronRight,
   Server,
   Wifi,
   WifiOff,
   Activity,
-  Settings,
   FileText,
-  HardDrive,
   Globe,
   Key,
   AlertTriangle,
   Info,
-  Play,
-  Square,
   Sparkles,
   Cpu,
+  TestTube,
+  GitBranch,
 } from 'lucide-react';
+
+// Test coverage data interface
+interface TestCoverageData {
+  frontend: {
+    jest: {
+      suites: number;
+      tests: number;
+      passed: number;
+      failed: number;
+      lastRun: string;
+    };
+    cypress: {
+      suites: number;
+      tests: number;
+      passed: number;
+      failed: number;
+      lastRun: string;
+    };
+  };
+  backend: {
+    vitest: {
+      suites: number;
+      tests: number;
+      passed: number;
+      failed: number;
+      coverage: number;
+      lastRun: string;
+    };
+  };
+  lastUpdated: string;
+  gitBranch: string;
+  gitCommit: string;
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-ramsaptamis-projects.vercel.app';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -114,104 +139,6 @@ const INTEGRATIONS = [
   },
 ];
 
-// Common debug issues
-const DEBUG_ISSUES = [
-  {
-    id: 'cors',
-    title: 'CORS Errors',
-    symptoms: ['Request blocked by CORS policy', 'No Access-Control-Allow-Origin header'],
-    solutions: [
-      'Check vercel.json has correct CORS headers',
-      'Ensure API_URL matches deployed backend URL',
-      'Verify frontend domain is in allowed origins',
-    ],
-    commands: ['curl -I {API_URL}/api/search'],
-  },
-  {
-    id: '404',
-    title: 'API 404 Errors',
-    symptoms: ['Endpoint returns 404', 'Route not found'],
-    solutions: [
-      'Verify file exists in backend/api/ folder',
-      'Check vercel.json function patterns match',
-      'Redeploy backend with --force flag',
-      'Check Vercel dashboard for build errors',
-    ],
-    commands: ['cd backend && vercel --prod --force'],
-  },
-  {
-    id: 'env',
-    title: 'Missing Environment Variables',
-    symptoms: ['undefined API key', 'Connection failed', 'Auth error'],
-    solutions: [
-      'Check Vercel dashboard → Settings → Environment Variables',
-      'Ensure variables are set for Production environment',
-      'Redeploy after adding new env vars',
-    ],
-    commands: ['vercel env ls'],
-  },
-  {
-    id: 'supabase',
-    title: 'Supabase Connection Issues',
-    symptoms: ['Database connection failed', 'Auth not working', 'RLS policy error'],
-    solutions: [
-      'Verify SUPABASE_URL and SUPABASE_KEY are correct',
-      'Check if using anon key (frontend) vs service key (backend)',
-      'Review Row Level Security policies in Supabase dashboard',
-    ],
-    commands: [],
-  },
-  {
-    id: 'ai',
-    title: 'AI/Claude API Issues',
-    symptoms: ['Enrichment failed', 'Rate limit exceeded', 'Invalid API key'],
-    solutions: [
-      'Verify ANTHROPIC_API_KEY is set in Vercel/Supabase',
-      'Check API usage limits in Anthropic console',
-      'Ensure Edge Function secrets are configured',
-    ],
-    commands: [],
-  },
-  {
-    id: 'shopify-oauth',
-    title: 'Shopify OAuth Issues',
-    symptoms: ['OAuth redirect fails', 'Invalid HMAC', 'Token not stored'],
-    solutions: [
-      'Verify APP_URL matches your Vercel deployment',
-      'Check SHOPIFY_SECRET matches Partner Dashboard',
-      'Ensure callback URL is whitelisted in Shopify app settings',
-    ],
-    commands: [],
-  },
-];
-
-// Dev commands
-const DEV_COMMANDS = [
-  {
-    category: 'Frontend',
-    commands: [
-      { name: 'Start Dev Server', cmd: 'cd frontend && npm run dev', description: 'Runs on localhost:3000' },
-      { name: 'Build', cmd: 'cd frontend && npm run build', description: 'Production build' },
-      { name: 'Run Tests', cmd: 'cd frontend && npm test', description: 'Jest tests' },
-    ],
-  },
-  {
-    category: 'Backend',
-    commands: [
-      { name: 'Start Dev Server', cmd: 'cd backend && vercel dev', description: 'Local Vercel dev' },
-      { name: 'Deploy', cmd: 'cd backend && vercel --prod', description: 'Deploy to production' },
-      { name: 'Force Deploy', cmd: 'cd backend && vercel --prod --force', description: 'Clear cache & deploy' },
-      { name: 'Run Tests', cmd: 'cd backend && npm test', description: 'Vitest tests' },
-    ],
-  },
-  {
-    category: 'Database',
-    commands: [
-      { name: 'Run Migration', cmd: 'cd backend && node scripts/run-migration.js', description: 'Apply SQL migrations' },
-      { name: 'Populate URLs', cmd: 'cd backend && node scripts/populate-product-urls.js', description: 'Generate product URLs' },
-    ],
-  },
-];
 
 interface IntegrationStatus {
   id: string;
@@ -314,11 +241,9 @@ interface AIProviderStatus {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'health' | 'shopify' | 'debug' | 'commands'>('health');
+  const [activeTab, setActiveTab] = useState<'health' | 'shopify'>('health');
   const [integrationStatuses, setIntegrationStatuses] = useState<IntegrationStatus[]>([]);
   const [isTestingAll, setIsTestingAll] = useState(false);
-  const [expandedIssue, setExpandedIssue] = useState<string | null>(null);
-  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
   // Shopify state
   const [shopDomain, setShopDomain] = useState('store-1-2352745.myshopify.com');
@@ -337,12 +262,27 @@ export default function AdminPage() {
   const [aiStatus, setAiStatus] = useState<AIProviderStatus | null>(null);
   const [isCheckingAI, setIsCheckingAI] = useState(false);
 
+  // Test coverage state
+  const [testCoverage, setTestCoverage] = useState<TestCoverageData | null>(null);
+
   // Load cached test results on mount
   useEffect(() => {
     const cached = loadCachedStatus();
     if (cached.length > 0) {
       setIntegrationStatuses(cached);
     }
+  }, []);
+
+  // Load test coverage from JSON file
+  useEffect(() => {
+    fetch('/test-coverage.json')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setTestCoverage(data);
+      })
+      .catch(() => {
+        // Coverage file not available yet
+      });
   }, []);
 
   // Check if local servers are running
@@ -356,10 +296,10 @@ export default function AdminPage() {
 
   const checkBackendStatus = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/search`, {
-        method: 'OPTIONS',
-      });
-      setBackendRunning(response.ok || response.status === 204);
+      // Any HTTP response means backend is reachable (even 401/403)
+      // Only network errors should show as "not running"
+      await fetch(`${API_URL}/api/search`, { method: 'OPTIONS' });
+      setBackendRunning(true);
     } catch {
       setBackendRunning(false);
     }
@@ -635,12 +575,6 @@ export default function AdminPage() {
     }
   };
 
-  const copyCommand = (cmd: string) => {
-    navigator.clipboard.writeText(cmd);
-    setCopiedCommand(cmd);
-    setTimeout(() => setCopiedCommand(null), 2000);
-  };
-
   const getStatusIcon = (status: IntegrationStatus['status']) => {
     switch (status) {
       case 'pending':
@@ -735,8 +669,6 @@ export default function AdminPage() {
         {[
           { id: 'health', label: 'Health', icon: Activity },
           { id: 'shopify', label: 'Shopify', icon: Store },
-          { id: 'debug', label: 'Debug', icon: Bug },
-          { id: 'commands', label: 'Commands', icon: Terminal },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -760,6 +692,126 @@ export default function AdminPage() {
       {/* Health Tab */}
       {activeTab === 'health' && (
         <div className="space-y-6">
+          {/* Test Coverage Section */}
+          <section
+            className="rounded-lg border"
+            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}>
+                  <TestTube size={20} style={{ color: 'var(--primary)' }} />
+                </div>
+                <div>
+                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                    Test Coverage
+                  </h2>
+                  <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                    Updated on each git merge
+                  </p>
+                </div>
+              </div>
+              {testCoverage && (
+                <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                  <GitBranch size={14} />
+                  <span>{testCoverage.gitBranch}</span>
+                  <span>({testCoverage.gitCommit})</span>
+                </div>
+              )}
+            </div>
+
+            {testCoverage ? (
+              <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Frontend Jest */}
+                <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--surface-light)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>Frontend (Jest)</span>
+                    {testCoverage.frontend.jest.failed === 0 ? (
+                      <CheckCircle size={16} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <XCircle size={16} style={{ color: 'var(--error)' }} />
+                    )}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Suites</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.frontend.jest.suites}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Tests</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.frontend.jest.tests}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Passed</span>
+                      <span style={{ color: 'var(--success)' }}>{testCoverage.frontend.jest.passed}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Frontend Cypress */}
+                <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--surface-light)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>E2E (Cypress)</span>
+                    {testCoverage.frontend.cypress.failed === 0 ? (
+                      <CheckCircle size={16} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <XCircle size={16} style={{ color: 'var(--error)' }} />
+                    )}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Suites</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.frontend.cypress.suites}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Tests</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.frontend.cypress.tests}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Passed</span>
+                      <span style={{ color: 'var(--success)' }}>{testCoverage.frontend.cypress.passed}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Backend Vitest */}
+                <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--surface-light)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium" style={{ color: 'var(--foreground)' }}>Backend (Vitest)</span>
+                    {testCoverage.backend.vitest.failed === 0 ? (
+                      <CheckCircle size={16} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <XCircle size={16} style={{ color: 'var(--error)' }} />
+                    )}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Suites</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.backend.vitest.suites}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Tests</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.backend.vitest.tests}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span style={{ color: 'var(--foreground-muted)' }}>Coverage</span>
+                      <span style={{ color: 'var(--foreground)' }}>{testCoverage.backend.vitest.coverage}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <p style={{ color: 'var(--foreground-muted)' }}>
+                  No coverage data. Run <code className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--background)' }}>npm run test:report</code> to generate.
+                </p>
+              </div>
+            )}
+          </section>
+
           {/* Overall Health Banner */}
           {overallHealth && (
             <div
@@ -1352,234 +1404,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Debug Tab */}
-      {activeTab === 'debug' && (
-        <div className="space-y-4">
-          <section
-            className="rounded-lg border"
-            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}>
-                  <Bug size={20} style={{ color: 'var(--primary)' }} />
-                </div>
-                <div>
-                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
-                    Common Issues & Solutions
-                  </h2>
-                  <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
-                    Quick fixes for typical problems
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {DEBUG_ISSUES.map((issue) => (
-                <div key={issue.id} className="p-4">
-                  <button
-                    onClick={() => setExpandedIssue(expandedIssue === issue.id ? null : issue.id)}
-                    className="w-full flex items-center justify-between text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle size={18} style={{ color: 'var(--warning, #f59e0b)' }} />
-                      <span className="font-medium" style={{ color: 'var(--foreground)' }}>
-                        {issue.title}
-                      </span>
-                    </div>
-                    {expandedIssue === issue.id ? (
-                      <ChevronDown size={18} style={{ color: 'var(--foreground-muted)' }} />
-                    ) : (
-                      <ChevronRight size={18} style={{ color: 'var(--foreground-muted)' }} />
-                    )}
-                  </button>
-
-                  {expandedIssue === issue.id && (
-                    <div className="mt-4 space-y-4 pl-9">
-                      <div>
-                        <p className="text-xs font-medium mb-2" style={{ color: 'var(--foreground-muted)' }}>
-                          Symptoms:
-                        </p>
-                        <ul className="space-y-1">
-                          {issue.symptoms.map((s, i) => (
-                            <li
-                              key={i}
-                              className="text-sm flex items-start gap-2"
-                              style={{ color: 'var(--foreground-secondary)' }}
-                            >
-                              <span style={{ color: 'var(--error)' }}>•</span>
-                              {s}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-medium mb-2" style={{ color: 'var(--foreground-muted)' }}>
-                          Solutions:
-                        </p>
-                        <ol className="space-y-1">
-                          {issue.solutions.map((s, i) => (
-                            <li
-                              key={i}
-                              className="text-sm flex items-start gap-2"
-                              style={{ color: 'var(--foreground)' }}
-                            >
-                              <span className="font-medium" style={{ color: 'var(--primary)' }}>
-                                {i + 1}.
-                              </span>
-                              {s}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-
-                      {issue.commands.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium mb-2" style={{ color: 'var(--foreground-muted)' }}>
-                            Commands:
-                          </p>
-                          {issue.commands.map((cmd, i) => (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between p-2 rounded text-sm font-mono"
-                              style={{ backgroundColor: 'var(--background)' }}
-                            >
-                              <code style={{ color: 'var(--foreground)' }}>
-                                {cmd.replace('{API_URL}', API_URL)}
-                              </code>
-                              <button
-                                onClick={() => copyCommand(cmd.replace('{API_URL}', API_URL))}
-                                className="p-1 rounded hover:bg-[var(--surface-light)]"
-                              >
-                                {copiedCommand === cmd.replace('{API_URL}', API_URL) ? (
-                                  <Check size={14} style={{ color: 'var(--success)' }} />
-                                ) : (
-                                  <Copy size={14} style={{ color: 'var(--foreground-muted)' }} />
-                                )}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Commands Tab */}
-      {activeTab === 'commands' && (
-        <div className="space-y-6">
-          {/* Local Dev Note */}
-          <div
-            className="p-4 rounded-lg flex items-start gap-3"
-            style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)' }}
-          >
-            <Info size={20} style={{ color: 'rgb(59, 130, 246)' }} />
-            <div>
-              <p className="font-medium" style={{ color: 'var(--foreground)' }}>
-                About Local Development
-              </p>
-              <p className="text-sm mt-1" style={{ color: 'var(--foreground-secondary)' }}>
-                The frontend runs locally via <code className="px-1 py-0.5 rounded" style={{ backgroundColor: 'var(--background)' }}>npm run dev</code> and cannot be started from this dashboard.
-                Use your terminal to run these commands. The backend can be run locally with <code className="px-1 py-0.5 rounded" style={{ backgroundColor: 'var(--background)' }}>vercel dev</code> or deployed to Vercel.
-              </p>
-            </div>
-          </div>
-
-          {DEV_COMMANDS.map((category) => (
-            <section
-              key={category.category}
-              className="rounded-lg border"
-              style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-            >
-              <div
-                className="p-4 border-b flex items-center gap-3"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}>
-                  <Terminal size={20} style={{ color: 'var(--primary)' }} />
-                </div>
-                <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
-                  {category.category}
-                </h2>
-              </div>
-
-              <div className="p-4 space-y-3">
-                {category.commands.map((cmd, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 rounded-lg"
-                    style={{ backgroundColor: 'var(--surface-light)' }}
-                  >
-                    <div>
-                      <p className="font-medium" style={{ color: 'var(--foreground)' }}>
-                        {cmd.name}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                        {cmd.description}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <code
-                        className="px-2 py-1 rounded text-xs"
-                        style={{ backgroundColor: 'var(--background)', color: 'var(--foreground-secondary)' }}
-                      >
-                        {cmd.cmd}
-                      </code>
-                      <button
-                        onClick={() => copyCommand(cmd.cmd)}
-                        className="p-2 rounded-lg hover:bg-[var(--background)] transition-colors"
-                      >
-                        {copiedCommand === cmd.cmd ? (
-                          <Check size={16} style={{ color: 'var(--success)' }} />
-                        ) : (
-                          <Copy size={16} style={{ color: 'var(--foreground-muted)' }} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
-
-          {/* Quick Links */}
-          <section
-            className="rounded-lg border p-4"
-            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-          >
-            <h3 className="font-medium mb-3" style={{ color: 'var(--foreground)' }}>
-              Quick Links
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: 'Vercel Dashboard', url: 'https://vercel.com/dashboard' },
-                { label: 'Supabase Dashboard', url: 'https://supabase.com/dashboard' },
-                { label: 'Shopify Partners', url: 'https://partners.shopify.com' },
-                { label: 'Anthropic Console', url: 'https://console.anthropic.com' },
-              ].map((link) => (
-                <a
-                  key={link.label}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
-                  style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
-                >
-                  <ExternalLink size={14} />
-                  {link.label}
-                </a>
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

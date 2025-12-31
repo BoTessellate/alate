@@ -146,11 +146,11 @@ export default function OnboardingPage() {
       <div className="mb-8">
         <div
           className="w-16 h-16 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: '#f6e9cf' }}
+          style={{ backgroundColor: '#222222' }}
         >
           <div
             className="w-8 h-3 rounded-full agent-pill-blink"
-            style={{ backgroundColor: '#4a7c4e' }}
+            style={{ backgroundColor: '#546c22' }}
           />
         </div>
       </div>
@@ -175,43 +175,35 @@ export default function OnboardingPage() {
             className="text-3xl font-bold mb-3"
             style={{ color: 'var(--foreground)' }}
           >
-            What's your style?
+            Hi I'm Moody, tell me a little about your style
           </h1>
           <p className="mb-8" style={{ color: 'var(--foreground-secondary)' }}>
-            Select at least 2 styles that vibe with you. This helps us
-            personalize your experience.
+            Select at least 2 styles that vibe with you.
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
+          <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-xl">
             {STYLE_CATEGORIES.map((category) => {
               const isSelected = selectedCategories.includes(category.id);
               return (
                 <button
                   key={category.id}
                   onClick={() => toggleCategory(category.id)}
-                  className="p-4 rounded-lg border-2 transition-all relative cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer"
                   style={{
                     backgroundColor: isSelected
-                      ? 'rgba(76, 112, 49, 0.15)'
+                      ? 'var(--primary)'
                       : 'var(--surface)',
                     borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                    color: isSelected ? 'white' : 'var(--foreground)',
                   }}
                 >
-                  {isSelected && (
-                    <div
-                      className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: 'var(--primary)' }}
-                    >
-                      <Check size={12} style={{ color: 'white' }} />
-                    </div>
-                  )}
-                  <span className="text-2xl mb-2 block">{category.emoji}</span>
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--foreground)' }}
-                  >
+                  <span className="text-base">{category.emoji}</span>
+                  <span className="text-sm font-medium">
                     {category.label}
                   </span>
+                  {isSelected && (
+                    <Check size={14} className="ml-1" />
+                  )}
                 </button>
               );
             })}

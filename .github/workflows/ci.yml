@@ -72,12 +72,17 @@ jobs:
         env:
           CI: true
 
+      - name: Generate coverage report JSON
+        run: npm run test:report
+
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: frontend-coverage
-          path: frontend/coverage/
+          path: |
+            frontend/coverage/
+            frontend/public/test-coverage.json
           retention-days: 7
 
   frontend-build:

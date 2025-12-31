@@ -1,13 +1,21 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, memo } from 'react';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Heart, Bookmark, ExternalLink, Shirt } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
-import { getProductUrl } from '@/utils/placeholder';
-import SaveToCollectionModal from './SaveToCollectionModal';
-import VirtualTryOnModal from './VirtualTryOnModal';
+import { getProductUrl, generatePlaceholderSVG } from '@/utils/placeholder';
 import type { Product } from '@/types';
+
+// Lazy load modals - they're only needed when user clicks
+const SaveToCollectionModal = dynamic(() => import('./SaveToCollectionModal'), {
+  loading: () => null,
+});
+const VirtualTryOnModal = dynamic(() => import('./VirtualTryOnModal'), {
+  loading: () => null,
+});
 
 interface ProductCardProps {
   product: Product;
@@ -26,12 +34,13 @@ const normalizeText = (text: string): string => {
     .join(' ');
 };
 
-export default function ProductCard({ product, onExternalLink }: ProductCardProps) {
+function ProductCard({ product, onExternalLink }: ProductCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTryOnModal, setShowTryOnModal] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
-  const { isProductInAnyCollection } = useCollectionsStore();
+  // Use selector pattern for better performance
+  const isProductInAnyCollection = useCollectionsStore(state => state.isProductInAnyCollection);
   const { format } = usePriceFormatter();
 
   const collectionsContainingProduct = isProductInAnyCollection(product.id);
@@ -84,10 +93,14 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
           style={{ backgroundColor: 'var(--background-secondary)' }}
         >
           {product.image_url ? (
-            <img
+            <Image
               src={product.image_url}
               alt={product.product_name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              placeholder="blur"
+              blurDataURL={generatePlaceholderSVG(product.product_name, 20, 20)}
             />
           ) : (
             <div
@@ -210,3 +223,6 @@ export default function ProductCard({ product, onExternalLink }: ProductCardProp
     </>
   );
 }
+
+// Memoize to prevent unnecessary re-renders in grids
+export default memo(ProductCard);

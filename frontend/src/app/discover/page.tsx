@@ -1,64 +1,27 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, Loader2, X } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
-import type { Product } from '@/types';
-
-const API_BASE_URL = 'https://backend-tml.vercel.app';
+import VirtualizedProductGrid from '@/components/VirtualizedProductGrid';
+import { useProducts } from '@/hooks/useProductSearch';
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const urlQuery = searchParams.get('q') || '';
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlQuery);
   const [showFloatingSearch, setShowFloatingSearch] = useState(false);
   const floatingInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchProducts = async (query: string = '') => {
-    setLoading(true);
-    setError(null);
-    try {
-      let response;
+  // Use SWR-based products hook with automatic caching
+  const { products, isLoading: loading, error, mutate } = useProducts(urlQuery, 100);
 
-      if (query.trim()) {
-        // Use POST for search queries
-        response = await fetch(`${API_BASE_URL}/api/search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: query,
-            limit: 100,
-          }),
-        });
-      } else {
-        // Use GET to fetch all products (no search filter)
-        response = await fetch(`${API_BASE_URL}/api/search?limit=100`);
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch products');
-      }
-
-      const data = await response.json();
-      setProducts(data.products || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch products on mount or when URL query changes
+  // Sync search input with URL query
   useEffect(() => {
     setSearchQuery(urlQuery);
-    fetchProducts(urlQuery);
   }, [urlQuery]);
 
   // Focus input when floating search opens
@@ -70,7 +33,12 @@ export default function DiscoverPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchProducts(searchQuery);
+    // Update URL to trigger SWR refetch with new query
+    if (searchQuery.trim()) {
+      router.push(`/discover?q=${encodeURIComponent(searchQuery)}`);
+    } else {
+      router.push('/discover');
+    }
     setShowFloatingSearch(false);
   };
 
@@ -117,9 +85,9 @@ export default function DiscoverPage() {
             }}
           >
             <p className="font-medium">Error loading products</p>
-            <p className="text-sm opacity-80 mt-1">{error}</p>
+            <p className="text-sm opacity-80 mt-1">{error.message}</p>
             <button
-              onClick={() => fetchProducts(searchQuery)}
+              onClick={() => mutate()}
               className="mt-4 px-4 py-2 rounded-md text-sm font-medium cursor-pointer"
               style={{
                 backgroundColor: 'rgba(255,255,255,0.2)',
@@ -157,11 +125,16 @@ export default function DiscoverPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            {/* Use virtualized grid for large lists, regular grid for small */}
+            {products.length > 20 ? (
+              <VirtualizedProductGrid products={products} gap={24} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

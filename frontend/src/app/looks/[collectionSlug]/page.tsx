@@ -27,18 +27,9 @@ import { useLooksStore, parseSlugId, generateMoodboardPath, CanvasItem } from '@
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductImage } from '@/utils/placeholder';
 import CollectionInspiration from '@/components/CollectionInspiration';
-import type { CollectionMetadata } from '@/types';
+import VirtualizedSidebarProducts from '@/components/VirtualizedSidebarProducts';
+import type { CollectionMetadata, Product } from '@/types';
 import Link from 'next/link';
-
-interface Product {
-  id: string;
-  product_name: string;
-  brand: string;
-  image_url: string;
-  price: number;
-  currency?: string;
-  tags?: string[];
-}
 
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
@@ -1357,80 +1348,15 @@ export default function MoodboardEditorPage() {
             )}
 
             {!loadingProducts && products.length > 0 && (
-              <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="group rounded-lg border overflow-hidden cursor-pointer transition-all duration-200"
-                    style={{
-                      backgroundColor: 'var(--surface-light)',
-                      borderColor: 'var(--border)',
-                    }}
-                    onClick={() => addProductToCanvas(product)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--border)';
-                    }}
-                  >
-                    <div
-                      className="relative aspect-square"
-                      style={{ backgroundColor: 'var(--background-secondary)' }}
-                    >
-                      <img
-                        src={getProductImage(product.image_url, product.product_name)}
-                        alt={product.product_name}
-                        className="w-full h-full object-cover"
-                      />
-
-                      <div
-                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ backgroundColor: 'rgba(76, 112, 49, 0.8)' }}
-                      >
-                        <Plus size={24} style={{ color: 'white' }} />
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(product.id);
-                        }}
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                        style={{
-                          backgroundColor: favorites.has(product.id)
-                            ? 'var(--error)'
-                            : 'rgba(0,0,0,0.5)',
-                        }}
-                      >
-                        <Heart
-                          size={12}
-                          fill={favorites.has(product.id) ? 'white' : 'none'}
-                          style={{ color: 'white' }}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="p-2">
-                      <p
-                        className="text-xs font-medium uppercase tracking-wide mb-0.5"
-                        style={{ color: 'var(--primary)' }}
-                      >
-                        {normalizeText(product.brand)}
-                      </p>
-                      <h4
-                        className="font-medium text-xs mb-1 line-clamp-2"
-                        style={{ color: 'var(--foreground)' }}
-                      >
-                        {normalizeText(product.product_name)}
-                      </h4>
-                      <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
-                        {formatPrice(product.price, product.currency)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <VirtualizedSidebarProducts
+                products={products}
+                favorites={favorites}
+                onAddToCanvas={addProductToCanvas}
+                onToggleFavorite={toggleFavorite}
+                formatPrice={formatPrice}
+                normalizeText={normalizeText}
+                getProductImage={getProductImage}
+              />
             )}
           </div>
         </div>

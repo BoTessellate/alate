@@ -239,6 +239,72 @@ throw new ExternalServiceError('OpenAI', 'Rate limited');
 throw new ConfigurationError('API key missing');
 ```
 
+### Page Creation
+
+All pages should follow a consistent header pattern:
+
+```tsx
+{/* Page Header */}
+<div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline gap-3">
+  <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
+    Page Title
+  </h1>
+  <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+    Brief description of the page
+  </span>
+</div>
+```
+
+**Page Header Rules:**
+- Heading: `text-3xl font-bold` with `var(--foreground)`
+- Subheading: `text-sm` with `var(--foreground-muted)`
+- Layout: `flex items-baseline gap-3` (inline, baseline aligned)
+- Container: `px-8 pt-8 pb-6 max-w-7xl mx-auto`
+- Background: `var(--background)` on page wrapper
+- **No stacked layouts** - always use inline baseline alignment
+
+### CTA & Interactive States
+
+All interactive elements (buttons, links, cards) must have three states:
+
+```tsx
+{/* Example: Text link with arrow */}
+<Link
+  href="/destination"
+  className="text-sm font-medium transition-all flex items-center gap-1"
+  style={{ color: 'var(--primary)' }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.color = 'var(--primary-dark)';
+    e.currentTarget.style.transform = 'translateX(2px)';
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.color = 'var(--primary)';
+    e.currentTarget.style.transform = 'translateX(0)';
+  }}
+  onMouseDown={(e) => {
+    e.currentTarget.style.transform = 'translateX(1px) scale(0.98)';
+  }}
+  onMouseUp={(e) => {
+    e.currentTarget.style.transform = 'translateX(2px)';
+  }}
+>
+  View all
+  <ArrowRight size={14} />
+</Link>
+```
+
+**CTA State Rules:**
+| State | Visual Change |
+|-------|---------------|
+| Normal | Base color, no transform |
+| Hover | Darker color (`--primary-dark`), subtle movement |
+| Active/Clicked | Scale down (0.98), reduced movement |
+
+**Button patterns:**
+- Primary: `bg: var(--primary)` → hover: `var(--primary-light)` → active: scale(0.98)
+- Secondary: `bg: var(--surface)` → hover: border `var(--primary)` → active: scale(0.98)
+- Text links: `color: var(--primary)` → hover: `var(--primary-dark)` + translateX
+
 ---
 
 ## Brand Colors
@@ -267,8 +333,8 @@ The TML logo consists of a **circle** and a **pill shape**. Color usage varies b
 **Standard Mode:**
 | Mode | Circle | Pill |
 |------|--------|------|
-| Dark Mode | charcoal (#222222) | primary-light (#546c22) |
-| Light Mode | cream (#F4EFED) | primary-light (#546c22) |
+| Light Mode | charcoal (#222222) | primary-light (#546c22) |
+| Dark Mode | cream (#F4EFED) | primary-light (#546c22) |
 
 **Agent Mode Toggle:**
 | Mode | Default State | Clicked/Active State |
@@ -307,8 +373,6 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 
 ### In Progress
 
-- [ ] **Test coverage improvement** (currently ~3% frontend)
-- [ ] **Cypress E2E testing setup**
 - [ ] WooCommerce plugin completion
 - [ ] Social sharing optimization
 
@@ -318,10 +382,23 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 - [ ] Advanced search filters UI
 - [ ] Brand dashboard analytics NOT PLANNED FOR NOW
 - [ ] Subscription/payment integration NOT PLANNED FOR NOW
-- [ ] Pinterest-style discovery feed 
+- [ ] Pinterest-style discovery feed
 - [ ] AR try-on for mobile
-- [ ] Performance optimization (lazy loading, caching)
-- [ ] Accessibility audit (WCAG compliance)
+- [ ] Accessibility audit (WCAG compliance) - Analysis complete, ready for implementation
+
+### Recently Completed
+
+- [x] **Performance optimization** - Implemented lazy loading, caching, and virtualization:
+  - Next.js Image with blur placeholders (ProductCard, VirtualizedSidebarProducts)
+  - SWR caching for API calls (useProductSearch hook)
+  - Virtualized grids for large lists (VirtualizedProductGrid, VirtualizedSidebarProducts)
+  - Zustand selector pattern for store subscriptions
+  - React.memo on grid components
+  - Dynamic imports for modals (SaveToCollectionModal, VirtualTryOnModal, PhotoUploadModal)
+- [x] **Test coverage improvement** - 471 tests passing across 12 suites (stores, components, hooks, utils)
+- [x] **Cypress E2E testing setup** - Installed with 4 E2E test suites (onboarding, settings, navigation, looks)
+- [x] **Fixed failing frontend tests** - Settings page tests now 31 passing
+- [x] **AI mode renamed to Agent mode** - Unified terminology across project
 
 ---
 
@@ -330,16 +407,44 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 ### Frontend (Jest + React Testing Library)
 
 ```
-Overall: ~3% statement coverage
-Most coverage: settings/page.tsx (has tests)
-Missing: components, hooks, stores, utils (0%)
+Total: 12 test suites, 471 tests passing
+settings/page.tsx: 31 tests passing
+stores/: 4 test files (useSettingsStore, useLooksStore, useCollectionsStore, useUploadStore)
+components/: 4 test files (TopBar, Sidebar, ProductCard, AppLayout) - 123 tests
+hooks/utils/: 3 test files (useCurrency, currency.ts, placeholder.ts)
 ```
 
-**Failing tests to fix:**
-- Password change validation
-- Export data functionality
-- Sign out state
-- Modal interactions
+**Test Files:**
+- `src/app/settings/__tests__/page.test.tsx` - 31 tests (settings page)
+- `src/stores/__tests__/useSettingsStore.test.ts` - Theme, agent mode, notifications, currency
+- `src/stores/__tests__/useLooksStore.test.ts` - Moodboard CRUD, slug generation
+- `src/stores/__tests__/useCollectionsStore.test.ts` - Collection CRUD, products
+- `src/stores/__tests__/useUploadStore.test.ts` - Upload flow, file management
+- `src/components/__tests__/TopBar.test.tsx` - 39 tests (navigation, agent mode)
+- `src/components/__tests__/Sidebar.test.tsx` - 32 tests (navigation links)
+- `src/components/__tests__/ProductCard.test.tsx` - 32 tests (product display)
+- `src/components/__tests__/AppLayout.test.tsx` - 20 tests (layout wrapper)
+- `src/utils/__tests__/currency.test.ts` - Currency formatting, conversion
+- `src/utils/__tests__/placeholder.test.ts` - SVG placeholder generation
+- `src/hooks/__tests__/useCurrency.test.ts` - Currency hook
+
+### Cypress E2E
+
+```
+Test Suites: 7
+- onboarding.cy.ts: 12 tests (onboarding flow)
+- settings.cy.ts: 25 tests (settings page)
+- navigation.cy.ts: 20 tests (TopBar navigation)
+- looks.cy.ts: 18 tests (moodboard page)
+- shopify.cy.ts: 25 tests (Shopify OAuth, connect/disconnect, product sync)
+- ai-features.cy.ts: 30 tests (AI search, enrichment, virtual try-on, composition, agent mode)
+- export.cy.ts: 28 tests (moodboard export, social sharing, collection export, embed code)
+```
+
+**NPM Scripts:**
+- `npm run cy:open` - Open Cypress Test Runner
+- `npm run cy:run` - Run tests headlessly
+- `npm run e2e` - Start server and run Cypress tests
 
 ### Backend (Vitest)
 
@@ -354,17 +459,17 @@ Test files exist for:
 - sdk/shared/errors.test.ts
 - sdk/__tests__/ai-fallbacks.test.ts
 
-Missing: @vitest/coverage-v8 dependency for coverage reports
+Coverage: npm run test:coverage (uses @vitest/coverage-v8)
 ```
 
-### Recommended: Cypress E2E
+### Cypress E2E Coverage Summary
 
-Ready to add Cypress for:
-1. User flows (onboarding, moodboard creation)
-2. Shopify OAuth flow testing
-3. AI feature integration tests
-4. Export functionality
-5. Cross-browser compatibility
+All recommended E2E tests implemented:
+- [x] User flows (onboarding, moodboard creation)
+- [x] Shopify OAuth flow testing
+- [x] AI feature integration tests
+- [x] Export functionality
+- [ ] Cross-browser compatibility (run with `--browser chrome/firefox/edge`)
 
 ---
 
@@ -430,3 +535,5 @@ npm start            # Expo dev server
 4. **Test coverage is low** - prioritize tests for critical paths
 5. **Mobile app shares stores/types** with web where possible
 6. **Shopify is the primary integration** - WooCommerce is secondary
+7. **Keep the High-Level Plan section updated** - When completing tasks mentioned in the "In Progress" section, move them to "Completed" and update the "Test Coverage Status" section with current metrics. This helps maintain project visibility.
+8. **Run all commands directly** - Claude Code should execute commands to spin up dev servers, run tests, and perform builds rather than just providing commands for the user to copy.
