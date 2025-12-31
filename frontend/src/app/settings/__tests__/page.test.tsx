@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import SettingsPage from '../page';
@@ -9,6 +9,10 @@ let mockStoreState = {
   emailNotifications: true,
   pushNotifications: false,
   aiModeEnabled: false,
+  currencyDisplayMode: 'original' as 'original' | 'local',
+  localCurrency: 'USD' as string,
+  userName: null as string | null,
+  isLoggedIn: false,
 };
 
 const mockSetTheme = jest.fn((theme) => {
@@ -23,6 +27,10 @@ const mockSetPushNotifications = jest.fn((enabled) => {
 const mockSetAiMode = jest.fn((enabled) => {
   mockStoreState.aiModeEnabled = enabled;
 });
+const mockSetCurrencyDisplayMode = jest.fn();
+const mockSetLocalCurrency = jest.fn();
+const mockSetUserName = jest.fn();
+const mockSetIsLoggedIn = jest.fn();
 
 // Mock the Zustand store
 jest.mock('@/stores/useSettingsStore', () => ({
@@ -32,6 +40,10 @@ jest.mock('@/stores/useSettingsStore', () => ({
     setEmailNotifications: mockSetEmailNotifications,
     setPushNotifications: mockSetPushNotifications,
     setAiMode: mockSetAiMode,
+    setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
+    setLocalCurrency: mockSetLocalCurrency,
+    setUserName: mockSetUserName,
+    setIsLoggedIn: mockSetIsLoggedIn,
   }),
   Theme: {},
 }));
@@ -39,6 +51,9 @@ jest.mock('@/stores/useSettingsStore', () => ({
 // Mock URL.createObjectURL
 global.URL.createObjectURL = jest.fn(() => 'mock-url');
 global.URL.revokeObjectURL = jest.fn();
+
+// Track if we're using fake timers
+let usingFakeTimers = false;
 
 describe('SettingsPage', () => {
   beforeEach(() => {
@@ -48,15 +63,29 @@ describe('SettingsPage', () => {
       emailNotifications: true,
       pushNotifications: false,
       aiModeEnabled: false,
+      currencyDisplayMode: 'original',
+      localCurrency: 'USD',
+      userName: null,
+      isLoggedIn: false,
     };
     jest.clearAllMocks();
+    usingFakeTimers = false;
   });
 
   afterEach(() => {
-    // Ensure proper cleanup between tests
+    // Only run timers if we're using fake timers
+    if (usingFakeTimers) {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    }
     cleanup();
-    jest.clearAllTimers();
   });
+
+  // Helper to enable fake timers for tests that need them
+  const enableFakeTimers = () => {
+    jest.useFakeTimers();
+    usingFakeTimers = true;
+  };
 
   describe('Rendering', () => {
     it('renders the settings page with all sections', () => {
@@ -248,9 +277,9 @@ describe('SettingsPage', () => {
 
       fireEvent.click(screen.getByTestId('change-password-btn'));
 
-      await userEvent.type(screen.getByTestId('current-password-input'), 'oldpassword');
-      await userEvent.type(screen.getByTestId('new-password-input'), 'newpassword123');
-      await userEvent.type(screen.getByTestId('confirm-password-input'), 'differentpassword');
+      fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpassword' } });
+      fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpassword123' } });
+      fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'differentpassword' } });
 
       fireEvent.click(screen.getByTestId('save-password-btn'));
 
@@ -264,9 +293,9 @@ describe('SettingsPage', () => {
 
       fireEvent.click(screen.getByTestId('change-password-btn'));
 
-      await userEvent.type(screen.getByTestId('current-password-input'), 'oldpassword');
-      await userEvent.type(screen.getByTestId('new-password-input'), 'newpassword123');
-      await userEvent.type(screen.getByTestId('confirm-password-input'), 'newpassword123');
+      fireEvent.change(screen.getByTestId('current-password-input'), { target: { value: 'oldpassword' } });
+      fireEvent.change(screen.getByTestId('new-password-input'), { target: { value: 'newpassword123' } });
+      fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'newpassword123' } });
 
       fireEvent.click(screen.getByTestId('save-password-btn'));
 
@@ -329,9 +358,6 @@ describe('SettingsPage', () => {
     });
 
     it('creates and downloads export file', async () => {
-      const mockAppendChild = jest.spyOn(document.body, 'appendChild').mockImplementation(() => null as unknown as Node);
-      const mockRemoveChild = jest.spyOn(document.body, 'removeChild').mockImplementation(() => null as unknown as Node);
-
       render(<SettingsPage />);
 
       fireEvent.click(screen.getByTestId('export-data-btn'));
@@ -339,9 +365,6 @@ describe('SettingsPage', () => {
       await waitFor(() => {
         expect(URL.createObjectURL).toHaveBeenCalled();
       }, { timeout: 3000 });
-
-      mockAppendChild.mockRestore();
-      mockRemoveChild.mockRestore();
     });
   });
 
@@ -361,19 +384,22 @@ describe('SettingsPage', () => {
 
       fireEvent.click(screen.getByTestId('email-notifications-toggle'));
 
-      await waitFor(() => {
-        expect(screen.getByText('Saving...')).toBeInTheDocument();
-      });
+      // Saving status appears immediately
+      expect(screen.getByText('Saving...')).toBeInTheDocument();
     });
 
     it('shows saved status after saving completes', async () => {
+      enableFakeTimers();
       render(<SettingsPage />);
 
       fireEvent.click(screen.getByTestId('email-notifications-toggle'));
 
-      await waitFor(() => {
-        expect(screen.getByText('Saved')).toBeInTheDocument();
-      }, { timeout: 1000 });
+      // Advance timer to complete the 500ms save operation
+      await act(async () => {
+        jest.advanceTimersByTime(600);
+      });
+
+      expect(screen.getByText('Saved')).toBeInTheDocument();
     });
   });
 
@@ -384,9 +410,11 @@ describe('SettingsPage', () => {
       fireEvent.click(screen.getByTestId('change-email-btn'));
       expect(screen.getByTestId('email-modal')).toBeInTheDocument();
 
-      // Click the backdrop (parent div)
+      // Click the backdrop (the fixed overlay div that contains the modal)
+      // The backdrop is the parent element with the onClick={closeModal}
       const backdrop = screen.getByTestId('email-modal').parentElement;
       if (backdrop) {
+        // Direct click on backdrop should close the modal
         fireEvent.click(backdrop);
       }
 
@@ -399,8 +427,9 @@ describe('SettingsPage', () => {
       fireEvent.click(screen.getByTestId('change-password-btn'));
       expect(screen.getByTestId('password-modal')).toBeInTheDocument();
 
-      // Find and click the X button
-      const closeButton = screen.getByTestId('password-modal').querySelector('button');
+      // The X button is the first button inside the modal header
+      const modal = screen.getByTestId('password-modal');
+      const closeButton = modal.querySelector('button');
       if (closeButton) {
         fireEvent.click(closeButton);
       }
@@ -409,15 +438,17 @@ describe('SettingsPage', () => {
     });
 
     it('resets form fields when modal closes', async () => {
+      jest.useRealTimers();
+      const user = userEvent.setup();
       render(<SettingsPage />);
 
-      fireEvent.click(screen.getByTestId('change-email-btn'));
-      await userEvent.type(screen.getByTestId('new-email-input'), 'test@example.com');
+      await user.click(screen.getByTestId('change-email-btn'));
+      await user.type(screen.getByTestId('new-email-input'), 'test@example.com');
 
-      fireEvent.click(screen.getByText('Cancel'));
+      await user.click(screen.getByText('Cancel'));
 
       // Reopen modal
-      fireEvent.click(screen.getByTestId('change-email-btn'));
+      await user.click(screen.getByTestId('change-email-btn'));
 
       expect(screen.getByTestId('new-email-input')).toHaveValue('');
     });
@@ -429,21 +460,23 @@ describe('SettingsPage', () => {
 
       fireEvent.click(screen.getByTestId('change-password-btn'));
 
+      // Check initial state
+      expect(screen.getByTestId('current-password-input')).toHaveAttribute('type', 'password');
+
+      // The eye button is inside the parent wrapper of the password input
       const passwordInput = screen.getByTestId('current-password-input');
-      expect(passwordInput).toHaveAttribute('type', 'password');
+      const inputWrapper = passwordInput.parentElement;
+      const eyeButton = inputWrapper?.querySelector('button');
 
-      // Find the eye button and click it
-      const eyeButtons = screen.getAllByRole('button').filter(
-        btn => btn.querySelector('svg')
-      );
+      expect(eyeButton).toBeTruthy();
 
-      // Click the first eye button (for current password field)
-      if (eyeButtons.length > 0) {
-        fireEvent.click(eyeButtons[0]);
-      }
+      // Click the eye button to toggle visibility
+      fireEvent.click(eyeButton!);
 
-      // All password fields should now show text
-      expect(passwordInput).toHaveAttribute('type', 'text');
+      // Re-query the input element after state change and verify
+      await waitFor(() => {
+        expect(screen.getByTestId('current-password-input')).toHaveAttribute('type', 'text');
+      });
     });
   });
 });
