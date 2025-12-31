@@ -36,6 +36,8 @@ import {
   Info,
   Play,
   Square,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-ramsaptamis-projects.vercel.app';
@@ -66,7 +68,7 @@ const INTEGRATIONS = [
     name: 'Product Enrichment',
     icon: Brain,
     description: 'AI product metadata',
-    testEndpoint: '/api/enrich',
+    testEndpoint: '/api/ai?action=enrich',
     method: 'POST',
     testBody: { url: 'https://example.com/test', dry_run: true },
     envVars: ['ANTHROPIC_API_KEY'],
@@ -76,7 +78,7 @@ const INTEGRATIONS = [
     name: 'Layout Generator',
     icon: Palette,
     description: 'Moodboard layouts',
-    testEndpoint: '/api/layout',
+    testEndpoint: '/api/ai?action=layout',
     method: 'POST',
     testBody: { productIds: [], boardSize: { width: 800, height: 600 }, dry_run: true },
     envVars: [],
@@ -86,7 +88,7 @@ const INTEGRATIONS = [
     name: 'Smart Labels',
     icon: FileText,
     description: 'AI label placement',
-    testEndpoint: '/api/smart-labels',
+    testEndpoint: '/api/ai?action=labels',
     method: 'POST',
     testBody: { items: [], dry_run: true },
     envVars: ['ANTHROPIC_API_KEY'],
@@ -282,6 +284,35 @@ interface SyncResult {
   message?: string;
 }
 
+// AI Provider Status types
+interface AIProviderInfo {
+  available: boolean;
+  configured: boolean;
+  latencyMs?: number;
+  error?: string;
+  model?: string;
+  lastChecked?: string;
+}
+
+interface AIProviderStatus {
+  anthropic: AIProviderInfo;
+  gemini: AIProviderInfo;
+  openai: AIProviderInfo;
+  timestamp: string;
+  cached: boolean;
+  summary: {
+    total: number;
+    configured: number;
+    available: number;
+    health: 'healthy' | 'degraded' | 'critical';
+  };
+  fallbackStatus: {
+    enrichment: string;
+    imageGen: string;
+    virtualTryOn: string;
+  };
+}
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'health' | 'shopify' | 'debug' | 'commands'>('health');
   const [integrationStatuses, setIntegrationStatuses] = useState<IntegrationStatus[]>([]);
@@ -301,6 +332,10 @@ export default function AdminPage() {
   // Local dev state
   const [frontendRunning, setFrontendRunning] = useState<boolean | null>(null);
   const [backendRunning, setBackendRunning] = useState<boolean | null>(null);
+
+  // AI Provider state
+  const [aiStatus, setAiStatus] = useState<AIProviderStatus | null>(null);
+  const [isCheckingAI, setIsCheckingAI] = useState(false);
 
   // Load cached test results on mount
   useEffect(() => {
@@ -329,6 +364,30 @@ export default function AdminPage() {
       setBackendRunning(false);
     }
   };
+
+  // Check AI provider status
+  const checkAIProviderStatus = async (forceRefresh = false) => {
+    setIsCheckingAI(true);
+    try {
+      const url = `${API_URL}/api/ai-status${forceRefresh ? '?refresh=true' : ''}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setAiStatus(data);
+      } else {
+        console.error('AI status check failed:', response.status);
+      }
+    } catch (err) {
+      console.error('AI status check error:', err);
+    } finally {
+      setIsCheckingAI(false);
+    }
+  };
+
+  // Load AI status on mount
+  useEffect(() => {
+    checkAIProviderStatus();
+  }, []);
 
   // Test all integrations
   const testAllIntegrations = async () => {
@@ -859,6 +918,175 @@ export default function AdminPage() {
                 );
               })}
             </div>
+          </section>
+
+          {/* AI Provider Status */}
+          <section
+            className="rounded-lg border"
+            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(196, 163, 90, 0.2)' }}>
+                  <Cpu size={20} style={{ color: 'var(--highlight)' }} />
+                </div>
+                <div>
+                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                    AI Providers
+                  </h2>
+                  <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                    Status of AI services with fallback chains
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => checkAIProviderStatus(true)}
+                disabled={isCheckingAI}
+                className="px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
+              >
+                {isCheckingAI ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Check Status
+              </button>
+            </div>
+
+            {aiStatus ? (
+              <div className="p-4 space-y-4">
+                {/* Health Summary */}
+                <div
+                  className="p-3 rounded-lg flex items-center justify-between"
+                  style={{
+                    backgroundColor: aiStatus.summary.health === 'healthy'
+                      ? 'rgba(76, 112, 49, 0.1)'
+                      : aiStatus.summary.health === 'degraded'
+                      ? 'rgba(245, 158, 11, 0.1)'
+                      : 'rgba(168, 64, 50, 0.1)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    {aiStatus.summary.health === 'healthy' ? (
+                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                    ) : aiStatus.summary.health === 'degraded' ? (
+                      <AlertTriangle size={18} style={{ color: 'var(--warning, #f59e0b)' }} />
+                    ) : (
+                      <XCircle size={18} style={{ color: 'var(--error)' }} />
+                    )}
+                    <span className="font-medium" style={{
+                      color: aiStatus.summary.health === 'healthy' ? 'var(--success)'
+                        : aiStatus.summary.health === 'degraded' ? 'var(--warning, #f59e0b)'
+                        : 'var(--error)'
+                    }}>
+                      {aiStatus.summary.available}/{aiStatus.summary.configured} providers available
+                    </span>
+                  </div>
+                  {aiStatus.cached && (
+                    <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--background)', color: 'var(--foreground-muted)' }}>
+                      Cached
+                    </span>
+                  )}
+                </div>
+
+                {/* Provider Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {[
+                    { id: 'anthropic', name: 'Claude', icon: Brain, data: aiStatus.anthropic, role: 'Enrichment (Primary)' },
+                    { id: 'gemini', name: 'Gemini', icon: Sparkles, data: aiStatus.gemini, role: 'Try-On (Primary), Fallback' },
+                    { id: 'openai', name: 'OpenAI', icon: Image, data: aiStatus.openai, role: 'Image Gen (Primary)' },
+                  ].map((provider) => {
+                    const Icon = provider.icon;
+                    return (
+                      <div
+                        key={provider.id}
+                        className="p-3 rounded-lg"
+                        style={{ backgroundColor: 'var(--surface-light)' }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Icon size={16} style={{ color: 'var(--foreground-secondary)' }} />
+                            <span className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>
+                              {provider.name}
+                            </span>
+                          </div>
+                          {provider.data.available ? (
+                            <CheckCircle size={16} style={{ color: 'var(--success)' }} />
+                          ) : provider.data.configured ? (
+                            <XCircle size={16} style={{ color: 'var(--error)' }} />
+                          ) : (
+                            <AlertTriangle size={16} style={{ color: 'var(--foreground-muted)' }} />
+                          )}
+                        </div>
+                        <p className="text-xs mb-2" style={{ color: 'var(--foreground-muted)' }}>
+                          {provider.role}
+                        </p>
+                        <div className="text-xs space-y-1">
+                          {provider.data.configured ? (
+                            <>
+                              <div style={{ color: provider.data.available ? 'var(--success)' : 'var(--error)' }}>
+                                {provider.data.available ? 'Online' : provider.data.error || 'Offline'}
+                              </div>
+                              {provider.data.latencyMs && (
+                                <div style={{ color: 'var(--foreground-muted)' }}>
+                                  {provider.data.latencyMs}ms latency
+                                </div>
+                              )}
+                              {provider.data.model && (
+                                <div style={{ color: 'var(--foreground-muted)' }}>
+                                  Model: {provider.data.model}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div style={{ color: 'var(--foreground-muted)' }}>
+                              Not configured
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Fallback Status */}
+                <div
+                  className="p-3 rounded-lg"
+                  style={{ backgroundColor: 'var(--background)' }}
+                >
+                  <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                    Active Fallback Chains
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span style={{ color: 'var(--foreground-muted)' }}>Enrichment:</span>
+                      <div style={{ color: 'var(--foreground)' }}>{aiStatus.fallbackStatus.enrichment}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--foreground-muted)' }}>Image Gen:</span>
+                      <div style={{ color: 'var(--foreground)' }}>{aiStatus.fallbackStatus.imageGen}</div>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--foreground-muted)' }}>Virtual Try-On:</span>
+                      <div style={{ color: 'var(--foreground)' }}>{aiStatus.fallbackStatus.virtualTryOn}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                {isCheckingAI ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 size={20} className="animate-spin" style={{ color: 'var(--foreground-muted)' }} />
+                    <span style={{ color: 'var(--foreground-muted)' }}>Checking AI providers...</span>
+                  </div>
+                ) : (
+                  <p style={{ color: 'var(--foreground-muted)' }}>
+                    Click "Check Status" to test AI provider connectivity
+                  </p>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Environment Info */}

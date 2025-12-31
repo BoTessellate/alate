@@ -3,10 +3,10 @@
 :root {
   /* TML Brand Colors */
   --primary: #4c7031;           /* Primary Green - logo, highlights, accent buttons */
-  --primary-light: #5d8a3d;
+  --primary-light: #649341;
   --primary-dark: #3d5a27;
 
-  --cream: #f6e9cf;             /* Soft Cream - backgrounds, subtle text contrast */
+  --cream: #4fefed;             /* Cyan/Turquoise - backgrounds, accent contrast */
   --cream-dark: #e8d9b8;
 
   --charcoal: #222222;          /* Dark Charcoal - main text, headers, dark mode base */
@@ -23,7 +23,7 @@
 
   --foreground: #f6e9cf;        /* Cream for text on dark */
   --foreground-secondary: #d4c9b0;
-  --foreground-muted: #9a9080;
+  --foreground-muted: #b0a090;
 
   --secondary: #8b6b4a;         /* Warm brown accent */
   --accent: #4c7031;            /* Same as primary green */
@@ -41,6 +41,7 @@
 
   /* Translucent topbar - brand green */
   --topbar-bg: rgba(76, 112, 49, 0.92);
+  --topbar-bg-warm: rgba(254, 250, 242, 0.95); /* Cream white for /looks page */
 }
 
 @theme inline {
@@ -91,9 +92,77 @@ body {
   outline-offset: 2px;
 }
 
+/* Custom cursor - classic pointer with softer feel */
+/* More upright, natural angle with subtle shadow for depth */
+:root {
+  /* White cursor with soft shadow for dark mode */
+  --cursor-click: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cdefs%3E%3Cfilter id='s' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeDropShadow dx='1' dy='1' stdDeviation='1' flood-opacity='0.3'/%3E%3C/filter%3E%3C/defs%3E%3Cpath filter='url(%23s)' fill='%23fff' d='M4 2l3 18 4-6 7-2L4 2z'/%3E%3C/svg%3E") 0 0, pointer;
+}
+
+/* Black cursor with soft shadow for light mode */
+[data-theme="light"] {
+  --cursor-click: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cdefs%3E%3Cfilter id='s' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeDropShadow dx='1' dy='1' stdDeviation='1' flood-opacity='0.2'/%3E%3C/filter%3E%3C/defs%3E%3Cpath filter='url(%23s)' fill='%23222' d='M4 2l3 18 4-6 7-2L4 2z'/%3E%3C/svg%3E") 0 0, pointer;
+}
+
+/* Apply custom cursor to all interactive elements */
+button,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+.cursor-pointer,
+[onclick] {
+  cursor: var(--cursor-click);
+}
+
+/* Screen reader only - visually hidden but accessible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Utility classes */
 .glass {
   background: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
+}
+
+/* AI Pill Blink Animation - human-like blink (~150ms blink, 4s interval) */
+@keyframes ai-blink {
+  0%, 96% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  98% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.ai-pill-blink {
+  animation: ai-blink 4s linear infinite;
+  will-change: opacity, transform;
+  transform-origin: center;
+}
+
+/* Pause animation when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ai-pill-blink {
+    animation: none;
+  }
 }
