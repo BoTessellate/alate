@@ -1,24 +1,86 @@
 /**
- * Layout AI API - Vercel Serverless Function
- * Combined endpoint for layout generation and smart label placement
+ * AI API - Consolidated Endpoint
+ * Combines product enrichment, image generation, and layout AI functionality
  *
  * Routes:
- * GET  /api/layout-ai              - List available layout types
- * POST /api/layout-ai?action=generate - Generate moodboard layout
- * POST /api/layout-ai?action=labels   - AI-powered label placement
+ * POST /api/ai?action=enrich    - Enrich product with AI-generated metadata
+ * POST /api/ai?action=compose   - AI moodboard composition
+ * POST /api/ai?action=tryon     - Virtual try-on
+ * GET  /api/ai?action=layouts   - List available layout types
+ * POST /api/ai?action=layout    - Generate moodboard layout
+ * POST /api/ai?action=labels    - AI-powered label placement
+ *
+ * This consolidation reduces serverless function count for Vercel Hobby plan limits.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyMiddleware } from '../sdk/shared/middleware';
 import { createModuleLogger } from '../sdk/shared/logger';
 import { callClaude, parseJSONFromResponse } from '../sdk/shared/secureAI';
+import {
+  createImageGenerator,
+  MoodboardCompositionInput,
+  VirtualTryOnInput,
+  TryOnType,
+} from '../sdk/imageGeneration';
+import { createClient } from '@supabase/supabase-js';
 
-const log = createModuleLogger('layout-ai');
+const log = createModuleLogger('ai');
+
+// Demo mode flag
+const DEMO_MODE = process.env.DEMO_MODE !== 'false';
+
+// Initialize Supabase for image storage (lazy)
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+// Enrichment types
+interface RawProduct {
+  name: string;
+  description?: string;
+  brand?: string;
+  price?: number;
+  currency?: string;
+  image_url?: string;
+  source_url?: string;
+}
+
+interface EnrichedProduct extends RawProduct {
+  tags: string[];
+  color_palette: string[];
+  material?: string;
+  texture?: string;
+  tone?: string;
+  category?: string;
+  enriched_at: string;
+}
+
+// Image AI types
+interface ComposeRequest {
+  productImages: Array<{ url?: string; base64?: string }>;
+  style?: {
+    aesthetic?: string;
+    colorPalette?: string[];
+    mood?: string;
+    lighting?: 'natural' | 'studio' | 'warm' | 'cool' | 'dramatic';
+  };
+  arrangement?: 'balanced' | 'asymmetric' | 'collage' | 'grid' | 'organic';
+  canvasSize?: '1024x1024' | '1536x1024' | '1024x1536';
+  lookId?: string;
+}
+
+interface TryOnRequest {
+  baseImage: { url?: string; base64?: string };
+  productImages: Array<{ url?: string; base64?: string }>;
+  type: TryOnType;
+  preserveBackground?: boolean;
+}
+
+// Layout types
 interface ProductPosition {
   id: string;
   name: string;
@@ -28,13 +90,6 @@ interface ProductPosition {
   height: number;
   rotation?: number;
   z_index: number;
-}
-
-interface LayoutResult {
-  layout_type: string;
-  canvas_size: { width: number; height: number };
-  products: ProductPosition[];
-  background_color?: string;
 }
 
 interface ImagePosition {
@@ -58,6 +113,59 @@ interface LabelPlacement {
 }
 
 type LayoutType = 'zigzag' | 'centerpiece' | 'grid' | 'asymmetric' | 'stacked' | 'diagonal' | 'cluster' | 'magazine';
+
+// ============================================================================
+// DEMO DATA FOR ENRICHMENT
+// ============================================================================
+
+const DEMO_ENRICHMENTS: Record<string, any> = {
+  default: {
+    tags: ['handcrafted', 'artisan', 'sustainable', 'boho'],
+    color_palette: ['terracotta', 'cream', 'sage green', 'natural wood'],
+    material: 'cotton',
+    texture: 'woven',
+    tone: 'earthy',
+    category: 'home decor'
+  },
+  cushion: {
+    tags: ['handwoven', 'traditional', 'boho', 'textured'],
+    color_palette: ['indigo', 'cream', 'gold', 'rust'],
+    material: 'cotton',
+    texture: 'woven',
+    tone: 'warm',
+    category: 'textiles'
+  },
+  ceramic: {
+    tags: ['handmade', 'artisan', 'minimalist', 'organic'],
+    color_palette: ['terracotta', 'white', 'speckled cream'],
+    material: 'ceramic',
+    texture: 'matte',
+    tone: 'earthy',
+    category: 'home decor'
+  },
+  furniture: {
+    tags: ['handcrafted', 'sustainable', 'modern', 'natural'],
+    color_palette: ['walnut', 'oak', 'natural wood', 'brass'],
+    material: 'wood',
+    texture: 'smooth',
+    tone: 'warm',
+    category: 'furniture'
+  }
+};
+
+function getDemoEnrichment(productName: string): any {
+  const name = productName.toLowerCase();
+  if (name.includes('cushion') || name.includes('pillow') || name.includes('textile')) {
+    return DEMO_ENRICHMENTS.cushion;
+  }
+  if (name.includes('ceramic') || name.includes('pottery') || name.includes('vase')) {
+    return DEMO_ENRICHMENTS.ceramic;
+  }
+  if (name.includes('chair') || name.includes('table') || name.includes('furniture') || name.includes('wood')) {
+    return DEMO_ENRICHMENTS.furniture;
+  }
+  return DEMO_ENRICHMENTS.default;
+}
 
 // ============================================================================
 // LAYOUT GENERATORS
@@ -87,7 +195,6 @@ function generateZigZagLayout(products: any[], canvasWidth: number, canvasHeight
 
 function generateCenterpieceLayout(products: any[], canvasWidth: number, canvasHeight: number): ProductPosition[] {
   const positions: ProductPosition[] = [];
-
   if (products.length === 0) return positions;
 
   const heroWidth = canvasWidth * 0.5;
@@ -325,8 +432,39 @@ const layoutGenerators: Record<LayoutType, typeof generateGridLayout> = {
 };
 
 // ============================================================================
-// SMART LABELS
+// HELPERS
 // ============================================================================
+
+async function uploadToStorage(
+  base64Data: string,
+  folder: string,
+  fileName: string
+): Promise<string | undefined> {
+  if (!supabaseUrl || !supabaseKey) return undefined;
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const path = `${folder}/${fileName}`;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const { data, error } = await supabase.storage
+      .from('moodboards')
+      .upload(path, buffer, {
+        contentType: 'image/png',
+        upsert: true,
+      });
+
+    if (!error && data) {
+      const { data: urlData } = supabase.storage
+        .from('moodboards')
+        .getPublicUrl(data.path);
+      return urlData.publicUrl;
+    }
+  } catch (err) {
+    log.warn({ error: err }, 'Failed to upload to storage');
+  }
+  return undefined;
+}
 
 function buildVisionPrompt(
   image_positions: ImagePosition[],
@@ -421,6 +559,298 @@ function generateRuleBasedLabels(
 // HANDLERS
 // ============================================================================
 
+async function handleEnrich(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { product } = req.body as { product: RawProduct };
+
+  if (!product || !product.name) {
+    return res.status(400).json({ error: 'Product name is required' });
+  }
+
+  try {
+    // Demo mode - return realistic mock data without API calls
+    if (DEMO_MODE) {
+      log.info({ productName: product.name, demoMode: true }, 'Using demo enrichment data');
+      const demoEnrichment = getDemoEnrichment(product.name);
+
+      const enrichedProduct: EnrichedProduct = {
+        ...product,
+        tags: demoEnrichment.tags,
+        color_palette: demoEnrichment.color_palette,
+        material: demoEnrichment.material,
+        texture: demoEnrichment.texture,
+        tone: demoEnrichment.tone,
+        category: demoEnrichment.category,
+        enriched_at: new Date().toISOString()
+      };
+
+      return res.status(200).json({
+        success: true,
+        product: enrichedProduct,
+        model_used: 'demo-mode',
+        _demo: true,
+        _note: 'Demo mode active. Set DEMO_MODE=false and add API credits for real AI enrichment.'
+      });
+    }
+
+    const prompt = `You are a product enrichment AI. Analyze this product and return structured metadata.
+
+Product:
+- Name: ${product.name}
+- Description: ${product.description || 'N/A'}
+- Brand: ${product.brand || 'N/A'}
+- Price: ${product.price ? `${product.currency || ''} ${product.price}` : 'N/A'}
+
+Return a JSON object with these fields:
+{
+  "tags": ["3-5 descriptive style keywords like 'bohemian', 'minimalist', 'handmade'"],
+  "color_palette": ["2-5 colors found in/associated with the product, e.g. 'cream', 'terracotta', 'forest green'"],
+  "material": "primary material if detectable (e.g., 'cotton', 'ceramic', 'wood')",
+  "texture": "texture description (e.g., 'woven', 'smooth', 'textured')",
+  "tone": "aesthetic mood (e.g., 'warm', 'cool', 'earthy', 'modern')",
+  "category": "product category (e.g., 'home decor', 'furniture', 'textiles', 'lighting')"
+}
+
+Return ONLY valid JSON, no explanation.`;
+
+    log.info({ productName: product.name }, 'Calling Claude for enrichment...');
+    const aiResponse = await callClaude(prompt, { maxTokens: 500 });
+
+    let enrichment;
+    if (aiResponse.success && aiResponse.text) {
+      log.info({ productName: product.name }, 'AI response received, parsing...');
+      enrichment = parseJSONFromResponse(aiResponse.text);
+    } else {
+      log.warn({ productName: product.name, error: aiResponse.error }, 'AI call failed');
+    }
+
+    if (!enrichment) {
+      log.warn({ productName: product.name }, 'Failed to parse AI response, using defaults');
+      enrichment = {
+        tags: ['product'],
+        color_palette: ['neutral'],
+        material: null,
+        texture: null,
+        tone: 'neutral',
+        category: 'general'
+      };
+    }
+
+    const enrichedProduct: EnrichedProduct = {
+      ...product,
+      tags: enrichment.tags || [],
+      color_palette: enrichment.color_palette || [],
+      material: enrichment.material,
+      texture: enrichment.texture,
+      tone: enrichment.tone,
+      category: enrichment.category,
+      enriched_at: new Date().toISOString()
+    };
+
+    return res.status(200).json({
+      success: true,
+      product: enrichedProduct,
+      model_used: 'claude-via-edge-function',
+      _debug: {
+        aiSuccess: aiResponse.success,
+        aiError: aiResponse.error,
+        usedDefaults: !aiResponse.success || !aiResponse.text
+      }
+    });
+  } catch (error) {
+    log.error({ error, productName: product.name }, 'Enrichment failed');
+    return res.status(500).json({
+      error: 'Enrichment failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function handleCompose(body: ComposeRequest, res: VercelResponse) {
+  if (!body.productImages || body.productImages.length === 0) {
+    return res.status(400).json({ error: 'At least one product image is required' });
+  }
+
+  if (body.productImages.length > 10) {
+    return res.status(400).json({ error: 'Maximum 10 product images allowed' });
+  }
+
+  // Demo mode
+  if (DEMO_MODE) {
+    log.info({ productCount: body.productImages.length, demoMode: true }, 'Demo mode active');
+    return res.status(200).json({
+      success: true,
+      moodboard: {
+        imageUrl: null,
+        productCount: body.productImages.length,
+        arrangement: body.arrangement || 'balanced',
+        model: 'demo-mode',
+        latencyMs: 0,
+      },
+      _demo: true,
+      _note: 'Demo mode active. Set DEMO_MODE=false and configure OPENAI_API_KEY for real AI composition.',
+      _fallback: '/api/ai?action=layout',
+    });
+  }
+
+  // Check for OpenAI API key
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(200).json({
+      success: false,
+      error: 'OpenAI API key not configured',
+      _fallback: '/api/ai?action=layout',
+    });
+  }
+
+  log.info(
+    { productCount: body.productImages.length, arrangement: body.arrangement },
+    'Starting AI moodboard composition'
+  );
+
+  const imageGenerator = createImageGenerator();
+
+  const input: MoodboardCompositionInput = {
+    productImages: body.productImages.map((img) => ({
+      url: img.url,
+      base64: img.base64,
+    })),
+    style: body.style,
+    arrangement: body.arrangement,
+    canvasSize: body.canvasSize,
+    mood: body.style?.mood,
+  };
+
+  const result = await imageGenerator.composeMoodboard(input);
+
+  // Upload to storage
+  let publicUrl: string | undefined;
+  if (result.imageBase64) {
+    publicUrl = await uploadToStorage(
+      result.imageBase64,
+      `moodboards/${body.lookId || 'temp'}`,
+      `${Date.now()}.png`
+    );
+  }
+
+  log.info(
+    { productCount: body.productImages.length, latencyMs: result.latencyMs },
+    'Moodboard composition complete'
+  );
+
+  return res.status(200).json({
+    success: true,
+    moodboard: {
+      imageUrl: publicUrl || result.imageUrl,
+      imageBase64: result.imageBase64,
+      productCount: result.productCount,
+      arrangement: result.arrangement,
+      model: result.model,
+      latencyMs: result.latencyMs,
+      revisedPrompt: result.revisedPrompt,
+    },
+  });
+}
+
+async function handleTryOn(body: TryOnRequest, res: VercelResponse) {
+  // Validation
+  if (!body.baseImage || (!body.baseImage.url && !body.baseImage.base64)) {
+    return res.status(400).json({
+      error: 'Base image is required',
+      hint: 'Provide a person photo (for clothing) or room photo (for furniture)',
+    });
+  }
+
+  if (!body.productImages || body.productImages.length === 0) {
+    return res.status(400).json({ error: 'At least one product image is required' });
+  }
+
+  if (body.productImages.length > 5) {
+    return res.status(400).json({ error: 'Maximum 5 product images allowed per try-on' });
+  }
+
+  const validTypes: TryOnType[] = ['clothing', 'accessory', 'furniture', 'decor'];
+  if (!body.type || !validTypes.includes(body.type)) {
+    return res.status(400).json({
+      error: 'Invalid try-on type',
+      hint: 'Use one of: clothing, accessory, furniture, decor',
+    });
+  }
+
+  // Demo mode
+  if (DEMO_MODE) {
+    log.info({ type: body.type, productCount: body.productImages.length, demoMode: true }, 'Demo mode active');
+    return res.status(200).json({
+      success: true,
+      result: {
+        imageUrl: null,
+        type: body.type,
+        productCount: body.productImages.length,
+        model: 'demo-mode',
+        latencyMs: 0,
+      },
+      _demo: true,
+      _note: 'Demo mode active. Set DEMO_MODE=false and configure OPENAI_API_KEY for real virtual try-on.',
+    });
+  }
+
+  // Check for OpenAI API key
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({
+      success: false,
+      error: 'OpenAI API key not configured',
+    });
+  }
+
+  log.info(
+    { type: body.type, productCount: body.productImages.length },
+    'Starting virtual try-on'
+  );
+
+  const imageGenerator = createImageGenerator();
+
+  const input: VirtualTryOnInput = {
+    baseImage: {
+      url: body.baseImage.url,
+      base64: body.baseImage.base64,
+    },
+    productImages: body.productImages.map((img) => ({
+      url: img.url,
+      base64: img.base64,
+    })),
+    type: body.type,
+    preserveBackground: body.preserveBackground ?? true,
+  };
+
+  const result = await imageGenerator.virtualTryOn(input);
+
+  // Upload to storage
+  let publicUrl: string | undefined;
+  if (result.imageBase64) {
+    publicUrl = await uploadToStorage(result.imageBase64, `tryons/${body.type}`, `${Date.now()}.png`);
+  }
+
+  log.info(
+    { type: body.type, productCount: body.productImages.length, latencyMs: result.latencyMs },
+    'Virtual try-on complete'
+  );
+
+  return res.status(200).json({
+    success: true,
+    result: {
+      imageUrl: publicUrl || result.imageUrl,
+      imageBase64: result.imageBase64,
+      type: result.type,
+      productCount: result.productCount,
+      model: result.model,
+      latencyMs: result.latencyMs,
+      revisedPrompt: result.revisedPrompt,
+    },
+  });
+}
+
 function handleListLayouts(res: VercelResponse) {
   return res.status(200).json({
     layouts: [
@@ -457,13 +887,11 @@ function handleGenerateLayout(req: VercelRequest, res: VercelResponse) {
 
   const positions = generator(products, canvas_width, canvas_height);
 
-  const result: LayoutResult = {
+  return res.status(200).json({
     layout_type,
     canvas_size: { width: canvas_width, height: canvas_height },
     products: positions
-  };
-
-  return res.status(200).json(result);
+  });
 }
 
 async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
@@ -533,13 +961,14 @@ async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
 // ============================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Apply CORS, rate limiting, and security headers
   const handled = applyMiddleware(req, res);
   if (handled) return;
 
   const action = req.query.action as string;
 
-  // GET request without action - list layouts
-  if (req.method === 'GET' && !action) {
+  // GET request for layout list
+  if (req.method === 'GET' && action === 'layouts') {
     return handleListLayouts(res);
   }
 
@@ -547,15 +976,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  switch (action) {
-    case 'generate':
-      return handleGenerateLayout(req, res);
+  try {
+    switch (action) {
+      case 'enrich':
+        return handleEnrich(req, res);
 
-    case 'labels':
-      return handleSmartLabels(req, res);
+      case 'compose':
+        return handleCompose(req.body as ComposeRequest, res);
 
-    default:
-      // Default to generate for backwards compatibility
-      return handleGenerateLayout(req, res);
+      case 'tryon':
+        return handleTryOn(req.body as TryOnRequest, res);
+
+      case 'layout':
+        return handleGenerateLayout(req, res);
+
+      case 'labels':
+        return handleSmartLabels(req, res);
+
+      default:
+        return res.status(400).json({
+          error: 'Invalid action',
+          hint: 'Use ?action=enrich|compose|tryon|layouts|layout|labels',
+          examples: {
+            enrich: 'POST /api/ai?action=enrich',
+            compose: 'POST /api/ai?action=compose',
+            tryon: 'POST /api/ai?action=tryon',
+            layouts: 'GET /api/ai?action=layouts',
+            layout: 'POST /api/ai?action=layout',
+            labels: 'POST /api/ai?action=labels',
+          },
+        });
+    }
+  } catch (error) {
+    log.error({ error, action }, 'AI operation failed');
+    return res.status(500).json({
+      error: 'Operation failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }

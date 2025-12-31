@@ -1,14 +1,16 @@
 /**
  * Image Generation SDK for Mood Layer
  *
- * Uses OpenAI GPT-image-1.5 for:
+ * Uses OpenAI GPT-image-1 (primary) with Gemini fallback for:
  * - AI-powered moodboard composition (replacing algorithmic layouts)
- * - Virtual try-on for clothing and furniture
  * - Product background removal
  * - Custom background generation
+ *
+ * Virtual try-on uses Gemini (primary) with OpenAI fallback for better results
  */
 
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import { createModuleLogger, logApiCall } from '../shared/logger';
 import { ExternalServiceError, ConfigurationError, ValidationError } from '../shared/errors';
@@ -105,27 +107,49 @@ The background should complement products placed on it without distraction.`;
 // ============================================================================
 
 export class ImageGenerator {
-  private openai: OpenAI;
+  private openai: OpenAI | null;
+  private gemini: GoogleGenerativeAI | null;
   private defaultSize: ImageSize;
   private defaultQuality: ImageQuality;
+  private geminiModel: string;
 
   constructor(config: ImageGenerationConfig) {
-    const apiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
+    const openaiApiKey = config.openaiApiKey || process.env.OPENAI_API_KEY;
+    const geminiApiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
+    // Initialize OpenAI if available
+    if (openaiApiKey) {
+      this.openai = new OpenAI({ apiKey: openaiApiKey });
+    } else {
+      this.openai = null;
+      logger.warn('OpenAI API key not provided - OpenAI image gen disabled');
+    }
+
+    // Initialize Gemini if available
+    if (geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(geminiApiKey);
+    } else {
+      this.gemini = null;
+      logger.warn('Gemini API key not provided - Gemini image gen disabled');
+    }
+
+    // Ensure at least one provider is available
+    if (!this.openai && !this.gemini) {
       throw new ConfigurationError(
-        'OpenAI API key is required for image generation. Set OPENAI_API_KEY environment variable.'
+        'At least one AI provider (OpenAI or Gemini) must be configured for image generation.'
       );
     }
 
-    this.openai = new OpenAI({ apiKey });
     this.defaultSize = config.defaultSize || '1024x1024';
     this.defaultQuality = config.defaultQuality || 'high';
+    this.geminiModel = config.geminiModel || process.env.GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-exp';
 
     logger.info(
       {
         defaultSize: this.defaultSize,
         defaultQuality: this.defaultQuality,
+        hasOpenAI: !!this.openai,
+        hasGemini: !!this.gemini,
       },
       'Image generator initialized'
     );
@@ -133,7 +157,7 @@ export class ImageGenerator {
 
   /**
    * Compose a moodboard from multiple product images using AI
-   * This replaces the algorithmic layout system with intelligent composition
+   * OpenAI primary, Gemini fallback
    */
   async composeMoodboard(input: MoodboardCompositionInput): Promise<MoodboardCompositionResponse> {
     const startTime = Date.now();
@@ -146,55 +170,118 @@ export class ImageGenerator {
       throw new ValidationError('Maximum 10 product images allowed per moodboard');
     }
 
+    // Build the prompt
+    const prompt = MOODBOARD_COMPOSITION_PROMPT
+      .replace('{arrangement}', input.arrangement || 'balanced')
+      .replace('{style}', input.style?.aesthetic || 'modern, minimalist')
+      .replace('{mood}', input.mood || 'sophisticated and curated');
+
+    logger.info(
+      { productCount: input.productImages.length, arrangement: input.arrangement },
+      'Composing moodboard with AI'
+    );
+
+    // Try OpenAI first if available
+    if (this.openai) {
+      try {
+        const imageFiles = await this.prepareImages(input.productImages);
+
+        const response = await this.openai.images.edit({
+          model: 'gpt-image-1',
+          image: imageFiles,
+          prompt,
+          size: input.canvasSize || this.defaultSize,
+        });
+
+        const latencyMs = Date.now() - startTime;
+        logApiCall(logger, 'openai', 'images.edit', startTime, true, {
+          productCount: input.productImages.length,
+        });
+
+        const imageData = response.data?.[0];
+        return {
+          imageBase64: imageData?.b64_json,
+          imageUrl: imageData?.url,
+          revisedPrompt: imageData?.revised_prompt,
+          model: 'gpt-image-1',
+          latencyMs,
+          productCount: input.productImages.length,
+          arrangement: input.arrangement || 'balanced',
+        };
+      } catch (openaiError: any) {
+        logger.warn({ error: openaiError.message }, 'OpenAI moodboard failed, trying Gemini fallback');
+        logApiCall(logger, 'openai', 'images.edit', startTime, false, {
+          error: openaiError.message,
+        });
+      }
+    }
+
+    // Gemini fallback
+    if (this.gemini) {
+      return await this.composeMoodboardWithGemini(input, prompt, startTime);
+    }
+
+    throw new ExternalServiceError('Image Generation', 'All providers failed for moodboard composition');
+  }
+
+  /**
+   * Compose moodboard using Gemini (fallback)
+   */
+  private async composeMoodboardWithGemini(
+    input: MoodboardCompositionInput,
+    prompt: string,
+    startTime: number
+  ): Promise<MoodboardCompositionResponse> {
+    if (!this.gemini) {
+      throw new ConfigurationError('Gemini not configured');
+    }
+
     try {
-      // Convert images to format OpenAI expects
-      const imageFiles = await this.prepareImages(input.productImages);
+      const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
 
-      // Build the prompt
-      const prompt = MOODBOARD_COMPOSITION_PROMPT
-        .replace('{arrangement}', input.arrangement || 'balanced')
-        .replace('{style}', input.style?.aesthetic || 'modern, minimalist')
-        .replace('{mood}', input.mood || 'sophisticated and curated');
+      // Prepare images as inline data for Gemini
+      const imageParts = await this.prepareImagesForGemini(input.productImages);
 
-      logger.info(
-        { productCount: input.productImages.length, arrangement: input.arrangement },
-        'Composing moodboard with AI'
-      );
-
-      // Call OpenAI image edit API
-      const response = await this.openai.images.edit({
-        model: 'gpt-image-1',
-        image: imageFiles,
+      const result = await model.generateContent([
         prompt,
-        size: input.canvasSize || this.defaultSize,
-      });
+        ...imageParts,
+      ]);
 
+      const response = await result.response;
       const latencyMs = Date.now() - startTime;
-      logApiCall(logger, 'openai', 'images.edit', startTime, true, {
+
+      logApiCall(logger, 'gemini', 'generateContent', startTime, true, {
         productCount: input.productImages.length,
       });
 
-      const imageData = response.data?.[0];
-      return {
-        imageBase64: imageData?.b64_json,
-        imageUrl: imageData?.url,
-        revisedPrompt: imageData?.revised_prompt,
-        model: 'gpt-image-1',
-        latencyMs,
-        productCount: input.productImages.length,
-        arrangement: input.arrangement || 'balanced',
-      };
+      // Extract image from Gemini response
+      const candidates = response.candidates;
+      if (candidates && candidates[0]?.content?.parts) {
+        for (const part of candidates[0].content.parts) {
+          if ('inlineData' in part && part.inlineData) {
+            return {
+              imageBase64: part.inlineData.data,
+              model: this.geminiModel,
+              latencyMs,
+              productCount: input.productImages.length,
+              arrangement: input.arrangement || 'balanced',
+            };
+          }
+        }
+      }
+
+      throw new Error('Gemini did not return an image');
     } catch (error: any) {
-      logApiCall(logger, 'openai', 'images.edit', startTime, false, {
+      logApiCall(logger, 'gemini', 'generateContent', startTime, false, {
         error: error.message,
       });
-      throw new ExternalServiceError('OpenAI Image Generation', error.message, error);
+      throw new ExternalServiceError('Gemini Image Generation', error.message, error);
     }
   }
 
   /**
    * Virtual try-on for clothing or furniture
-   * Supports both person + clothing and room + furniture
+   * Gemini primary, OpenAI fallback (Gemini has better try-on results)
    */
   async virtualTryOn(input: VirtualTryOnInput): Promise<VirtualTryOnResponse> {
     const startTime = Date.now();
@@ -203,87 +290,193 @@ export class ImageGenerator {
       throw new ValidationError('At least one product image is required');
     }
 
-    try {
-      // Prepare all images (base + products)
-      const allImages = [input.baseImage, ...input.productImages];
-      const imageFiles = await this.prepareImages(allImages);
+    // Select appropriate prompt based on type
+    const prompt = this.getTryOnPrompt(input.type);
 
-      // Select appropriate prompt based on type
-      const prompt = this.getTryOnPrompt(input.type);
+    logger.info(
+      { type: input.type, productCount: input.productImages.length },
+      'Starting virtual try-on'
+    );
 
-      logger.info(
-        { type: input.type, productCount: input.productImages.length },
-        'Starting virtual try-on'
-      );
-
-      // Call OpenAI image edit API
-      const response = await this.openai.images.edit({
-        model: 'gpt-image-1',
-        image: imageFiles,
-        prompt,
-        size: this.defaultSize,
-      });
-
-      const latencyMs = Date.now() - startTime;
-      logApiCall(logger, 'openai', 'images.edit', startTime, true, {
-        type: input.type,
-        productCount: input.productImages.length,
-      });
-
-      const imageData = response.data?.[0];
-      return {
-        imageBase64: imageData?.b64_json,
-        imageUrl: imageData?.url,
-        revisedPrompt: imageData?.revised_prompt,
-        model: 'gpt-image-1',
-        latencyMs,
-        type: input.type,
-        productCount: input.productImages.length,
-      };
-    } catch (error: any) {
-      logApiCall(logger, 'openai', 'images.edit', startTime, false, {
-        error: error.message,
-      });
-      throw new ExternalServiceError('OpenAI Image Generation', error.message, error);
+    // Try Gemini first for try-on (primary)
+    if (this.gemini) {
+      try {
+        return await this.virtualTryOnWithGemini(input, prompt, startTime);
+      } catch (geminiError: any) {
+        logger.warn({ error: geminiError.message }, 'Gemini try-on failed, trying OpenAI fallback');
+        logApiCall(logger, 'gemini', 'generateContent', startTime, false, {
+          error: geminiError.message,
+        });
+      }
     }
+
+    // OpenAI fallback for try-on
+    if (this.openai) {
+      try {
+        const allImages = [input.baseImage, ...input.productImages];
+        const imageFiles = await this.prepareImages(allImages);
+
+        const response = await this.openai.images.edit({
+          model: 'gpt-image-1',
+          image: imageFiles,
+          prompt,
+          size: this.defaultSize,
+        });
+
+        const latencyMs = Date.now() - startTime;
+        logApiCall(logger, 'openai', 'images.edit', startTime, true, {
+          type: input.type,
+          productCount: input.productImages.length,
+        });
+
+        const imageData = response.data?.[0];
+        return {
+          imageBase64: imageData?.b64_json,
+          imageUrl: imageData?.url,
+          revisedPrompt: imageData?.revised_prompt,
+          model: 'gpt-image-1 (fallback)',
+          latencyMs,
+          type: input.type,
+          productCount: input.productImages.length,
+        };
+      } catch (openaiError: any) {
+        logApiCall(logger, 'openai', 'images.edit', startTime, false, {
+          error: openaiError.message,
+        });
+      }
+    }
+
+    throw new ExternalServiceError('Virtual Try-On', 'All providers failed for virtual try-on');
+  }
+
+  /**
+   * Virtual try-on using Gemini (primary)
+   */
+  private async virtualTryOnWithGemini(
+    input: VirtualTryOnInput,
+    prompt: string,
+    startTime: number
+  ): Promise<VirtualTryOnResponse> {
+    if (!this.gemini) {
+      throw new ConfigurationError('Gemini not configured');
+    }
+
+    const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
+
+    // Prepare all images (base + products) for Gemini
+    const allImages = [input.baseImage, ...input.productImages];
+    const imageParts = await this.prepareImagesForGemini(allImages);
+
+    const result = await model.generateContent([
+      prompt,
+      ...imageParts,
+    ]);
+
+    const response = await result.response;
+    const latencyMs = Date.now() - startTime;
+
+    logApiCall(logger, 'gemini', 'generateContent', startTime, true, {
+      type: input.type,
+      productCount: input.productImages.length,
+    });
+
+    // Extract image from Gemini response
+    const candidates = response.candidates;
+    if (candidates && candidates[0]?.content?.parts) {
+      for (const part of candidates[0].content.parts) {
+        if ('inlineData' in part && part.inlineData) {
+          return {
+            imageBase64: part.inlineData.data,
+            model: this.geminiModel,
+            latencyMs,
+            type: input.type,
+            productCount: input.productImages.length,
+          };
+        }
+      }
+    }
+
+    throw new Error('Gemini did not return an image for try-on');
   }
 
   /**
    * Extract product from background (create transparent PNG)
+   * OpenAI primary, Gemini fallback
    */
   async extractProduct(image: ImageInput): Promise<ImageGenerationResponse> {
     const startTime = Date.now();
 
-    try {
-      const imageFiles = await this.prepareImages([image]);
+    // Try OpenAI first
+    if (this.openai) {
+      try {
+        const imageFiles = await this.prepareImages([image]);
 
-      const response = await this.openai.images.edit({
-        model: 'gpt-image-1',
-        image: imageFiles,
-        prompt: PRODUCT_EXTRACTION_PROMPT,
-        size: this.defaultSize,
-      });
+        const response = await this.openai.images.edit({
+          model: 'gpt-image-1',
+          image: imageFiles,
+          prompt: PRODUCT_EXTRACTION_PROMPT,
+          size: this.defaultSize,
+        });
 
-      const latencyMs = Date.now() - startTime;
-      logApiCall(logger, 'openai', 'images.edit', startTime, true);
+        const latencyMs = Date.now() - startTime;
+        logApiCall(logger, 'openai', 'images.edit', startTime, true);
 
-      const imageData = response.data?.[0];
-      return {
-        imageBase64: imageData?.b64_json,
-        imageUrl: imageData?.url,
-        model: 'gpt-image-1',
-        latencyMs,
-      };
-    } catch (error: any) {
-      logApiCall(logger, 'openai', 'images.edit', startTime, false, {
-        error: error.message,
-      });
-      throw new ExternalServiceError('OpenAI Image Generation', error.message, error);
+        const imageData = response.data?.[0];
+        return {
+          imageBase64: imageData?.b64_json,
+          imageUrl: imageData?.url,
+          model: 'gpt-image-1',
+          latencyMs,
+        };
+      } catch (openaiError: any) {
+        logger.warn({ error: openaiError.message }, 'OpenAI extractProduct failed, trying Gemini');
+        logApiCall(logger, 'openai', 'images.edit', startTime, false, {
+          error: openaiError.message,
+        });
+      }
     }
+
+    // Gemini fallback
+    if (this.gemini) {
+      try {
+        const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
+        const imageParts = await this.prepareImagesForGemini([image]);
+
+        const result = await model.generateContent([
+          PRODUCT_EXTRACTION_PROMPT,
+          ...imageParts,
+        ]);
+
+        const response = await result.response;
+        const latencyMs = Date.now() - startTime;
+        logApiCall(logger, 'gemini', 'generateContent', startTime, true);
+
+        const candidates = response.candidates;
+        if (candidates && candidates[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if ('inlineData' in part && part.inlineData) {
+              return {
+                imageBase64: part.inlineData.data,
+                model: this.geminiModel,
+                latencyMs,
+              };
+            }
+          }
+        }
+        throw new Error('Gemini did not return an image');
+      } catch (geminiError: any) {
+        logApiCall(logger, 'gemini', 'generateContent', startTime, false, {
+          error: geminiError.message,
+        });
+      }
+    }
+
+    throw new ExternalServiceError('Product Extraction', 'All providers failed');
   }
 
   /**
    * Generate a custom background for moodboards
+   * OpenAI primary, Gemini fallback
    */
   async generateBackground(
     theme: string,
@@ -292,37 +485,73 @@ export class ImageGenerator {
   ): Promise<ImageGenerationResponse> {
     const startTime = Date.now();
 
-    try {
-      const prompt = BACKGROUND_GENERATION_PROMPT
-        .replace('{theme}', theme)
-        .replace('{colors}', colors.join(', '))
-        .replace('{mood}', mood);
+    const prompt = BACKGROUND_GENERATION_PROMPT
+      .replace('{theme}', theme)
+      .replace('{colors}', colors.join(', '))
+      .replace('{mood}', mood);
 
-      const response = await this.openai.images.generate({
-        model: 'gpt-image-1',
-        prompt,
-        size: this.defaultSize,
-        quality: this.defaultQuality,
-        n: 1,
-      });
+    // Try OpenAI first
+    if (this.openai) {
+      try {
+        const response = await this.openai.images.generate({
+          model: 'gpt-image-1',
+          prompt,
+          size: this.defaultSize,
+          quality: this.defaultQuality,
+          n: 1,
+        });
 
-      const latencyMs = Date.now() - startTime;
-      logApiCall(logger, 'openai', 'images.generate', startTime, true);
+        const latencyMs = Date.now() - startTime;
+        logApiCall(logger, 'openai', 'images.generate', startTime, true);
 
-      const imageData = response.data?.[0];
-      return {
-        imageBase64: imageData?.b64_json,
-        imageUrl: imageData?.url,
-        revisedPrompt: imageData?.revised_prompt,
-        model: 'gpt-image-1',
-        latencyMs,
-      };
-    } catch (error: any) {
-      logApiCall(logger, 'openai', 'images.generate', startTime, false, {
-        error: error.message,
-      });
-      throw new ExternalServiceError('OpenAI Image Generation', error.message, error);
+        const imageData = response.data?.[0];
+        return {
+          imageBase64: imageData?.b64_json,
+          imageUrl: imageData?.url,
+          revisedPrompt: imageData?.revised_prompt,
+          model: 'gpt-image-1',
+          latencyMs,
+        };
+      } catch (openaiError: any) {
+        logger.warn({ error: openaiError.message }, 'OpenAI background gen failed, trying Gemini');
+        logApiCall(logger, 'openai', 'images.generate', startTime, false, {
+          error: openaiError.message,
+        });
+      }
     }
+
+    // Gemini fallback
+    if (this.gemini) {
+      try {
+        const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const latencyMs = Date.now() - startTime;
+
+        logApiCall(logger, 'gemini', 'generateContent', startTime, true);
+
+        const candidates = response.candidates;
+        if (candidates && candidates[0]?.content?.parts) {
+          for (const part of candidates[0].content.parts) {
+            if ('inlineData' in part && part.inlineData) {
+              return {
+                imageBase64: part.inlineData.data,
+                model: this.geminiModel,
+                latencyMs,
+              };
+            }
+          }
+        }
+        throw new Error('Gemini did not return an image');
+      } catch (geminiError: any) {
+        logApiCall(logger, 'gemini', 'generateContent', startTime, false, {
+          error: geminiError.message,
+        });
+      }
+    }
+
+    throw new ExternalServiceError('Background Generation', 'All providers failed');
   }
 
   /**
@@ -378,6 +607,55 @@ export class ImageGenerator {
 
     return prepared;
   }
+
+  /**
+   * Helper: Convert ImageInput[] to format Gemini expects
+   * Gemini uses inline data with base64 and mimeType
+   */
+  private async prepareImagesForGemini(images: ImageInput[]): Promise<any[]> {
+    const parts: any[] = [];
+
+    for (const image of images) {
+      let base64Data: string;
+      let mimeType = image.mimeType || 'image/jpeg';
+
+      if (image.buffer) {
+        base64Data = image.buffer.toString('base64');
+      } else if (image.base64) {
+        base64Data = image.base64;
+      } else if (image.url) {
+        try {
+          const response = await axios.get(image.url, {
+            responseType: 'arraybuffer',
+            timeout: 10000,
+          });
+          base64Data = Buffer.from(response.data).toString('base64');
+          // Try to detect mime type from URL or response
+          const contentType = response.headers['content-type'];
+          if (contentType) {
+            mimeType = contentType.split(';')[0] as any;
+          }
+        } catch (error: any) {
+          throw new ExternalServiceError(
+            'Image Fetch',
+            `Failed to fetch image from URL: ${image.url}`,
+            error
+          );
+        }
+      } else {
+        throw new ValidationError('Image must have url, base64, or buffer');
+      }
+
+      parts.push({
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
+      });
+    }
+
+    return parts;
+  }
 }
 
 // ============================================================================
@@ -390,7 +668,9 @@ export class ImageGenerator {
 export function createImageGenerator(config?: Partial<ImageGenerationConfig>): ImageGenerator {
   return new ImageGenerator({
     openaiApiKey: config?.openaiApiKey || process.env.OPENAI_API_KEY,
+    geminiApiKey: config?.geminiApiKey || process.env.GEMINI_API_KEY,
     defaultSize: config?.defaultSize,
     defaultQuality: config?.defaultQuality,
+    geminiModel: config?.geminiModel,
   });
 }

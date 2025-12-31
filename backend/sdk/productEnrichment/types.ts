@@ -121,8 +121,10 @@ export interface ValidationResult {
 }
 
 export interface EnrichmentConfig {
-  anthropicApiKey: string;
+  anthropicApiKey?: string;  // Optional - Claude primary provider
+  geminiApiKey?: string;     // Optional - Gemini fallback provider
   supabaseUrl: string;
   supabaseKey: string;
-  model?: string;
+  model?: string;            // Claude model (default: claude-opus-4-5-20251101)
+  geminiModel?: string;      // Gemini model (default: gemini-2.5-flash)
 }

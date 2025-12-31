@@ -1,9 +1,10 @@
 /**
  * Product Enrichment Module
- * Enriches raw product data using Claude AI
+ * Enriches raw product data using Claude AI (primary) with Gemini fallback
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   RawProductInput,
@@ -24,14 +25,36 @@ import {
 } from '../taxonomy';
 
 export class ProductEnrichmentEngine {
-  private anthropic: Anthropic;
+  private anthropic: Anthropic | null;
+  private gemini: GoogleGenerativeAI | null;
   private supabase: SupabaseClient;
   private model: string;
+  private geminiModel: string;
 
   constructor(config: EnrichmentConfig) {
-    this.anthropic = new Anthropic({
-      apiKey: config.anthropicApiKey
-    });
+    // Initialize Anthropic if API key available
+    if (config.anthropicApiKey) {
+      this.anthropic = new Anthropic({
+        apiKey: config.anthropicApiKey
+      });
+    } else {
+      this.anthropic = null;
+      console.warn('Anthropic API key not provided - Claude enrichment disabled');
+    }
+
+    // Initialize Gemini as fallback
+    const geminiApiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(geminiApiKey);
+    } else {
+      this.gemini = null;
+      console.warn('Gemini API key not provided - Gemini fallback disabled');
+    }
+
+    // Ensure at least one provider is available
+    if (!this.anthropic && !this.gemini) {
+      throw new Error('At least one AI provider (Anthropic or Gemini) must be configured');
+    }
 
     this.supabase = createClient(
       config.supabaseUrl,
@@ -39,6 +62,7 @@ export class ProductEnrichmentEngine {
     );
 
     this.model = config.model || process.env.ENRICHMENT_MODEL || 'claude-opus-4-5-20251101';
+    this.geminiModel = config.geminiModel || process.env.GEMINI_ENRICHMENT_MODEL || 'gemini-2.5-flash';
   }
 
   /**
@@ -122,38 +146,78 @@ export class ProductEnrichmentEngine {
   }
 
   /**
-   * Calls Claude API to enrich product data
+   * Calls AI API to enrich product data (Claude primary, Gemini fallback)
    * @param product - Sanitized raw product
-   * @returns Enriched fields from Claude
+   * @returns Enriched fields from AI
    */
   private async callClaudeForEnrichment(
     product: RawProductInput
   ): Promise<ClaudeEnrichmentResponse> {
     const prompt = this.buildEnrichmentPrompt(product);
 
-    const message = await this.anthropic.messages.create({
-      model: this.model,
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    });
+    // Try Claude first if available
+    if (this.anthropic) {
+      try {
+        const message = await this.anthropic.messages.create({
+          model: this.model,
+          max_tokens: 1024,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        });
 
-    // Extract text from Claude response
-    const responseText = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => ('text' in block ? block.text : ''))
-      .join('');
+        // Extract text from Claude response
+        const responseText = message.content
+          .filter((block) => block.type === 'text')
+          .map((block) => ('text' in block ? block.text : ''))
+          .join('');
 
-    // Parse JSON response
+        // Parse JSON response
+        const enriched = JSON.parse(responseText);
+        console.log('Product enrichment completed using Claude');
+        return enriched as ClaudeEnrichmentResponse;
+      } catch (claudeError) {
+        console.warn('Claude enrichment failed, attempting Gemini fallback:', claudeError);
+        // Fall through to Gemini fallback
+      }
+    }
+
+    // Gemini fallback
+    if (this.gemini) {
+      return await this.callGeminiForEnrichment(prompt);
+    }
+
+    throw new Error('All AI providers failed for product enrichment');
+  }
+
+  /**
+   * Calls Gemini API for enrichment (fallback)
+   * @param prompt - The enrichment prompt
+   * @returns Enriched fields from Gemini
+   */
+  private async callGeminiForEnrichment(prompt: string): Promise<ClaudeEnrichmentResponse> {
+    if (!this.gemini) {
+      throw new Error('Gemini not configured');
+    }
+
+    const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let responseText = response.text();
+
+    // Clean up response - Gemini sometimes wraps in markdown code blocks
+    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
     try {
       const enriched = JSON.parse(responseText);
+      console.log('Product enrichment completed using Gemini (fallback)');
       return enriched as ClaudeEnrichmentResponse;
     } catch (error) {
-      throw new Error(`Failed to parse Claude response: ${responseText}`);
+      throw new Error(`Failed to parse Gemini response: ${responseText}`);
     }
   }
 

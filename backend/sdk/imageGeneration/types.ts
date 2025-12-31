@@ -10,9 +10,11 @@ import { z } from 'zod';
 // ============================================================================
 
 export interface ImageGenerationConfig {
-  openaiApiKey?: string;
+  openaiApiKey?: string;           // OpenAI for general image gen (primary)
+  geminiApiKey?: string;           // Gemini for virtual try-on (primary) and general fallback
   defaultSize?: ImageSize;
   defaultQuality?: ImageQuality;
+  geminiModel?: string;            // Default: imagen-3.0-generate-001
 }
 
 export type ImageSize = '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
