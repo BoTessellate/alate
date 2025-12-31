@@ -1,0 +1,43 @@
+{
+  "products": [
+    {
+      "id": "test-product-1",
+      "product_name": "Modern Minimalist Chair",
+      "brand": "Nordic Design",
+      "image_url": "https://via.placeholder.com/200",
+      "price": 299.99,
+      "currency": "USD",
+      "tags": ["modern", "minimalist", "furniture"]
+    },
+    {
+      "id": "test-product-2",
+      "product_name": "Vintage Leather Bag",
+      "brand": "Heritage Goods",
+      "image_url": "https://via.placeholder.com/200",
+      "price": 189.00,
+      "currency": "USD",
+      "tags": ["vintage", "leather", "accessories"]
+    },
+    {
+      "id": "test-product-3",
+      "product_name": "Natural Wood Table",
+      "brand": "Artisan Workshop",
+      "image_url": "https://via.placeholder.com/200",
+      "price": 549.00,
+      "currency": "USD",
+      "tags": ["natural", "wood", "furniture"]
+    }
+  ],
+  "popularTags": [
+    "modern",
+    "vintage",
+    "natural",
+    "elegant",
+    "rustic",
+    "cozy",
+    "minimal",
+    "bold",
+    "neutral",
+    "colorful"
+  ]
+}
