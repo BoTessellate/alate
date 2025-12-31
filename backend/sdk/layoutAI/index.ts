@@ -25,6 +25,9 @@ export * from './generateSmartLabels';
 export * from './visionScoreClient';
 export * from './scoreLayout';
 
+// Aesthetic feedback loop
+export * from './aestheticFeedback';
+
 // Vision AI product analyzer
 export * from './visionAnalyzer';
 

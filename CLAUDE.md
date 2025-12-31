@@ -39,7 +39,7 @@ stel/
 │   └── sdk/                  # Modular SDK (20 modules)
 │       ├── productEnrichment/  # Claude AI tagging
 │       ├── searchEngine/       # Product discovery
-│       ├── layoutGenerator/    # 8 layout archetypes
+│       ├── layoutGenerator/    # 4 layout archetypes (Minimal, Hero, Dynamic, Collage)
 │       ├── layoutAI/           # Smart label placement
 │       ├── imageGeneration/    # OpenAI/Gemini image gen
 │       ├── exportEngine/       # PNG/JPG export
@@ -89,7 +89,7 @@ stel/
 ┌─────────────────────────────────────────────────────────────┐
 │              MOODBOARD COMPOSITION                          │
 ├─────────────────────────────────────────────────────────────┤
-│  Layout Generation (8 archetypes)                           │
+│  Layout Generation (4 archetypes + Vision AI)               │
 │  Smart Label Placement (Vision AI)                          │
 │  Theme Token Extraction                                     │
 └────────────────────────┬────────────────────────────────────┘
@@ -246,11 +246,11 @@ throw new ConfigurationError('API key missing');
 ```css
 /* Primary palette */
 --primary: #4c7031;           /* TML Green */
---primary-light: #649341;     /* Lighter green */
---primary-dark: #3d5a27;      /* Darker green */
+--primary-light: #546c22;     /* Lighter green */
+--primary-dark: #3D522D;      /* Darker green - headings, bold typefaces */
 
 /* Neutral palette */
---cream: #4fefed;             /* Cyan/Turquoise accent */
+--cream: #F4EFED;             /* Light orange parchment */
 --charcoal: #222222;          /* Dark base */
 
 /* Semantic colors */
@@ -260,11 +260,28 @@ throw new ConfigurationError('API key missing');
 --info: #4a7c9b;              /* Blue */
 ```
 
-### Reserved Color Combo (Secondary - Analogous Greens)
+### Brand Logo Rules
+
+The TML logo consists of a **circle** and a **pill shape**. Color usage varies by mode:
+
+**Standard Mode:**
+| Mode | Circle | Pill |
+|------|--------|------|
+| Dark Mode | charcoal (#222222) | primary-light (#546c22) |
+| Light Mode | cream (#F4EFED) | primary-light (#546c22) |
+
+**AI Mode Toggle:**
+| Mode | Default State | Clicked/Active State |
+|------|---------------|---------------------|
+| Dark Mode | circle: cream, pill: primary-light | circle: primary-light, pill: cream |
+| Light Mode | circle: primary-dark, pill: cream | circle: cream, pill: primary-dark |
+
+**Typography:**
+- `--primary-dark` (#3D522D) is used for headings and bold typefaces
+
+### Reserved Color Combo (Secondary)
 When updating secondary color, consider this analogous palette:
-- **#4C7031** (primary)
-- **#317035** (deeper forest green)
-- **#6B7031** (olive/khaki green)
+-- **#546c22** (deeper forest green)
 
 Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 
@@ -277,7 +294,7 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 - [x] Core moodboard creation and editing
 - [x] Product enrichment with Claude AI
 - [x] Shopify integration (OAuth, sync, webhooks)
-- [x] 8 layout archetypes for moodboard generation
+- [x] 4 layout archetypes for moodboard generation (simplified from 8)
 - [x] Smart label placement with Vision AI
 - [x] Export to PNG/JPG/WebP
 - [x] User authentication (Supabase)
@@ -297,11 +314,11 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 
 ### Pending / Planned
 
-- [ ] Collaboration features (real-time editing)
+- [ ] Collaboration features (real-time editing) NOT PLANNED FOR NOW
 - [ ] Advanced search filters UI
-- [ ] Brand dashboard analytics
-- [ ] Subscription/payment integration
-- [ ] Pinterest-style discovery feed
+- [ ] Brand dashboard analytics NOT PLANNED FOR NOW
+- [ ] Subscription/payment integration NOT PLANNED FOR NOW
+- [ ] Pinterest-style discovery feed 
 - [ ] AR try-on for mobile
 - [ ] Performance optimization (lazy loading, caching)
 - [ ] Accessibility audit (WCAG compliance)
