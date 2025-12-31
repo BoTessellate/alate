@@ -8,7 +8,6 @@ import {
   ZoomOut,
   RotateCcw,
   Layers,
-  Image,
   Type,
   X,
   Heart,
@@ -16,18 +15,20 @@ import {
   LayoutGrid,
   Grid3X3,
   Sparkles,
-  ChevronDown,
   Trash2,
   Copy,
   ArrowDown,
   Wand2,
   Download,
+  ArrowLeft,
+  Palette,
 } from 'lucide-react';
-import { useLooksStore, parseSlugId, generateLookPath, CanvasItem } from '@/stores/useLooksStore';
+import { useLooksStore, parseSlugId, generateMoodboardPath, CanvasItem } from '@/stores/useLooksStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductImage } from '@/utils/placeholder';
 import CollectionInspiration from '@/components/CollectionInspiration';
 import type { CollectionMetadata } from '@/types';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -41,26 +42,32 @@ interface Product {
 
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
-export default function LookEditorPage() {
+export default function MoodboardEditorPage() {
   const params = useParams();
   const router = useRouter();
-  const slugId = params.id as string;
+  const moodboardSlug = params.collectionSlug as string;
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // Parse the slug-id from URL
-  const parsed = parseSlugId(slugId);
-  const lookId = parsed?.id || slugId;
+  const parsed = parseSlugId(moodboardSlug);
+  const moodboardId = parsed?.id || moodboardSlug;
 
-  // Get look data from store
-  const { getLookById, updateLook, updateLookItems, createLook, setSaveStatus } = useLooksStore();
-  const look = getLookById(lookId);
+  // Get moodboard data from store
+  const { getMoodboardById, updateMoodboard, updateMoodboardItems, setMoodboardBackground, setSaveStatus } = useLooksStore();
+  const moodboard = getMoodboardById(moodboardId);
 
-  const [lookName, setLookName] = useState('');
+  const [moodboardName, setMoodboardName] = useState('');
   const [items, setItems] = useState<CanvasItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState(1);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Drag-to-select state
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
+  const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 });
 
   // Product suggestions state
   const [products, setProducts] = useState<Product[]>([]);
@@ -83,6 +90,10 @@ export default function LookEditorPage() {
   // Collection inspiration filter state
   const [isCollectionFilterActive, setIsCollectionFilterActive] = useState(false);
 
+  // Background state
+  const [showBackgroundMenu, setShowBackgroundMenu] = useState(false);
+  const [backgroundIndex, setBackgroundIndex] = useState(0);
+
   // Available layout types
   const layoutTypes = [
     { type: 'ai', name: 'AI Compose', icon: Wand2, description: 'OpenAI visual moodboard', isAi: true },
@@ -92,34 +103,50 @@ export default function LookEditorPage() {
     { type: 'masonry', name: 'Masonry', icon: LayoutGrid, description: 'Pinterest-style columns' },
   ];
 
-  // Load look data from store
+  // Canvas background options
+  const backgroundOptions = [
+    { name: 'Cream', value: 'var(--surface)', preview: '#f6f1e7' },
+    { name: 'White', value: '#ffffff', preview: '#ffffff' },
+    { name: 'Charcoal', value: 'var(--charcoal)', preview: '#222222' },
+    { name: 'Sage', value: 'linear-gradient(135deg, #e8f0e4 0%, #d4e4cc 100%)', preview: '#d4e4cc' },
+    { name: 'Warm Beige', value: 'linear-gradient(135deg, #f5ebe0 0%, #e3d5ca 100%)', preview: '#e3d5ca' },
+    { name: 'Cool Gray', value: 'linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%)', preview: '#dee2e6' },
+    { name: 'Soft Pink', value: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%)', preview: '#f8bbd9' },
+    { name: 'Forest', value: 'linear-gradient(135deg, #2d4a3e 0%, #1a2f26 100%)', preview: '#2d4a3e' },
+  ];
+
   useEffect(() => {
-    if (look) {
-      setLookName(look.name);
-      setItems(look.items);
-    } else if (slugId === 'new') {
-      // Create a new look
-      const newLook = createLook('Untitled Look');
-      router.replace(`/looks/${generateLookPath(newLook.name, newLook.id)}`);
-    } else {
-      // Look not found, redirect to looks page
+    setIsHydrated(true);
+  }, []);
+
+  // Load moodboard data from store
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (moodboard) {
+      setMoodboardName(moodboard.name);
+      setItems(moodboard.items);
+      setBackgroundIndex(moodboard.backgroundIndex || 0);
+    } else if (!moodboard && isHydrated) {
+      // Moodboard not found, redirect to looks page
       router.push('/looks');
     }
-  }, [look, slugId, createLook, router]);
+  }, [moodboard, router, isHydrated]);
 
   // Auto-save with debounce
   const autoSave = useCallback(() => {
-    if (!look) return;
+    if (!moodboard) return;
 
     setSaveStatus('saving');
 
     // Update the store
-    updateLook(look.id, { name: lookName });
-    updateLookItems(look.id, items);
+    updateMoodboard(moodboard.id, { name: moodboardName });
+    updateMoodboardItems(moodboard.id, items);
+    setMoodboardBackground(moodboard.id, backgroundIndex);
 
     // Update URL if name changed
-    const newPath = generateLookPath(lookName, look.id);
-    const currentPath = slugId;
+    const newPath = generateMoodboardPath(moodboardName, moodboard.id);
+    const currentPath = moodboardSlug;
     if (newPath !== currentPath) {
       router.replace(`/looks/${newPath}`, { scroll: false });
     }
@@ -127,26 +154,27 @@ export default function LookEditorPage() {
     setTimeout(() => {
       setSaveStatus('saved');
     }, 500);
-  }, [look, lookName, items, updateLook, updateLookItems, router, slugId]);
+  }, [moodboard, moodboardName, items, backgroundIndex, updateMoodboard, updateMoodboardItems, setMoodboardBackground, router, moodboardSlug, setSaveStatus]);
 
   // Debounced auto-save on changes
   useEffect(() => {
-    if (!look) return;
+    if (!moodboard) return;
 
-    const hasChanges = lookName !== look.name || JSON.stringify(items) !== JSON.stringify(look.items);
+    const hasChanges = moodboardName !== moodboard.name ||
+      JSON.stringify(items) !== JSON.stringify(moodboard.items) ||
+      backgroundIndex !== moodboard.backgroundIndex;
 
     if (hasChanges) {
       setSaveStatus('unsaved');
       const timer = setTimeout(autoSave, 1000);
       return () => clearTimeout(timer);
     }
-  }, [lookName, items, look, autoSave]);
+  }, [moodboardName, items, backgroundIndex, moodboard, autoSave, setSaveStatus]);
 
   // Fetch products on mount
   const fetchProducts = async (query: string = '') => {
     setLoadingProducts(true);
     try {
-      // Use GET without query param to fetch all products, or with q param to search
       const url = query
         ? `${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}&limit=50`
         : `${API_BASE_URL}/api/search?limit=50`;
@@ -182,48 +210,24 @@ export default function LookEditorPage() {
     fetchProducts();
   }, []);
 
-  // Apply collection filters - search using aggregated metadata
+  // Apply collection filters
   const handleApplyCollectionFilters = async (metadata: CollectionMetadata) => {
     setIsCollectionFilterActive(true);
     setLoadingProducts(true);
 
     try {
-      // Build a search query from the collection metadata
       const searchTerms: string[] = [];
+      if (metadata.tags.length > 0) searchTerms.push(...metadata.tags.slice(0, 5));
+      if (metadata.categories.length > 0) searchTerms.push(...metadata.categories.slice(0, 3));
+      if (metadata.materials.length > 0) searchTerms.push(...metadata.materials.slice(0, 2));
+      if (metadata.textures.length > 0) searchTerms.push(...metadata.textures.slice(0, 2));
 
-      // Add tags (most important)
-      if (metadata.tags.length > 0) {
-        searchTerms.push(...metadata.tags.slice(0, 5));
-      }
-
-      // Add categories
-      if (metadata.categories.length > 0) {
-        searchTerms.push(...metadata.categories.slice(0, 3));
-      }
-
-      // Add materials
-      if (metadata.materials.length > 0) {
-        searchTerms.push(...metadata.materials.slice(0, 2));
-      }
-
-      // Add textures
-      if (metadata.textures.length > 0) {
-        searchTerms.push(...metadata.textures.slice(0, 2));
-      }
-
-      // Create a combined search prompt
       const searchPrompt = searchTerms.join(' ');
 
-      // Use POST endpoint for semantic search
       const response = await fetch(`${API_BASE_URL}/api/search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: searchPrompt || 'all products',
-          limit: 50,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: searchPrompt || 'all products', limit: 50 }),
       });
 
       if (response.ok) {
@@ -238,7 +242,6 @@ export default function LookEditorPage() {
     }
   };
 
-  // Clear collection filters
   const handleClearCollectionFilters = () => {
     setIsCollectionFilterActive(false);
     setActiveSearchQuery('');
@@ -298,40 +301,48 @@ export default function LookEditorPage() {
     setItems([...items, newItem]);
   };
 
-  const deleteSelectedItem = useCallback(() => {
-    if (selectedItem) {
-      setItems(items.filter((item) => item.id !== selectedItem));
-      setSelectedItem(null);
+  const deleteSelectedItems = useCallback(() => {
+    if (selectedItems.size > 0) {
+      setItems(items.filter((item) => !selectedItems.has(item.id)));
+      setSelectedItems(new Set());
     }
-  }, [selectedItem, items]);
+  }, [selectedItems, items]);
 
-  const duplicateSelectedItem = () => {
-    if (selectedItem) {
-      const item = items.find((i) => i.id === selectedItem);
-      if (item) {
-        const newItem: CanvasItem = {
-          ...item,
-          id: `item-${Date.now()}`,
-          x: item.x + 20,
-          y: item.y + 20,
-          zIndex: items.length,
-        };
-        setItems([...items, newItem]);
-        setSelectedItem(newItem.id);
-      }
+  const duplicateSelectedItems = () => {
+    if (selectedItems.size > 0) {
+      const newItems: CanvasItem[] = [];
+      let offset = 0;
+      items.forEach((item) => {
+        if (selectedItems.has(item.id)) {
+          offset += 20;
+          newItems.push({
+            ...item,
+            id: `item-${Date.now()}-${offset}`,
+            x: item.x + offset,
+            y: item.y + offset,
+            zIndex: items.length + newItems.length,
+          });
+        }
+      });
+      setItems([...items, ...newItems]);
+      setSelectedItems(new Set(newItems.map((i) => i.id)));
     }
   };
 
   const sendToBack = () => {
-    if (selectedItem) {
+    if (selectedItems.size > 0) {
       const minZ = Math.min(...items.map((i) => i.zIndex));
+      let zOffset = 0;
       setItems(
-        items.map((item) =>
-          item.id === selectedItem ? { ...item, zIndex: minZ - 1 } : item
-        )
+        items.map((item) => {
+          if (selectedItems.has(item.id)) {
+            zOffset++;
+            return { ...item, zIndex: minZ - zOffset };
+          }
+          return item;
+        })
       );
-      // Deselect so the z-index change is visible immediately
-      setSelectedItem(null);
+      setSelectedItems(new Set());
     }
   };
 
@@ -339,25 +350,51 @@ export default function LookEditorPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Don't delete if user is typing in an input
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
           return;
         }
         e.preventDefault();
-        deleteSelectedItem();
+        deleteSelectedItems();
       }
       if (e.key === 'Escape') {
-        setSelectedItem(null);
+        setSelectedItems(new Set());
+        setIsSelecting(false);
+      }
+      // Select all with Ctrl/Cmd + A
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+        e.preventDefault();
+        setSelectedItems(new Set(items.map((i) => i.id)));
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteSelectedItem]);
+  }, [deleteSelectedItems, items]);
 
-  const handleMouseDown = (e: React.MouseEvent, itemId: string) => {
+  const handleItemMouseDown = (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
-    setSelectedItem(itemId);
+
+    // If shift is held, add/remove from selection
+    if (e.shiftKey) {
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(itemId)) {
+          newSet.delete(itemId);
+        } else {
+          newSet.add(itemId);
+        }
+        return newSet;
+      });
+    } else {
+      // If clicking on an already selected item, keep the selection for dragging
+      if (!selectedItems.has(itemId)) {
+        setSelectedItems(new Set([itemId]));
+      }
+    }
+
     setDraggedItem(itemId);
 
     const item = items.find((i) => i.id === itemId);
@@ -370,22 +407,109 @@ export default function LookEditorPage() {
     }
   };
 
+  // Handle canvas mousedown for drag-to-select
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Only start selection if clicking on empty canvas area
+    if (e.target === canvasRef.current) {
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / zoom;
+      const y = (e.clientY - rect.top) / zoom;
+
+      setIsSelecting(true);
+      setSelectionStart({ x, y });
+      setSelectionEnd({ x, y });
+
+      // Clear selection unless shift is held
+      if (!e.shiftKey) {
+        setSelectedItems(new Set());
+      }
+    }
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggedItem && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / zoom - dragOffset.x;
-      const y = (e.clientY - rect.top) / zoom - dragOffset.y;
+    if (!canvasRef.current) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
+
+    // Handle drag-to-select
+    if (isSelecting) {
+      setSelectionEnd({ x, y });
+
+      // Calculate selection bounds
+      const selectionBounds = {
+        left: Math.min(selectionStart.x, x),
+        right: Math.max(selectionStart.x, x),
+        top: Math.min(selectionStart.y, y),
+        bottom: Math.max(selectionStart.y, y),
+      };
+
+      // Find items that intersect with selection rectangle
+      const newSelection = new Set<string>();
+      items.forEach((item) => {
+        const itemBounds = {
+          left: item.x,
+          right: item.x + item.width,
+          top: item.y,
+          bottom: item.y + item.height,
+        };
+
+        // Check if rectangles intersect
+        const intersects =
+          selectionBounds.left < itemBounds.right &&
+          selectionBounds.right > itemBounds.left &&
+          selectionBounds.top < itemBounds.bottom &&
+          selectionBounds.bottom > itemBounds.top;
+
+        if (intersects) {
+          newSelection.add(item.id);
+        }
+      });
+
+      setSelectedItems(newSelection);
+      return;
+    }
+
+    // Handle item dragging (move all selected items together)
+    if (draggedItem) {
+      const deltaX = x - dragOffset.x - (items.find((i) => i.id === draggedItem)?.x || 0);
+      const deltaY = y - dragOffset.y - (items.find((i) => i.id === draggedItem)?.y || 0);
 
       setItems(
-        items.map((item) =>
-          item.id === draggedItem ? { ...item, x, y } : item
-        )
+        items.map((item) => {
+          if (selectedItems.has(item.id)) {
+            return { ...item, x: item.x + deltaX, y: item.y + deltaY };
+          }
+          return item;
+        })
       );
+
+      // Update drag offset to prevent accumulating delta
+      const draggedItemData = items.find((i) => i.id === draggedItem);
+      if (draggedItemData) {
+        setDragOffset({
+          x: x - draggedItemData.x - deltaX,
+          y: y - draggedItemData.y - deltaY,
+        });
+      }
     }
   };
 
   const handleMouseUp = () => {
     setDraggedItem(null);
+    setIsSelecting(false);
+  };
+
+  // Get selection rectangle dimensions for rendering
+  const getSelectionRect = () => {
+    if (!isSelecting) return null;
+    return {
+      left: Math.min(selectionStart.x, selectionEnd.x),
+      top: Math.min(selectionStart.y, selectionEnd.y),
+      width: Math.abs(selectionEnd.x - selectionStart.x),
+      height: Math.abs(selectionEnd.y - selectionStart.y),
+    };
   };
 
   const normalizeText = (text: string): string => {
@@ -397,7 +521,7 @@ export default function LookEditorPage() {
       .join(' ');
   };
 
-  // AI Compose function - calls OpenAI to generate visual moodboard
+  // AI Compose function
   const handleAiCompose = async () => {
     if (items.length === 0) return;
 
@@ -406,7 +530,6 @@ export default function LookEditorPage() {
     setAiComposeError(null);
 
     try {
-      // Get image URLs from items
       const productImages = items
         .filter((item) => item.type === 'image' && item.src)
         .map((item) => ({ url: item.src! }));
@@ -417,14 +540,14 @@ export default function LookEditorPage() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/image-ai?action=compose`, {
+      const response = await fetch(`${API_BASE_URL}/api/ai?action=compose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productImages,
           arrangement: 'organic',
           canvasSize: '1024x1024',
-          lookId: lookId,
+          moodboardId: moodboardId,
           style: {
             aesthetic: 'modern moodboard',
             mood: 'curated',
@@ -457,7 +580,6 @@ export default function LookEditorPage() {
   const applyLayout = (layoutType: string) => {
     if (items.length === 0) return;
 
-    // Handle AI compose separately
     if (layoutType === 'ai') {
       handleAiCompose();
       return;
@@ -475,7 +597,6 @@ export default function LookEditorPage() {
 
     switch (layoutType) {
       case 'grid': {
-        // Clean grid layout
         const cols = count <= 2 ? count : count <= 4 ? 2 : count <= 6 ? 3 : 4;
         const rows = Math.ceil(count / cols);
         const cellWidth = (canvasWidth - padding * 2) / cols;
@@ -488,21 +609,12 @@ export default function LookEditorPage() {
           const x = padding + col * cellWidth + (cellWidth - itemSize) / 2;
           const y = padding + row * cellHeight + (cellHeight - itemSize) / 2;
 
-          return {
-            ...item,
-            x,
-            y,
-            width: itemSize,
-            height: itemSize,
-            rotation: 0,
-            zIndex: index,
-          };
+          return { ...item, x, y, width: itemSize, height: itemSize, rotation: 0, zIndex: index };
         });
         break;
       }
 
       case 'hero': {
-        // Hero layout - first item large in center, others smaller around
         if (count === 1) {
           updatedItems = [{
             ...items[0],
@@ -517,7 +629,6 @@ export default function LookEditorPage() {
           const heroSize = Math.min(350, canvasWidth * 0.45);
           const smallSize = Math.min(140, (canvasWidth - heroSize - padding * 3) / 2);
 
-          // Hero item centered
           updatedItems = [{
             ...items[0],
             x: (canvasWidth - heroSize) / 2,
@@ -528,14 +639,13 @@ export default function LookEditorPage() {
             zIndex: count,
           }];
 
-          // Position other items around the hero
           const positions = [
-            { x: padding, y: padding }, // top-left
-            { x: canvasWidth - smallSize - padding, y: padding }, // top-right
-            { x: padding, y: canvasHeight - smallSize - padding }, // bottom-left
-            { x: canvasWidth - smallSize - padding, y: canvasHeight - smallSize - padding }, // bottom-right
-            { x: padding, y: (canvasHeight - smallSize) / 2 }, // middle-left
-            { x: canvasWidth - smallSize - padding, y: (canvasHeight - smallSize) / 2 }, // middle-right
+            { x: padding, y: padding },
+            { x: canvasWidth - smallSize - padding, y: padding },
+            { x: padding, y: canvasHeight - smallSize - padding },
+            { x: canvasWidth - smallSize - padding, y: canvasHeight - smallSize - padding },
+            { x: padding, y: (canvasHeight - smallSize) / 2 },
+            { x: canvasWidth - smallSize - padding, y: (canvasHeight - smallSize) / 2 },
           ];
 
           for (let i = 1; i < count; i++) {
@@ -555,31 +665,24 @@ export default function LookEditorPage() {
       }
 
       case 'scattered': {
-        // Organic scattered layout with slight overlaps and rotations
-        // Size based on count - smaller items when more products
         const baseSize = count <= 3 ? 200 : count <= 5 ? 170 : count <= 7 ? 150 : 130;
-        const positions: { x: number; y: number; rotation: number; size: number }[] = [];
-
-        // Calculate usable area (accounting for item size)
         const usableWidth = canvasWidth - baseSize - padding * 2;
         const usableHeight = canvasHeight - baseSize - padding * 2;
 
-        // Generate positions using a spiral-like distribution for better space usage
+        const positions: { x: number; y: number; rotation: number; size: number }[] = [];
+
         for (let i = 0; i < count; i++) {
-          const sizeVariation = 0.85 + Math.random() * 0.3; // 85% to 115%
+          const sizeVariation = 0.85 + Math.random() * 0.3;
           const size = baseSize * sizeVariation;
-          const rotation = (Math.random() - 0.5) * 14; // -7 to +7 degrees
+          const rotation = (Math.random() - 0.5) * 14;
 
-          // Use golden angle distribution for organic but space-efficient placement
-          const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~137.5 degrees
+          const goldenAngle = Math.PI * (3 - Math.sqrt(5));
           const angle = i * goldenAngle;
-          const radius = 0.3 + (i / count) * 0.5; // Expand outward
+          const radius = 0.3 + (i / count) * 0.5;
 
-          // Convert polar to cartesian, centered on canvas
           let x = padding + usableWidth / 2 + Math.cos(angle) * radius * usableWidth / 2;
           let y = padding + usableHeight / 2 + Math.sin(angle) * radius * usableHeight / 2;
 
-          // Add small jitter for organic feel
           const jitterX = (Math.random() - 0.5) * 40;
           const jitterY = (Math.random() - 0.5) * 40;
           x = Math.max(padding, Math.min(canvasWidth - size - padding, x + jitterX));
@@ -601,18 +704,16 @@ export default function LookEditorPage() {
       }
 
       case 'masonry': {
-        // Pinterest-style masonry columns
         const cols = count <= 2 ? 2 : count <= 4 ? 2 : 3;
         const gap = 12;
         const colWidth = (canvasWidth - padding * 2 - gap * (cols - 1)) / cols;
         const columnHeights = new Array(cols).fill(padding);
 
-        // First pass: calculate positions with varied heights
         const tempPositions: { x: number; y: number; width: number; height: number }[] = [];
 
         for (let i = 0; i < count; i++) {
           const shortestCol = columnHeights.indexOf(Math.min(...columnHeights));
-          const heightRatio = 0.85 + Math.random() * 0.3; // 85% to 115%
+          const heightRatio = 0.85 + Math.random() * 0.3;
           const itemHeight = colWidth * heightRatio;
 
           const x = padding + shortestCol * (colWidth + gap);
@@ -622,13 +723,11 @@ export default function LookEditorPage() {
           tempPositions.push({ x, y, width: colWidth, height: itemHeight });
         }
 
-        // Check if content overflows and scale down if needed
         const maxHeight = Math.max(...columnHeights);
         const availableHeight = canvasHeight - padding;
         const scale = maxHeight > availableHeight ? availableHeight / maxHeight : 1;
 
         if (scale < 1) {
-          // Scale everything down to fit
           const scaledColWidth = colWidth * scale;
           const scaledGap = gap * scale;
           const totalScaledWidth = scaledColWidth * cols + scaledGap * (cols - 1);
@@ -644,7 +743,6 @@ export default function LookEditorPage() {
             zIndex: index,
           }));
         } else {
-          // No scaling needed, center vertically if extra space
           const offsetY = (canvasHeight - maxHeight) / 2;
           updatedItems = items.map((item, index) => ({
             ...item,
@@ -667,11 +765,32 @@ export default function LookEditorPage() {
     setApplyingLayout(false);
   };
 
-  // Don't render until look is loaded
-  if (!look) {
+  // Don't render until hydrated
+  if (!isHydrated) {
     return (
       <div className="h-full flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
         <Loader2 size={32} className="animate-spin" style={{ color: 'var(--primary)' }} />
+      </div>
+    );
+  }
+
+  // Moodboard not found
+  if (!moodboard) {
+    return (
+      <div className="h-full flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>
+            Moodboard not found
+          </h1>
+          <Link
+            href="/looks"
+            className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg transition-colors"
+            style={{ color: 'var(--primary)' }}
+          >
+            <ArrowLeft size={18} />
+            Back to Layers
+          </Link>
+        </div>
       </div>
     );
   }
@@ -805,6 +924,66 @@ export default function LookEditorPage() {
               )}
             </div>
 
+            {/* Background Picker Button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBackgroundMenu(!showBackgroundMenu)}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+                style={{
+                  color: showBackgroundMenu ? 'var(--primary)' : 'var(--foreground-secondary)',
+                  backgroundColor: showBackgroundMenu ? 'var(--surface-light)' : 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  e.currentTarget.style.color = 'var(--primary)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!showBackgroundMenu) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  }
+                }}
+                title="Canvas Background"
+              >
+                <Palette size={18} />
+              </button>
+
+              {/* Background Menu Dropdown */}
+              {showBackgroundMenu && (
+                <div
+                  className="absolute left-full top-0 ml-2 w-44 rounded-lg border shadow-lg overflow-hidden"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderColor: 'var(--border)',
+                  }}
+                >
+                  <div className="p-2 border-b" style={{ borderColor: 'var(--border)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--foreground-muted)' }}>
+                      Canvas Background
+                    </p>
+                  </div>
+                  <div className="p-2 grid grid-cols-4 gap-1.5">
+                    {backgroundOptions.map((bg, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setBackgroundIndex(idx);
+                          setShowBackgroundMenu(false);
+                        }}
+                        className="w-8 h-8 rounded-md border-2 transition-all cursor-pointer"
+                        style={{
+                          background: bg.preview,
+                          borderColor: backgroundIndex === idx ? 'var(--primary)' : 'transparent',
+                          boxShadow: backgroundIndex === idx ? '0 0 0 2px rgba(76, 112, 49, 0.2)' : 'none',
+                        }}
+                        title={bg.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="h-px my-1" style={{ backgroundColor: 'var(--border)' }} />
 
             <button
@@ -866,22 +1045,23 @@ export default function LookEditorPage() {
               height: 'min(calc(100% - 32px), 600px)',
               maxWidth: '800px',
               maxHeight: '600px',
-              backgroundColor: 'var(--surface)',
+              background: backgroundOptions[backgroundIndex]?.value || 'var(--surface)',
               borderRadius: '8px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
               transform: `scale(${zoom})`,
               transformOrigin: 'center center',
+              cursor: isSelecting ? 'crosshair' : 'default',
             }}
-            onClick={() => setSelectedItem(null)}
+            onMouseDown={handleCanvasMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
           >
             {items.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <Layers size={64} style={{ color: 'var(--foreground-muted)' }} className="mb-4" />
                 <p className="text-lg font-medium mb-2" style={{ color: 'var(--foreground-secondary)' }}>
-                  Start building your look
+                  Start building your moodboard
                 </p>
                 <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
                   Click on products from the right panel to add them
@@ -889,123 +1069,209 @@ export default function LookEditorPage() {
               </div>
             )}
 
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className="absolute"
-                style={{
-                  left: item.x,
-                  top: item.y,
-                  width: item.width,
-                  height: selectedItem === item.id ? item.height + 52 : item.height,
-                  zIndex: selectedItem === item.id ? 9999 : item.zIndex,
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* The actual item */}
+            {items.map((item) => {
+              const isSelected = selectedItems.has(item.id);
+              return (
                 <div
-                  className={`cursor-move transition-shadow duration-150 ${selectedItem === item.id ? 'ring-2 ring-green-700/50' : ''}`}
+                  key={item.id}
+                  className="absolute"
                   style={{
+                    left: item.x,
+                    top: item.y,
                     width: item.width,
-                    height: item.height,
-                    transform: `rotate(${item.rotation}deg)`,
+                    height: isSelected && selectedItems.size === 1 ? item.height + 52 : item.height,
+                    zIndex: isSelected ? 9999 : item.zIndex,
                   }}
-                  onMouseDown={(e) => handleMouseDown(e, item.id)}
                 >
-                  {item.type === 'image' && item.src && (
-                    <img
-                      src={item.src}
-                      alt={item.alt || ''}
-                      className="w-full h-full object-contain rounded-lg"
-                      style={{ backgroundColor: 'var(--surface-light)' }}
-                      draggable={false}
-                    />
-                  )}
-                  {item.type === 'text' && (
+                  <div
+                    className={`cursor-move transition-shadow duration-150 ${isSelected ? 'ring-2 ring-green-700/50' : ''}`}
+                    style={{
+                      width: item.width,
+                      height: item.height,
+                      transform: `rotate(${item.rotation}deg)`,
+                    }}
+                    onMouseDown={(e) => handleItemMouseDown(e, item.id)}
+                  >
+                    {item.type === 'image' && item.src && (
+                      <img
+                        src={item.src}
+                        alt={item.alt || ''}
+                        className="w-full h-full object-contain rounded-lg"
+                        style={{ backgroundColor: 'var(--surface-light)' }}
+                        draggable={false}
+                      />
+                    )}
+                    {item.type === 'text' && (
+                      <div
+                        className="w-full h-full flex items-center justify-center p-2"
+                        style={{
+                          fontSize: item.fontSize,
+                          fontWeight: item.fontWeight,
+                          color: 'var(--foreground)',
+                        }}
+                      >
+                        {item.text}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Show toolbar only when single item is selected */}
+                  {isSelected && selectedItems.size === 1 && (
                     <div
-                      className="w-full h-full flex items-center justify-center p-2"
-                      style={{
-                        fontSize: item.fontSize,
-                        fontWeight: item.fontWeight,
-                        color: 'var(--foreground)',
-                      }}
+                      className="flex items-center justify-center mt-2"
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
-                      {item.text}
+                      <div
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-lg"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        <button
+                          onClick={duplicateSelectedItems}
+                          className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                          style={{ color: 'var(--foreground-secondary)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                            e.currentTarget.style.color = 'var(--foreground)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = 'var(--foreground-secondary)';
+                          }}
+                          title="Duplicate"
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <button
+                          onClick={sendToBack}
+                          className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                          style={{ color: 'var(--foreground-secondary)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                            e.currentTarget.style.color = 'var(--foreground)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = 'var(--foreground-secondary)';
+                          }}
+                          title="Send to back"
+                        >
+                          <ArrowDown size={14} />
+                        </button>
+                        <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border)' }} />
+                        <button
+                          onClick={deleteSelectedItems}
+                          className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                          style={{ color: 'var(--foreground-secondary)' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                            e.currentTarget.style.color = 'var(--error)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = 'var(--foreground-secondary)';
+                          }}
+                          title="Delete (Del)"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
+              );
+            })}
 
-                {/* Floating toolbar on selection */}
-                {selectedItem === item.id && (
-                  <div
-                    className="flex items-center justify-center mt-2"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div
-                      className="flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-lg"
-                      style={{
-                        backgroundColor: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      <button
-                        onClick={duplicateSelectedItem}
-                        className="w-7 h-7 rounded flex items-center justify-center transition-colors"
-                        style={{ color: 'var(--foreground-secondary)' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                          e.currentTarget.style.color = 'var(--foreground)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = 'var(--foreground-secondary)';
-                        }}
-                        title="Duplicate"
-                      >
-                        <Copy size={14} />
-                      </button>
-                      <button
-                        onClick={sendToBack}
-                        className="w-7 h-7 rounded flex items-center justify-center transition-colors"
-                        style={{ color: 'var(--foreground-secondary)' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                          e.currentTarget.style.color = 'var(--foreground)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = 'var(--foreground-secondary)';
-                        }}
-                        title="Send to back"
-                      >
-                        <ArrowDown size={14} />
-                      </button>
-                      <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border)' }} />
-                      <button
-                        onClick={deleteSelectedItem}
-                        className="w-7 h-7 rounded flex items-center justify-center transition-colors"
-                        style={{ color: 'var(--foreground-secondary)' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                          e.currentTarget.style.color = 'var(--error)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = 'var(--foreground-secondary)';
-                        }}
-                        title="Delete (Del)"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
+            {/* Selection Rectangle */}
+            {isSelecting && (() => {
+              const rect = getSelectionRect();
+              if (!rect || (rect.width < 5 && rect.height < 5)) return null;
+              return (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                    border: '1px dashed rgba(76, 112, 49, 0.8)',
+                    backgroundColor: 'rgba(76, 112, 49, 0.1)',
+                    zIndex: 10000,
+                  }}
+                />
+              );
+            })()}
+
+            {/* Multi-selection floating toolbar */}
+            {selectedItems.size > 1 && (
+              <div
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-2 rounded-lg shadow-lg z-[10001]"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <span className="text-xs mr-2" style={{ color: 'var(--foreground-muted)' }}>
+                  {selectedItems.size} selected
+                </span>
+                <button
+                  onClick={duplicateSelectedItems}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                  style={{ color: 'var(--foreground-secondary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                    e.currentTarget.style.color = 'var(--foreground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  }}
+                  title="Duplicate All"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  onClick={sendToBack}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                  style={{ color: 'var(--foreground-secondary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                    e.currentTarget.style.color = 'var(--foreground)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  }}
+                  title="Send All to Back"
+                >
+                  <ArrowDown size={14} />
+                </button>
+                <div className="w-px h-4 mx-0.5" style={{ backgroundColor: 'var(--border)' }} />
+                <button
+                  onClick={deleteSelectedItems}
+                  className="w-7 h-7 rounded flex items-center justify-center transition-colors"
+                  style={{ color: 'var(--foreground-secondary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.color = 'var(--error)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--foreground-secondary)';
+                  }}
+                  title="Delete All (Del)"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
-        {/* Right Side - Product Suggestions (Discover Content) */}
+        {/* Right Side - Product Suggestions */}
         <div
           className="w-[400px] xl:w-[500px] 2xl:w-[600px] border-l flex flex-col shrink-0 min-h-0"
           style={{
@@ -1013,14 +1279,12 @@ export default function LookEditorPage() {
             borderColor: 'var(--border)',
           }}
         >
-          {/* Collection Inspiration Panel - Moved to top for visibility */}
           <CollectionInspiration
             onApplyFilters={handleApplyCollectionFilters}
             onClearFilters={handleClearCollectionFilters}
             isFilterActive={isCollectionFilterActive}
           />
 
-          {/* Header with Search Status - Title and count on same line */}
           <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
@@ -1057,7 +1321,6 @@ export default function LookEditorPage() {
                 )}
               </div>
             </div>
-            {/* Search/Filter Status Message (only when filtering) */}
             {activeSearchQuery && !loadingProducts && (
               <div className="flex items-center gap-2 mt-1.5">
                 <div
@@ -1073,7 +1336,6 @@ export default function LookEditorPage() {
             )}
           </div>
 
-          {/* Products Grid */}
           <div className="flex-1 overflow-y-auto p-3">
             {loadingProducts && (
               <div className="flex items-center justify-center py-12">
@@ -1096,83 +1358,79 @@ export default function LookEditorPage() {
 
             {!loadingProducts && products.length > 0 && (
               <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                  {products.map((product) => (
+                {products.map((product) => (
+                  <div
+                    key={product.id}
+                    className="group rounded-lg border overflow-hidden cursor-pointer transition-all duration-200"
+                    style={{
+                      backgroundColor: 'var(--surface-light)',
+                      borderColor: 'var(--border)',
+                    }}
+                    onClick={() => addProductToCanvas(product)}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                    }}
+                  >
                     <div
-                      key={product.id}
-                      className="group rounded-lg border overflow-hidden cursor-pointer transition-all duration-200"
-                      style={{
-                        backgroundColor: 'var(--surface-light)',
-                        borderColor: 'var(--border)',
-                      }}
-                      onClick={() => addProductToCanvas(product)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--primary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--border)';
-                      }}
+                      className="relative aspect-square"
+                      style={{ backgroundColor: 'var(--background-secondary)' }}
                     >
-                      {/* Product Image */}
+                      <img
+                        src={getProductImage(product.image_url, product.product_name)}
+                        alt={product.product_name}
+                        className="w-full h-full object-cover"
+                      />
+
                       <div
-                        className="relative aspect-square"
-                        style={{ backgroundColor: 'var(--background-secondary)' }}
+                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ backgroundColor: 'rgba(76, 112, 49, 0.8)' }}
                       >
-                        <img
-                          src={getProductImage(product.image_url, product.product_name)}
-                          alt={product.product_name}
-                          className="w-full h-full object-cover"
+                        <Plus size={24} style={{ color: 'white' }} />
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(product.id);
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                        style={{
+                          backgroundColor: favorites.has(product.id)
+                            ? 'var(--error)'
+                            : 'rgba(0,0,0,0.5)',
+                        }}
+                      >
+                        <Heart
+                          size={12}
+                          fill={favorites.has(product.id) ? 'white' : 'none'}
+                          style={{ color: 'white' }}
                         />
-
-                        {/* Add indicator on hover */}
-                        <div
-                          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                          style={{ backgroundColor: 'rgba(76, 112, 49, 0.8)' }}
-                        >
-                          <Plus size={24} style={{ color: 'white' }} />
-                        </div>
-
-                        {/* Favorite Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(product.id);
-                          }}
-                          className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                          style={{
-                            backgroundColor: favorites.has(product.id)
-                              ? 'var(--error)'
-                              : 'rgba(0,0,0,0.5)',
-                          }}
-                        >
-                          <Heart
-                            size={12}
-                            fill={favorites.has(product.id) ? 'white' : 'none'}
-                            style={{ color: 'white' }}
-                          />
-                        </button>
-                      </div>
-
-                      {/* Product Info */}
-                      <div className="p-2">
-                        <p
-                          className="text-xs font-medium uppercase tracking-wide mb-0.5"
-                          style={{ color: 'var(--primary)' }}
-                        >
-                          {normalizeText(product.brand)}
-                        </p>
-                        <h4
-                          className="font-medium text-xs mb-1 line-clamp-2"
-                          style={{ color: 'var(--foreground)' }}
-                        >
-                          {normalizeText(product.product_name)}
-                        </h4>
-                        <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
-                          {formatPrice(product.price, product.currency)}
-                        </p>
-                      </div>
+                      </button>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="p-2">
+                      <p
+                        className="text-xs font-medium uppercase tracking-wide mb-0.5"
+                        style={{ color: 'var(--primary)' }}
+                      >
+                        {normalizeText(product.brand)}
+                      </p>
+                      <h4
+                        className="font-medium text-xs mb-1 line-clamp-2"
+                        style={{ color: 'var(--foreground)' }}
+                      >
+                        {normalizeText(product.product_name)}
+                      </h4>
+                      <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
+                        {formatPrice(product.price, product.currency)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -1190,7 +1448,6 @@ export default function LookEditorPage() {
             style={{ backgroundColor: 'var(--surface)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div
               className="flex items-center justify-between px-4 py-3 border-b"
               style={{ borderColor: 'var(--border)' }}
@@ -1216,7 +1473,6 @@ export default function LookEditorPage() {
               </button>
             </div>
 
-            {/* Image */}
             <div className="p-4">
               <img
                 src={aiComposedImage}
@@ -1226,14 +1482,13 @@ export default function LookEditorPage() {
               />
             </div>
 
-            {/* Footer */}
             <div
               className="flex items-center justify-end gap-3 px-4 py-3 border-t"
               style={{ borderColor: 'var(--border)' }}
             >
               <a
                 href={aiComposedImage}
-                download={`moodboard-${lookId}-${Date.now()}.png`}
+                download={`moodboard-${moodboardId}-${Date.now()}.png`}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 style={{
                   backgroundColor: 'var(--primary)',

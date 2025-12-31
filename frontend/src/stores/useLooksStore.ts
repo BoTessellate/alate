@@ -24,12 +24,13 @@ export interface CanvasItem {
   fontWeight?: string;
 }
 
-export interface Look {
+export interface Moodboard {
   id: string;
   name: string;
   slug: string;
-  thumbnail: string | null;
+  description?: string;
   items: CanvasItem[];
+  backgroundIndex: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,18 +38,19 @@ export interface Look {
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
 
 interface LooksState {
-  looks: Look[];
-  currentLookId: string | null;
+  moodboards: Moodboard[];
+  currentMoodboardId: string | null;
   saveStatus: SaveStatus;
 
-  // Actions
-  createLook: (name: string) => Look;
-  updateLook: (id: string, updates: Partial<Omit<Look, 'id' | 'slug'>>) => void;
-  deleteLook: (id: string) => void;
-  getLookBySlug: (slug: string) => Look | undefined;
-  getLookById: (id: string) => Look | undefined;
-  setCurrentLook: (id: string | null) => void;
-  updateLookItems: (id: string, items: CanvasItem[]) => void;
+  // Moodboard Actions
+  createMoodboard: (name: string, description?: string) => Moodboard;
+  updateMoodboard: (id: string, updates: Partial<Omit<Moodboard, 'id' | 'slug'>>) => void;
+  deleteMoodboard: (id: string) => void;
+  getMoodboardBySlug: (slugId: string) => Moodboard | undefined;
+  getMoodboardById: (id: string) => Moodboard | undefined;
+  setCurrentMoodboard: (id: string | null) => void;
+  updateMoodboardItems: (id: string, items: CanvasItem[]) => void;
+  setMoodboardBackground: (id: string, backgroundIndex: number) => void;
   setSaveStatus: (status: SaveStatus) => void;
 }
 
@@ -63,22 +65,22 @@ export const generateSlug = (name: string): string => {
     .substring(0, 50); // Limit length
 };
 
-// Generate full URL path: slug-id format
-export const generateLookPath = (name: string, id: string): string => {
+// Generate full URL path: slug--id format (double hyphen separator)
+export const generateMoodboardPath = (name: string, id: string): string => {
   const slug = generateSlug(name);
-  return `${slug}-${id}`;
+  return `${slug}--${id}`;
 };
 
-// Parse slug-id format to extract id
+// Parse slug--id format to extract id (uses double hyphen as separator)
 export const parseSlugId = (slugId: string): { slug: string; id: string } | null => {
-  // The ID is always the last segment after the last hyphen
-  const lastHyphenIndex = slugId.lastIndexOf('-');
-  if (lastHyphenIndex === -1) {
+  // Use double hyphen as separator to handle IDs that contain hyphens
+  const separatorIndex = slugId.lastIndexOf('--');
+  if (separatorIndex === -1) {
     return null;
   }
 
-  const slug = slugId.substring(0, lastHyphenIndex);
-  const id = slugId.substring(lastHyphenIndex + 1);
+  const slug = slugId.substring(0, separatorIndex);
+  const id = slugId.substring(separatorIndex + 2); // +2 to skip '--'
 
   return { slug, id };
 };
@@ -86,109 +88,125 @@ export const parseSlugId = (slugId: string): { slug: string; id: string } | null
 export const useLooksStore = create<LooksState>()(
   persist(
     (set, get) => ({
-      looks: [
+      moodboards: [
         {
-          id: '1',
+          id: 'mb-1',
           name: 'Living Room Refresh',
           slug: 'living-room-refresh',
-          thumbnail: null,
+          description: 'Ideas for refreshing my living room',
           items: [],
+          backgroundIndex: 0,
           createdAt: '2024-12-15',
           updatedAt: '2024-12-18',
         },
         {
-          id: '2',
+          id: 'mb-2',
           name: 'Bedroom Makeover',
           slug: 'bedroom-makeover',
-          thumbnail: null,
+          description: 'Cozy bedroom inspiration',
           items: [],
+          backgroundIndex: 0,
           createdAt: '2024-12-10',
           updatedAt: '2024-12-17',
         },
         {
-          id: '3',
+          id: 'mb-3',
           name: 'Office Space',
           slug: 'office-space',
-          thumbnail: null,
+          description: 'Modern home office setup',
           items: [],
+          backgroundIndex: 0,
           createdAt: '2024-12-08',
           updatedAt: '2024-12-16',
         },
       ],
-      currentLookId: null,
+      currentMoodboardId: null,
       saveStatus: 'saved',
 
-      createLook: (name: string) => {
-        const id = Date.now().toString();
+      createMoodboard: (name: string, description?: string) => {
+        const id = `mb-${Date.now()}`;
         const slug = generateSlug(name);
         const now = new Date().toISOString().split('T')[0];
 
-        const newLook: Look = {
+        const newMoodboard: Moodboard = {
           id,
-          name: name.trim() || 'Untitled Look',
+          name: name.trim() || 'Untitled Moodboard',
           slug,
-          thumbnail: null,
+          description,
           items: [],
+          backgroundIndex: 0,
           createdAt: now,
           updatedAt: now,
         };
 
         set((state) => ({
-          looks: [newLook, ...state.looks],
-          currentLookId: id,
+          moodboards: [newMoodboard, ...state.moodboards],
+          currentMoodboardId: id,
         }));
 
-        return newLook;
+        return newMoodboard;
       },
 
-      updateLook: (id: string, updates: Partial<Omit<Look, 'id' | 'slug'>>) => {
+      updateMoodboard: (id: string, updates: Partial<Omit<Moodboard, 'id' | 'slug'>>) => {
         set((state) => ({
-          looks: state.looks.map((look) =>
-            look.id === id
+          moodboards: state.moodboards.map((mb) =>
+            mb.id === id
               ? {
-                  ...look,
+                  ...mb,
                   ...updates,
-                  // Update slug if name changed
-                  slug: updates.name ? generateSlug(updates.name) : look.slug,
+                  slug: updates.name ? generateSlug(updates.name) : mb.slug,
                   updatedAt: new Date().toISOString().split('T')[0],
                 }
-              : look
+              : mb
           ),
         }));
       },
 
-      deleteLook: (id: string) => {
+      deleteMoodboard: (id: string) => {
         set((state) => ({
-          looks: state.looks.filter((look) => look.id !== id),
-          currentLookId: state.currentLookId === id ? null : state.currentLookId,
+          moodboards: state.moodboards.filter((mb) => mb.id !== id),
+          currentMoodboardId: state.currentMoodboardId === id ? null : state.currentMoodboardId,
         }));
       },
 
-      getLookBySlug: (slugId: string) => {
+      getMoodboardBySlug: (slugId: string) => {
         const parsed = parseSlugId(slugId);
         if (!parsed) return undefined;
-
-        return get().looks.find((look) => look.id === parsed.id);
+        return get().moodboards.find((mb) => mb.id === parsed.id);
       },
 
-      getLookById: (id: string) => {
-        return get().looks.find((look) => look.id === id);
+      getMoodboardById: (id: string) => {
+        return get().moodboards.find((mb) => mb.id === id);
       },
 
-      setCurrentLook: (id: string | null) => {
-        set({ currentLookId: id });
+      setCurrentMoodboard: (id: string | null) => {
+        set({ currentMoodboardId: id });
       },
 
-      updateLookItems: (id: string, items: CanvasItem[]) => {
+      updateMoodboardItems: (id: string, items: CanvasItem[]) => {
         set((state) => ({
-          looks: state.looks.map((look) =>
-            look.id === id
+          moodboards: state.moodboards.map((mb) =>
+            mb.id === id
               ? {
-                  ...look,
+                  ...mb,
                   items,
                   updatedAt: new Date().toISOString().split('T')[0],
                 }
-              : look
+              : mb
+          ),
+        }));
+      },
+
+      setMoodboardBackground: (id: string, backgroundIndex: number) => {
+        set((state) => ({
+          moodboards: state.moodboards.map((mb) =>
+            mb.id === id
+              ? {
+                  ...mb,
+                  backgroundIndex,
+                  updatedAt: new Date().toISOString().split('T')[0],
+                }
+              : mb
           ),
         }));
       },
@@ -199,6 +217,56 @@ export const useLooksStore = create<LooksState>()(
     }),
     {
       name: 'tml-looks-storage',
+      version: 2,
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>;
+
+        if (version < 2) {
+          // Migration from v0/v1: Convert old collections/looks structure to moodboards
+          const oldCollections = state.collections as Array<{
+            id: string;
+            name: string;
+            slug: string;
+            description?: string;
+            createdAt: string;
+            updatedAt: string;
+          }> | undefined;
+
+          const oldLooks = state.looks as Array<{
+            id: string;
+            collectionId: string;
+            items: CanvasItem[];
+          }> | undefined;
+
+          if (oldCollections && Array.isArray(oldCollections)) {
+            // Convert collections to moodboards
+            const moodboards: Moodboard[] = oldCollections.map((col) => {
+              // Find looks that belonged to this collection and merge their items
+              const collectionLooks = oldLooks?.filter((l) => l.collectionId === col.id) || [];
+              const allItems = collectionLooks.flatMap((l) => l.items || []);
+
+              return {
+                id: col.id.replace('col-', 'mb-'),
+                name: col.name,
+                slug: col.slug,
+                description: col.description,
+                items: allItems,
+                backgroundIndex: 0,
+                createdAt: col.createdAt,
+                updatedAt: col.updatedAt,
+              };
+            });
+
+            return {
+              moodboards,
+              currentMoodboardId: null,
+              saveStatus: 'saved',
+            };
+          }
+        }
+
+        return state as LooksState;
+      },
     }
   )
 );
