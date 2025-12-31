@@ -1,0 +1,41 @@
+# Shopify App Configuration
+# Mood Layer - Product Sync Integration
+#
+# This file configures the Shopify app for connecting with Mood Layer.
+# See: https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Mood Layer"
+client_id = "${SHOPIFY_API_KEY}"
+
+[access_scopes]
+# Scopes required for product sync
+scopes = "read_products,write_products,read_inventory"
+
+[auth]
+redirect_urls = [
+  "https://${APP_URL}/auth/callback",
+  "https://${APP_URL}/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-01"
+
+  [[webhooks.subscriptions]]
+  topics = ["products/create", "products/update", "products/delete"]
+  uri = "/webhooks/products"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "/webhooks/app-uninstalled"
+
+[app_proxy]
+url = "https://${APP_URL}"
+subpath = "moodlayer"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "${DEV_STORE_URL}"
