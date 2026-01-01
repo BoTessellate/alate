@@ -101,37 +101,31 @@ export function PageHeader({
   return (
     <div className={`${styles.padding} ${maxWidthClass} mx-auto ${className}`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-baseline gap-3">
-            <h1
-              className={`${styles.title} italic`}
-              style={{
-                fontFamily: 'var(--font-cormorant)',
-                fontWeight: 500,
-                color: 'var(--foreground)',
-              }}
-            >
-              {title}
-            </h1>
-            {badge && (
-              <span
-                className="text-sm font-medium px-2 py-0.5 rounded-full"
-                style={{
-                  backgroundColor: 'var(--surface-light)',
-                  color: 'var(--foreground-muted)',
-                }}
-              >
-                {badge}
-              </span>
-            )}
-          </div>
+        <div className="flex items-baseline gap-3 flex-1">
+          <h1
+            className={`${styles.title} font-bold`}
+            style={{ color: 'var(--foreground)' }}
+          >
+            {title}
+          </h1>
           {subtitle && (
-            <p
-              className="text-sm mt-1"
-              style={{ color: 'var(--foreground-secondary)' }}
+            <span
+              className="text-sm"
+              style={{ color: 'var(--foreground-muted)' }}
             >
               {subtitle}
-            </p>
+            </span>
+          )}
+          {badge && (
+            <span
+              className="text-sm font-medium px-2 py-0.5 rounded-full"
+              style={{
+                backgroundColor: 'var(--surface-light)',
+                color: 'var(--foreground-muted)',
+              }}
+            >
+              {badge}
+            </span>
           )}
         </div>
         {actions && <div className="flex items-center gap-3">{actions}</div>}
@@ -182,24 +176,20 @@ export function SectionHeader({
 
   return (
     <div className={`flex items-center justify-between ${styles.gap} mb-4 ${className}`}>
-      <div>
+      <div className="flex items-baseline gap-3">
         <h2
-          className={`${styles.title} italic`}
-          style={{
-            fontFamily: 'var(--font-cormorant)',
-            fontWeight: 500,
-            color: 'var(--foreground)',
-          }}
+          className={`${styles.title} font-semibold`}
+          style={{ color: 'var(--foreground)' }}
         >
           {title}
         </h2>
         {subtitle && (
-          <p
-            className="text-sm mt-0.5"
+          <span
+            className="text-sm"
             style={{ color: 'var(--foreground-muted)' }}
           >
             {subtitle}
-          </p>
+          </span>
         )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
