@@ -230,8 +230,11 @@ async function cropImageRegion(
     boundingBox,
   }, 'Cropping image');
 
-  // Crop the region
-  const croppedBuffer = await sharp(buffer)
+  // Crop the region - use explicit typing for sharp
+  const sharpInstance = sharp(buffer) as ReturnType<typeof sharp> & {
+    extract: (region: { left: number; top: number; width: number; height: number }) => ReturnType<typeof sharp>;
+  };
+  const croppedBuffer = await sharpInstance
     .extract({ left, top, width: cropWidth, height: cropHeight })
     .toBuffer();
 
