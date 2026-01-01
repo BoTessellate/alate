@@ -14,7 +14,15 @@ import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { applyMiddleware } from '../sdk/shared/middleware';
 import { createModuleLogger } from '../sdk/shared/logger';
-import { processPhotoUpload, PhotoUploadInput } from '../sdk/photoUpload';
+import {
+  processPhotoUpload,
+  PhotoUploadInput,
+  detectMultipleProducts,
+  MultiProductDetectionInput,
+  processSelectedProducts,
+  ProcessMultipleInput,
+  SelectedProduct,
+} from '../sdk/photoUpload';
 
 const logger = createModuleLogger('image-processing');
 
@@ -62,6 +70,33 @@ interface PhotoUploadRequestBody {
     mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
     fileName?: string;
   };
+  productType: 'fashion' | 'home';
+}
+
+interface DetectMultiRequestBody {
+  image: {
+    base64: string;
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  };
+  context: 'fashion' | 'home';
+}
+
+interface ProcessMultiRequestBody {
+  originalBase64: string;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  selectedProducts: Array<{
+    tempId: string;
+    boundingBox: { x: number; y: number; width: number; height: number };
+    customName?: string;
+    detected: {
+      tempId: string;
+      boundingBox: { x: number; y: number; width: number; height: number };
+      suggestedName: string;
+      category: string;
+      colors: string[];
+      confidence: number;
+    };
+  }>;
   productType: 'fashion' | 'home';
 }
 
@@ -281,6 +316,148 @@ async function handlePhotoUpload(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// MULTI-PRODUCT DETECTION HANDLER
+// ============================================================================
+
+async function handleMultiProductDetection(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const body = req.body as DetectMultiRequestBody;
+
+    // Validate request
+    if (!body.image?.base64 || !body.image?.mimeType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Image data and mimeType are required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.context || !['fashion', 'home'].includes(body.context)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Context must be "fashion" or "home"',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    // Check payload size
+    if (body.image.base64.length > MAX_PAYLOAD_SIZE) {
+      return res.status(413).json({
+        success: false,
+        error: 'Image file too large. Maximum size: 10MB',
+        code: 'FILE_TOO_LARGE',
+      });
+    }
+
+    logger.info({
+      mimeType: body.image.mimeType,
+      context: body.context,
+      base64Length: body.image.base64.length,
+    }, 'Starting multi-product detection');
+
+    const input: MultiProductDetectionInput = {
+      base64: body.image.base64,
+      mimeType: body.image.mimeType,
+      context: body.context,
+    };
+
+    const result = await detectMultipleProducts(input);
+
+    logger.info({
+      detectedCount: result.detectedProducts.length,
+      processingMs: result.processingTimeMs,
+      demo: result._demo,
+    }, 'Multi-product detection complete');
+
+    return res.status(200).json(result);
+
+  } catch (error) {
+    logger.error({ error }, 'Multi-product detection failed');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+      code: 'DETECTION_FAILED',
+    });
+  }
+}
+
+// ============================================================================
+// MULTI-PRODUCT PROCESSING HANDLER
+// ============================================================================
+
+async function handleProcessMultipleProducts(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const body = req.body as ProcessMultiRequestBody;
+
+    // Validate request
+    if (!body.originalBase64 || !body.mimeType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Original image base64 and mimeType are required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.selectedProducts || body.selectedProducts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one product must be selected',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.productType || !['fashion', 'home'].includes(body.productType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'productType must be "fashion" or "home"',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    logger.info({
+      mimeType: body.mimeType,
+      productType: body.productType,
+      selectedCount: body.selectedProducts.length,
+    }, 'Starting multi-product processing');
+
+    const input: ProcessMultipleInput = {
+      originalBase64: body.originalBase64,
+      mimeType: body.mimeType,
+      selectedProducts: body.selectedProducts as SelectedProduct[],
+      productType: body.productType,
+    };
+
+    const result = await processSelectedProducts(input);
+
+    logger.info({
+      processedCount: result.products.length,
+      totalMs: result.totalProcessingMs,
+      demo: result._demo,
+    }, 'Multi-product processing complete');
+
+    return res.status(200).json(result);
+
+  } catch (error) {
+    logger.error({ error }, 'Multi-product processing failed');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+      code: 'PROCESSING_FAILED',
+    });
+  }
+}
+
+// ============================================================================
 // MAIN HANDLER
 // ============================================================================
 
@@ -298,13 +475,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 'upload':
       return handlePhotoUpload(req, res);
 
+    case 'detect-multi':
+      return handleMultiProductDetection(req, res);
+
+    case 'process-multi':
+      return handleProcessMultipleProducts(req, res);
+
     default:
       return res.status(400).json({
         error: 'Invalid action',
-        hint: 'Use ?action=remove-bg or ?action=upload',
+        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, or ?action=process-multi',
         examples: {
           'remove-bg': 'POST /api/image-processing?action=remove-bg',
           'upload': 'POST /api/image-processing?action=upload',
+          'detect-multi': 'POST /api/image-processing?action=detect-multi',
+          'process-multi': 'POST /api/image-processing?action=process-multi',
         },
       });
   }

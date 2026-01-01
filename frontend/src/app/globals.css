@@ -43,7 +43,7 @@
   /* Translucent topbar - brand green */
   --topbar-bg: rgba(76, 112, 49, 0.92);
   --topbar-bg-warm: rgba(254, 250, 242, 0.95); /* Cream white for /looks page */
-  --topbar-bg-highlight: rgba(0, 74, 173, 0.92); /* Blue (#004aad) for /discover page */
+  --topbar-bg-highlight: rgba(153, 107, 38, 0.92); /* Gold (#996b26) for /discover page */
 }
 
 @theme inline {

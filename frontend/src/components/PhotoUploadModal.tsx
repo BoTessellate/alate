@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
-import { X, Upload, Loader2, Check, AlertCircle, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { X, Upload, Loader2, Check, AlertCircle, Plus, Layers, Image as ImageIcon } from 'lucide-react';
 import { useUploadStore, ProductType } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
 import { Button, IconButton, Input, Select, Checkbox } from '@/components/ui';
+import MultiProductSelectionGrid from './MultiProductSelectionGrid';
 
 /**
  * Modal for uploading and processing product photos
@@ -26,10 +27,31 @@ export default function PhotoUploadModal() {
     setProductType,
     updateProductField,
     toggleCollection,
+    // Multi-product state
+    isMultiMode,
+    setMultiMode,
+    detectedProducts,
+    selectedProductIds,
+    originalImageUrl,
+    processedProducts,
+    toggleProductSelection,
+    selectAllProducts,
+    deselectAllProducts,
+    updateDetectedProductName,
+    updateProcessedProduct,
   } = useUploadStore();
 
   const { collections, createCollection } = useCollectionsStore();
-  const { uploadAndProcess, saveToCollections } = usePhotoUpload();
+  const {
+    uploadAndProcess,
+    saveToCollections,
+    detectProducts,
+    processSelectedProductsFromDetection,
+    saveMultipleToCollections,
+  } = usePhotoUpload();
+
+  // Track which product is expanded in multi-edit mode
+  const [expandedProductIndex, setExpandedProductIndex] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -89,12 +111,35 @@ export default function PhotoUploadModal() {
     [productData?.tags, updateProductField]
   );
 
+  // Multi-product handlers
+  const handleDetectProducts = useCallback(async () => {
+    if (selectedFile) await detectProducts();
+  }, [selectedFile, detectProducts]);
+
+  const handleProcessSelected = useCallback(async () => {
+    await processSelectedProductsFromDetection();
+  }, [processSelectedProductsFromDetection]);
+
+  const handleSaveMultiple = useCallback(async () => {
+    const success = await saveMultipleToCollections();
+    if (success) {
+      setTimeout(() => closeModal(), 1000);
+    }
+  }, [saveMultipleToCollections, closeModal]);
+
   if (!isModalOpen) return null;
 
   const isProcessing = status === 'uploading' || status === 'processing';
   const canEdit = status === 'editing' || status === 'error';
   const isSaving = status === 'saving';
   const isSuccess = status === 'success';
+
+  // Multi-product states
+  const isDetecting = status === 'detecting';
+  const isSelecting = status === 'selecting';
+  const isProcessingMulti = status === 'processing-multi';
+  const isEditingMulti = status === 'editing-multi';
+  const isAnyMultiState = isDetecting || isSelecting || isProcessingMulti || isEditingMulti;
 
   return (
     <div
@@ -149,10 +194,15 @@ export default function PhotoUploadModal() {
                     style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
                   />
                 )}
-                {isProcessing && (
+                {(isProcessing || isDetecting || isProcessingMulti) && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
                     <Loader2 size={32} className="animate-spin mb-2" style={{ color: 'var(--primary)' }} aria-hidden="true" />
-                    <p className="text-sm text-white">{status === 'uploading' ? 'Uploading...' : 'Processing...'}</p>
+                    <p className="text-sm text-white">
+                      {status === 'uploading' && 'Uploading...'}
+                      {status === 'processing' && 'Processing...'}
+                      {status === 'detecting' && 'Detecting products...'}
+                      {status === 'processing-multi' && 'Processing selected products...'}
+                    </p>
                     <div className="w-32 h-1 rounded-full mt-2 overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
                       <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: 'var(--primary)' }} />
                     </div>
@@ -196,7 +246,7 @@ export default function PhotoUploadModal() {
           )}
 
           {/* Product Type Selection */}
-          {!canEdit && !isProcessing && !isSuccess && selectedFile && (
+          {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
             <div>
               <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
                 Product Type
@@ -216,11 +266,76 @@ export default function PhotoUploadModal() {
             </div>
           )}
 
-          {/* Upload Button */}
-          {!canEdit && !isProcessing && !isSuccess && selectedFile && (
-            <Button className="w-full" onClick={handleUpload}>
-              Process Image
+          {/* Mode Toggle */}
+          {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
+            <div>
+              <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                Detection Mode
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMultiMode(false)}
+                  className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors"
+                  style={{
+                    borderColor: !isMultiMode ? 'var(--primary)' : 'var(--border)',
+                    backgroundColor: !isMultiMode ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  <ImageIcon size={16} />
+                  <span className="text-sm">Single</span>
+                </button>
+                <button
+                  onClick={() => setMultiMode(true)}
+                  className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors"
+                  style={{
+                    borderColor: isMultiMode ? 'var(--primary)' : 'var(--border)',
+                    backgroundColor: isMultiMode ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  <Layers size={16} />
+                  <span className="text-sm">Multiple</span>
+                </button>
+              </div>
+              <p className="text-xs mt-1" style={{ color: 'var(--foreground-muted)' }}>
+                {isMultiMode
+                  ? 'Detect multiple products in one image (e.g., an outfit)'
+                  : 'Process as a single product'}
+              </p>
+            </div>
+          )}
+
+          {/* Upload / Detect Button */}
+          {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
+            <Button
+              className="w-full"
+              onClick={isMultiMode ? handleDetectProducts : handleUpload}
+            >
+              {isMultiMode ? 'Detect Products' : 'Process Image'}
             </Button>
+          )}
+
+          {/* Multi-Product Selection Grid */}
+          {isSelecting && originalImageUrl && (
+            <div className="space-y-3">
+              <MultiProductSelectionGrid
+                products={detectedProducts}
+                selectedIds={selectedProductIds}
+                originalImageUrl={originalImageUrl}
+                onToggle={toggleProductSelection}
+                onSelectAll={selectAllProducts}
+                onDeselectAll={deselectAllProducts}
+                onUpdateName={updateDetectedProductName}
+              />
+              <Button
+                className="w-full"
+                onClick={handleProcessSelected}
+                disabled={selectedProductIds.size === 0}
+              >
+                Process Selected ({selectedProductIds.size})
+              </Button>
+            </div>
           )}
 
           {/* Editing Form */}
@@ -349,6 +464,152 @@ export default function PhotoUploadModal() {
                     </>
                   ) : (
                     'Save Product'
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Multi-Product Editing */}
+          {isEditingMulti && processedProducts.length > 0 && (
+            <div className="space-y-4">
+              {/* Product Tabs */}
+              <div className="flex gap-1 overflow-x-auto pb-2">
+                {processedProducts.map((product, index) => (
+                  <button
+                    key={product.id || index}
+                    onClick={() => setExpandedProductIndex(index)}
+                    className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: expandedProductIndex === index ? 'var(--primary)' : 'var(--surface-light)',
+                      color: expandedProductIndex === index ? 'white' : 'var(--foreground)',
+                    }}
+                  >
+                    {product.product_name || `Product ${index + 1}`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Current Product Editor */}
+              {processedProducts[expandedProductIndex] && (
+                <div className="space-y-3">
+                  {/* Product Image Preview */}
+                  <div className="flex gap-3">
+                    <div
+                      className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0"
+                      style={{ backgroundColor: 'var(--background-secondary)' }}
+                    >
+                      {processedProducts[expandedProductIndex].image_url && (
+                        <img
+                          src={processedProducts[expandedProductIndex].image_url}
+                          alt={processedProducts[expandedProductIndex].product_name || ''}
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <Input
+                        label="Name"
+                        value={processedProducts[expandedProductIndex].product_name || ''}
+                        onChange={(e) => updateProcessedProduct(expandedProductIndex, { product_name: e.target.value })}
+                        placeholder="Product name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="Brand"
+                      value={processedProducts[expandedProductIndex].brand || ''}
+                      onChange={(e) => updateProcessedProduct(expandedProductIndex, { brand: e.target.value })}
+                      placeholder="Brand"
+                    />
+                    <Input
+                      label="Price"
+                      type="number"
+                      value={processedProducts[expandedProductIndex].price || ''}
+                      onChange={(e) => updateProcessedProduct(expandedProductIndex, { price: parseFloat(e.target.value) || 0 })}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <span className="text-xs font-medium mb-1 block" style={{ color: 'var(--foreground-secondary)' }}>
+                      Tags
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {(processedProducts[expandedProductIndex].tags || []).map((tag: string) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-0.5 rounded-full text-xs"
+                          style={{ backgroundColor: 'var(--primary)', color: 'white' }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Collection Selection */}
+              <div>
+                <span className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                  Save All to Collection
+                </span>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {collections.map((collection) => (
+                    <div
+                      key={collection.id}
+                      className="p-2 rounded-lg transition-colors"
+                      style={{
+                        backgroundColor: selectedCollections.includes(collection.id) ? 'var(--primary-alpha)' : 'transparent',
+                      }}
+                    >
+                      <Checkbox
+                        id={`multi-collection-${collection.id}`}
+                        checked={selectedCollections.includes(collection.id)}
+                        onChange={() => toggleCollection(collection.id)}
+                        label={collection.name}
+                        helperText={`${collection.products.length} items`}
+                        size="sm"
+                      />
+                    </div>
+                  ))}
+
+                  {/* New Collection Input */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <Input
+                      ref={newCollectionInputRef}
+                      placeholder="New collection name..."
+                      className="flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateCollection();
+                      }}
+                    />
+                    <IconButton icon={Plus} aria-label="Create new collection" onClick={handleCreateCollection} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={closeModal}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSaveMultiple}
+                  disabled={isSaving || selectedCollections.length === 0}
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin mr-2" aria-hidden="true" />
+                      Saving...
+                    </>
+                  ) : (
+                    `Save All (${processedProducts.length})`
                   )}
                 </Button>
               </div>
