@@ -430,10 +430,11 @@ export default function SettingsPage() {
       {saveStatus !== 'idle' && (
         <div
           data-testid="save-status"
-          className="fixed top-20 right-8 px-4 py-2 rounded-lg flex items-center gap-2 z-50"
+          className="fixed top-20 right-8 px-4 py-2 rounded-lg flex items-center gap-2 z-50 shadow-lg border"
           style={{
             backgroundColor: saveStatus === 'saved' ? 'var(--success)' : 'var(--surface)',
-            color: 'white',
+            borderColor: saveStatus === 'saved' ? 'var(--success)' : 'var(--border)',
+            color: saveStatus === 'saved' ? 'white' : 'var(--foreground)',
           }}
         >
           {saveStatus === 'saving' ? (
