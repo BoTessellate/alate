@@ -695,7 +695,14 @@ export default function AdminPage() {
                   <TestTube size={20} style={{ color: 'var(--primary)' }} />
                 </div>
                 <div>
-                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                  <h2
+                    className="text-lg italic"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
                     Test Coverage
                   </h2>
                   <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
@@ -853,7 +860,14 @@ export default function AdminPage() {
                   <Server size={20} style={{ color: 'var(--primary)' }} />
                 </div>
                 <div>
-                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                  <h2
+                    className="text-lg italic"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
                     Integration Health
                   </h2>
                   <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
@@ -979,7 +993,14 @@ export default function AdminPage() {
                   <Cpu size={20} style={{ color: 'var(--highlight)' }} />
                 </div>
                 <div>
-                  <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                  <h2
+                    className="text-lg italic"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
                     AI Providers
                   </h2>
                   <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
@@ -1182,7 +1203,14 @@ export default function AdminPage() {
                 <Store size={20} style={{ color: 'var(--primary)' }} />
               </div>
               <div>
-                <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                <h2
+                  className="text-lg italic"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 500,
+                    color: 'var(--foreground)',
+                  }}
+                >
                   Shopify Integration
                 </h2>
                 <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>

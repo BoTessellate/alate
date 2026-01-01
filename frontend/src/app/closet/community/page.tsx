@@ -59,7 +59,14 @@ export default function CommunityClosetPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-semibold mb-1" style={{ color: 'var(--foreground)' }}>
+                    <h3
+                      className="text-lg italic mb-1"
+                      style={{
+                        fontFamily: 'var(--font-cormorant)',
+                        fontWeight: 500,
+                        color: 'var(--foreground)',
+                      }}
+                    >
                       {collection.name}
                     </h3>
                     <p className="text-sm mb-3" style={{ color: 'var(--foreground-secondary)' }}>

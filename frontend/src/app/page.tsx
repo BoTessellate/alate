@@ -107,7 +107,14 @@ export default function Home() {
                 <Plus size={24} color="white" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold mb-0.5" style={{ color: 'var(--foreground)' }}>
+                <h2
+                  className="text-xl italic mb-0.5"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 500,
+                    color: 'var(--foreground)',
+                  }}
+                >
                   Create a new layer
                 </h2>
                 <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>

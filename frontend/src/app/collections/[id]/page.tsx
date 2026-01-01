@@ -146,7 +146,14 @@ export default function CollectionDetailPage() {
           style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
         >
           <FolderOpen size={48} className="mx-auto mb-4" style={{ color: 'var(--foreground-muted)' }} />
-          <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
+          <h3
+            className="text-xl italic mb-2"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
+          >
             Collection not found
           </h3>
           <p style={{ color: 'var(--foreground-secondary)' }}>

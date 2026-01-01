@@ -771,7 +771,14 @@ export default function MoodboardEditorPage() {
     return (
       <div className="h-full flex items-center justify-center" style={{ backgroundColor: 'var(--background)' }}>
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>
+          <h1
+            className="text-2xl italic mb-2"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
+          >
             Moodboard not found
           </h1>
           <Link

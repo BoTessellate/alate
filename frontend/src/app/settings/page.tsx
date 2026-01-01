@@ -52,7 +52,14 @@ function SectionHeader({
         <Icon size={20} style={{ color: 'var(--primary)' }} />
       </div>
       <div>
-        <h2 className="font-semibold" style={{ color: 'var(--foreground)' }}>
+        <h2
+          className="text-lg italic"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+          }}
+        >
           {title}
         </h2>
         <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
@@ -764,7 +771,14 @@ export default function SettingsPage() {
             <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(168, 64, 50, 0.2)' }}>
               <AlertTriangle size={24} style={{ color: 'var(--error)' }} />
             </div>
-            <h3 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
+            <h3
+              className="text-xl italic"
+              style={{
+                fontFamily: 'var(--font-cormorant)',
+                fontWeight: 500,
+                color: 'var(--foreground)',
+              }}
+            >
               Delete Account
             </h3>
           </div>
