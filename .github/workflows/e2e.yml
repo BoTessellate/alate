@@ -1,6 +1,7 @@
 # End-to-End Tests Workflow
 # Runs Cypress E2E tests against the frontend
 # Triggered on push to main/develop and pull requests
+# Skipped for Dependabot PRs (dependency updates don't need e2e)
 
 name: E2E Tests
 
@@ -23,6 +24,8 @@ jobs:
   cypress-e2e:
     name: Cypress E2E Tests
     runs-on: ubuntu-latest
+    # Skip for Dependabot PRs - dependency updates don't need full e2e
+    if: github.actor != 'dependabot[bot]'
     defaults:
       run:
         working-directory: frontend
