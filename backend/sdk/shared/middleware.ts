@@ -52,7 +52,22 @@ export function isOriginAllowed(origin: string | undefined): boolean {
   // If '*' is in allowed list, allow all
   if (allowed.includes('*')) return true;
 
-  return allowed.includes(origin);
+  // Check exact match first
+  if (allowed.includes(origin)) return true;
+
+  // Check for Vercel preview URL patterns
+  // Pattern: https://{project}-{hash}-{username}.vercel.app
+  try {
+    const originUrl = new URL(origin);
+    if (originUrl.hostname.endsWith('.vercel.app')) {
+      // Allow all Vercel preview deployments if any vercel.app domain is in allowed list
+      if (allowed.some(a => a.includes('.vercel.app'))) return true;
+    }
+  } catch {
+    // Invalid URL, ignore
+  }
+
+  return false;
 }
 
 // ============================================================================
@@ -92,12 +107,11 @@ export function setCorsHeaders(
   config: CorsConfig = {}
 ): boolean {
   const mergedConfig = { ...DEFAULT_CORS_CONFIG, ...config };
-  const origin = req.headers.origin;
+  const origin = req.headers.origin as string | undefined;
 
-  // Check if origin is allowed
+  // Check if origin is allowed using the shared helper
   const allowedOrigins = mergedConfig.allowedOrigins || getAllowedOrigins();
-  const isAllowed =
-    allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin));
+  const isAllowed = allowedOrigins.includes('*') || isOriginAllowed(origin);
 
   if (isAllowed && origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
