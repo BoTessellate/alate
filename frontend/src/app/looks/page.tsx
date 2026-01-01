@@ -11,10 +11,8 @@ import {
   ModalContent,
   ModalFooter,
   Input,
-  PageHeader,
   EmptyState,
   DropdownItem,
-  DropdownDivider,
 } from '@/components/ui';
 
 export default function LooksPage() {
@@ -125,16 +123,46 @@ export default function LooksPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
-      {/* Header */}
-      <PageHeader
-        title="Layers"
-        subtitle="Create and organize your mood layers"
-        actions={
-          <Button variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
-            New Layer
-          </Button>
-        }
-      />
+      {/* Hero Section */}
+      <div className="px-8 py-16 max-w-7xl mx-auto text-center">
+        <p
+          className="text-sm tracking-[0.3em] uppercase mb-4"
+          style={{
+            color: 'var(--foreground-muted)',
+            letterSpacing: '0.3em',
+          }}
+        >
+          Create & Organize
+        </p>
+
+        <h1
+          className="text-6xl md:text-7xl lg:text-8xl italic mb-4"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+            lineHeight: 1,
+          }}
+        >
+          Layers
+        </h1>
+
+        <p
+          className="text-lg md:text-xl max-w-lg mx-auto mb-8"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-secondary)',
+            fontWeight: 300,
+            letterSpacing: '0.05em',
+          }}
+        >
+          Curate your mood, one layer at a time
+        </p>
+
+        <Button variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
+          New Layer
+        </Button>
+      </div>
 
       {/* Content */}
       <div className="px-8 pb-8 max-w-7xl mx-auto">

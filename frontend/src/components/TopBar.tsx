@@ -34,6 +34,7 @@ export default function TopBar() {
   const localCurrency = useSettingsStore(state => state.localCurrency);
   const setCurrencyDisplayMode = useSettingsStore(state => state.setCurrencyDisplayMode);
   const setLocalCurrency = useSettingsStore(state => state.setLocalCurrency);
+  const userName = useSettingsStore(state => state.userName);
   const getMoodboardById = useLooksStore(state => state.getMoodboardById);
   const saveStatus = useLooksStore(state => state.saveStatus);
 
@@ -99,15 +100,15 @@ export default function TopBar() {
     }
   }
 
-  // User name (this would come from auth/user store in production)
-  const userName = 'John Doe';
+  // Display name for user (from settings store)
+  const displayName = userName || 'Guest';
 
   // Generate breadcrumbs with proper names - always start with user's space
   const breadcrumbs: { name: string; href: string; isLast: boolean }[] = [];
 
   // Always add user's space as the first breadcrumb
   const isHomePage = pathSegments.length === 0;
-  breadcrumbs.push({ name: `${userName}'s space`, href: '/', isLast: isHomePage });
+  breadcrumbs.push({ name: `${displayName}'s space`, href: '/', isLast: isHomePage });
 
   // Add the rest of the path segments
   pathSegments.forEach((segment, index) => {
@@ -608,11 +609,13 @@ export default function TopBar() {
             >
               <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
                 <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-                  {userName}
+                  {displayName}
                 </p>
-                <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                  user@example.com
-                </p>
+                {userName && (
+                  <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                    Signed in
+                  </p>
+                )}
               </div>
               <div className="py-1" role="group">
                 <Link

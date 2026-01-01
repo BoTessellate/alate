@@ -54,6 +54,7 @@ const mockSettingsState = {
   localCurrency: 'USD',
   setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
   setLocalCurrency: mockSetLocalCurrency,
+  userName: 'Test User',
 };
 
 jest.mock('@/stores/useSettingsStore', () => ({
@@ -216,18 +217,18 @@ describe('TopBar', () => {
       fireEvent.click(userMenuButton);
 
       await waitFor(() => {
-        expect(screen.getByText('John Doe')).toBeInTheDocument();
+        expect(screen.getByText('Test User')).toBeInTheDocument();
       });
     });
 
-    it('displays user email in menu', async () => {
+    it('displays signed in status when user has name', async () => {
       render(<TopBar />);
 
       const userMenuButton = screen.getByLabelText(/User menu/i);
       fireEvent.click(userMenuButton);
 
       await waitFor(() => {
-        expect(screen.getByText('user@example.com')).toBeInTheDocument();
+        expect(screen.getByText('Signed in')).toBeInTheDocument();
       });
     });
 

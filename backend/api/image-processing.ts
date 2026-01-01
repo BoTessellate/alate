@@ -154,9 +154,10 @@ async function handleRemoveBackground(req: VercelRequest, res: VercelResponse) {
     const cutoutUrl = publicUrlData.publicUrl;
 
     // Update product record with cutout URL
-    const { error: updateError } = await supabase
-      .from('products')
-      .update({ cutout_url: cutoutUrl } as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase
+      .from('products') as any)
+      .update({ cutout_url: cutoutUrl })
       .eq('id', product_id);
 
     if (updateError) {

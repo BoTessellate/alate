@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
-import { Card, PageHeader, SectionHeader, Button } from '@/components/ui';
+import { useSettingsStore } from '@/stores/useSettingsStore';
+import { Card, SectionHeader, Button } from '@/components/ui';
 
 export default function Home() {
   const { moodboards } = useLooksStore();
+  const userName = useSettingsStore(state => state.userName);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -51,12 +53,44 @@ export default function Home() {
   return (
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Section */}
-      <div className="px-8 pt-8 pb-6 max-w-6xl mx-auto">
-        <PageHeader
-          title="Welcome back"
-          subtitle="Ready to create something beautiful?"
-          className="mb-8 px-0 pt-0 pb-0"
-        />
+      <div className="px-8 py-16 max-w-6xl mx-auto text-center">
+        <p
+          className="text-sm tracking-[0.3em] uppercase mb-4"
+          style={{
+            color: 'var(--foreground-muted)',
+            letterSpacing: '0.3em',
+          }}
+        >
+          {isHydrated && userName ? `Welcome Back, ${userName}` : 'Welcome Back'}
+        </p>
+
+        <h1
+          className="text-6xl md:text-7xl lg:text-8xl italic mb-4"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+            lineHeight: 1,
+          }}
+        >
+          The Mood Layer
+        </h1>
+
+        <p
+          className="text-lg md:text-xl max-w-lg mx-auto mb-10"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-secondary)',
+            fontWeight: 300,
+            letterSpacing: '0.05em',
+          }}
+        >
+          Ready to create something beautiful?
+        </p>
+      </div>
+
+      {/* Content */}
+      <div className="px-8 pb-8 max-w-6xl mx-auto">
 
         {/* Main CTA Card */}
         <Card

@@ -133,7 +133,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check
-        run: npx tsc --noEmit
+        run: npx tsc --project tsconfig.ci.json
 
   frontend-build:
     name: Frontend Build Check

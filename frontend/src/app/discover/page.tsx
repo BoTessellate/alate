@@ -9,7 +9,6 @@ import { useProducts } from '@/hooks/useProductSearch';
 import {
   Button,
   Card,
-  PageHeader,
   EmptyState,
   IconButton,
   Divider,
@@ -51,14 +50,45 @@ export default function DiscoverPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
-      {/* Header */}
-      <PageHeader
-        title="Discover"
-        subtitle="Explore products and add them to your collections"
-      />
+      {/* Hero Section */}
+      <div className="px-8 py-16 max-w-7xl mx-auto text-center">
+        <p
+          className="text-sm tracking-[0.3em] uppercase mb-4"
+          style={{
+            color: 'var(--foreground-muted)',
+            letterSpacing: '0.3em',
+          }}
+        >
+          Explore & Inspire
+        </p>
+
+        <h1
+          className="text-6xl md:text-7xl lg:text-8xl italic mb-4"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+            lineHeight: 1,
+          }}
+        >
+          Discover
+        </h1>
+
+        <p
+          className="text-lg md:text-xl max-w-lg mx-auto"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-secondary)',
+            fontWeight: 300,
+            letterSpacing: '0.05em',
+          }}
+        >
+          Find products that speak to your style
+        </p>
+      </div>
 
       {/* Content */}
-      <div className="px-8 pb-8 max-w-7xl mx-auto mt-6">
+      <div className="px-8 pb-8 max-w-7xl mx-auto">
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-20">

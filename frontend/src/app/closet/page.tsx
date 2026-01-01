@@ -3,69 +3,44 @@
 import Link from 'next/link';
 import { ArrowRight, Shirt, Globe } from 'lucide-react';
 
-const HERO_BG_URL = 'https://ancuwmmivgdvommzigwv.supabase.co/storage/v1/object/sign/digital%20assets/orange-pink%20tessellate.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iNWFkYWFkOS01Y2YyLTRmNzQtYmU5Yi0wYTdjMjdhMDE2NzIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJkaWdpdGFsIGFzc2V0cy9vcmFuZ2UtcGluayB0ZXNzZWxsYXRlLnBuZyIsImlhdCI6MTc2NzI1ODA0MywiZXhwIjoxNzk4Nzk0MDQzfQ.63awLEQS0BRy-IqezYCHvljLIQ0jmJ7qgIsnpWm314A';
-
 export default function ClosetPage() {
   return (
     <div style={{ backgroundColor: 'var(--background)' }} className="min-h-screen">
-      {/* Hero Section with Background Image */}
-      <div className="relative overflow-hidden">
-        {/* Background Image with enhanced saturation and sharpness */}
-        <div
-          className="absolute inset-0"
+      {/* Hero Section */}
+      <div className="px-8 py-20 max-w-4xl mx-auto text-center">
+        <p
+          className="text-sm tracking-[0.3em] uppercase mb-6"
           style={{
-            backgroundImage: `url(${HERO_BG_URL})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            filter: 'saturate(1.3) contrast(1.1)',
+            color: 'var(--foreground-muted)',
+            letterSpacing: '0.3em',
           }}
-        />
+        >
+          The Mood Layer Presents
+        </p>
 
-        {/* Overlay for text readability */}
-        <div
-          className="absolute inset-0"
+        <h1
+          className="text-7xl md:text-8xl lg:text-9xl italic mb-6"
           style={{
-            background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0.5) 100%)',
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+            lineHeight: 1,
           }}
-        />
+        >
+          Closet
+        </h1>
 
-        {/* Hero Content */}
-        <div className="relative z-10 px-8 py-24 max-w-4xl mx-auto text-center">
-          <p
-            className="text-sm tracking-[0.3em] uppercase mb-6"
-            style={{
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontFamily: 'var(--font-geist-sans)',
-              letterSpacing: '0.3em',
-            }}
-          >
-            The Mood Layer Presents
-          </p>
-
-          <h1
-            className="text-7xl md:text-8xl lg:text-9xl font-light mb-6"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              color: 'white',
-              textShadow: '0 4px 30px rgba(0, 0, 0, 0.3)',
-              lineHeight: 1,
-            }}
-          >
-            Closet
-          </h1>
-
-          <p
-            className="text-lg md:text-xl max-w-lg mx-auto"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontWeight: 300,
-              letterSpacing: '0.05em',
-            }}
-          >
-            Your wardrobe, curated with intention
-          </p>
-        </div>
+        <p
+          className="text-lg md:text-xl max-w-lg mx-auto"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-secondary)',
+            fontWeight: 300,
+            letterSpacing: '0.05em',
+          }}
+        >
+          Your wardrobe, curated with intention
+        </p>
       </div>
 
       {/* Options Grid */}
