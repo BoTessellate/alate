@@ -8,57 +8,85 @@
 
 ## Architecture
 
-### Folder Structure
+### Feature → Files Map
 
-```
-stel/
-├── frontend/                 # Next.js 16 + React 19 web app
-│   └── src/
-│       ├── app/              # Next.js App Router pages
-│       │   ├── admin/        # Admin dashboard
-│       │   ├── closet/       # User wardrobe
-│       │   ├── collections/  # Collection pages
-│       │   ├── discover/     # Discovery/browse
-│       │   ├── looks/        # Moodboard pages
-│       │   ├── onboarding/   # User onboarding
-│       │   └── settings/     # User preferences
-│       ├── components/       # Reusable React components
-│       ├── hooks/            # Custom React hooks
-│       ├── stores/           # Zustand state management
-│       ├── lib/              # External integrations (Supabase)
-│       ├── types/            # TypeScript definitions
-│       └── utils/            # Utility functions
-│
-├── backend/                  # Node.js + Express + Vercel Functions
-│   ├── api/                  # Serverless API endpoints
-│   │   ├── ai.ts             # AI enrichment
-│   │   ├── ai-status.ts      # AI provider health (24h cache)
-│   │   ├── search.ts         # Product search
-│   │   ├── shopify.ts        # Shopify integration
-│   │   └── ...
-│   └── sdk/                  # Modular SDK (20 modules)
-│       ├── productEnrichment/  # Claude AI tagging
-│       ├── searchEngine/       # Product discovery
-│       ├── layoutGenerator/    # 4 layout archetypes (Minimal, Hero, Dynamic, Collage)
-│       ├── layoutAI/           # Smart label placement
-│       ├── imageGeneration/    # OpenAI/Gemini image gen
-│       ├── exportEngine/       # PNG/JPG export
-│       ├── pluginBridge/       # E-commerce integrations
-│       ├── brandDashboard/     # Brand management
-│       ├── shared/             # Common utilities
-│       └── ...
-│
-├── mobile/                   # React Native + Expo app
-│   └── src/
-│       ├── screens/
-│       ├── components/
-│       ├── navigation/
-│       └── store/
-│
-└── integrations/             # E-commerce plugins
-    ├── shopify-app/
-    └── woocommerce-plugin/
-```
+Use this to navigate directly to feature code without searching.
+
+#### Moodboard Editor (Looks/Layers)
+| Type | Files |
+|------|-------|
+| Pages | `app/looks/page.tsx`, `app/looks/[collectionSlug]/page.tsx` |
+| Store | `stores/useLooksStore.ts` |
+| Components | `VirtualizedSidebarProducts.tsx`, `CollectionInspiration.tsx` |
+
+#### Product Collections (Closet)
+| Type | Files |
+|------|-------|
+| Pages | `app/closet/page.tsx`, `app/closet/personal/page.tsx`, `app/closet/community/page.tsx`, `app/collections/[id]/page.tsx` |
+| Store | `stores/useCollectionsStore.ts` |
+| Components | `SaveToCollectionModal.tsx` |
+
+#### Photo Upload & AI Enrichment
+| Type | Files |
+|------|-------|
+| Store | `stores/useUploadStore.ts` |
+| Hook | `hooks/usePhotoUpload.ts` |
+| Components | `PhotoUploadModal.tsx`, `FloatingActionButton.tsx` |
+
+#### Product Search & Discovery
+| Type | Files |
+|------|-------|
+| Pages | `app/discover/page.tsx` |
+| Hook | `hooks/useProductSearch.ts` |
+| Components | `VirtualizedProductGrid.tsx`, `ProductCard.tsx` |
+
+#### Virtual Try-On
+| Type | Files |
+|------|-------|
+| Components | `VirtualTryOnModal.tsx` |
+
+#### User Settings & Theme
+| Type | Files |
+|------|-------|
+| Pages | `app/settings/page.tsx` |
+| Store | `stores/useSettingsStore.ts` (theme, currency, agentMode) |
+| Hook | `hooks/useCurrency.ts` |
+
+#### User Onboarding
+| Type | Files |
+|------|-------|
+| Pages | `app/onboarding/page.tsx` |
+| Store | `stores/useUserStore.ts` |
+
+#### Navigation & Layout
+| Type | Files |
+|------|-------|
+| Components | `AppLayout.tsx`, `TopBar.tsx`, `ThemeProvider.tsx` |
+| TopBar sub-components | `ui/topbar/Logo.tsx`, `ui/topbar/AgentModeToggle.tsx`, `ui/topbar/useTopbarColors.ts` |
+
+#### UI Component Library
+| Location | `components/ui/` |
+|----------|------------------|
+| Core | `Button.tsx`, `Card.tsx`, `Modal.tsx`, `Input.tsx`, `Toggle.tsx`, `Select.tsx` |
+| Layout | `PageHeader.tsx`, `Divider.tsx`, `EmptyState.tsx`, `ErrorBoundary.tsx` |
+
+#### Backend SDK Modules
+| Feature | Path |
+|---------|------|
+| AI Enrichment | `backend/sdk/productEnrichment/` |
+| Search | `backend/sdk/searchEngine/` |
+| Layout Generation | `backend/sdk/layoutGenerator/`, `backend/sdk/layoutAI/` |
+| Image Gen | `backend/sdk/imageGeneration/` |
+| Export | `backend/sdk/exportEngine/` |
+| E-commerce | `backend/sdk/pluginBridge/` |
+
+### Quick Reference
+
+**Stores (5):** `useLooksStore`, `useCollectionsStore`, `useUploadStore`, `useSettingsStore`, `useUserStore`
+
+**Hooks (3):** `usePhotoUpload`, `useProductSearch`, `useCurrency`
+
+**All paths relative to `frontend/src/` unless noted**
 
 ### Data Flow
 
