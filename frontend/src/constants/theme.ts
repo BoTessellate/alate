@@ -30,7 +30,7 @@ export const THEME_TOKENS = {
     foregroundMuted: '#b0a090',
     border: '#2a2a2a',
     borderLight: '#3a3a3a',
-    topbarBg: 'rgba(13, 13, 13, 0.95)',
+    topbarBg: 'rgba(61, 82, 45, 0.95)', // primary-dark with transparency
   },
   // Brand colors (theme-independent)
   brand: {
@@ -55,6 +55,74 @@ export const THEME_TOKENS = {
 } as const;
 
 export type ThemeMode = 'light' | 'dark';
+
+/**
+ * Get topbar-aware colors for components in the topbar
+ * USE THIS instead of hardcoding colors in topbar components!
+ *
+ * @param isWarmTopbar - true on /looks page (warm background)
+ */
+export function getTopbarColors(isWarmTopbar: boolean) {
+  const { brand } = THEME_TOKENS;
+
+  return {
+    // Text colors
+    text: isWarmTopbar ? brand.charcoal : brand.cream,
+    textMuted: isWarmTopbar
+      ? 'rgba(34, 34, 34, 0.75)'
+      : 'rgba(255, 255, 255, 0.75)',
+    textMutedMore: isWarmTopbar
+      ? 'rgba(34, 34, 34, 0.5)'
+      : 'rgba(244, 239, 237, 0.5)',
+
+    // Interactive element backgrounds
+    hoverBg: isWarmTopbar
+      ? 'rgba(0, 0, 0, 0.08)'
+      : 'rgba(255, 255, 255, 0.15)',
+    activeBg: isWarmTopbar
+      ? 'rgba(0, 0, 0, 0.15)'
+      : 'rgba(255, 255, 255, 0.25)',
+    pressedBg: isWarmTopbar
+      ? 'rgba(0, 0, 0, 0.1)'
+      : 'rgba(255, 255, 255, 0.2)',
+
+    // Logo (contrasts with topbar)
+    logoCircle: isWarmTopbar ? brand.charcoal : brand.cream,
+    logoPill: isWarmTopbar ? brand.primary : brand.primaryDark,
+
+    // Border for dividers
+    border: isWarmTopbar
+      ? 'rgba(0, 0, 0, 0.15)'
+      : 'rgba(255, 255, 255, 0.2)',
+  };
+}
+
+/**
+ * Get agent mode toggle colors based on theme and state
+ *
+ * Dark Mode:  Default → circle: charcoal, pill: cream
+ *             Active  → circle: charcoal, pill: primary (green)
+ * Light Mode: Default → circle: cream, pill: charcoal
+ *             Active  → circle: cream, pill: primary (green)
+ */
+export function getAgentModeColors(
+  effectiveTheme: ThemeMode,
+  isActive: boolean
+) {
+  const { brand } = THEME_TOKENS;
+
+  if (effectiveTheme === 'dark') {
+    return {
+      circle: brand.charcoal, // Charcoal contrasts with green topbar
+      pill: isActive ? brand.primary : brand.cream,
+    };
+  } else {
+    return {
+      circle: brand.cream, // Cream contrasts with green topbar
+      pill: isActive ? brand.primary : brand.charcoal,
+    };
+  }
+}
 
 /**
  * Apply theme tokens to CSS variables

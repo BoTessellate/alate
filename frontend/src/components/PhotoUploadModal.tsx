@@ -5,6 +5,7 @@ import { X, Upload, Loader2, Check, AlertCircle, Plus } from 'lucide-react';
 import { useUploadStore, ProductType } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
+import { Button, IconButton, Input } from '@/components/ui';
 
 /**
  * Modal for uploading and processing product photos
@@ -28,7 +29,7 @@ export default function PhotoUploadModal() {
   } = useUploadStore();
 
   const { collections, createCollection } = useCollectionsStore();
-  const { uploadAndProcess, saveToCollections, resetUpload } = usePhotoUpload();
+  const { uploadAndProcess, saveToCollections } = usePhotoUpload();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -37,60 +38,40 @@ export default function PhotoUploadModal() {
   // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isModalOpen) {
-        closeModal();
-      }
+      if (e.key === 'Escape' && isModalOpen) closeModal();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isModalOpen, closeModal]);
 
-  // Handle file selection
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) {
-        setFile(file);
-      }
+      if (file) setFile(file);
     },
     [setFile]
   );
 
-  // Handle drag and drop
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files?.[0];
-      if (file && file.type.startsWith('image/')) {
-        setFile(file);
-      }
+      if (file && file.type.startsWith('image/')) setFile(file);
     },
     [setFile]
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  // Handle upload button click
   const handleUpload = useCallback(async () => {
-    if (selectedFile) {
-      await uploadAndProcess();
-    }
+    if (selectedFile) await uploadAndProcess();
   }, [selectedFile, uploadAndProcess]);
 
-  // Handle save button click
   const handleSave = useCallback(async () => {
     const success = await saveToCollections();
     if (success) {
-      // Close modal after a brief delay to show success state
-      setTimeout(() => {
-        closeModal();
-      }, 1000);
+      setTimeout(() => closeModal(), 1000);
     }
   }, [saveToCollections, closeModal]);
 
-  // Handle new collection creation
   const handleCreateCollection = useCallback(() => {
     const input = newCollectionInputRef.current;
     if (input && input.value.trim()) {
@@ -100,7 +81,6 @@ export default function PhotoUploadModal() {
     }
   }, [createCollection, toggleCollection]);
 
-  // Handle tag removal
   const handleRemoveTag = useCallback(
     (tagToRemove: string) => {
       const currentTags = productData?.tags || [];
@@ -133,27 +113,11 @@ export default function PhotoUploadModal() {
         style={{ backgroundColor: 'var(--surface)', maxHeight: '70vh', overflowY: 'auto' }}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between p-4 border-b"
-          style={{ borderColor: 'var(--border)' }}
-        >
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <h2 id="photo-upload-modal-title" className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
             Upload Product Photo
           </h2>
-          <button
-            onClick={closeModal}
-            aria-label="Close modal"
-            className="w-11 h-11 flex items-center justify-center rounded-md transition-colors cursor-pointer"
-            style={{ color: 'var(--foreground-muted)' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <X size={20} aria-hidden="true" />
-          </button>
+          <IconButton icon={X} aria-label="Close modal" onClick={closeModal} />
         </div>
 
         {/* Content */}
@@ -167,16 +131,12 @@ export default function PhotoUploadModal() {
               minHeight: '200px',
             }}
             onDrop={handleDrop}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => e.preventDefault()}
             onClick={() => !selectedFile && fileInputRef.current?.click()}
           >
             {previewUrl ? (
               <div className="relative w-full h-[200px]">
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="w-full h-full object-contain"
-                />
+                <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
                 {!isProcessing && !canEdit && (
                   <button
                     onClick={(e) => {
@@ -184,37 +144,18 @@ export default function PhotoUploadModal() {
                       setFile(null);
                     }}
                     aria-label="Remove selected image"
-                    className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full cursor-pointer"
+                    className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full cursor-pointer"
                     style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
                   >
                     <X size={16} color="white" aria-hidden="true" />
                   </button>
                 )}
                 {isProcessing && (
-                  <div
-                    className="absolute inset-0 flex flex-col items-center justify-center"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-                  >
-                    <Loader2
-                      size={32}
-                      className="animate-spin mb-2"
-                      style={{ color: 'var(--primary)' }}
-                      aria-hidden="true"
-                    />
-                    <p className="text-sm text-white">
-                      {status === 'uploading' ? 'Uploading...' : 'Processing...'}
-                    </p>
-                    <div
-                      className="w-32 h-1 rounded-full mt-2 overflow-hidden"
-                      style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                    >
-                      <div
-                        className="h-full transition-all duration-300"
-                        style={{
-                          width: `${progress}%`,
-                          backgroundColor: 'var(--primary)',
-                        }}
-                      />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
+                    <Loader2 size={32} className="animate-spin mb-2" style={{ color: 'var(--primary)' }} aria-hidden="true" />
+                    <p className="text-sm text-white">{status === 'uploading' ? 'Uploading...' : 'Processing...'}</p>
+                    <div className="w-32 h-1 rounded-full mt-2 overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
+                      <div className="h-full transition-all duration-300" style={{ width: `${progress}%`, backgroundColor: 'var(--primary)' }} />
                     </div>
                   </div>
                 )}
@@ -241,10 +182,7 @@ export default function PhotoUploadModal() {
 
           {/* Error Message */}
           {error && (
-            <div
-              className="flex items-center gap-2 p-3 rounded-lg"
-              style={{ backgroundColor: 'var(--error)', color: 'white' }}
-            >
+            <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--error)', color: 'white' }}>
               <AlertCircle size={18} aria-hidden="true" />
               <p className="text-sm">{error}</p>
             </div>
@@ -252,16 +190,13 @@ export default function PhotoUploadModal() {
 
           {/* Success Message */}
           {isSuccess && (
-            <div
-              className="flex items-center gap-2 p-3 rounded-lg"
-              style={{ backgroundColor: 'var(--success)', color: 'white' }}
-            >
+            <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--success)', color: 'white' }}>
               <Check size={18} aria-hidden="true" />
               <p className="text-sm">Product saved to collection!</p>
             </div>
           )}
 
-          {/* Product Type Selection - Only show before processing */}
+          {/* Product Type Selection */}
           {!canEdit && !isProcessing && !isSuccess && selectedFile && (
             <div>
               <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
@@ -286,120 +221,58 @@ export default function PhotoUploadModal() {
             </div>
           )}
 
-          {/* Upload Button - Only show before processing */}
+          {/* Upload Button */}
           {!canEdit && !isProcessing && !isSuccess && selectedFile && (
-            <button
-              onClick={handleUpload}
-              className="w-full py-3 rounded-lg font-medium transition-colors cursor-pointer"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--primary)';
-              }}
-            >
+            <Button className="w-full" onClick={handleUpload}>
               Process Image
-            </button>
+            </Button>
           )}
 
-          {/* Editing Form - Only show after processing */}
+          {/* Editing Form */}
           {canEdit && productData && (
             <div className="space-y-4">
-              {/* Brand */}
-              <div>
-                <label htmlFor="product-brand" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
-                  Brand
-                </label>
-                <input
-                  id="product-brand"
-                  type="text"
-                  value={productData.brand || ''}
-                  onChange={(e) => updateProductField('brand', e.target.value)}
-                  placeholder="Enter brand name"
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{
-                    backgroundColor: 'var(--background-secondary)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                />
-              </div>
+              <Input
+                label="Brand"
+                value={productData.brand || ''}
+                onChange={(e) => updateProductField('brand', e.target.value)}
+                placeholder="Enter brand name"
+              />
 
-              {/* Product Name */}
-              <div>
-                <label htmlFor="product-name" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
-                  Name
-                </label>
-                <input
-                  id="product-name"
-                  type="text"
-                  value={productData.product_name || ''}
-                  onChange={(e) => updateProductField('product_name', e.target.value)}
-                  placeholder="Product name"
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{
-                    backgroundColor: 'var(--background-secondary)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                />
-              </div>
+              <Input
+                label="Name"
+                value={productData.product_name || ''}
+                onChange={(e) => updateProductField('product_name', e.target.value)}
+                placeholder="Product name"
+              />
 
-              {/* Size */}
-              <div>
-                <label htmlFor="product-size" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
-                  Size
-                </label>
-                <input
-                  id="product-size"
-                  type="text"
-                  value={productData.size || ''}
-                  onChange={(e) => updateProductField('size', e.target.value)}
-                  placeholder="e.g., M, 42, 10x12"
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{
-                    backgroundColor: 'var(--background-secondary)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--foreground)',
-                  }}
-                />
-              </div>
+              <Input
+                label="Size"
+                value={productData.size || ''}
+                onChange={(e) => updateProductField('size', e.target.value)}
+                placeholder="e.g., M, 42, 10x12"
+              />
 
               {/* Price */}
               <div className="flex gap-2">
-                <div className="flex-1">
-                  <label htmlFor="product-price" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
-                    Price
-                  </label>
-                  <input
-                    id="product-price"
-                    type="number"
-                    value={productData.price || ''}
-                    onChange={(e) => updateProductField('price', parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{
-                      backgroundColor: 'var(--background-secondary)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--foreground)',
-                    }}
-                  />
-                </div>
+                <Input
+                  label="Price"
+                  type="number"
+                  value={productData.price || ''}
+                  onChange={(e) => updateProductField('price', parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  className="flex-1"
+                />
                 <div className="w-24">
-                  <label htmlFor="product-currency" className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                  <label htmlFor="product-currency" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--foreground)' }}>
                     Currency
                   </label>
                   <select
                     id="product-currency"
                     value={productData.currency || 'USD'}
                     onChange={(e) => updateProductField('currency', e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
+                    className="w-full h-10 px-3 rounded-lg text-sm outline-none cursor-pointer"
                     style={{
-                      backgroundColor: 'var(--background-secondary)',
+                      backgroundColor: 'var(--background)',
                       border: '1px solid var(--border)',
                       color: 'var(--foreground)',
                     }}
@@ -414,25 +287,18 @@ export default function PhotoUploadModal() {
 
               {/* AI Tags */}
               <div>
-                <span id="product-tags-label" className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                <span className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
                   Tags
                 </span>
-                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="product-tags-label">
+                <div className="flex flex-wrap gap-2">
                   {(productData.tags || []).map((tag) => (
                     <span
                       key={tag}
                       className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs"
-                      style={{
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                      }}
+                      style={{ backgroundColor: 'var(--primary)', color: 'white' }}
                     >
                       {tag}
-                      <button
-                        onClick={() => handleRemoveTag(tag)}
-                        aria-label={`Remove tag ${tag}`}
-                        className="hover:opacity-70 cursor-pointer"
-                      >
+                      <button onClick={() => handleRemoveTag(tag)} aria-label={`Remove tag ${tag}`} className="hover:opacity-70 cursor-pointer">
                         <X size={12} aria-hidden="true" />
                       </button>
                     </span>
@@ -442,19 +308,17 @@ export default function PhotoUploadModal() {
 
               {/* Collection Selection */}
               <div>
-                <span id="collection-selection-label" className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
+                <span className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
                   Save to Collection
                 </span>
-                <div className="space-y-2 max-h-40 overflow-y-auto" role="group" aria-labelledby="collection-selection-label">
+                <div className="space-y-2 max-h-40 overflow-y-auto">
                   {collections.map((collection) => (
                     <label
                       key={collection.id}
                       htmlFor={`collection-${collection.id}`}
                       className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
                       style={{
-                        backgroundColor: selectedCollections.includes(collection.id)
-                          ? 'var(--primary-alpha)'
-                          : 'transparent',
+                        backgroundColor: selectedCollections.includes(collection.id) ? 'var(--primary-alpha)' : 'transparent',
                       }}
                     >
                       <input
@@ -476,72 +340,44 @@ export default function PhotoUploadModal() {
 
                   {/* New Collection Input */}
                   <div className="flex items-center gap-2 pt-2">
-                    <label htmlFor="new-collection-name" className="sr-only">
-                      New collection name
-                    </label>
                     <input
-                      id="new-collection-name"
                       ref={newCollectionInputRef}
                       type="text"
                       placeholder="New collection name..."
-                      className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                      className="flex-1 px-3 py-2 h-10 rounded-lg text-sm outline-none"
                       style={{
-                        backgroundColor: 'var(--background-secondary)',
+                        backgroundColor: 'var(--background)',
                         border: '1px solid var(--border)',
                         color: 'var(--foreground)',
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleCreateCollection();
-                        }
+                        if (e.key === 'Enter') handleCreateCollection();
                       }}
                     />
-                    <button
-                      onClick={handleCreateCollection}
-                      aria-label="Create new collection"
-                      className="w-11 h-11 flex items-center justify-center rounded-lg transition-colors cursor-pointer"
-                      style={{
-                        backgroundColor: 'var(--primary)',
-                        color: 'white',
-                      }}
-                    >
-                      <Plus size={18} aria-hidden="true" />
-                    </button>
+                    <IconButton icon={Plus} aria-label="Create new collection" onClick={handleCreateCollection} />
                   </div>
                 </div>
               </div>
 
-              {/* Save Button */}
+              {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
-                <button
-                  onClick={closeModal}
-                  className="flex-1 py-3 rounded-lg font-medium transition-colors cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--background-secondary)',
-                    color: 'var(--foreground)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
+                <Button variant="outline" className="flex-1" onClick={closeModal}>
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
+                  className="flex-1"
                   onClick={handleSave}
                   disabled={isSaving || selectedCollections.length === 0}
-                  className="flex-1 py-3 rounded-lg font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: 'var(--primary)',
-                    color: 'white',
-                  }}
                 >
                   {isSaving ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                    <>
+                      <Loader2 size={16} className="animate-spin mr-2" aria-hidden="true" />
                       Saving...
-                    </span>
+                    </>
                   ) : (
                     'Save Product'
                   )}
-                </button>
+                </Button>
               </div>
             </div>
           )}

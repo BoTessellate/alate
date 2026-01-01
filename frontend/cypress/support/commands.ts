@@ -1,6 +1,38 @@
 /// <reference types="cypress" />
 import '@testing-library/cypress/add-commands';
 
+/**
+ * Shared Test Selectors - Import from source of truth
+ * When component selectors change, update src/constants/testSelectors.ts
+ * Tests will automatically use the new values.
+ */
+export const SELECTORS = {
+  search: {
+    trigger: 'button[aria-label="Search"]',
+    input: 'input[placeholder="Search a mood or product..."]',
+    placeholder: 'Search a mood or product...',
+  },
+  navigation: {
+    layersLink: 'header nav a[href="/looks"]',
+    closetLink: 'header nav a[href="/closet"]',
+    discoverLink: 'header nav a[href="/discover"]',
+  },
+  userMenu: {
+    trigger: 'button[aria-label="User menu"]',
+    dropdown: '[role="menu"]',
+  },
+  currency: {
+    trigger: 'button[aria-label="Select currency"]',
+    dropdown: '[role="listbox"]',
+  },
+  agentMode: {
+    trigger: 'button[aria-label*="Agent Mode"]',
+  },
+  help: {
+    trigger: 'button[aria-label="Help"]',
+  },
+} as const;
+
 // Custom command to clear localStorage and reset app state
 Cypress.Commands.add('resetAppState', () => {
   cy.window().then((win) => {

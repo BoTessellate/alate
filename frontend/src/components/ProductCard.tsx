@@ -7,6 +7,7 @@ import { Heart, Bookmark, ExternalLink, Shirt } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductUrl, generatePlaceholderSVG } from '@/utils/placeholder';
+import { Card, IconButton } from '@/components/ui';
 import type { Product } from '@/types';
 
 // Lazy load modals - they're only needed when user clicks
@@ -39,7 +40,6 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTryOnModal, setShowTryOnModal] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
-  // Use selector pattern for better performance
   const isProductInAnyCollection = useCollectionsStore(state => state.isProductInAnyCollection);
   const { format } = usePriceFormatter();
 
@@ -61,7 +61,6 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
     if (onExternalLink) {
       onExternalLink(product);
     } else {
-      // Open generated product URL in new tab
       const url = getProductUrl(product.brand, product.product_name);
       window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -74,19 +73,7 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
 
   return (
     <>
-      <div
-        className="group rounded-lg border overflow-hidden transition-all duration-200"
-        style={{
-          backgroundColor: 'var(--surface)',
-          borderColor: 'var(--border)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--primary)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border)';
-        }}
-      >
+      <Card variant="interactive" className="group">
         {/* Product Image */}
         <div
           className="relative aspect-square"
@@ -106,8 +93,7 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
             <div
               className="w-full h-full flex items-center justify-center"
               style={{
-                backgroundImage:
-                  'linear-gradient(135deg, var(--primary) 0%, var(--cream-dark) 100%)',
+                backgroundImage: 'linear-gradient(135deg, var(--primary) 0%, var(--cream-dark) 100%)',
                 opacity: 0.5,
               }}
             />
@@ -119,9 +105,7 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
             <button
               onClick={handleFavoriteClick}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{
-                backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)',
-              }}
+              style={{ backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)' }}
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               aria-pressed={isFavorite}
             >
@@ -138,11 +122,7 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
               ref={saveButtonRef}
               onClick={handleSaveClick}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{
-                backgroundColor: isInCollection
-                  ? 'var(--primary)'
-                  : 'rgba(0,0,0,0.5)',
-              }}
+              style={{ backgroundColor: isInCollection ? 'var(--primary)' : 'rgba(0,0,0,0.5)' }}
               aria-label={isInCollection ? 'Manage collections' : 'Save to collection'}
             >
               <Bookmark
@@ -157,15 +137,12 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
             <button
               onClick={handleTryOnClick}
               className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{
-                backgroundColor: 'rgba(0,0,0,0.5)',
-              }}
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
               aria-label="Virtual try-on"
             >
               <Shirt size={18} style={{ color: 'white' }} aria-hidden="true" />
             </button>
           </div>
-
         </div>
 
         {/* Product Info */}
@@ -186,25 +163,16 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
             <p className="font-semibold" style={{ color: 'var(--foreground)' }}>
               {format(product.price, product.currency)}
             </p>
-            <button
-              onClick={handleExternalClick}
-              className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center transition-colors"
-              style={{ color: 'var(--foreground-muted)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--surface-light)';
-                e.currentTarget.style.color = 'var(--primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--foreground-muted)';
-              }}
+            <IconButton
+              icon={ExternalLink}
               aria-label={`Shop ${normalizeText(product.product_name)} on external site`}
-            >
-              <ExternalLink size={16} aria-hidden="true" />
-            </button>
+              onClick={handleExternalClick}
+              size="lg"
+              className="-mr-2"
+            />
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Save to Collection Modal */}
       <SaveToCollectionModal

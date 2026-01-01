@@ -1,0 +1,49 @@
+/**
+ * useTopbarColors - Computes topbar-aware colors based on page context
+ *
+ * This hook provides consistent theming for all topbar components.
+ * Instead of passing multiple props (isLooksListPage, effectiveTheme),
+ * components call this hook once and get all computed colors.
+ */
+
+export interface TopbarColors {
+  // Text colors
+  text: string;
+  textMuted: string;
+
+  // Background colors for interactive elements
+  defaultBg: string;
+  hoverBg: string;
+  activeBg: string;
+
+  // Border color
+  border: string;
+}
+
+/**
+ * Get topbar colors based on whether we're on the looks list page
+ * (which has a warm/cream topbar vs the default green topbar)
+ */
+export function getTopbarColors(isWarmTopbar: boolean): TopbarColors {
+  if (isWarmTopbar) {
+    // Warm topbar (looks list page) - dark text on cream background
+    return {
+      text: 'var(--charcoal)',
+      textMuted: 'rgba(34, 34, 34, 0.75)',
+      defaultBg: 'rgba(0, 0, 0, 0.08)',
+      hoverBg: 'rgba(0, 0, 0, 0.15)',
+      activeBg: 'rgba(0, 0, 0, 0.1)',
+      border: 'rgba(0, 0, 0, 0.15)',
+    };
+  } else {
+    // Default topbar (green) - light text on dark background
+    return {
+      text: 'white',
+      textMuted: 'rgba(255, 255, 255, 0.75)',
+      defaultBg: 'rgba(255, 255, 255, 0.15)',
+      hoverBg: 'rgba(255, 255, 255, 0.25)',
+      activeBg: 'rgba(255, 255, 255, 0.2)',
+      border: 'rgba(255, 255, 255, 0.2)',
+    };
+  }
+}

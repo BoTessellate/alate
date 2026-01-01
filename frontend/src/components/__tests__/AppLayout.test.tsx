@@ -1,3 +1,11 @@
+/**
+ * AppLayout Tests
+ *
+ * NOTE: Test failures should NOT be fixed just to make them pass.
+ * Each test must be logically and functionally correct, reflecting
+ * the actual intended behavior of the code. If a test fails, verify
+ * whether the implementation or the test expectation needs updating.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AppLayout from '../AppLayout';
@@ -64,13 +72,14 @@ jest.mock('../PhotoUploadModal', () => {
   return MockModal;
 });
 
-// Mock user store
-const mockHasCompletedOnboarding = jest.fn().mockReturnValue(true);
+// Mock user store - use selector pattern to match Zustand usage
+let mockHasCompletedOnboardingValue = true;
 
 jest.mock('@/stores/useUserStore', () => ({
-  useUserStore: () => ({
-    hasCompletedOnboarding: mockHasCompletedOnboarding,
-  }),
+  useUserStore: (selector: (state: { hasCompletedOnboarding: () => boolean }) => unknown) =>
+    selector({
+      hasCompletedOnboarding: () => mockHasCompletedOnboardingValue,
+    }),
 }));
 
 // Mock settings store for TopBar
@@ -105,7 +114,7 @@ describe('AppLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPathname.mockReturnValue('/');
-    mockHasCompletedOnboarding.mockReturnValue(true);
+    mockHasCompletedOnboardingValue = true;
   });
 
   describe('Rendering', () => {
@@ -266,7 +275,7 @@ describe('AppLayout', () => {
 
   describe('Onboarding Redirect', () => {
     it('redirects to onboarding when not completed', async () => {
-      mockHasCompletedOnboarding.mockReturnValue(false);
+      mockHasCompletedOnboardingValue = false;
       mockPathname.mockReturnValue('/');
 
       render(
@@ -281,7 +290,7 @@ describe('AppLayout', () => {
     });
 
     it('does not redirect when onboarding is completed', async () => {
-      mockHasCompletedOnboarding.mockReturnValue(true);
+      mockHasCompletedOnboardingValue = true;
       mockPathname.mockReturnValue('/');
 
       render(
@@ -298,7 +307,7 @@ describe('AppLayout', () => {
     });
 
     it('does not redirect when already on onboarding page', async () => {
-      mockHasCompletedOnboarding.mockReturnValue(false);
+      mockHasCompletedOnboardingValue = false;
       mockPathname.mockReturnValue('/onboarding');
 
       render(

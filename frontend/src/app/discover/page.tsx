@@ -2,10 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, Loader2, X } from 'lucide-react';
+import { Search, Loader2, X, ShoppingBag } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import VirtualizedProductGrid from '@/components/VirtualizedProductGrid';
 import { useProducts } from '@/hooks/useProductSearch';
+import {
+  Button,
+  Card,
+  PageHeader,
+  EmptyState,
+  IconButton,
+  Divider,
+} from '@/components/ui';
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams();
@@ -33,7 +41,6 @@ export default function DiscoverPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Update URL to trigger SWR refetch with new query
     if (searchQuery.trim()) {
       router.push(`/discover?q=${encodeURIComponent(searchQuery)}`);
     } else {
@@ -42,24 +49,15 @@ export default function DiscoverPage() {
     setShowFloatingSearch(false);
   };
 
-  const handleFloatingSearchClick = () => {
-    setShowFloatingSearch(true);
-  };
-
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
-      {/* Header Section - Static */}
-      <div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline gap-3">
-        <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-          Discover
-        </h1>
-        <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-          Explore products and add them to your collections
-        </span>
-      </div>
+      {/* Header */}
+      <PageHeader
+        title="Discover"
+        subtitle="Explore products and add them to your collections"
+      />
 
-
-      {/* Content area */}
+      {/* Content */}
       <div className="px-8 pb-8 max-w-7xl mx-auto mt-6">
         {/* Loading State */}
         {loading && (
@@ -77,43 +75,29 @@ export default function DiscoverPage() {
 
         {/* Error State */}
         {error && !loading && (
-          <div
-            className="p-6 rounded-lg text-center"
-            style={{
-              backgroundColor: 'var(--error)',
-              color: 'white',
-            }}
-          >
-            <p className="font-medium">Error loading products</p>
-            <p className="text-sm opacity-80 mt-1">{error.message}</p>
-            <button
+          <Card className="p-6 text-center" style={{ backgroundColor: 'var(--error)' }}>
+            <p className="font-medium text-white">Error loading products</p>
+            <p className="text-sm text-white/80 mt-1">
+              {String(error) || 'Something went wrong'}
+            </p>
+            <Button
+              variant="ghost"
               onClick={() => mutate()}
-              className="mt-4 px-4 py-2 rounded-md text-sm font-medium cursor-pointer"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.2)',
-              }}
+              className="mt-4"
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' }}
             >
               Try Again
-            </button>
-          </div>
+            </Button>
+          </Card>
         )}
 
         {/* Empty State */}
         {!loading && !error && products.length === 0 && (
-          <div
-            className="p-12 rounded-lg text-center"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
-            }}
-          >
-            <p className="text-lg font-medium" style={{ color: 'var(--foreground)' }}>
-              No products found
-            </p>
-            <p style={{ color: 'var(--foreground-secondary)' }}>
-              Try a different search term or browse all products.
-            </p>
-          </div>
+          <EmptyState
+            icon={ShoppingBag}
+            title="No products found"
+            description="Try a different search term or browse all products."
+          />
         )}
 
         {/* Products Grid */}
@@ -125,7 +109,6 @@ export default function DiscoverPage() {
               </p>
             </div>
 
-            {/* Use virtualized grid for large lists, regular grid for small */}
             {products.length > 20 ? (
               <VirtualizedProductGrid products={products} gap={24} />
             ) : (
@@ -139,12 +122,12 @@ export default function DiscoverPage() {
         )}
       </div>
 
-      {/* Floating Search FAB - Always visible, positioned above Plus FAB */}
+      {/* Floating Search FAB */}
       <button
-        onClick={handleFloatingSearchClick}
+        onClick={() => setShowFloatingSearch(true)}
         className="fixed z-50 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer"
         style={{
-          bottom: '96px', // Above the Plus FAB (which is at 24px, plus 56px height + 16px gap)
+          bottom: '96px',
           right: '24px',
           width: '56px',
           height: '56px',
@@ -160,12 +143,6 @@ export default function DiscoverPage() {
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'scale(1)';
           e.currentTarget.style.backgroundColor = 'var(--primary)';
-        }}
-        onMouseDown={(e) => {
-          e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onMouseUp={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
         }}
         title="Search Products"
         aria-label="Search products"
@@ -183,13 +160,9 @@ export default function DiscoverPage() {
           />
 
           {/* Search Panel */}
-          <div
+          <Card
             className="fixed z-50 left-4 right-4 md:left-auto md:right-6 md:w-[500px] rounded-2xl shadow-2xl"
-            style={{
-              bottom: '100px',
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-            }}
+            style={{ bottom: '100px' }}
           >
             <form onSubmit={handleSearch} className="p-4">
               <div className="flex items-center gap-3">
@@ -203,29 +176,20 @@ export default function DiscoverPage() {
                   className="flex-1 bg-transparent outline-none text-base"
                   style={{ color: 'var(--foreground)' }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowFloatingSearch(false)}
-                  className="p-2 rounded-full hover:bg-[var(--surface-light)] transition-colors"
+                <IconButton
+                  icon={X}
                   aria-label="Close search"
-                >
-                  <X size={20} style={{ color: 'var(--foreground-muted)' }} />
-                </button>
+                  onClick={() => setShowFloatingSearch(false)}
+                />
               </div>
-              <div className="flex justify-end mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-                <button
-                  type="submit"
-                  className="rounded-lg text-sm font-medium px-6 py-2.5 transition-colors"
-                  style={{
-                    backgroundColor: 'var(--primary)',
-                    color: 'white',
-                  }}
-                >
+              <Divider spacing="sm" />
+              <div className="flex justify-end">
+                <Button type="submit" variant="primary">
                   Search
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </>
       )}
     </div>

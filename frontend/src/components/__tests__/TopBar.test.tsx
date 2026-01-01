@@ -1,3 +1,11 @@
+/**
+ * TopBar Tests
+ *
+ * NOTE: Test failures should NOT be fixed just to make them pass.
+ * Each test must be logically and functionally correct, reflecting
+ * the actual intended behavior of the code. If a test fails, verify
+ * whether the implementation or the test expectation needs updating.
+ */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import TopBar from '../TopBar';
@@ -33,28 +41,35 @@ jest.mock('../BreadcrumbNav', () => {
   return MockBreadcrumbNav;
 });
 
-// Mock settings store
+// Mock settings store - use selector pattern to match Zustand usage
 const mockSetAgentMode = jest.fn();
 const mockSetCurrencyDisplayMode = jest.fn();
 const mockSetLocalCurrency = jest.fn();
 
+const mockSettingsState = {
+  agentModeEnabled: false,
+  setAgentMode: mockSetAgentMode,
+  theme: 'system' as const,
+  currencyDisplayMode: 'local' as const,
+  localCurrency: 'USD',
+  setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
+  setLocalCurrency: mockSetLocalCurrency,
+};
+
 jest.mock('@/stores/useSettingsStore', () => ({
-  useSettingsStore: () => ({
-    agentModeEnabled: false,
-    setAgentMode: mockSetAgentMode,
-    currencyDisplayMode: 'local',
-    localCurrency: 'USD',
-    setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
-    setLocalCurrency: mockSetLocalCurrency,
-  }),
+  useSettingsStore: (selector: (state: typeof mockSettingsState) => unknown) =>
+    selector(mockSettingsState),
 }));
 
-// Mock looks store
+// Mock looks store - use selector pattern to match Zustand usage
+const mockLooksState = {
+  getMoodboardById: jest.fn(),
+  saveStatus: 'saved' as const,
+};
+
 jest.mock('@/stores/useLooksStore', () => ({
-  useLooksStore: () => ({
-    getMoodboardById: jest.fn(),
-    saveStatus: 'saved',
-  }),
+  useLooksStore: (selector: (state: typeof mockLooksState) => unknown) =>
+    selector(mockLooksState),
   parseSlugId: jest.fn().mockReturnValue(null),
 }));
 
@@ -111,7 +126,8 @@ describe('TopBar', () => {
 
     it('renders search button', () => {
       render(<TopBar />);
-      expect(screen.getByText(/Search.../i)).toBeInTheDocument();
+      // Search is an icon button with aria-label, not visible text
+      expect(screen.getByLabelText(/Search/i)).toBeInTheDocument();
     });
 
     it('renders Agent Mode toggle button', () => {
@@ -300,26 +316,30 @@ describe('TopBar', () => {
     it('opens search input on click', async () => {
       render(<TopBar />);
 
-      const searchArea = screen.getByText(/Search.../i);
-      fireEvent.click(searchArea);
+      // Search is an icon button with aria-label
+      const searchButton = screen.getByLabelText(/^Search$/i);
+      fireEvent.click(searchButton);
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search products.../i)).toBeInTheDocument();
+        // Actual placeholder: "Search a mood or product..."
+        expect(screen.getByPlaceholderText(/Search a mood or product/i)).toBeInTheDocument();
       });
     });
 
     it('shows close button when search is open', async () => {
       render(<TopBar />);
 
-      const searchArea = screen.getByText(/Search.../i);
-      fireEvent.click(searchArea);
+      const searchButton = screen.getByLabelText(/^Search$/i);
+      fireEvent.click(searchButton);
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search products.../i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Search a mood or product/i)).toBeInTheDocument();
       });
 
-      // The X button should be visible
-      const closeButton = screen.getByRole('button', { name: '' });
+      // The close button contains an X icon - find the button in the search form
+      const searchInput = screen.getByPlaceholderText(/Search a mood or product/i);
+      const searchContainer = searchInput.closest('div');
+      const closeButton = searchContainer?.querySelector('button[type="button"]');
       expect(closeButton).toBeInTheDocument();
     });
 
@@ -329,7 +349,7 @@ describe('TopBar', () => {
       fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search products.../i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Search a mood or product/i)).toBeInTheDocument();
       });
     });
 
@@ -340,14 +360,14 @@ describe('TopBar', () => {
       fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText(/Search products.../i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Search a mood or product/i)).toBeInTheDocument();
       });
 
       // Press Escape
       fireEvent.keyDown(document, { key: 'Escape' });
 
       await waitFor(() => {
-        expect(screen.queryByPlaceholderText(/Search products.../i)).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText(/Search a mood or product/i)).not.toBeInTheDocument();
       });
     });
   });

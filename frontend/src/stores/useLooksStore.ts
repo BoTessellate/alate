@@ -54,6 +54,19 @@ interface LooksState {
   setSaveStatus: (status: SaveStatus) => void;
 }
 
+// Random color names for generating layer names
+const LAYER_COLORS = [
+  'coral', 'sage', 'blush', 'amber', 'slate', 'ivory', 'olive', 'rust',
+  'mauve', 'teal', 'ochre', 'plum', 'mint', 'clay', 'dusk', 'fern',
+  'rose', 'moss', 'sand', 'storm', 'pearl', 'cedar', 'honey', 'ash',
+];
+
+// Generate a random layer name in format: colour_mood
+export const generateLayerName = (): string => {
+  const color = LAYER_COLORS[Math.floor(Math.random() * LAYER_COLORS.length)];
+  return `${color}_mood`;
+};
+
 // Generate URL-friendly slug from name
 export const generateSlug = (name: string): string => {
   return name
@@ -125,12 +138,13 @@ export const useLooksStore = create<LooksState>()(
 
       createMoodboard: (name: string, description?: string) => {
         const id = `mb-${Date.now()}`;
-        const slug = generateSlug(name);
+        const finalName = name.trim() || generateLayerName();
+        const slug = generateSlug(finalName);
         const now = new Date().toISOString().split('T')[0];
 
         const newMoodboard: Moodboard = {
           id,
-          name: name.trim() || 'Untitled Moodboard',
+          name: finalName,
           slug,
           description,
           items: [],

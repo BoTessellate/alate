@@ -339,7 +339,7 @@ The TML logo consists of a **circle** and a **pill shape**. Color usage varies b
 **Agent Mode Toggle:**
 | Mode | Default State | Clicked/Active State |
 |------|---------------|---------------------|
-| Dark Mode | circle: cream, pill: primary-light | circle: primary-light, pill: cream |
+| Dark Mode | circle: primary-dark, pill: cream | circle: primary-dark, pill: charcoal |
 | Light Mode | circle: primary-dark, pill: cream | circle: cream, pill: primary-dark |
 
 **Typography:**

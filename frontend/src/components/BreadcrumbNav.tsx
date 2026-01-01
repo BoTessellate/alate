@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronsUpDown, Compass, Layers2, PersonStanding, AlignHorizontalSpaceAround, Grid3X3 } from 'lucide-react';
+import { ChevronsUpDown, Compass, Layers2, AlignHorizontalSpaceAround, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 
@@ -24,11 +24,6 @@ const ROOT_OPTIONS = [
   { label: 'Discover', href: '/discover', icon: Compass },
 ];
 
-// Closet sub-navigation
-const CLOSET_CHILDREN = [
-  { label: 'Discover', href: '/discover', icon: Compass },
-  { label: 'Personal Collection', href: '/closet/personal', icon: PersonStanding },
-];
 
 export default function BreadcrumbNav() {
   const pathname = usePathname();
@@ -64,11 +59,10 @@ export default function BreadcrumbNav() {
   const buildBreadcrumbs = (): BreadcrumbSegment[] => {
     const segments: BreadcrumbSegment[] = [];
 
-    // First segment: User's Mood Layer or The Mood Layer
+    // First segment: User's Mood Layer or The Mood Layer (no dropdown - just home link)
     segments.push({
       label: displayName ? `${displayName}'s Mood Layer` : 'The Mood Layer',
       href: '/',
-      options: ROOT_OPTIONS,
     });
 
     // Home page - just show root
@@ -78,18 +72,11 @@ export default function BreadcrumbNav() {
 
     // LOOKS SECTION
     if (pathname.startsWith('/looks')) {
-      // Build moodboard options for dropdown
-      const looksOptions = moodboards.map(mb => ({
-        label: mb.name,
-        href: `/looks/${generateMoodboardPath(mb.name, mb.id)}`,
-        icon: Grid3X3,
-      }));
-
-      // Add "Layers" as section with dropdown to moodboards
+      // "Layers" shows navigation options to switch sections
       segments.push({
         label: 'Layers',
         href: '/looks',
-        options: looksOptions.length > 0 ? looksOptions : undefined,
+        options: ROOT_OPTIONS,
       });
 
       // /looks page - shows all moodboards
@@ -114,7 +101,7 @@ export default function BreadcrumbNav() {
         if (moodboardSlug && isHydrated) {
           const moodboard = getMoodboardBySlug(moodboardSlug);
           if (moodboard) {
-            // Get all moodboards as options for dropdown
+            // Get all moodboards as options for dropdown to switch boards
             const moodboardOptions = moodboards.map(mb => ({
               label: mb.name,
               href: `/looks/${generateMoodboardPath(mb.name, mb.id)}`,
@@ -124,7 +111,7 @@ export default function BreadcrumbNav() {
             segments.push({
               label: moodboard.name,
               href: pathname,
-              options: moodboardOptions.length > 1 ? moodboardOptions : undefined,
+              options: moodboardOptions.length > 0 ? moodboardOptions : undefined,
             });
           }
         }
@@ -137,23 +124,24 @@ export default function BreadcrumbNav() {
       segments.push({
         label: 'Discover',
         href: '/discover',
+        options: ROOT_OPTIONS,
       });
       return segments;
     }
 
     // CLOSET SECTION
     if (pathname.startsWith('/closet')) {
+      // "Closet" shows navigation options to switch sections (same as Layers)
       segments.push({
         label: 'Closet',
         href: '/closet',
-        options: CLOSET_CHILDREN,
+        options: ROOT_OPTIONS,
       });
 
       if (pathname === '/closet/personal') {
         segments.push({
           label: 'Personal Collection',
           href: '/closet/personal',
-          options: CLOSET_CHILDREN,
         });
       }
       return segments;
@@ -177,8 +165,8 @@ export default function BreadcrumbNav() {
   const isLooksListPage = pathname === '/looks';
 
   // Colors based on topbar theme
-  const textColor = isLooksListPage ? 'var(--charcoal)' : '#f6e9cf';
-  const textColorMuted = isLooksListPage ? 'rgba(34, 34, 34, 0.5)' : 'rgba(246, 233, 207, 0.5)';
+  const textColor = isLooksListPage ? 'var(--charcoal)' : 'var(--cream)';
+  const textColorMuted = isLooksListPage ? 'rgba(34, 34, 34, 0.5)' : 'rgba(244, 239, 237, 0.5)';
   const hoverBg = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
   const dropdownBg = 'var(--surface)';
   const dropdownBorder = 'var(--border)';
@@ -202,8 +190,8 @@ export default function BreadcrumbNav() {
             ref={el => { dropdownRefs.current[index] = el; }}
             className="relative"
           >
-            {segment.options && segment.options.length > 0 && index !== breadcrumbs.length - 1 ? (
-              // Segment with dropdown (not shown for last item)
+            {segment.options && segment.options.length > 0 ? (
+              // Segment with dropdown
               <button
                 onClick={() => setOpenDropdown(openDropdown === index ? null : index)}
                 className="flex items-center gap-1 px-2 py-1 text-sm font-medium group/breadcrumb"

@@ -1,3 +1,11 @@
+/**
+ * Settings Page Tests
+ *
+ * NOTE: Test failures should NOT be fixed just to make them pass.
+ * Each test must be logically and functionally correct, reflecting
+ * the actual intended behavior of the code. If a test fails, verify
+ * whether the implementation or the test expectation needs updating.
+ */
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
@@ -8,9 +16,6 @@ let mockStoreState = {
   theme: 'system' as 'light' | 'dark' | 'system',
   emailNotifications: true,
   pushNotifications: false,
-  agentModeEnabled: false,
-  currencyDisplayMode: 'original' as 'original' | 'local',
-  localCurrency: 'USD' as string,
   userName: null as string | null,
   isLoggedIn: false,
 };
@@ -24,11 +29,6 @@ const mockSetEmailNotifications = jest.fn((enabled) => {
 const mockSetPushNotifications = jest.fn((enabled) => {
   mockStoreState.pushNotifications = enabled;
 });
-const mockSetAgentMode = jest.fn((enabled) => {
-  mockStoreState.agentModeEnabled = enabled;
-});
-const mockSetCurrencyDisplayMode = jest.fn();
-const mockSetLocalCurrency = jest.fn();
 const mockSetUserName = jest.fn();
 const mockSetIsLoggedIn = jest.fn();
 
@@ -39,9 +39,6 @@ jest.mock('@/stores/useSettingsStore', () => ({
     setTheme: mockSetTheme,
     setEmailNotifications: mockSetEmailNotifications,
     setPushNotifications: mockSetPushNotifications,
-    setAgentMode: mockSetAgentMode,
-    setCurrencyDisplayMode: mockSetCurrencyDisplayMode,
-    setLocalCurrency: mockSetLocalCurrency,
     setUserName: mockSetUserName,
     setIsLoggedIn: mockSetIsLoggedIn,
   }),
@@ -62,9 +59,6 @@ describe('SettingsPage', () => {
       theme: 'system',
       emailNotifications: true,
       pushNotifications: false,
-      agentModeEnabled: false,
-      currencyDisplayMode: 'original',
-      localCurrency: 'USD',
       userName: null,
       isLoggedIn: false,
     };
@@ -140,7 +134,8 @@ describe('SettingsPage', () => {
       render(<SettingsPage />);
 
       const toggle = screen.getByTestId('email-notifications-toggle');
-      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      // Toggle component uses role="switch" with aria-checked
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
 
       fireEvent.click(toggle);
 
@@ -151,7 +146,8 @@ describe('SettingsPage', () => {
       render(<SettingsPage />);
 
       const toggle = screen.getByTestId('push-notifications-toggle');
-      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      // Toggle component uses role="switch" with aria-checked
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
 
       fireEvent.click(toggle);
 
@@ -322,7 +318,8 @@ describe('SettingsPage', () => {
       fireEvent.click(screen.getByTestId('delete-account-btn'));
 
       const deleteBtn = screen.getByTestId('confirm-delete-btn');
-      expect(deleteBtn).toHaveStyle({ cursor: 'not-allowed' });
+      // Button uses disabled attribute when deleteConfirmText !== 'DELETE'
+      expect(deleteBtn).toBeDisabled();
     });
 
     it('enables delete button when DELETE is typed', async () => {
@@ -333,7 +330,8 @@ describe('SettingsPage', () => {
       await userEvent.type(screen.getByTestId('delete-confirm-input'), 'DELETE');
 
       const deleteBtn = screen.getByTestId('confirm-delete-btn');
-      expect(deleteBtn).toHaveStyle({ cursor: 'pointer' });
+      // Button is enabled when deleteConfirmText === 'DELETE'
+      expect(deleteBtn).toBeEnabled();
     });
 
     it('auto-capitalizes delete confirmation input', async () => {

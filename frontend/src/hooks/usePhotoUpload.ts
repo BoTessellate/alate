@@ -155,7 +155,29 @@ export function usePhotoUpload() {
 
       return product;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Upload failed';
+      // Provide action-based error messages
+      let message = 'Upload failed';
+
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+
+        if (errorMsg.includes('failed to fetch') || errorMsg.includes('networkerror') || errorMsg.includes('network')) {
+          message = 'Unable to connect to server. Check your internet connection and try again.';
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('aborted')) {
+          message = 'Request timed out. Please try again with a smaller image.';
+        } else if (errorMsg.includes('invalid file') || errorMsg.includes('format')) {
+          message = error.message; // Keep validation errors as-is
+        } else if (errorMsg.includes('413') || errorMsg.includes('too large')) {
+          message = 'Image is too large. Please use an image under 10MB.';
+        } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
+          message = 'Authentication error. Please refresh the page and try again.';
+        } else if (errorMsg.includes('500') || errorMsg.includes('server')) {
+          message = 'Server error while processing image. Please try again later.';
+        } else {
+          message = error.message || 'Failed to process image. Please try again.';
+        }
+      }
+
       setError(message);
       return null;
     }
@@ -206,7 +228,7 @@ export function usePhotoUpload() {
       setStatus('success');
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save';
+      const message = error instanceof Error ? error.message : 'Failed to save product. Please try again.';
       setError(message);
       return false;
     }

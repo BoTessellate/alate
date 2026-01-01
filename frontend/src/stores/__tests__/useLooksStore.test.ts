@@ -4,10 +4,18 @@ import {
   generateSlug,
   generateMoodboardPath,
   parseSlugId,
+  generateLayerName,
   type CanvasItem,
   type Moodboard,
   type SaveStatus,
 } from '../useLooksStore';
+
+// Valid colors from LAYER_COLORS array in useLooksStore
+const VALID_LAYER_COLORS = [
+  'coral', 'sage', 'blush', 'amber', 'slate', 'ivory', 'olive', 'rust',
+  'mauve', 'teal', 'ochre', 'plum', 'mint', 'clay', 'dusk', 'fern',
+  'rose', 'moss', 'sand', 'storm', 'pearl', 'cedar', 'honey', 'ash',
+];
 
 describe('useLooksStore', () => {
   // Store initial moodboards for resetting
@@ -111,7 +119,7 @@ describe('useLooksStore', () => {
       expect(newMoodboard!.slug).toBe('my-cool-board');
     });
 
-    it('should use default name for empty string', () => {
+    it('should use generated layer name for empty string', () => {
       const { result } = renderHook(() => useLooksStore());
 
       let newMoodboard: Moodboard;
@@ -119,7 +127,9 @@ describe('useLooksStore', () => {
         newMoodboard = result.current.createMoodboard('');
       });
 
-      expect(newMoodboard!.name).toBe('Untitled Moodboard');
+      // generateLayerName() creates names in format: {color}_mood
+      const colorPattern = VALID_LAYER_COLORS.join('|');
+      expect(newMoodboard!.name).toMatch(new RegExp(`^(${colorPattern})_mood$`));
     });
 
     it('should trim whitespace from name', () => {
@@ -514,7 +524,36 @@ describe('useLooksStore', () => {
   });
 });
 
+/**
+ * Helper Functions Tests
+ *
+ * NOTE: Test failures should NOT be fixed just to make them pass.
+ * Each test must be logically and functionally correct, reflecting
+ * the actual intended behavior of the code. If a test fails, verify
+ * whether the implementation or the test expectation needs updating.
+ */
 describe('Helper Functions', () => {
+  describe('generateLayerName', () => {
+    it('should generate name in {color}_mood format', () => {
+      const name = generateLayerName();
+      const colorPattern = VALID_LAYER_COLORS.join('|');
+      expect(name).toMatch(new RegExp(`^(${colorPattern})_mood$`));
+    });
+
+    it('should return a string', () => {
+      expect(typeof generateLayerName()).toBe('string');
+    });
+
+    it('should generate names from valid color list', () => {
+      // Run multiple times to test randomness stays within bounds
+      for (let i = 0; i < 20; i++) {
+        const name = generateLayerName();
+        const [color] = name.split('_');
+        expect(VALID_LAYER_COLORS).toContain(color);
+      }
+    });
+  });
+
   describe('generateSlug', () => {
     it('should convert name to lowercase', () => {
       expect(generateSlug('My Board')).toBe('my-board');

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { X, Check, Plus, FolderPlus } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import type { Product } from '@/types';
+import { Button, IconButton, Input } from '@/components/ui';
 
 interface SaveToCollectionModalProps {
   product: Product;
@@ -30,11 +31,9 @@ export default function SaveToCollectionModal({
   const [newCollectionName, setNewCollectionName] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Position modal near anchor element - use useLayoutEffect to calculate before paint
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  // useLayoutEffect runs synchronously before browser paint, preventing visual shift
+  // Position modal near anchor element
   useLayoutEffect(() => {
     if (isOpen && anchorRef?.current) {
       const rect = anchorRef.current.getBoundingClientRect();
@@ -44,19 +43,16 @@ export default function SaveToCollectionModal({
       let left = rect.left;
       let top = rect.bottom + 8;
 
-      // Adjust if would overflow right edge
       if (left + modalWidth > window.innerWidth - 16) {
         left = window.innerWidth - modalWidth - 16;
       }
 
-      // Adjust if would overflow bottom edge
       if (top + modalHeight > window.innerHeight - 16) {
         top = rect.top - modalHeight - 8;
       }
 
       setPosition({ top, left });
     } else if (!isOpen) {
-      // Reset position when closed so it recalculates on next open
       setPosition(null);
     }
   }, [isOpen, anchorRef]);
@@ -124,13 +120,6 @@ export default function SaveToCollectionModal({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleCreateCollection();
-    }
-  };
-
-  // Don't render until open AND position is calculated (prevents flash at 0,0)
   if (!isOpen || !position) return null;
 
   return (
@@ -160,21 +149,16 @@ export default function SaveToCollectionModal({
         >
           Save to Collection
         </span>
-        <button
-          onClick={onClose}
+        <IconButton
+          icon={X}
           aria-label="Close modal"
-          className="w-11 h-11 flex items-center justify-center rounded hover:bg-opacity-10 transition-colors"
-          style={{ color: 'var(--foreground-secondary)' }}
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+          size="sm"
+          onClick={onClose}
+        />
       </div>
 
       {/* Collections list */}
-      <div
-        className="max-h-48 overflow-y-auto"
-        style={{ scrollbarWidth: 'thin' }}
-      >
+      <div className="max-h-48 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
         {collections.length === 0 && !isCreating ? (
           <div
             className="px-4 py-6 text-center text-sm"
@@ -193,9 +177,7 @@ export default function SaveToCollectionModal({
                 onClick={() => handleToggleCollection(collection.id)}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-5 transition-colors text-left cursor-pointer"
                 style={{
-                  backgroundColor: isInCollection
-                    ? 'rgba(76, 112, 49, 0.1)'
-                    : 'transparent',
+                  backgroundColor: isInCollection ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
                 }}
               >
                 {/* Cover preview */}
@@ -212,29 +194,18 @@ export default function SaveToCollectionModal({
                   ))}
                   {collection.coverImages.length === 0 && (
                     <div className="col-span-2 row-span-2 flex items-center justify-center">
-                      <FolderPlus
-                        size={16}
-                        aria-hidden="true"
-                        style={{ color: 'var(--foreground-muted)' }}
-                      />
+                      <FolderPlus size={16} aria-hidden="true" style={{ color: 'var(--foreground-muted)' }} />
                     </div>
                   )}
                 </div>
 
                 {/* Collection info */}
                 <div className="flex-1 min-w-0">
-                  <div
-                    className="text-sm font-medium truncate"
-                    style={{ color: 'var(--foreground)' }}
-                  >
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>
                     {collection.name}
                   </div>
-                  <div
-                    className="text-xs"
-                    style={{ color: 'var(--foreground-muted)' }}
-                  >
-                    {collection.products.length} item
-                    {collection.products.length !== 1 ? 's' : ''}
+                  <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                    {collection.products.length} item{collection.products.length !== 1 ? 's' : ''}
                   </div>
                 </div>
 
@@ -254,64 +225,36 @@ export default function SaveToCollectionModal({
       </div>
 
       {/* Create new collection */}
-      <div
-        className="border-t px-4 py-3"
-        style={{ borderColor: 'var(--border)' }}
-      >
+      <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}>
         {isCreating ? (
           <div className="flex items-center gap-2">
-            <input
+            <Input
               ref={inputRef}
-              type="text"
               value={newCollectionName}
               onChange={(e) => setNewCollectionName(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateCollection()}
               placeholder="Collection name"
-              className="flex-1 px-3 py-2 text-sm rounded border outline-none"
-              style={{
-                backgroundColor: 'var(--background)',
-                borderColor: 'var(--border)',
-                color: 'var(--foreground)',
-              }}
+              size="sm"
+              className="flex-1"
             />
-            <button
+            <Button
+              size="sm"
               onClick={handleCreateCollection}
               disabled={!newCollectionName.trim()}
-              className="px-3 py-2 rounded text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: newCollectionName.trim()
-                  ? 'var(--primary)'
-                  : 'var(--surface-light)',
-                color: newCollectionName.trim()
-                  ? 'white'
-                  : 'var(--foreground-muted)',
-                cursor: newCollectionName.trim() ? 'pointer' : 'not-allowed',
-              }}
             >
               Create
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
+          <Button
+            variant="outline"
+            icon={Plus}
             onClick={() => setIsCreating(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 min-h-[44px] rounded text-sm font-medium transition-colors cursor-pointer"
-            style={{
-              backgroundColor: 'transparent',
-              color: 'var(--foreground-secondary)',
-              border: '1px dashed var(--border)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--foreground-muted)';
-              e.currentTarget.style.color = 'var(--foreground)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border)';
-              e.currentTarget.style.color = 'var(--foreground-secondary)';
-            }}
+            className="w-full"
+            style={{ borderStyle: 'dashed' }}
           >
-            <Plus size={16} aria-hidden="true" />
             Create Collection
-          </button>
+          </Button>
         )}
       </div>
     </div>

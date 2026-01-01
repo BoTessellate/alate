@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Upload, Shirt, Sofa, Loader2, Download, RefreshCw } from 'lucide-react';
 import type { Product } from '@/types';
+import { Button, IconButton } from '@/components/ui';
 
 interface VirtualTryOnModalProps {
   product: Product;
@@ -10,7 +11,7 @@ interface VirtualTryOnModalProps {
   onClose: () => void;
 }
 
-type TryOnType = 'clothing' | 'accessory' | 'furniture' | 'decor';
+type TryOnType = 'clothing' | 'furniture';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend-tml.vercel.app';
 
@@ -41,27 +42,19 @@ export default function VirtualTryOnModal({
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
   // Close on escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
     }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
 
   // Reset state when modal opens
@@ -79,7 +72,6 @@ export default function VirtualTryOnModal({
         setError('Please select an image file');
         return;
       }
-
       setBaseImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -115,21 +107,14 @@ export default function VirtualTryOnModal({
     setResult(null);
 
     try {
-      // Convert base64 data URL to just the base64 part
       const base64Data = baseImage.split(',')[1];
 
       const response = await fetch(`${BACKEND_URL}/api/ai?action=tryon`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          baseImage: {
-            base64: base64Data,
-          },
-          productImages: [
-            { url: product.image_url },
-          ],
+          baseImage: { base64: base64Data },
+          productImages: [{ url: product.image_url }],
           type: tryOnType,
           preserveBackground: true,
         }),
@@ -160,7 +145,6 @@ export default function VirtualTryOnModal({
 
   const handleDownload = () => {
     if (!result) return;
-
     const link = document.createElement('a');
     link.href = result;
     link.download = `tryon-${product.product_name.replace(/\s+/g, '-')}.png`;
@@ -204,65 +188,44 @@ export default function VirtualTryOnModal({
             >
               Virtual Try-On
             </h2>
-            <p
-              className="text-sm mt-0.5"
-              style={{ color: 'var(--foreground-muted)' }}
-            >
+            <p className="text-sm mt-0.5" style={{ color: 'var(--foreground-muted)' }}>
               See how {product.product_name} looks on you or in your space
             </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close modal"
-            className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-opacity-10 transition-colors"
-            style={{ color: 'var(--foreground-secondary)' }}
-          >
-            <X size={20} aria-hidden="true" />
-          </button>
+          <IconButton icon={X} aria-label="Close modal" onClick={onClose} />
         </div>
 
         {/* Content */}
         <div className="p-6">
           {/* Type Selection */}
           <div className="flex gap-3 mb-6">
-            <button
-              onClick={() => setTryOnType('clothing')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all min-h-11 ${
-                tryOnType === 'clothing' ? 'border-2' : ''
-              }`}
-              style={{
-                borderColor: tryOnType === 'clothing' ? 'var(--primary)' : 'var(--border)',
-                backgroundColor: tryOnType === 'clothing' ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
-                color: 'var(--foreground)',
-              }}
-            >
-              <Shirt size={20} aria-hidden="true" />
-              <span className="font-medium">Clothing</span>
-            </button>
-            <button
-              onClick={() => setTryOnType('furniture')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all min-h-11 ${
-                tryOnType === 'furniture' ? 'border-2' : ''
-              }`}
-              style={{
-                borderColor: tryOnType === 'furniture' ? 'var(--primary)' : 'var(--border)',
-                backgroundColor: tryOnType === 'furniture' ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
-                color: 'var(--foreground)',
-              }}
-            >
-              <Sofa size={20} aria-hidden="true" />
-              <span className="font-medium">Furniture</span>
-            </button>
+            {[
+              { type: 'clothing' as TryOnType, icon: Shirt, label: 'Clothing' },
+              { type: 'furniture' as TryOnType, icon: Sofa, label: 'Furniture' },
+            ].map(({ type, icon: Icon, label }) => (
+              <button
+                key={type}
+                onClick={() => setTryOnType(type)}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg border transition-all min-h-11 ${
+                  tryOnType === type ? 'border-2' : ''
+                }`}
+                style={{
+                  borderColor: tryOnType === type ? 'var(--primary)' : 'var(--border)',
+                  backgroundColor: tryOnType === type ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
+                  color: 'var(--foreground)',
+                }}
+              >
+                <Icon size={20} aria-hidden="true" />
+                <span className="font-medium">{label}</span>
+              </button>
+            ))}
           </div>
 
           {/* Main Content Area */}
           <div className="grid grid-cols-2 gap-6">
             {/* Base Image Upload */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: 'var(--foreground)' }}
-              >
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                 {tryOnType === 'clothing' ? 'Your Photo' : 'Room Photo'}
               </label>
               <div
@@ -273,15 +236,11 @@ export default function VirtualTryOnModal({
               >
                 {baseImage ? (
                   <>
-                    <img
-                      src={baseImage}
-                      alt="Base"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={baseImage} alt="Base" className="w-full h-full object-cover" />
                     <button
                       onClick={handleReset}
                       aria-label="Remove uploaded image"
-                      className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+                      className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 transition-colors"
                     >
                       <X size={16} style={{ color: 'white' }} aria-hidden="true" />
                     </button>
@@ -293,13 +252,8 @@ export default function VirtualTryOnModal({
                     style={{ backgroundColor: 'var(--background-secondary)' }}
                   >
                     <Upload size={32} style={{ color: 'var(--foreground-muted)' }} aria-hidden="true" />
-                    <span
-                      className="text-sm text-center px-4"
-                      style={{ color: 'var(--foreground-muted)' }}
-                    >
-                      {tryOnType === 'clothing'
-                        ? 'Upload a photo of yourself'
-                        : 'Upload a photo of your room'}
+                    <span className="text-sm text-center px-4" style={{ color: 'var(--foreground-muted)' }}>
+                      {tryOnType === 'clothing' ? 'Upload a photo of yourself' : 'Upload a photo of your room'}
                     </span>
                   </button>
                 )}
@@ -315,10 +269,7 @@ export default function VirtualTryOnModal({
 
             {/* Result / Product Preview */}
             <div>
-              <label
-                className="block text-sm font-medium mb-2"
-                style={{ color: 'var(--foreground)' }}
-              >
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
                 {result ? 'Result' : 'Product'}
               </label>
               <div
@@ -330,15 +281,11 @@ export default function VirtualTryOnModal({
               >
                 {result ? (
                   <>
-                    <img
-                      src={result}
-                      alt="Try-on result"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={result} alt="Try-on result" className="w-full h-full object-cover" />
                     <button
                       onClick={handleDownload}
                       aria-label="Download result image"
-                      className="absolute bottom-2 right-2 w-11 h-11 flex items-center justify-center rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
+                      className="absolute bottom-2 right-2 w-10 h-10 flex items-center justify-center rounded-lg bg-black/50 hover:bg-black/70 transition-colors"
                       title="Download"
                     >
                       <Download size={18} style={{ color: 'white' }} aria-hidden="true" />
@@ -370,43 +317,30 @@ export default function VirtualTryOnModal({
             </div>
           )}
 
-          {/* Generate Button */}
+          {/* Action Buttons */}
           <div className="mt-6 flex gap-3">
             {result && (
-              <button
-                onClick={handleReset}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-colors min-h-11"
-                style={{
-                  borderColor: 'var(--border)',
-                  color: 'var(--foreground)',
-                }}
-              >
-                <RefreshCw size={18} aria-hidden="true" />
+              <Button variant="outline" icon={RefreshCw} onClick={handleReset}>
                 Try Again
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              className="flex-1"
               onClick={handleGenerate}
               disabled={!baseImage || isGenerating}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all min-h-11"
-              style={{
-                backgroundColor: baseImage && !isGenerating ? 'var(--primary)' : 'var(--surface-light)',
-                color: baseImage && !isGenerating ? 'white' : 'var(--foreground-muted)',
-                cursor: baseImage && !isGenerating ? 'pointer' : 'not-allowed',
-              }}
             >
               {isGenerating ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                  <Loader2 size={18} className="animate-spin mr-2" aria-hidden="true" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Shirt size={18} aria-hidden="true" />
+                  <Shirt size={18} className="mr-2" aria-hidden="true" />
                   Generate Try-On
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -1,15 +1,24 @@
+/**
+ * ProductCard Tests
+ *
+ * NOTE: Test failures should NOT be fixed just to make them pass.
+ * Each test must be logically and functionally correct, reflecting
+ * the actual intended behavior of the code. If a test fails, verify
+ * whether the implementation or the test expectation needs updating.
+ */
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ProductCard from '../ProductCard';
 import type { Product } from '@/types';
 
-// Mock collections store
-const mockIsProductInAnyCollection = jest.fn().mockReturnValue([]);
+// Mock collections store - use selector pattern to match Zustand usage
+let mockIsProductInAnyCollectionResult: string[] = [];
 
 jest.mock('@/stores/useCollectionsStore', () => ({
-  useCollectionsStore: () => ({
-    isProductInAnyCollection: mockIsProductInAnyCollection,
-  }),
+  useCollectionsStore: (selector: (state: { isProductInAnyCollection: (id: string) => string[] }) => unknown) =>
+    selector({
+      isProductInAnyCollection: () => mockIsProductInAnyCollectionResult,
+    }),
 }));
 
 // Mock price formatter hook
@@ -28,6 +37,7 @@ jest.mock('@/hooks/useCurrency', () => ({
 jest.mock('@/utils/placeholder', () => ({
   getProductUrl: (brand: string, productName: string) =>
     `https://example.com/${brand.toLowerCase()}/${productName.toLowerCase().replace(/ /g, '-')}`,
+  generatePlaceholderSVG: () => 'data:image/svg+xml;base64,mock',
 }));
 
 // Mock SaveToCollectionModal
@@ -84,7 +94,7 @@ const mockProductTestPrefix: Product = {
 describe('ProductCard', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsProductInAnyCollection.mockReturnValue([]);
+    mockIsProductInAnyCollectionResult = [];
   });
 
   describe('Rendering', () => {
@@ -98,7 +108,8 @@ describe('ProductCard', () => {
       render(<ProductCard product={mockProduct} />);
 
       const image = screen.getByRole('img', { name: mockProduct.product_name });
-      expect(image).toHaveAttribute('src', mockProduct.image_url);
+      // Next.js Image component transforms src, so check it contains the original URL
+      expect(image.getAttribute('src')).toContain(encodeURIComponent(mockProduct.image_url));
     });
 
     it('renders placeholder when no image URL', () => {
@@ -201,7 +212,7 @@ describe('ProductCard', () => {
     });
 
     it('shows different label when product is in collection', () => {
-      mockIsProductInAnyCollection.mockReturnValue(['col-1']);
+      mockIsProductInAnyCollectionResult = ['col-1'];
       render(<ProductCard product={mockProduct} />);
 
       expect(screen.getByLabelText(/Manage collections/i)).toBeInTheDocument();
@@ -316,7 +327,7 @@ describe('ProductCard', () => {
 
   describe('Product in Collection', () => {
     it('shows filled bookmark icon when product is in collection', () => {
-      mockIsProductInAnyCollection.mockReturnValue(['col-1', 'col-2']);
+      mockIsProductInAnyCollectionResult = ['col-1', 'col-2'];
       render(<ProductCard product={mockProduct} />);
 
       const saveButton = screen.getByLabelText(/Manage collections/i);
@@ -324,7 +335,7 @@ describe('ProductCard', () => {
     });
 
     it('shows empty bookmark icon when product is not in any collection', () => {
-      mockIsProductInAnyCollection.mockReturnValue([]);
+      mockIsProductInAnyCollectionResult = [];
       render(<ProductCard product={mockProduct} />);
 
       const saveButton = screen.getByLabelText(/Save to collection/i);

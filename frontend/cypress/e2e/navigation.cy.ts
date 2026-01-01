@@ -1,5 +1,12 @@
 /// <reference types="cypress" />
+import { SELECTORS } from '../support/commands';
 
+/**
+ * TopBar Navigation Tests
+ *
+ * Uses shared SELECTORS from cypress/support/commands.ts
+ * When component selectors change, update SELECTORS in one place.
+ */
 describe('TopBar Navigation', () => {
   beforeEach(() => {
     // Reset app state and complete onboarding
@@ -41,8 +48,8 @@ describe('TopBar Navigation', () => {
     it('should navigate to Layers/Looks page', () => {
       cy.visit('/');
 
-      // Click on Layers navigation
-      cy.get('header nav a[href="/looks"]').click();
+      // Click on Layers navigation - using shared selector
+      cy.get(SELECTORS.navigation.layersLink).click();
 
       // Should be on looks page
       cy.url().should('include', '/looks');
@@ -52,8 +59,8 @@ describe('TopBar Navigation', () => {
     it('should navigate to Closet page', () => {
       cy.visit('/');
 
-      // Click on Closet navigation
-      cy.get('header nav a[href="/closet"]').click();
+      // Click on Closet navigation - using shared selector
+      cy.get(SELECTORS.navigation.closetLink).click();
 
       // Should be on closet page
       cy.url().should('include', '/closet');
@@ -62,8 +69,8 @@ describe('TopBar Navigation', () => {
     it('should navigate to Discover page', () => {
       cy.visit('/');
 
-      // Click on Discover navigation
-      cy.get('header nav a[href="/discover"]').click();
+      // Click on Discover navigation - using shared selector
+      cy.get(SELECTORS.navigation.discoverLink).click();
 
       // Should be on discover page
       cy.url().should('include', '/discover');
@@ -73,7 +80,7 @@ describe('TopBar Navigation', () => {
       cy.visit('/looks');
 
       // The Layers/Looks link should appear active (has different background)
-      cy.get('header nav a[href="/looks"]')
+      cy.get(SELECTORS.navigation.layersLink)
         .find('div[class*="rounded-full"]')
         .should('have.css', 'background-color')
         .and('not.eq', 'rgba(0, 0, 0, 0)'); // Not transparent
@@ -91,31 +98,33 @@ describe('TopBar Navigation', () => {
   });
 
   describe('Search Functionality', () => {
-    it('should display search bar', () => {
+    // Uses shared SELECTORS - update cypress/support/commands.ts when search changes
+
+    it('should display search icon button', () => {
       cy.visit('/');
 
-      // Search element should exist
-      cy.get('header').contains('Search...').should('be.visible');
+      // Search icon button should exist (collapsed state)
+      cy.get(SELECTORS.search.trigger).should('be.visible');
     });
 
     it('should expand search on click', () => {
       cy.visit('/');
 
-      // Click on search
-      cy.get('header').contains('Search...').click();
+      // Click on search icon
+      cy.get(SELECTORS.search.trigger).click();
 
-      // Input should appear
-      cy.get('header input[placeholder="Search products..."]').should('be.visible');
+      // Input should appear with updated placeholder
+      cy.get(SELECTORS.search.input).should('be.visible');
     });
 
     it('should show search results when typing', () => {
       cy.visit('/');
 
       // Open search
-      cy.get('header').contains('Search...').click();
+      cy.get(SELECTORS.search.trigger).click();
 
       // Type search query
-      cy.get('header input[placeholder="Search products..."]').type('chair');
+      cy.get(SELECTORS.search.input).type('chair');
 
       // Wait for API response
       cy.wait('@searchAPI');
@@ -128,16 +137,17 @@ describe('TopBar Navigation', () => {
       cy.visit('/');
 
       // Open search
-      cy.get('header').contains('Search...').click();
+      cy.get(SELECTORS.search.trigger).click();
 
       // Input should be visible
-      cy.get('header input[placeholder="Search products..."]').should('be.visible');
+      cy.get(SELECTORS.search.input).should('be.visible');
 
       // Click X button to close
       cy.get('header form').find('button').last().click();
 
-      // Search should collapse back
-      cy.get('header input[placeholder="Search products..."]').should('not.exist');
+      // Search should collapse back - icon button returns
+      cy.get(SELECTORS.search.input).should('not.exist');
+      cy.get(SELECTORS.search.trigger).should('be.visible');
     });
 
     it('should open search with keyboard shortcut Ctrl+K', () => {
@@ -147,31 +157,30 @@ describe('TopBar Navigation', () => {
       cy.get('body').type('{ctrl}k');
 
       // Search input should appear
-      cy.get('header input[placeholder="Search products..."]').should('be.visible');
+      cy.get(SELECTORS.search.input).should('be.visible');
     });
 
     it('should close search with Escape key', () => {
       cy.visit('/');
 
       // Open search
-      cy.get('header').contains('Search...').click();
+      cy.get(SELECTORS.search.trigger).click();
 
       // Press Escape
       cy.get('body').type('{esc}');
 
       // Search should close
-      cy.get('header input[placeholder="Search products..."]').should('not.exist');
+      cy.get(SELECTORS.search.input).should('not.exist');
     });
 
     it('should navigate to discover with search query on submit', () => {
       cy.visit('/');
 
       // Open search
-      cy.get('header').contains('Search...').click();
+      cy.get(SELECTORS.search.trigger).click();
 
       // Type and submit
-      cy.get('header input[placeholder="Search products..."]')
-        .type('modern furniture{enter}');
+      cy.get(SELECTORS.search.input).type('modern furniture{enter}');
 
       // Should navigate to discover with query
       cy.url().should('include', '/discover');
@@ -182,15 +191,14 @@ describe('TopBar Navigation', () => {
       cy.visit('/');
 
       // Open search and type
-      cy.get('header').contains('Search...').click();
-      cy.get('header input[placeholder="Search products..."]').type('chair');
+      cy.get(SELECTORS.search.trigger).click();
+      cy.get(SELECTORS.search.input).type('chair');
 
       // Wait for results
       cy.wait('@searchAPI');
 
       // Use arrow keys to navigate
-      cy.get('header input[placeholder="Search products..."]')
-        .type('{downarrow}');
+      cy.get(SELECTORS.search.input).type('{downarrow}');
 
       // First result should be highlighted
       cy.contains('Modern Chair')
@@ -205,18 +213,18 @@ describe('TopBar Navigation', () => {
     it('should display user menu button', () => {
       cy.visit('/');
 
-      // User button should exist
-      cy.get('header button[aria-label="User menu"]').should('be.visible');
+      // User button should exist - using shared selector
+      cy.get(SELECTORS.userMenu.trigger).should('be.visible');
     });
 
     it('should open user dropdown on click', () => {
       cy.visit('/');
 
       // Click user menu
-      cy.get('header button[aria-label="User menu"]').click();
+      cy.get(SELECTORS.userMenu.trigger).click();
 
       // Dropdown should appear with options
-      cy.get('[role="menu"]').should('be.visible');
+      cy.get(SELECTORS.userMenu.dropdown).should('be.visible');
       cy.contains('Settings').should('be.visible');
       cy.contains('Sign out').should('be.visible');
     });
@@ -225,10 +233,10 @@ describe('TopBar Navigation', () => {
       cy.visit('/');
 
       // Open user menu
-      cy.get('header button[aria-label="User menu"]').click();
+      cy.get(SELECTORS.userMenu.trigger).click();
 
       // Click Settings
-      cy.get('[role="menu"]').contains('Settings').click();
+      cy.get(SELECTORS.userMenu.dropdown).contains('Settings').click();
 
       // Should be on settings page
       cy.url().should('include', '/settings');
@@ -238,16 +246,16 @@ describe('TopBar Navigation', () => {
       cy.visit('/');
 
       // Open user menu
-      cy.get('header button[aria-label="User menu"]').click();
+      cy.get(SELECTORS.userMenu.trigger).click();
 
       // Menu should be visible
-      cy.get('[role="menu"]').should('be.visible');
+      cy.get(SELECTORS.userMenu.dropdown).should('be.visible');
 
       // Click outside (on body)
       cy.get('body').click('bottomLeft');
 
       // Menu should close
-      cy.get('[role="menu"]').should('not.exist');
+      cy.get(SELECTORS.userMenu.dropdown).should('not.exist');
     });
   });
 
@@ -255,18 +263,18 @@ describe('TopBar Navigation', () => {
     it('should display currency selector', () => {
       cy.visit('/');
 
-      // Currency button should exist
-      cy.get('header button[aria-label="Select currency"]').should('be.visible');
+      // Currency button should exist - using shared selector
+      cy.get(SELECTORS.currency.trigger).should('be.visible');
     });
 
     it('should open currency dropdown', () => {
       cy.visit('/');
 
       // Click currency selector
-      cy.get('header button[aria-label="Select currency"]').click();
+      cy.get(SELECTORS.currency.trigger).click();
 
       // Dropdown should appear with currency options
-      cy.get('[role="listbox"]').should('be.visible');
+      cy.get(SELECTORS.currency.dropdown).should('be.visible');
       cy.contains('USD').should('be.visible');
       cy.contains('EUR').should('be.visible');
     });
@@ -275,16 +283,16 @@ describe('TopBar Navigation', () => {
       cy.visit('/');
 
       // Open currency dropdown
-      cy.get('header button[aria-label="Select currency"]').click();
+      cy.get(SELECTORS.currency.trigger).click();
 
       // Select EUR
-      cy.get('[role="listbox"]').contains('EUR').click();
+      cy.get(SELECTORS.currency.dropdown).contains('EUR').click();
 
       // Dropdown should close
-      cy.get('[role="listbox"]').should('not.exist');
+      cy.get(SELECTORS.currency.dropdown).should('not.exist');
 
       // Currency should be updated (shows euro symbol)
-      cy.get('header button[aria-label="Select currency"]').should('be.visible');
+      cy.get(SELECTORS.currency.trigger).should('be.visible');
     });
   });
 
@@ -292,22 +300,22 @@ describe('TopBar Navigation', () => {
     it('should display Agent mode toggle', () => {
       cy.visit('/');
 
-      // Agent toggle button should exist
-      cy.get('header button[aria-label*="Agent Mode"]').should('be.visible');
+      // Agent toggle button should exist - using shared selector
+      cy.get(SELECTORS.agentMode.trigger).should('be.visible');
     });
 
     it('should toggle Agent mode', () => {
       cy.visit('/');
 
       // Get initial state
-      cy.get('header button[aria-label*="Agent Mode"]')
+      cy.get(SELECTORS.agentMode.trigger)
         .invoke('attr', 'aria-pressed')
         .then((initialState) => {
           // Click toggle
-          cy.get('header button[aria-label*="Agent Mode"]').click();
+          cy.get(SELECTORS.agentMode.trigger).click();
 
           // State should change
-          cy.get('header button[aria-label*="Agent Mode"]')
+          cy.get(SELECTORS.agentMode.trigger)
             .invoke('attr', 'aria-pressed')
             .should('not.eq', initialState);
         });
@@ -318,8 +326,8 @@ describe('TopBar Navigation', () => {
     it('should display help button', () => {
       cy.visit('/');
 
-      // Help button should exist
-      cy.get('header button[aria-label="Help"]').should('be.visible');
+      // Help button should exist - using shared selector
+      cy.get(SELECTORS.help.trigger).should('be.visible');
     });
 
     it('should display feedback button', () => {

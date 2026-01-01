@@ -9,6 +9,13 @@ import { getCurrencySymbol } from '@/utils/currency';
 import { useLooksStore, parseSlugId } from '@/stores/useLooksStore';
 import { useProductSearch } from '@/hooks/useProductSearch';
 import BreadcrumbNav from './BreadcrumbNav';
+import {
+  getTopbarColors,
+  TopbarIconButton,
+  TopbarTextButton,
+  Logo,
+  AgentModeToggle,
+} from './ui/topbar';
 
 const navigationItems = [
   { name: 'Layers', href: '/looks', icon: Layers2 },
@@ -77,6 +84,9 @@ export default function TopBar() {
   // Check if on My Looks page (not editor) for warm topbar
   const isLooksListPage = pathname === '/looks';
   const pathSegments = pathname.split('/').filter(Boolean);
+
+  // Compute topbar colors once - used by all icon buttons
+  const colors = getTopbarColors(isLooksListPage);
 
   // Get moodboard name if on editor page (only after hydration to avoid mismatch)
   let moodboardName: string | null = null;
@@ -271,23 +281,7 @@ export default function TopBar() {
       >
       {/* Left side - Logo + Breadcrumb Navigation */}
       <div className="flex items-center gap-3">
-        {/* Logo Icon */}
-        <Link
-          href="/"
-          className="flex items-center transition-opacity hover:opacity-80"
-        >
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: isLooksListPage ? '#F4EFED' : '#222222' }}
-          >
-            <div
-              className="w-4 h-1.5 rounded-full"
-              style={{ backgroundColor: '#546c22' }}
-            />
-          </div>
-        </Link>
-
-        {/* Breadcrumb Navigation */}
+        <Logo isWarmTopbar={isLooksListPage} effectiveTheme={effectiveTheme} />
         <BreadcrumbNav />
       </div>
 
@@ -379,53 +373,54 @@ export default function TopBar() {
           </div>
         )}
 
-        {/* Search - Unified component with smooth transition */}
+        {/* Search - Icon that expands on click */}
         <div ref={searchContainerRef} className="relative">
           <form onSubmit={handleSearchSubmit}>
-            <div
-              onClick={() => !showSearch && setShowSearch(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-text"
-              style={{
-                backgroundColor: showSearch ? 'var(--background)' : (isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)'),
-                width: showSearch ? '256px' : 'auto',
-                transition: 'width 200ms ease-out, background-color 200ms ease-out',
-              }}
-            >
-              <Search size={14} style={{ color: showSearch ? 'var(--foreground-muted)' : (isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)'), flexShrink: 0 }} />
-              {showSearch ? (
-                <>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearchKeyDown}
-                    placeholder="Search products..."
-                    className="flex-1 bg-transparent text-sm min-w-0"
-                    style={{ color: 'var(--foreground)', border: 'none', outline: 'none', boxShadow: 'none' }}
-                  />
-                  {isSearching && (
-                    <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--foreground-muted)' }} />
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowSearch(false);
-                      setSearchQuery('');
-                    }}
-                    className="flex-shrink-0 transition-opacity hover:opacity-70"
-                    style={{ color: 'var(--foreground-muted)' }}
-                  >
-                    <X size={14} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="text-sm" style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}>Search...</span>
-                </>
-              )}
-            </div>
+            {showSearch ? (
+              <div
+                className="flex items-center gap-2 px-3 h-8 rounded-full"
+                style={{
+                  backgroundColor: 'var(--background)',
+                  width: '280px',
+                  transition: 'width 200ms ease-out',
+                }}
+              >
+                <Search size={16} style={{ color: 'var(--foreground-muted)', flexShrink: 0 }} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search a mood or product..."
+                  className="flex-1 bg-transparent text-sm min-w-0"
+                  style={{ color: 'var(--foreground)', border: 'none', outline: 'none', boxShadow: 'none' }}
+                />
+                {isSearching && (
+                  <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--foreground-muted)' }} />
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSearch(false);
+                    setSearchQuery('');
+                  }}
+                  className="flex-shrink-0 transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--foreground-muted)' }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <TopbarIconButton
+                icon={Search}
+                aria-label="Search"
+                title="Search (Ctrl+K)"
+                onClick={() => setShowSearch(true)}
+                colors={colors}
+              />
+            )}
           </form>
 
           {/* Search Results Dropdown with fade-in animation */}
@@ -473,23 +468,24 @@ export default function TopBar() {
         <div ref={currencyMenuRef} className="relative">
           <button
             onClick={() => setShowCurrencyMenu(!showCurrencyMenu)}
-            className="w-10 h-10 flex items-center justify-center gap-1 rounded-full transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
             style={{
-              backgroundColor: isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)',
-              color: isLooksListPage ? 'var(--charcoal)' : 'white',
+              backgroundColor: colors.defaultBg,
+              color: colors.text,
             }}
             aria-label="Select currency"
             aria-expanded={showCurrencyMenu}
             aria-haspopup="listbox"
+            title="Currency"
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.25)';
+              e.currentTarget.style.backgroundColor = colors.hoverBg;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.backgroundColor = colors.defaultBg;
             }}
           >
-            <span className="text-sm font-medium">
-              {currencyDisplayMode === 'local' ? getCurrencySymbol(localCurrency) : 'Original'}
+            <span className="text-xs font-medium">
+              {currencyDisplayMode === 'local' ? getCurrencySymbol(localCurrency) : '¤'}
             </span>
           </button>
 
@@ -562,97 +558,42 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Agent Mode Toggle - Logo style icon with circle + pill
-            Per CLAUDE.md:
-            Dark Mode Default: circle: cream, pill: primary-light
-            Dark Mode Active: circle: primary-light, pill: cream
-            Light Mode Default: circle: primary-dark, pill: cream
-            Light Mode Active: circle: cream, pill: primary-dark
-        */}
-        <button
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-all"
-          style={{ backgroundColor: 'transparent' }}
-          onClick={() => setAgentMode(!agentModeEnabled)}
-          aria-label={agentModeEnabled ? 'Disable Agent Mode' : 'Enable Agent Mode'}
-          aria-pressed={agentModeEnabled}
-        >
-          {/* Circle background - slightly larger than other icons */}
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-            style={{
-              backgroundColor: agentModeEnabled
-                ? (effectiveTheme === 'dark' ? 'var(--primary-light)' : 'var(--cream)')
-                : (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)'),
-            }}
-          >
-            {/* Pill inside circle - blinks like a human eye when active */}
-            <div
-              className={`agent-pill w-4 h-2 rounded-full ${agentModeEnabled ? 'agent-pill-blink' : 'transition-colors'}`}
-              style={{
-                backgroundColor: agentModeEnabled
-                  ? (effectiveTheme === 'dark' ? 'var(--cream)' : 'var(--primary-dark)')
-                  : (effectiveTheme === 'dark' ? 'var(--primary-light)' : 'var(--cream)'),
-              }}
-              aria-hidden="true"
-            />
-          </div>
-        </button>
+        {/* Agent Mode Toggle */}
+        <AgentModeToggle
+          isActive={agentModeEnabled}
+          onToggle={() => setAgentMode(!agentModeEnabled)}
+          effectiveTheme={effectiveTheme}
+        />
 
         {/* Help */}
-        <button
-          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-          style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = isLooksListPage ? 'var(--charcoal)' : 'white';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)';
-          }}
+        <TopbarIconButton
+          icon={HelpCircle}
           aria-label="Help"
-        >
-          <HelpCircle size={16} aria-hidden="true" />
-        </button>
+          title="Help"
+          colors={colors}
+        />
 
         {/* Feedback */}
-        <button
-          className="h-10 rounded-full flex items-center justify-center px-4 transition-colors"
-          style={{ color: isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = isLooksListPage ? 'var(--charcoal)' : 'white';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = isLooksListPage ? 'rgba(34, 34, 34, 0.75)' : 'rgba(255, 255, 255, 0.75)';
-          }}
+        <TopbarTextButton
           aria-label="Send feedback"
+          title="Send Feedback"
+          colors={colors}
         >
-          <span className="text-xs font-medium">Feedback</span>
-        </button>
+          Feedback
+        </TopbarTextButton>
 
         {/* User Menu with Dropdown */}
-        <div ref={userMenuRef} className="pl-2 relative" style={{ borderLeft: `1px solid ${isLooksListPage ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.2)'}` }}>
-          <button
-            className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-            style={{
-              backgroundColor: isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.2)',
-              color: isLooksListPage ? 'var(--charcoal)' : 'white',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 255, 255, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.2)';
-            }}
-            onClick={() => setShowUserMenu(!showUserMenu)}
+        <div ref={userMenuRef} className="pl-2 relative" style={{ borderLeft: `1px solid ${colors.border}` }}>
+          <TopbarIconButton
+            icon={User}
             aria-label="User menu"
             aria-expanded={showUserMenu}
             aria-haspopup="menu"
-          >
-            <User size={16} aria-hidden="true" />
-          </button>
+            title="Account"
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            colors={colors}
+            variant="filled"
+          />
 
           {/* User Dropdown Menu */}
           {showUserMenu && (

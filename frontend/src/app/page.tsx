@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
+import { Card, PageHeader, SectionHeader, Button } from '@/components/ui';
 
 export default function Home() {
   const { moodboards } = useLooksStore();
@@ -51,32 +52,17 @@ export default function Home() {
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Section */}
       <div className="px-8 pt-8 pb-6 max-w-6xl mx-auto">
-        {/* Page Header - inline pattern */}
-        <div className="flex items-baseline gap-3 mb-8">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-            Welcome back
-          </h1>
-          <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-            Ready to create something beautiful?
-          </span>
-        </div>
+        <PageHeader
+          title="Welcome back"
+          subtitle="Ready to create something beautiful?"
+          className="mb-8 px-0 pt-0 pb-0"
+        />
 
         {/* Main CTA Card */}
-        <Link
-          href="/looks/create"
-          className="block mb-6 p-6 rounded-2xl border transition-all duration-300 group relative overflow-hidden"
-          style={{
-            backgroundColor: 'var(--surface)',
-            borderColor: 'var(--border)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
+        <Card
+          variant="elevated"
+          onClick={() => window.location.href = '/looks/create'}
+          className="mb-6 p-6 rounded-2xl group"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -101,62 +87,39 @@ export default function Home() {
               style={{ color: 'var(--foreground-muted)' }}
             />
           </div>
-        </Link>
+        </Card>
 
         {/* Two column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Curated Layers - takes 2 columns, only show if there are layers */}
+          {/* Curated Layers - takes 2 columns */}
           <div className="lg:col-span-2">
             {recentLayers.length > 0 ? (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-medium uppercase tracking-wide" style={{ color: 'var(--foreground-muted)' }}>
-                    Curated Layers
-                  </h2>
-                  <Link
-                    href="/looks"
-                    className="text-sm font-medium transition-all flex items-center gap-1"
-                    style={{ color: 'var(--primary)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = 'var(--primary-dark)';
-                      e.currentTarget.style.transform = 'translateX(2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = 'var(--primary)';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                    }}
-                    onMouseDown={(e) => {
-                      e.currentTarget.style.transform = 'translateX(1px) scale(0.98)';
-                    }}
-                    onMouseUp={(e) => {
-                      e.currentTarget.style.transform = 'translateX(2px)';
-                    }}
-                  >
-                    View all
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
+                <SectionHeader
+                  title="Curated Layers"
+                  actions={
+                    <Link
+                      href="/looks"
+                      className="text-sm font-medium transition-colors flex items-center gap-1"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      View all
+                      <ArrowRight size={14} />
+                    </Link>
+                  }
+                  className="mb-4"
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {recentLayers.map((layer) => {
                     const coverImages = getCoverImages(layer.items);
                     return (
-                      <Link
+                      <Card
                         key={layer.id}
-                        href={`/looks/${generateMoodboardPath(layer.name, layer.id)}`}
-                        className="group rounded-lg border overflow-hidden transition-all duration-200"
-                        style={{
-                          backgroundColor: 'var(--surface)',
-                          borderColor: 'var(--border)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--primary)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'var(--border)';
-                        }}
+                        variant="interactive"
+                        onClick={() => window.location.href = `/looks/${generateMoodboardPath(layer.name, layer.id)}`}
                       >
-                        {/* Cover Image Grid - Square aspect ratio (matches Layers page) */}
+                        {/* Cover Image Grid */}
                         <div
                           className="aspect-square relative"
                           style={{ backgroundColor: 'var(--background-secondary)' }}
@@ -170,7 +133,6 @@ export default function Home() {
                                   style={{ backgroundImage: `url(${img})` }}
                                 />
                               ))}
-                              {/* Fill remaining slots if less than 4 images */}
                               {Array.from({ length: Math.max(0, 4 - coverImages.length) }).map(
                                 (_, idx) => (
                                   <div
@@ -190,7 +152,7 @@ export default function Home() {
                             </div>
                           )}
                         </div>
-                        {/* Moodboard Info - Compact (matches Layers page) */}
+                        {/* Moodboard Info */}
                         <div className="p-2.5">
                           <h3 className="font-medium text-sm mb-0.5 truncate" style={{ color: 'var(--foreground)' }}>
                             {layer.name}
@@ -200,13 +162,12 @@ export default function Home() {
                             <span>{formatRelativeTime(layer.updatedAt)}</span>
                           </div>
                         </div>
-                      </Link>
+                      </Card>
                     );
                   })}
                 </div>
               </>
             ) : (
-              // Empty state - show nothing, just take up space for layout
               <div />
             )}
           </div>
@@ -214,19 +175,11 @@ export default function Home() {
           {/* Sidebar - Quick actions */}
           <div className="space-y-4">
             {/* Discover Card */}
-            <Link
-              href="/discover"
-              className="block p-4 rounded-xl border transition-all duration-200 group"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-              }}
+            <Card
+              variant="interactive"
+              onClick={() => window.location.href = '/discover'}
+              padding="md"
+              className="rounded-xl"
             >
               <div className="flex items-center gap-3 mb-2">
                 <div
@@ -242,16 +195,10 @@ export default function Home() {
               <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
                 Explore trending products and find inspiration
               </p>
-            </Link>
+            </Card>
 
             {/* AI Feature Card */}
-            <div
-              className="p-4 rounded-xl border"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-              }}
-            >
+            <Card padding="md" className="rounded-xl" hoverHighlight={false}>
               <div className="flex items-center gap-3 mb-2">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -275,22 +222,14 @@ export default function Home() {
               >
                 Coming soon
               </span>
-            </div>
+            </Card>
 
             {/* Collections Quick Access */}
-            <Link
-              href="/collections"
-              className="block p-4 rounded-xl border transition-all duration-200 group"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border)';
-              }}
+            <Card
+              variant="interactive"
+              onClick={() => window.location.href = '/collections'}
+              padding="md"
+              className="rounded-xl"
             >
               <div className="flex items-center gap-3 mb-2">
                 <div
@@ -306,7 +245,7 @@ export default function Home() {
               <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
                 Browse your saved products and wishlists
               </p>
-            </Link>
+            </Card>
           </div>
         </div>
       </div>
