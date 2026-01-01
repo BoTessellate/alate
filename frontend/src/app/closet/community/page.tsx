@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Search, Grid3X3, Users, Heart } from 'lucide-react';
+import { Search, Users, Heart } from 'lucide-react';
+import { EmptyState, PageHeader } from '@/components/ui';
 
 // Placeholder for community closet - will be connected to API later
 export default function CommunityClosetPage() {
@@ -10,51 +11,25 @@ export default function CommunityClosetPage() {
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
       {/* Header Section */}
-      <div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-            Community
-          </h1>
-          <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-            Curated collections from the community
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="Community"
+        subtitle="Curated collections from the community"
+      />
 
       {/* Content area */}
       <div className="px-8 pb-8 max-w-7xl mx-auto">
         {collections.length === 0 ? (
-          /* Empty State */
-          <div
-            className="text-center py-20 rounded-lg border"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
+          <EmptyState
+            icon={Users}
+            title="Community collections coming soon"
+            description="We're building a space for the community to share their curated wardrobes and style inspiration."
+            action={{
+              label: 'Discover Items',
+              onClick: () => window.location.href = '/discover',
+              icon: Search,
+              variant: 'secondary',
             }}
-          >
-            <Users
-              size={48}
-              className="mx-auto mb-4"
-              style={{ color: 'var(--foreground-muted)' }}
-            />
-            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
-              Community collections coming soon
-            </h3>
-            <p className="mb-6 max-w-md mx-auto" style={{ color: 'var(--foreground-secondary)' }}>
-              We're building a space for the community to share their curated wardrobes and style inspiration.
-            </p>
-            <a
-              href="/discover"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors"
-              style={{
-                backgroundColor: 'var(--secondary)',
-                color: 'white',
-              }}
-            >
-              <Search size={18} />
-              Discover Items
-            </a>
-          </div>
+          />
         ) : (
           /* Collections Grid */
           <>

@@ -28,10 +28,10 @@
 
   --secondary: #8b6b4a;         /* Warm brown accent */
   --accent: #4c7031;            /* Same as primary green */
-  --highlight: #c4a35a;         /* Gold highlight */
+  --highlight: #996b26;         /* Gold highlight (WCAG AA: 4.68:1 on white) */
 
   --success: #4c7031;           /* Use primary green for success */
-  --warning: #c4a35a;
+  --warning: #996b26;           /* WCAG AA compliant gold */
   --error: #a84032;
   --info: #4a7c9b;
 

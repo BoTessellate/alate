@@ -353,6 +353,78 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 
 ---
 
+## Design Decisions & Feature Intent
+
+This section captures the "why" behind design choices. Claude should reference this before making UI/UX changes.
+
+### Core Design Philosophy
+
+<!-- Add your overall design vision here -->
+-
+-
+
+### UI Patterns - Do's
+
+<!-- Things that should always be done -->
+| Pattern | Reason |
+|---------|--------|
+| Page headers use inline baseline layout | Consistent hierarchy, never stacked |
+| Agent mode toggle uses green when active | Signifies AI is engaged |
+| | |
+
+### UI Patterns - Don'ts (Anti-patterns)
+
+<!-- Things that should never happen -->
+| Anti-pattern | Why to avoid |
+|--------------|--------------|
+| Stacked page header layouts | Breaks visual consistency |
+| Matching agent toggle to logo colors | Too blended, needs contrast |
+| | |
+
+### Feature Behavior Intent
+
+<!-- How specific features should behave -->
+
+**Agent Mode:**
+- Purpose:<PENDING ON USER - WILL FILL THIS SOON>
+- When active:
+- When inactive:
+
+**Closet (Personal vs Community):**
+- Personal:User's own clothes that have been uploaded via images or social links
+- Community:Artefacts shared by community members
+
+**Layer Naming (`color_mood`):**
+- Why this format: to evoke a sense of creativity in addition to what the platform provides
+- Example names: coral_mood, sage_mood
+
+### User Experience Goals
+
+<!-- What feeling/experience should users have -->
+- evoke creativity and openness to new experiences
+- layout needs to be elegant but modern
+- user should feel driven to explore more
+
+### Edge Cases & Special Handling
+
+<!-- How to handle unusual scenarios -->
+| Scenario | Expected Behavior |
+|----------|-------------------|
+| Empty moodboard | |
+| No products in closet | |
+| | |
+
+### Recent Design Decisions Log
+
+<!-- Quick log of decisions made in conversations -->
+| Date | Decision | Context |
+|------|----------|---------|
+| 2026-01-01 | Agent toggle: green when active, contrast with logo | User feedback: "too blended" |
+| 2026-01-01 | Dark mode topbar: primary-dark not charcoal | Maintain brand consistency |
+| | | |
+
+---
+
 ## High-Level Plan
 
 ### Completed
@@ -379,14 +451,22 @@ Current secondary: `#8b6b4a` (warm brown) - used in page.tsx BookHeart icon
 ### Pending / Planned
 
 - [ ] Collaboration features (real-time editing) NOT PLANNED FOR NOW
-- [ ] Advanced search filters UI
 - [ ] Brand dashboard analytics NOT PLANNED FOR NOW
 - [ ] Subscription/payment integration NOT PLANNED FOR NOW
+- [ ] Advanced search filters UI
 - [ ] Pinterest-style discovery feed
 - [ ] AR try-on for mobile
-- [ ] Accessibility audit (WCAG compliance) - Analysis complete, ready for implementation
 
 ### Recently Completed
+
+- [x] **WCAG Accessibility Compliance** - Implemented core accessibility features:
+  - Skip link for keyboard navigation (AppLayout)
+  - ARIA landmarks: `<header>`, `<nav aria-label>`, `<main id="main-content">`
+  - Focus trapping in Modal component
+  - Focus restoration on modal close
+  - aria-labels on all interactive elements (54+ occurrences)
+  - WCAG AA color contrast fix: warning/highlight #c4a35a → #996b26 (4.68:1 ratio)
+  - Backend colorUtils: `getContrastRatio()`, `meetsContrastRequirement()` for validation
 
 - [x] **Performance optimization** - Implemented lazy loading, caching, and virtualization:
   - Next.js Image with blur placeholders (ProductCard, VirtualizedSidebarProducts)
@@ -524,6 +604,88 @@ npm run deploy       # Deploy to Vercel
 cd mobile
 npm start            # Expo dev server
 ```
+
+---
+
+## Available Development Tools
+
+Claude Code has direct access to the following tools for debugging and development. These can be used without asking the user to run commands manually.
+
+### Version Control
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **Git** | `git status`, `git add`, `git commit`, `git push`, `git log`, `git diff` | Full access to all git operations |
+| **GitHub CLI** | `gh pr list`, `gh issue list`, `gh run list` | May require authentication setup |
+
+### Deployment & Hosting
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **Vercel CLI** | `vercel --prod`, `vercel logs <url>`, `vercel inspect <url>`, `vercel ls` | Deploy, inspect, and monitor deployments |
+| **Vercel Dev** | `vercel dev` (backend) | Run backend locally with Vercel functions |
+
+### Package Management & Build
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **npm** | `npm install`, `npm run build`, `npm test`, `npm run dev` | Full package management |
+| **npx** | `npx tsc --noEmit`, `npx jest` | Run package binaries |
+| **Node.js** | `node script.js` | Execute Node scripts |
+
+### Testing
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **Jest** | `npm test` (frontend) | Unit and component tests |
+| **Vitest** | `npm test` (backend) | Backend unit tests |
+| **Cypress** | `npm run cy:run` | E2E tests (headless) |
+| **TypeScript** | `npx tsc --noEmit` | Type checking without emit |
+
+### Shell & System
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **PowerShell** | `powershell -Command "..."` | Windows shell commands |
+| **cmd** | `cmd /c "..."` | Windows command prompt |
+| **WSL** | `wsl` commands | Linux subsystem (if available) |
+
+### Web & API
+
+| Tool | Command Examples | Notes |
+|------|------------------|-------|
+| **WebFetch** | Fetch and analyze web pages | Check deployment status, debug responses |
+| **WebSearch** | Search for documentation | Find solutions, check current docs |
+| **curl/wget** | HTTP requests | API testing (via PowerShell) |
+
+### File Operations
+
+| Tool | Capability | Notes |
+|------|------------|-------|
+| **Read** | Read any file | View code, configs, logs |
+| **Write** | Create new files | New components, configs |
+| **Edit** | Modify existing files | Code changes, fixes |
+| **Glob** | Find files by pattern | Search codebase structure |
+| **Grep** | Search file contents | Find code patterns |
+
+### Debugging Workflow
+
+When debugging issues, Claude Code can:
+
+1. **Check deployment status**: `vercel inspect <url> --logs`
+2. **View runtime logs**: `vercel logs <url>`
+3. **Run local builds**: `npm run build`
+4. **Run type checks**: `npx tsc --noEmit` or `npx tsc --project tsconfig.ci.json`
+5. **Run tests**: `npm test`
+6. **Check git status**: `git status`, `git diff`
+7. **Push fixes**: `git add`, `git commit`, `git push`
+
+### Environment Notes
+
+- All commands run in **Windows (PowerShell)** environment
+- Git commands use Windows line endings (CRLF warnings are normal)
+- Vercel CLI requires `--yes` flag for non-interactive mode
+- Some background tasks write output to temp files that can be read
 
 ---
 

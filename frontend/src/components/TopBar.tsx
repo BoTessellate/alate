@@ -287,7 +287,7 @@ export default function TopBar() {
       </div>
 
       {/* Center - Navigation Icons */}
-      <nav className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8">
+      <nav aria-label="Main navigation" className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-8">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href ||
             (item.href !== '/' && pathname.startsWith(item.href));

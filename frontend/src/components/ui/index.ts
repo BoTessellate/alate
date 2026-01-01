@@ -88,6 +88,13 @@ export { Chip, type ChipProps } from './Chip';
 // Checkbox
 export { Checkbox, type CheckboxProps } from './Checkbox';
 
+// Error Boundary
+export {
+  ErrorBoundary,
+  withErrorBoundary,
+  type ErrorBoundaryProps,
+} from './ErrorBoundary';
+
 // Topbar-specific components
 export {
   getTopbarColors,

@@ -40,8 +40,12 @@ export function PageHeader({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-baseline gap-3">
           <h1
-            className="text-3xl font-bold"
-            style={{ color: 'var(--foreground)' }}
+            className="text-4xl italic"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
           >
             {title}
           </h1>
@@ -84,8 +88,12 @@ export function SectionHeader({
     <div className={`flex items-center justify-between gap-4 mb-4 ${className}`}>
       <div>
         <h2
-          className="text-xl font-semibold"
-          style={{ color: 'var(--foreground)' }}
+          className="text-2xl italic"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+          }}
         >
           {title}
         </h2>

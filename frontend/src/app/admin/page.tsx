@@ -608,7 +608,14 @@ export default function AdminPage() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--foreground)' }}>
+          <h1
+            className="text-3xl italic mb-2"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
+          >
             Admin Dashboard
           </h1>
           <p style={{ color: 'var(--foreground-secondary)' }}>

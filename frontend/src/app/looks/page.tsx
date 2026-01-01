@@ -13,6 +13,7 @@ import {
   Input,
   EmptyState,
   DropdownItem,
+  ErrorBoundary,
 } from '@/components/ui';
 
 export default function LooksPage() {
@@ -182,6 +183,10 @@ export default function LooksPage() {
 
         {/* Moodboards Grid */}
         {moodboards.length > 0 && (
+          <ErrorBoundary
+            onError={(error) => console.error('[LooksPage] Grid error:', error.message)}
+            showReset
+          >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {moodboards.map((moodboard) => {
               const coverImages = getCoverImages(moodboard);

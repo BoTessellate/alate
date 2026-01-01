@@ -39,11 +39,11 @@ export const THEME_TOKENS = {
     primaryDark: '#3D522D',
     secondary: '#8b6b4a',
     accent: '#4c7031',
-    highlight: '#c4a35a',
+    highlight: '#996b26',       // WCAG AA compliant gold
     cream: '#F4EFED',
     charcoal: '#222222',
     success: '#4c7031',
-    warning: '#c4a35a',
+    warning: '#996b26',         // WCAG AA compliant gold
     error: '#a84032',
     info: '#4a7c9b',
   },

@@ -173,8 +173,12 @@ export default function OnboardingPage() {
       {step === 1 && (
         <div className="max-w-2xl w-full text-center">
           <h1
-            className="text-3xl font-bold mb-3"
-            style={{ color: 'var(--foreground)' }}
+            className="text-3xl italic mb-3"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
           >
             Hi I'm Moody, tell me a little about your style
           </h1>
@@ -216,8 +220,12 @@ export default function OnboardingPage() {
       {step === 2 && (
         <div className="max-w-2xl w-full text-center">
           <h1
-            className="text-3xl font-bold mb-3"
-            style={{ color: 'var(--foreground)' }}
+            className="text-3xl italic mb-3"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
           >
             Pick your favorites
           </h1>
@@ -272,8 +280,12 @@ export default function OnboardingPage() {
             <Sparkles size={40} style={{ color: 'var(--primary)' }} />
           </div>
           <h1
-            className="text-3xl font-bold mb-3"
-            style={{ color: 'var(--foreground)' }}
+            className="text-3xl italic mb-3"
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
           >
             You're all set!
           </h1>

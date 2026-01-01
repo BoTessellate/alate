@@ -26,6 +26,11 @@ function useDropdownContext() {
   return context;
 }
 
+// Safe version that returns null when outside Dropdown context (for standalone usage)
+function useDropdownContextSafe(): DropdownContextValue | null {
+  return useContext(DropdownContext);
+}
+
 export interface DropdownProps {
   children: ReactNode;
   /** Controlled open state */
@@ -209,14 +214,15 @@ export function DropdownItem({
   className = '',
   closeOnClick = true,
 }: DropdownItemProps) {
-  const { close } = useDropdownContext();
+  // Use safe context - allows standalone usage outside Dropdown wrapper
+  const context = useDropdownContextSafe();
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = () => {
     if (disabled) return;
     onClick?.();
-    if (closeOnClick) {
-      close();
+    if (closeOnClick && context?.close) {
+      context.close();
     }
   };
 

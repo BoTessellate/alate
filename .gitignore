@@ -46,3 +46,5 @@ Thumbs.db
 
 # Generated files
 backend/sdk/productEnrichment/generated-images/
+
+.vercel

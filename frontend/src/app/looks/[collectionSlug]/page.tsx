@@ -1051,10 +1051,24 @@ export default function MoodboardEditorPage() {
             {items.length === 0 && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <Layers size={64} style={{ color: 'var(--foreground-muted)' }} className="mb-4" />
-                <p className="text-lg font-medium mb-2" style={{ color: 'var(--foreground-secondary)' }}>
+                <p
+                  className="text-2xl italic mb-2"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 500,
+                    color: 'var(--foreground-secondary)',
+                  }}
+                >
                   Start building your moodboard
                 </p>
-                <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                <p
+                  className="text-sm"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    color: 'var(--foreground-muted)',
+                    letterSpacing: '0.02em',
+                  }}
+                >
                   Click on products from the right panel to add them
                 </p>
               </div>
@@ -1278,7 +1292,14 @@ export default function MoodboardEditorPage() {
 
           <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>
+              <h3
+                className="text-lg italic"
+                style={{
+                  fontFamily: 'var(--font-cormorant)',
+                  fontWeight: 500,
+                  color: 'var(--foreground)',
+                }}
+              >
                 Add Products
               </h3>
               <div className="flex items-center gap-2">
@@ -1342,7 +1363,13 @@ export default function MoodboardEditorPage() {
             )}
 
             {!loadingProducts && products.length === 0 && (
-              <p className="text-sm text-center py-8" style={{ color: 'var(--foreground-muted)' }}>
+              <p
+                className="text-center py-8 italic"
+                style={{
+                  fontFamily: 'var(--font-cormorant)',
+                  color: 'var(--foreground-muted)',
+                }}
+              >
                 No products found
               </p>
             )}

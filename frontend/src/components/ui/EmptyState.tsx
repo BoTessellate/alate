@@ -62,19 +62,19 @@ export function EmptyState({
     sm: {
       container: 'py-8',
       icon: 32,
-      title: 'text-base',
+      title: 'text-lg',
       description: 'text-xs',
     },
     md: {
       container: 'py-12',
       icon: 48,
-      title: 'text-lg',
+      title: 'text-2xl',
       description: 'text-sm',
     },
     lg: {
       container: 'py-20',
       icon: 64,
-      title: 'text-xl',
+      title: 'text-3xl',
       description: 'text-base',
     },
   };
@@ -98,15 +98,23 @@ export function EmptyState({
         </div>
       )}
       <h3
-        className={`${styles.title} font-semibold`}
-        style={{ color: 'var(--foreground)' }}
+        className={`${styles.title} italic`}
+        style={{
+          fontFamily: 'var(--font-cormorant)',
+          fontWeight: 500,
+          color: 'var(--foreground)',
+        }}
       >
         {title}
       </h3>
       {description && (
         <p
           className={`${styles.description} mt-2 max-w-md mx-auto`}
-          style={{ color: 'var(--foreground-muted)' }}
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-muted)',
+            letterSpacing: '0.02em',
+          }}
         >
           {description}
         </p>

@@ -9,6 +9,8 @@ export interface DividerProps {
   label?: ReactNode;
   /** Spacing around divider */
   spacing?: 'none' | 'sm' | 'md' | 'lg';
+  /** Visual variant */
+  variant?: 'default' | 'ornamental';
   /** Custom className */
   className?: string;
 }
@@ -41,6 +43,7 @@ export function Divider({
   orientation = 'horizontal',
   label,
   spacing = 'md',
+  variant = 'default',
   className = '',
 }: DividerProps) {
   if (orientation === 'vertical') {
@@ -51,6 +54,39 @@ export function Divider({
         role="separator"
         aria-orientation="vertical"
       />
+    );
+  }
+
+  // Ornamental divider with decorative flourishes
+  if (variant === 'ornamental') {
+    return (
+      <div
+        className={`flex items-center justify-center gap-4 ${spacingClasses[spacing]} ${className}`}
+        role="separator"
+      >
+        <div
+          className="flex-1 h-px"
+          style={{
+            background: 'linear-gradient(to right, transparent, var(--border))',
+          }}
+        />
+        <span
+          className="text-lg"
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            color: 'var(--foreground-muted)',
+            fontWeight: 300,
+          }}
+        >
+          ✦
+        </span>
+        <div
+          className="flex-1 h-px"
+          style={{
+            background: 'linear-gradient(to left, transparent, var(--border))',
+          }}
+        />
+      </div>
     );
   }
 

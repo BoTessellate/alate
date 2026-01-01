@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Plus, Search, Grid3X3, MoreHorizontal } from 'lucide-react';
+import { Button, EmptyState, PageHeader } from '@/components/ui';
 
 // Placeholder for personal collection - will be connected to a store later
 export default function PersonalCollectionPage() {
@@ -9,68 +10,30 @@ export default function PersonalCollectionPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
-      {/* Header Section - matches Discover/Looks page */}
-      <div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-            Personal
-          </h1>
-          <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-            Your saved items and wardrobe
-          </span>
-        </div>
-        <button
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors cursor-pointer"
-          style={{
-            backgroundColor: 'var(--primary)',
-            color: 'white',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--primary)';
-          }}
-        >
-          <Plus size={20} />
-          Add Item
-        </button>
-      </div>
+      {/* Header Section */}
+      <PageHeader
+        title="Personal"
+        subtitle="Your saved items and wardrobe"
+        actions={
+          <Button variant="primary" icon={Plus}>
+            Add Item
+          </Button>
+        }
+      />
 
       {/* Content area */}
       <div className="px-8 pb-8 max-w-7xl mx-auto">
         {items.length === 0 ? (
-          /* Empty State */
-          <div
-            className="text-center py-20 rounded-lg border"
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderColor: 'var(--border)',
+          <EmptyState
+            icon={Grid3X3}
+            title="Your closet is empty"
+            description="Start building your personal collection by discovering items."
+            action={{
+              label: 'Discover Items',
+              onClick: () => window.location.href = '/discover',
+              icon: Search,
             }}
-          >
-            <Grid3X3
-              size={48}
-              className="mx-auto mb-4"
-              style={{ color: 'var(--foreground-muted)' }}
-            />
-            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
-              Your closet is empty
-            </h3>
-            <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
-              Start building your personal collection by discovering items.
-            </p>
-            <a
-              href="/discover"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors"
-              style={{
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-              }}
-            >
-              <Search size={18} />
-              Discover Items
-            </a>
-          </div>
+          />
         ) : (
           /* Items Grid */
           <>

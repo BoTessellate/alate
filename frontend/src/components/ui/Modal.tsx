@@ -95,7 +95,7 @@ export function Modal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeOnEscape, onClose]);
 
-  // Focus management
+  // Focus management and focus trapping
   useEffect(() => {
     if (isOpen) {
       previousActiveElement.current = document.activeElement as HTMLElement;
@@ -103,6 +103,32 @@ export function Modal({
     } else if (previousActiveElement.current) {
       previousActiveElement.current.focus();
     }
+  }, [isOpen]);
+
+  // Focus trap - keep focus within modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !modalRef.current) return;
+
+      const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement?.focus();
+      } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleTabKey);
+    return () => document.removeEventListener('keydown', handleTabKey);
   }, [isOpen]);
 
   // Prevent body scroll when open
@@ -167,8 +193,12 @@ export function Modal({
               {title && (
                 <h2
                   id="modal-title"
-                  className="text-lg font-semibold"
-                  style={{ color: 'var(--foreground)' }}
+                  className="text-xl italic"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 500,
+                    color: 'var(--foreground)',
+                  }}
                 >
                   {title}
                 </h2>
