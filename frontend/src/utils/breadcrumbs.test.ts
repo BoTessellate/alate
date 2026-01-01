@@ -117,13 +117,15 @@ describe('buildBreadcrumbs', () => {
       expect(segments[1].options).toHaveLength(3);
     });
 
-    it('should show Personal Collection without dropdown on /closet/personal', () => {
+    it('should show Personal with sibling routes dropdown on /closet/personal', () => {
       const context = createContext({ pathname: '/closet/personal' });
       const segments = buildBreadcrumbs(context, mockIcons);
 
       expect(segments).toHaveLength(3);
-      expect(segments[2].label).toBe('Personal Collection');
-      expect(segments[2].options).toBeUndefined();
+      expect(segments[2].label).toBe('Personal');
+      // Should have dropdown with sibling routes (Personal, Community, Discover)
+      expect(segments[2].options).toBeDefined();
+      expect(segments[2].options!.length).toBeGreaterThan(0);
     });
   });
 
@@ -135,6 +137,70 @@ describe('buildBreadcrumbs', () => {
       expect(segments).toHaveLength(2);
       expect(segments[1].label).toBe('Account Settings');
       expect(segments[1].options).toBeUndefined();
+    });
+  });
+
+  describe('Closet subsections (new routes)', () => {
+    it('should show Community with sibling routes dropdown on /closet/community', () => {
+      const context = createContext({ pathname: '/closet/community' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(3);
+      expect(segments[1].label).toBe('Closet');
+      expect(segments[1].options).toHaveLength(3); // Section switcher
+      expect(segments[2].label).toBe('Community');
+      // Should have dropdown with sibling routes
+      expect(segments[2].options).toBeDefined();
+    });
+
+    it('should show Discover with sibling routes dropdown on /closet/discover', () => {
+      const context = createContext({ pathname: '/closet/discover' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(3);
+      expect(segments[1].label).toBe('Closet');
+      expect(segments[2].label).toBe('Discover');
+      // Should have dropdown with sibling routes
+      expect(segments[2].options).toBeDefined();
+    });
+  });
+
+  describe('Collections section', () => {
+    it('should show Collections with Closet parent on /collections', () => {
+      const context = createContext({ pathname: '/collections' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(3);
+      expect(segments[1].label).toBe('Closet');
+      expect(segments[2].label).toBe('Collections');
+    });
+  });
+
+  describe('Admin page', () => {
+    it('should show Admin Dashboard without dropdown on /admin', () => {
+      const context = createContext({ pathname: '/admin' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(2);
+      expect(segments[1].label).toBe('Admin Dashboard');
+      expect(segments[1].options).toBeUndefined();
+    });
+  });
+
+  describe('Unknown/hidden routes', () => {
+    it('should return only root for unknown routes', () => {
+      const context = createContext({ pathname: '/unknown-page' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(1);
+      expect(segments[0].label).toBe('The Mood Layer');
+    });
+
+    it('should return only root for hidden routes like /onboarding', () => {
+      const context = createContext({ pathname: '/onboarding' });
+      const segments = buildBreadcrumbs(context, mockIcons);
+
+      expect(segments).toHaveLength(1);
     });
   });
 });

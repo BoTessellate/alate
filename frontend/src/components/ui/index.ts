@@ -59,6 +59,9 @@ export {
   type PasswordInputProps,
 } from './Input';
 
+// Select
+export { Select, type SelectProps } from './Select';
+
 // Page Structure
 export {
   PageHeader,
@@ -78,6 +81,12 @@ export {
 
 // Toggle/Switch
 export { Toggle, type ToggleProps } from './Toggle';
+
+// Chip
+export { Chip, type ChipProps } from './Chip';
+
+// Checkbox
+export { Checkbox, type CheckboxProps } from './Checkbox';
 
 // Topbar-specific components
 export {

@@ -51,7 +51,7 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(function Toggle
       aria-checked={checked}
       data-testid={testId}
       onClick={() => !disabled && onChange(!checked)}
-      className={`relative ${s.track} rounded-full transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      className={`relative ${s.track} rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       style={{
         backgroundColor: checked ? 'var(--primary)' : 'var(--surface-light)',
       }}

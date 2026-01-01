@@ -1,11 +1,22 @@
 /**
- * Breadcrumb Logic - Extracted for testability
+ * Breadcrumb Logic - Config-Driven Implementation
  *
- * This module contains the pure logic for building breadcrumb segments.
- * It's separated from the React component so it can be unit tested independently.
+ * This module uses the centralized route configuration to build breadcrumbs.
+ * When adding new pages, add them to src/config/routes.ts and breadcrumbs
+ * will automatically work.
+ *
+ * Separated from the React component for unit testability.
  */
 
 import type { LucideIcon } from 'lucide-react';
+import {
+  ROUTES,
+  getRouteConfig,
+  getRouteParentChain,
+  getSiblingRoutes,
+  buildSectionOptions,
+  type RouteConfig,
+} from '@/config/routes';
 
 export interface BreadcrumbSegment {
   label: string;
@@ -25,6 +36,11 @@ export interface BreadcrumbContext {
     name: string;
   }>;
   currentMoodboard: { name: string } | null;
+  collections?: Array<{
+    id: string;
+    name: string;
+  }>;
+  currentCollection?: { name: string } | null;
   isHydrated: boolean;
 }
 
@@ -37,13 +53,10 @@ export interface BreadcrumbIcons {
 
 /**
  * Build ROOT_OPTIONS for section switching
+ * @deprecated Use buildSectionOptions from @/config/routes instead
  */
 export function buildRootOptions(icons: BreadcrumbIcons) {
-  return [
-    { label: 'Layers', href: '/looks', icon: icons.Layers2 },
-    { label: 'Closet', href: '/closet', icon: icons.AlignHorizontalSpaceAround },
-    { label: 'Discover', href: '/discover', icon: icons.Compass },
-  ];
+  return buildSectionOptions(icons);
 }
 
 /**
@@ -58,20 +71,66 @@ export function generateMoodboardPath(name: string, id: string): string {
 }
 
 /**
+ * Build a breadcrumb segment from a route config
+ */
+function buildSegmentFromConfig(
+  config: RouteConfig,
+  href: string,
+  icons: BreadcrumbIcons,
+  customLabel?: string,
+  customOptions?: BreadcrumbSegment['options']
+): BreadcrumbSegment {
+  const ROOT_OPTIONS = buildSectionOptions(icons);
+
+  const segment: BreadcrumbSegment = {
+    label: customLabel || config.label,
+    href,
+  };
+
+  // Add section switcher dropdown if configured
+  if (config.showSectionSwitcher) {
+    segment.options = ROOT_OPTIONS;
+  }
+
+  // Add sibling routes dropdown if configured
+  if (config.showSiblingRoutes) {
+    const siblings = getSiblingRoutes(href);
+    if (siblings.length > 0) {
+      // Include current route + siblings
+      const allOptions = [
+        { label: config.label, href, icon: icons.Grid3X3 },
+        ...siblings.map(s => ({
+          label: s.config.label,
+          href: s.path,
+          icon: icons.Grid3X3,
+        })),
+      ];
+      segment.options = allOptions;
+    }
+  }
+
+  // Override with custom options if provided
+  if (customOptions) {
+    segment.options = customOptions;
+  }
+
+  return segment;
+}
+
+/**
  * Build breadcrumb segments based on pathname and context
  *
  * Rules:
  * - First segment: "User's Mood Layer" or "The Mood Layer" (no dropdown)
- * - Section segments (Layers, Closet, Discover): show ROOT_OPTIONS dropdown
- * - Moodboard segment: show list of moodboards to switch between
- * - Settings: no dropdown
+ * - Section root segments (Layers, Closet, Discover): show ROOT_OPTIONS dropdown
+ * - Dynamic segments (moodboard name, collection name): show list to switch
+ * - Other pages: no dropdown
  */
 export function buildBreadcrumbs(
   context: BreadcrumbContext,
   icons: BreadcrumbIcons
 ): BreadcrumbSegment[] {
-  const { pathname, displayName, moodboards, currentMoodboard, isHydrated } = context;
-  const ROOT_OPTIONS = buildRootOptions(icons);
+  const { pathname, displayName, moodboards, currentMoodboard, collections, currentCollection, isHydrated } = context;
   const segments: BreadcrumbSegment[] = [];
 
   // First segment: User's Mood Layer or The Mood Layer (no dropdown)
@@ -85,86 +144,63 @@ export function buildBreadcrumbs(
     return segments;
   }
 
-  // LOOKS SECTION
-  if (pathname.startsWith('/looks')) {
-    // "Layers" shows navigation options to switch sections
-    segments.push({
-      label: 'Layers',
-      href: '/looks',
-      options: ROOT_OPTIONS,
-    });
+  // Get route config
+  const routeConfig = getRouteConfig(pathname);
 
-    // /looks page - shows all moodboards
-    if (pathname === '/looks') {
-      return segments;
-    }
-
-    // /looks/discover - discover looks page
-    if (pathname === '/looks/discover') {
-      segments.push({
-        label: 'Discover',
-        href: '/looks/discover',
-      });
-      return segments;
-    }
-
-    const pathParts = pathname.split('/').filter(Boolean);
-
-    // /looks/[moodboardSlug] - moodboard editor
-    if (pathParts.length === 2 && isHydrated && currentMoodboard) {
-      // Get all moodboards as options for dropdown to switch boards
-      const moodboardOptions = moodboards.map(mb => ({
-        label: mb.name,
-        href: `/looks/${generateMoodboardPath(mb.name, mb.id)}`,
-        icon: icons.Grid3X3,
-      }));
-
-      segments.push({
-        label: currentMoodboard.name,
-        href: pathname,
-        options: moodboardOptions.length > 0 ? moodboardOptions : undefined,
-      });
-      return segments;
-    }
-
+  // Unknown route - just return root breadcrumb
+  if (!routeConfig || routeConfig.hidden) {
     return segments;
   }
 
-  // DISCOVER PAGE (at root level)
-  if (pathname === '/discover') {
-    segments.push({
-      label: 'Discover',
-      href: '/discover',
-      options: ROOT_OPTIONS,
-    });
-    return segments;
-  }
+  // Get parent chain to build full breadcrumb trail
+  const parentChain = getRouteParentChain(pathname);
 
-  // CLOSET SECTION
-  if (pathname.startsWith('/closet')) {
-    // "Closet" shows navigation options to switch sections
-    segments.push({
-      label: 'Closet',
-      href: '/closet',
-      options: ROOT_OPTIONS,
-    });
-
-    if (pathname === '/closet/personal') {
-      segments.push({
-        label: 'Personal Collection',
-        href: '/closet/personal',
-      });
+  // Build segments for each parent in the chain
+  for (const parentPath of parentChain) {
+    const parentConfig = ROUTES[parentPath];
+    if (parentConfig && !parentConfig.hidden) {
+      segments.push(buildSegmentFromConfig(parentConfig, parentPath, icons));
     }
-    return segments;
   }
 
-  // SETTINGS SECTION
-  if (pathname === '/settings') {
-    segments.push({
-      label: 'Account Settings',
-      href: '/settings',
-    });
-    return segments;
+  // Build segment for current route
+  // Handle dynamic routes specially
+  if (routeConfig.isDynamic) {
+    // Moodboard route: /looks/[moodboardSlug]
+    if (pathname.startsWith('/looks/') && !pathname.includes('/discover')) {
+      if (isHydrated && currentMoodboard) {
+        const moodboardOptions = moodboards.map(mb => ({
+          label: mb.name,
+          href: `/looks/${generateMoodboardPath(mb.name, mb.id)}`,
+          icon: icons.Grid3X3,
+        }));
+
+        segments.push({
+          label: currentMoodboard.name,
+          href: pathname,
+          options: moodboardOptions.length > 0 ? moodboardOptions : undefined,
+        });
+      }
+    }
+    // Collection detail route: /collections/[id]
+    else if (pathname.startsWith('/collections/') && collections && currentCollection) {
+      if (isHydrated) {
+        const collectionOptions = collections.map(col => ({
+          label: col.name,
+          href: `/collections/${col.id}`,
+          icon: icons.Grid3X3,
+        }));
+
+        segments.push({
+          label: currentCollection.name,
+          href: pathname,
+          options: collectionOptions.length > 0 ? collectionOptions : undefined,
+        });
+      }
+    }
+  } else {
+    // Static route - use config directly
+    segments.push(buildSegmentFromConfig(routeConfig, pathname, icons));
   }
 
   return segments;
@@ -194,41 +230,43 @@ export function getExpectedBreadcrumbStructure(pathname: string): {
     return result;
   }
 
-  if (pathname.startsWith('/looks')) {
-    result.segmentCount = 2;
-    result.hasDropdownAt = [1]; // "Layers" has dropdown
-
-    if (pathname !== '/looks' && pathname !== '/looks/discover') {
-      // Moodboard editor
-      result.segmentCount = 3;
-      result.hasDropdownAt = [1, 2]; // Both "Layers" and moodboard name have dropdowns
-    }
-
-    if (pathname === '/looks/discover') {
-      result.segmentCount = 3;
-      result.hasDropdownAt = [1]; // Only "Layers" has dropdown
-    }
+  const routeConfig = getRouteConfig(pathname);
+  if (!routeConfig || routeConfig.hidden) {
+    return result;
   }
 
-  if (pathname === '/discover') {
-    result.segmentCount = 2;
-    result.hasDropdownAt = [1]; // "Discover" has dropdown
-  }
+  const parentChain = getRouteParentChain(pathname);
 
-  if (pathname.startsWith('/closet')) {
-    result.segmentCount = 2;
-    result.hasDropdownAt = [1]; // "Closet" has dropdown
+  // Count segments: root + parents + current
+  result.segmentCount = 1 + parentChain.length + 1;
 
-    if (pathname === '/closet/personal') {
-      result.segmentCount = 3;
-      result.hasDropdownAt = [1]; // Only "Closet" has dropdown
+  // Determine which segments have dropdowns
+  let index = 1; // Start after root segment
+
+  // Check parent segments
+  for (const parentPath of parentChain) {
+    const parentConfig = ROUTES[parentPath];
+    if (parentConfig?.showSectionSwitcher) {
+      result.hasDropdownAt.push(index);
     }
+    index++;
   }
 
-  if (pathname === '/settings') {
-    result.segmentCount = 2;
-    result.hasDropdownAt = []; // No dropdowns
+  // Check current segment
+  if (routeConfig.showSectionSwitcher) {
+    result.hasDropdownAt.push(index);
+  }
+  // Dynamic routes (moodboards) also have dropdowns
+  if (routeConfig.isDynamic && pathname.startsWith('/looks/') && !pathname.includes('/discover')) {
+    result.hasDropdownAt.push(index);
   }
 
   return result;
+}
+
+/**
+ * Get all configured routes (for debugging/documentation)
+ */
+export function getAllRoutes(): Record<string, RouteConfig> {
+  return { ...ROUTES };
 }

@@ -128,6 +128,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const baseClasses = [
     'inline-flex items-center justify-center font-medium rounded-lg border transition-all duration-200',
+    // Suppress browser focus ring - we use hover/active states for visual feedback
+    'outline-none focus:outline-none focus-visible:outline-none',
     sizeClasses[size],
     fullWidth ? 'w-full' : '',
     isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
@@ -162,11 +164,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 /**
  * IconButton - Square icon-only button
+ *
+ * Supports custom styling via className and style props.
+ * When custom styles are provided, they override the variant styles.
  */
 export const IconButton = forwardRef<
   HTMLButtonElement,
   Omit<ButtonProps, 'children' | 'iconRight'> & { 'aria-label': string }
->(function IconButton({ icon: Icon, size = 'md', variant = 'ghost', ...props }, ref) {
+>(function IconButton(
+  { icon: Icon, size = 'md', variant = 'ghost', className = '', style, ...props },
+  ref
+) {
   const [isHovered, setIsHovered] = useState(false);
 
   const sizeClasses = {
@@ -194,13 +202,21 @@ export const IconButton = forwardRef<
     };
   };
 
-  const styles = getStyles();
+  const baseStyles = getStyles();
+  // Merge custom style with base styles, custom style takes precedence
+  const mergedStyles = style ? { ...baseStyles, ...style } : baseStyles;
+
+  // Build className - custom className can override size classes
+  const hasCustomSize = className.includes('w-') || className.includes('h-');
+  const baseClassName = hasCustomSize
+    ? 'rounded-full flex items-center justify-center transition-colors outline-none focus:outline-none focus-visible:outline-none'
+    : `${sizeClasses[size]} rounded-full flex items-center justify-center transition-colors outline-none focus:outline-none focus-visible:outline-none`;
 
   return (
     <button
       ref={ref}
-      className={`${sizeClasses[size]} rounded-full flex items-center justify-center transition-colors`}
-      style={styles}
+      className={`${baseClassName} ${className}`.trim()}
+      style={mergedStyles}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       {...props}

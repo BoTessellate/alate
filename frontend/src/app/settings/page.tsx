@@ -63,7 +63,7 @@ function SectionHeader({
   );
 }
 
-// Action list item button
+// Action list item button using Button component styling patterns
 function ActionButton({
   icon: Icon,
   title,
@@ -99,11 +99,13 @@ function ActionButton({
   const colors = bgColors[variant];
 
   return (
-    <button
+    <Button
       data-testid={testId}
       onClick={onClick}
       disabled={isLoading}
-      className="w-full flex items-center justify-between p-3 rounded-lg transition-colors"
+      variant="ghost"
+      fullWidth
+      className="h-auto p-3 justify-between outline-none focus:outline-none focus-visible:outline-none"
       style={{ backgroundColor: isHovered ? colors.hover : colors.normal }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -124,7 +126,7 @@ function ActionButton({
         </div>
       </div>
       <ChevronRight size={20} style={{ color: variant === 'destructive' ? 'var(--error)' : 'var(--foreground-muted)' }} />
-    </button>
+    </Button>
   );
 }
 
@@ -155,7 +157,7 @@ function SettingRow({
   );
 }
 
-// Selection button for options like theme/currency
+// Selection button for options like theme/currency using Button component
 function SelectionButton({
   isSelected,
   onClick,
@@ -170,10 +172,11 @@ function SelectionButton({
   className?: string;
 }) {
   return (
-    <button
+    <Button
       data-testid={testId}
       onClick={onClick}
-      className={`p-4 rounded-lg border-2 text-left transition-all ${className}`}
+      variant="outline"
+      className={`h-auto p-4 text-left transition-all border-2 outline-none focus:outline-none focus-visible:outline-none ${className}`}
       style={{
         backgroundColor: isSelected ? 'rgba(76, 112, 49, 0.1)' : 'var(--surface-light)',
         borderColor: isSelected ? 'var(--primary)' : 'transparent',
@@ -181,7 +184,7 @@ function SelectionButton({
       }}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

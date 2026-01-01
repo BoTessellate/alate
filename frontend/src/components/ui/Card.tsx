@@ -75,6 +75,8 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
 
   const baseClasses = [
     'rounded-lg border overflow-hidden transition-all duration-200',
+    // Suppress browser focus ring - we use border color for focus indication
+    'outline-none focus:outline-none focus-visible:outline-none',
     paddingMap[padding],
     className,
   ].filter(Boolean).join(' ');

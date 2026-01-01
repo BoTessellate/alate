@@ -123,32 +123,22 @@ export default function DiscoverPage() {
       </div>
 
       {/* Floating Search FAB */}
-      <button
+      <IconButton
+        icon={Search}
+        aria-label="Search products"
         onClick={() => setShowFloatingSearch(true)}
-        className="fixed z-50 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer"
+        className="fixed z-50 w-14 h-14 shadow-lg transition-all duration-200 cursor-pointer hover:scale-105"
         style={{
           bottom: '96px',
           right: '24px',
-          width: '56px',
-          height: '56px',
           backgroundColor: 'var(--primary)',
+          color: 'white',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1)',
           opacity: showFloatingSearch ? 0 : 1,
           pointerEvents: showFloatingSearch ? 'none' : 'auto',
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.backgroundColor = 'var(--primary)';
-        }}
         title="Search Products"
-        aria-label="Search products"
-      >
-        <Search size={24} color="white" />
-      </button>
+      />
 
       {/* Expanded Floating Search Modal */}
       {showFloatingSearch && (
@@ -163,6 +153,7 @@ export default function DiscoverPage() {
           <Card
             className="fixed z-50 left-4 right-4 md:left-auto md:right-6 md:w-[500px] rounded-2xl shadow-2xl"
             style={{ bottom: '100px' }}
+            hoverHighlight={false}
           >
             <form onSubmit={handleSearch} className="p-4">
               <div className="flex items-center gap-3">
@@ -173,7 +164,7 @@ export default function DiscoverPage() {
                   placeholder="Search for products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 bg-transparent outline-none text-base"
+                  className="flex-1 bg-transparent outline-none focus:outline-none focus-visible:outline-none text-base"
                   style={{ color: 'var(--foreground)' }}
                 />
                 <IconButton

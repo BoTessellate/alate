@@ -6,28 +6,25 @@ import Link from 'next/link';
 import { ChevronsUpDown, Compass, Layers2, AlignHorizontalSpaceAround, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import {
+  buildBreadcrumbs,
+  type BreadcrumbContext,
+  type BreadcrumbIcons,
+} from '@/utils/breadcrumbs';
 
-interface BreadcrumbSegment {
-  label: string;
-  href?: string;
-  options?: {
-    label: string;
-    href: string;
-    icon?: React.ComponentType<{ size?: number }>;
-  }[];
-}
-
-// Root level options (switching between main sections)
-const ROOT_OPTIONS = [
-  { label: 'Layers', href: '/looks', icon: Layers2 },
-  { label: 'Closet', href: '/closet', icon: AlignHorizontalSpaceAround },
-  { label: 'Discover', href: '/discover', icon: Compass },
-];
-
+// Icons for breadcrumb logic
+const BREADCRUMB_ICONS: BreadcrumbIcons = {
+  Layers2,
+  Compass,
+  AlignHorizontalSpaceAround,
+  Grid3X3,
+};
 
 export default function BreadcrumbNav() {
   const pathname = usePathname();
   const { moodboards, getMoodboardBySlug } = useLooksStore();
+  const { collections } = useCollectionsStore();
   const { userName, isLoggedIn } = useSettingsStore();
 
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
@@ -55,111 +52,30 @@ export default function BreadcrumbNav() {
   // Display name for breadcrumb
   const displayName = isLoggedIn && userName ? userName : null;
 
-  // Build breadcrumb segments based on current path
-  const buildBreadcrumbs = (): BreadcrumbSegment[] => {
-    const segments: BreadcrumbSegment[] = [];
+  // Get current moodboard if on a moodboard page
+  const pathParts = pathname.split('/').filter(Boolean);
+  const moodboardSlug = pathParts[0] === 'looks' && pathParts.length === 2 ? pathParts[1] : null;
+  const currentMoodboard = moodboardSlug && isHydrated ? getMoodboardBySlug(moodboardSlug) : null;
 
-    // First segment: User's Mood Layer or The Mood Layer (no dropdown - just home link)
-    segments.push({
-      label: displayName ? `${displayName}'s Mood Layer` : 'The Mood Layer',
-      href: '/',
-    });
+  // Get current collection if on a collection detail page
+  const collectionId = pathParts[0] === 'collections' && pathParts.length === 2 ? pathParts[1] : null;
+  const currentCollection = collectionId && isHydrated
+    ? collections.find(c => c.id === collectionId)
+    : null;
 
-    // Home page - just show root
-    if (pathname === '/' || pathname === '') {
-      return segments;
-    }
-
-    // LOOKS SECTION
-    if (pathname.startsWith('/looks')) {
-      // "Layers" shows navigation options to switch sections
-      segments.push({
-        label: 'Layers',
-        href: '/looks',
-        options: ROOT_OPTIONS,
-      });
-
-      // /looks page - shows all moodboards
-      if (pathname === '/looks') {
-        return segments;
-      }
-
-      // /looks/discover - discover looks page
-      if (pathname === '/looks/discover') {
-        segments.push({
-          label: 'Discover',
-          href: '/looks/discover',
-        });
-        return segments;
-      }
-
-      const pathParts = pathname.split('/').filter(Boolean);
-
-      // /looks/[moodboardSlug] - moodboard editor
-      if (pathParts.length === 2) {
-        const moodboardSlug = pathParts[1];
-        if (moodboardSlug && isHydrated) {
-          const moodboard = getMoodboardBySlug(moodboardSlug);
-          if (moodboard) {
-            // Get all moodboards as options for dropdown to switch boards
-            const moodboardOptions = moodboards.map(mb => ({
-              label: mb.name,
-              href: `/looks/${generateMoodboardPath(mb.name, mb.id)}`,
-              icon: Grid3X3,
-            }));
-
-            segments.push({
-              label: moodboard.name,
-              href: pathname,
-              options: moodboardOptions.length > 0 ? moodboardOptions : undefined,
-            });
-          }
-        }
-        return segments;
-      }
-    }
-
-    // DISCOVER PAGE (at root level)
-    if (pathname === '/discover') {
-      segments.push({
-        label: 'Discover',
-        href: '/discover',
-        options: ROOT_OPTIONS,
-      });
-      return segments;
-    }
-
-    // CLOSET SECTION
-    if (pathname.startsWith('/closet')) {
-      // "Closet" shows navigation options to switch sections (same as Layers)
-      segments.push({
-        label: 'Closet',
-        href: '/closet',
-        options: ROOT_OPTIONS,
-      });
-
-      if (pathname === '/closet/personal') {
-        segments.push({
-          label: 'Personal Collection',
-          href: '/closet/personal',
-        });
-      }
-      return segments;
-    }
-
-    // SETTINGS SECTION
-    if (pathname === '/settings') {
-      segments.push({
-        label: 'Account Settings',
-        href: '/settings',
-      });
-      return segments;
-    }
-
-    return segments;
+  // Build context for breadcrumb logic
+  const context: BreadcrumbContext = {
+    pathname,
+    displayName,
+    moodboards: moodboards.map(mb => ({ id: mb.id, name: mb.name })),
+    currentMoodboard: currentMoodboard ? { name: currentMoodboard.name } : null,
+    collections: collections.map(c => ({ id: c.id, name: c.name })),
+    currentCollection: currentCollection ? { name: currentCollection.name } : null,
+    isHydrated,
   };
 
-  const breadcrumbs = buildBreadcrumbs();
+  // Use the shared breadcrumb logic
+  const breadcrumbs = buildBreadcrumbs(context, BREADCRUMB_ICONS);
 
   // Check if current page is in looks section for theming
   const isLooksListPage = pathname === '/looks';
@@ -191,17 +107,24 @@ export default function BreadcrumbNav() {
             className="relative"
           >
             {segment.options && segment.options.length > 0 ? (
-              // Segment with dropdown
-              <button
-                onClick={() => setOpenDropdown(openDropdown === index ? null : index)}
-                className="flex items-center gap-1 px-2 py-1 text-sm font-medium group/breadcrumb"
-                style={{
-                  color: textColor,
-                }}
-              >
-                <span>{segment.label}</span>
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center transition-colors"
+              // Segment with dropdown - text is clickable link, icon toggles dropdown
+              <div className="flex items-center gap-0.5">
+                <Link
+                  href={segment.href || '#'}
+                  className="px-2 py-1 rounded-md transition-colors text-sm font-medium outline-none focus:outline-none"
+                  style={{ color: textColor }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {segment.label}
+                </Link>
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === index ? null : index)}
+                  className="w-5 h-5 rounded flex items-center justify-center transition-colors outline-none focus:outline-none"
                   style={{
                     backgroundColor: openDropdown === index ? hoverBg : 'transparent',
                   }}
@@ -215,18 +138,19 @@ export default function BreadcrumbNav() {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
+                  aria-label={`Show ${segment.label} options`}
                 >
                   <ChevronsUpDown
                     size={14}
-                    style={{ opacity: 0.6 }}
+                    style={{ opacity: 0.6, color: textColor }}
                   />
-                </div>
-              </button>
+                </button>
+              </div>
             ) : (
               // Simple segment (no dropdown)
               <Link
                 href={segment.href || '#'}
-                className="px-2 py-1 rounded-md transition-colors text-sm font-medium"
+                className="px-2 py-1 rounded-md transition-colors text-sm font-medium outline-none focus:outline-none"
                 style={{ color: textColor }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = hoverBg;
@@ -258,7 +182,7 @@ export default function BreadcrumbNav() {
                       key={optIndex}
                       href={option.href}
                       onClick={() => setOpenDropdown(null)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors group/item"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors group/item outline-none focus:outline-none"
                       style={{
                         color: 'var(--foreground)',
                       }}

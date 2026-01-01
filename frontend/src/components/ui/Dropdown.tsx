@@ -234,7 +234,7 @@ export function DropdownItem({
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left ${className}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left outline-none focus:outline-none ${className}`}
       style={{
         backgroundColor: isHovered ? 'var(--surface-light)' : 'transparent',
         color: textColor,

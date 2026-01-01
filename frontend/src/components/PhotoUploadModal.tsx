@@ -5,7 +5,7 @@ import { X, Upload, Loader2, Check, AlertCircle, Plus } from 'lucide-react';
 import { useUploadStore, ProductType } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
-import { Button, IconButton, Input } from '@/components/ui';
+import { Button, IconButton, Input, Select, Checkbox } from '@/components/ui';
 
 /**
  * Modal for uploading and processing product photos
@@ -138,17 +138,16 @@ export default function PhotoUploadModal() {
               <div className="relative w-full h-[200px]">
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
                 {!isProcessing && !canEdit && (
-                  <button
+                  <IconButton
+                    icon={X}
                     onClick={(e) => {
                       e.stopPropagation();
                       setFile(null);
                     }}
                     aria-label="Remove selected image"
-                    className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full cursor-pointer"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-                  >
-                    <X size={16} color="white" aria-hidden="true" />
-                  </button>
+                    className="absolute top-2 right-2"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
+                  />
                 )}
                 {isProcessing && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
@@ -204,18 +203,14 @@ export default function PhotoUploadModal() {
               </label>
               <div className="flex gap-2">
                 {(['fashion', 'home'] as ProductType[]).map((type) => (
-                  <button
+                  <Button
                     key={type}
+                    variant={productType === type ? 'primary' : 'secondary'}
                     onClick={() => setProductType(type)}
-                    className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors cursor-pointer"
-                    style={{
-                      backgroundColor: productType === type ? 'var(--primary)' : 'var(--background-secondary)',
-                      color: productType === type ? 'white' : 'var(--foreground)',
-                      border: `1px solid ${productType === type ? 'var(--primary)' : 'var(--border)'}`,
-                    }}
+                    className="flex-1"
                   >
                     {type === 'fashion' ? 'Fashion' : 'Home'}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -262,27 +257,18 @@ export default function PhotoUploadModal() {
                   placeholder="0"
                   className="flex-1"
                 />
-                <div className="w-24">
-                  <label htmlFor="product-currency" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--foreground)' }}>
-                    Currency
-                  </label>
-                  <select
-                    id="product-currency"
-                    value={productData.currency || 'USD'}
-                    onChange={(e) => updateProductField('currency', e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg text-sm outline-none cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--background)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--foreground)',
-                    }}
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="INR">INR</option>
-                  </select>
-                </div>
+                <Select
+                  label="Currency"
+                  value={productData.currency || 'USD'}
+                  onChange={(e) => updateProductField('currency', e.target.value)}
+                  className="w-24"
+                  fullWidth={false}
+                >
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="INR">INR</option>
+                </Select>
               </div>
 
               {/* AI Tags */}
@@ -313,43 +299,30 @@ export default function PhotoUploadModal() {
                 </span>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {collections.map((collection) => (
-                    <label
+                    <div
                       key={collection.id}
-                      htmlFor={`collection-${collection.id}`}
-                      className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
+                      className="p-2 rounded-lg transition-colors"
                       style={{
                         backgroundColor: selectedCollections.includes(collection.id) ? 'var(--primary-alpha)' : 'transparent',
                       }}
                     >
-                      <input
+                      <Checkbox
                         id={`collection-${collection.id}`}
-                        type="checkbox"
                         checked={selectedCollections.includes(collection.id)}
                         onChange={() => toggleCollection(collection.id)}
-                        className="rounded cursor-pointer"
-                        style={{ accentColor: 'var(--primary)' }}
+                        label={collection.name}
+                        helperText={`${collection.products.length} items`}
+                        size="sm"
                       />
-                      <span className="text-sm" style={{ color: 'var(--foreground)' }}>
-                        {collection.name}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                        ({collection.products.length} items)
-                      </span>
-                    </label>
+                    </div>
                   ))}
 
                   {/* New Collection Input */}
                   <div className="flex items-center gap-2 pt-2">
-                    <input
+                    <Input
                       ref={newCollectionInputRef}
-                      type="text"
                       placeholder="New collection name..."
-                      className="flex-1 px-3 py-2 h-10 rounded-lg text-sm outline-none"
-                      style={{
-                        backgroundColor: 'var(--background)',
-                        border: '1px solid var(--border)',
-                        color: 'var(--foreground)',
-                      }}
+                      className="flex-1"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleCreateCollection();
                       }}

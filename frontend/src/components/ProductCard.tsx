@@ -102,46 +102,49 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
           {/* Action Buttons - Top Right */}
           <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {/* Favorite Button */}
-            <button
+            <IconButton
+              icon={() => (
+                <Heart
+                  size={18}
+                  fill={isFavorite ? 'white' : 'none'}
+                  style={{ color: 'white' }}
+                  aria-hidden="true"
+                />
+              )}
               onClick={handleFavoriteClick}
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{ backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)' }}
+              className="w-11 h-11"
+              style={{ backgroundColor: isFavorite ? 'var(--error)' : 'rgba(0,0,0,0.5)', color: 'white' }}
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               aria-pressed={isFavorite}
-            >
-              <Heart
-                size={18}
-                fill={isFavorite ? 'white' : 'none'}
-                style={{ color: 'white' }}
-                aria-hidden="true"
-              />
-            </button>
+            />
 
             {/* Save to Collection Button */}
-            <button
+            <IconButton
               ref={saveButtonRef}
+              icon={() => (
+                <Bookmark
+                  size={18}
+                  fill={isInCollection ? 'white' : 'none'}
+                  style={{ color: 'white' }}
+                  aria-hidden="true"
+                />
+              )}
               onClick={handleSaveClick}
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{ backgroundColor: isInCollection ? 'var(--primary)' : 'rgba(0,0,0,0.5)' }}
+              className="w-11 h-11"
+              style={{ backgroundColor: isInCollection ? 'var(--primary)' : 'rgba(0,0,0,0.5)', color: 'white' }}
               aria-label={isInCollection ? 'Manage collections' : 'Save to collection'}
-            >
-              <Bookmark
-                size={18}
-                fill={isInCollection ? 'white' : 'none'}
-                style={{ color: 'white' }}
-                aria-hidden="true"
-              />
-            </button>
+            />
 
             {/* Virtual Try-On Button */}
-            <button
+            <IconButton
+              icon={() => (
+                <Shirt size={18} style={{ color: 'white' }} aria-hidden="true" />
+              )}
               onClick={handleTryOnClick}
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all"
-              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              className="w-11 h-11"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
               aria-label="Virtual try-on"
-            >
-              <Shirt size={18} style={{ color: 'white' }} aria-hidden="true" />
-            </button>
+            />
           </div>
         </div>
 

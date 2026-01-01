@@ -31,6 +31,7 @@ import {
   TestTube,
   GitBranch,
 } from 'lucide-react';
+import { Button, IconButton } from '@/components/ui';
 
 // Test coverage data interface
 interface TestCoverageData {
@@ -670,21 +671,22 @@ export default function AdminPage() {
           { id: 'health', label: 'Health', icon: Activity },
           { id: 'shopify', label: 'Shopify', icon: Store },
         ].map((tab) => {
-          const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
+            <Button
               key={tab.id}
+              variant={isActive ? 'secondary' : 'ghost'}
+              icon={tab.icon}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium transition-colors"
+              className="flex-1"
               style={{
                 backgroundColor: isActive ? 'var(--surface)' : 'transparent',
                 color: isActive ? 'var(--foreground)' : 'var(--foreground-muted)',
+                borderColor: 'transparent',
               }}
             >
-              <Icon size={16} />
               {tab.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -837,15 +839,16 @@ export default function AdminPage() {
                   {overallHealth.label}
                 </span>
               </div>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={RefreshCw}
                 onClick={testAllIntegrations}
                 disabled={isTestingAll}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm"
-                style={{ backgroundColor: 'var(--surface)', color: 'var(--foreground)' }}
+                loading={isTestingAll}
               >
-                <RefreshCw size={14} className={isTestingAll ? 'animate-spin' : ''} />
                 Re-test
-              </button>
+              </Button>
             </div>
           )}
 
@@ -871,15 +874,15 @@ export default function AdminPage() {
                   </p>
                 </div>
               </div>
-              <button
+              <Button
+                variant="primary"
+                icon={Zap}
                 onClick={testAllIntegrations}
                 disabled={isTestingAll}
-                className="px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                style={{ backgroundColor: 'var(--primary)', color: 'white' }}
+                loading={isTestingAll}
               >
-                {isTestingAll ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
                 Test All
-              </button>
+              </Button>
             </div>
 
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -955,16 +958,19 @@ export default function AdminPage() {
                         {status?.latency !== undefined && <span>{status.latency}ms</span>}
                         {status?.testedAt && <span>• {getLastTestedLabel()}</span>}
                       </div>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={RefreshCw}
                         onClick={() => testSingleIntegration(integration.id)}
                         disabled={isTesting}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors"
-                        style={{ backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+                        loading={isTesting}
                         title="Re-test this integration"
+                        style={{ backgroundColor: 'var(--background)' }}
+                        className="h-7 px-2 text-xs"
                       >
-                        <RefreshCw size={12} className={isTesting ? 'animate-spin' : ''} />
                         Test
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -994,15 +1000,15 @@ export default function AdminPage() {
                   </p>
                 </div>
               </div>
-              <button
+              <Button
+                variant="secondary"
+                icon={RefreshCw}
                 onClick={() => checkAIProviderStatus(true)}
                 disabled={isCheckingAI}
-                className="px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
+                loading={isCheckingAI}
               >
-                {isCheckingAI ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                Check Status
-              </button>
+                Check AI Status
+              </Button>
             </div>
 
             {aiStatus ? (
@@ -1218,33 +1224,33 @@ export default function AdminPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <button
+                <Button
+                  variant="primary"
+                  icon={ExternalLink}
                   onClick={connectToShopify}
                   disabled={isConnecting}
-                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-                  style={{ backgroundColor: 'var(--primary)', color: 'white' }}
+                  loading={isConnecting}
                 >
-                  {isConnecting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
                   Connect Store
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={RefreshCw}
                   onClick={checkStatus}
                   disabled={isCheckingStatus}
-                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-                  style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
+                  loading={isCheckingStatus}
                 >
-                  {isCheckingStatus ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
                   Check Status
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon={Package}
                   onClick={syncProducts}
                   disabled={isSyncing}
-                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-                  style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
+                  loading={isSyncing}
                 >
-                  {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
                   Sync Products
-                </button>
+                </Button>
               </div>
 
               {/* Status Display */}

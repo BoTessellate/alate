@@ -13,7 +13,7 @@ export default function CommunityClosetPage() {
       <div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
-            Community Closet
+            Community
           </h1>
           <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
             Curated collections from the community

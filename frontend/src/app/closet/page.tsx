@@ -43,7 +43,7 @@ export default function ClosetPage() {
               <Shirt size={28} className="text-white" />
             </div>
             <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
-              Personal Collection
+              Personal
             </h2>
             <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
               Your saved items and wardrobe. Build your personal style library with pieces you own or love.
@@ -81,7 +81,7 @@ export default function ClosetPage() {
               <Globe size={28} className="text-white" />
             </div>
             <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
-              Community Closet
+              Community
             </h2>
             <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
               Explore what others are wearing. Get inspired by curated collections from the community.

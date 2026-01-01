@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useUserStore } from '@/stores/useUserStore';
 import { STYLE_CATEGORIES } from '@/types';
+import { Button } from '@/components/ui';
 
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
@@ -188,7 +189,7 @@ export default function OnboardingPage() {
                 <button
                   key={category.id}
                   onClick={() => toggleCategory(category.id)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none"
                   style={{
                     backgroundColor: isSelected
                       ? 'var(--primary)'
@@ -241,7 +242,7 @@ export default function OnboardingPage() {
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
-                    className="px-4 py-2 rounded-full border transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-full border transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none"
                     style={{
                       backgroundColor: isSelected
                         ? 'var(--primary)'
@@ -284,29 +285,26 @@ export default function OnboardingPage() {
       )}
 
       {/* Navigation Button */}
-      <button
+      <Button
         onClick={step === 3 ? handleFinish : handleNext}
         disabled={!canProceed}
-        className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all"
-        style={{
-          backgroundColor: canProceed ? 'var(--primary)' : 'var(--surface-light)',
-          color: canProceed ? 'white' : 'var(--foreground-muted)',
-          cursor: canProceed ? 'pointer' : 'not-allowed',
-        }}
+        variant="primary"
+        size="lg"
+        iconRight={ArrowRight}
       >
         {step === 3 ? 'Start Exploring' : 'Continue'}
-        <ArrowRight size={18} />
-      </button>
+      </Button>
 
       {/* Skip option for steps 1 and 2 - always visible with pb-32 on container */}
       {step < 3 && (
-        <button
+        <Button
           onClick={handleSkip}
-          className="mt-8 text-sm transition-colors hover:underline"
-          style={{ color: 'var(--foreground-muted)' }}
+          variant="ghost"
+          size="sm"
+          className="mt-8"
         >
           Skip for now
-        </button>
+        </Button>
       )}
       </div>
     </div>
