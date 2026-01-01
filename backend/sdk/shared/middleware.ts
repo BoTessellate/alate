@@ -57,11 +57,12 @@ export function isOriginAllowed(origin: string | undefined): boolean {
 
   // Check for Vercel preview URL patterns
   // Pattern: https://{project}-{hash}-{username}.vercel.app
+  // Always allow Vercel preview deployments in production for easier testing
   try {
     const originUrl = new URL(origin);
     if (originUrl.hostname.endsWith('.vercel.app')) {
-      // Allow all Vercel preview deployments if any vercel.app domain is in allowed list
-      if (allowed.some(a => a.includes('.vercel.app'))) return true;
+      // Always allow Vercel preview deployments
+      return true;
     }
   } catch {
     // Invalid URL, ignore
