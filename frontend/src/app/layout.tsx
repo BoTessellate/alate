@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Jost, JetBrains_Mono, Cormorant_Garamond } from "next/font/google";
+import { Jost, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import AppLayout from "@/components/AppLayout";
 import { getThemeInitScript } from "@/constants/theme";
@@ -8,11 +8,6 @@ const jost = Jost({
   variable: "--font-jost",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
 });
 
 const cormorantGaramond = Cormorant_Garamond({
@@ -41,7 +36,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${jost.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} antialiased`}
+        className={`${jost.variable} ${cormorantGaramond.variable} antialiased`}
         suppressHydrationWarning
       >
         <AppLayout>{children}</AppLayout>

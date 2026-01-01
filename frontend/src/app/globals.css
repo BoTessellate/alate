@@ -43,13 +43,14 @@
   /* Translucent topbar - brand green */
   --topbar-bg: rgba(76, 112, 49, 0.92);
   --topbar-bg-warm: rgba(254, 250, 242, 0.95); /* Cream white for /looks page */
+  --topbar-bg-highlight: rgba(153, 107, 38, 0.92); /* Golden for /discover page */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-jost);
-  --font-mono: var(--font-mono);
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 * {
