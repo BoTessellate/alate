@@ -4,7 +4,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import sharp from 'sharp';
+// Sharp is dynamically imported to avoid Vercel serverless function issues
+// with native bindings at module load time
 import { getSupabaseClient } from '../shared/supabaseClient';
 import { createImageGenerator } from '../imageGeneration';
 import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
@@ -201,6 +202,9 @@ async function cropImageRegion(
   mimeType: string,
   boundingBox: BoundingBox
 ): Promise<string> {
+  // Dynamic import sharp to avoid Vercel serverless issues with native bindings
+  const sharp = (await import('sharp')).default;
+
   const buffer = Buffer.from(base64, 'base64');
 
   // Get image dimensions
@@ -230,11 +234,8 @@ async function cropImageRegion(
     boundingBox,
   }, 'Cropping image');
 
-  // Crop the region - use explicit typing for sharp
-  const sharpInstance = sharp(buffer) as ReturnType<typeof sharp> & {
-    extract: (region: { left: number; top: number; width: number; height: number }) => ReturnType<typeof sharp>;
-  };
-  const croppedBuffer = await sharpInstance
+  // Crop the region
+  const croppedBuffer = await sharp(buffer)
     .extract({ left, top, width: cropWidth, height: cropHeight })
     .toBuffer();
 
