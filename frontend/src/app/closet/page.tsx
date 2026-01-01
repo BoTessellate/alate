@@ -69,7 +69,14 @@ export default function ClosetPage() {
             >
               <Shirt size={28} className="text-white" />
             </div>
-            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
+            <h2
+              className="text-2xl italic mb-2"
+              style={{
+                fontFamily: 'var(--font-cormorant)',
+                fontWeight: 500,
+                color: 'var(--foreground)',
+              }}
+            >
               Personal
             </h2>
             <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
@@ -107,7 +114,14 @@ export default function ClosetPage() {
             >
               <Globe size={28} className="text-white" />
             </div>
-            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--foreground)' }}>
+            <h2
+              className="text-2xl italic mb-2"
+              style={{
+                fontFamily: 'var(--font-cormorant)',
+                fontWeight: 500,
+                color: 'var(--foreground)',
+              }}
+            >
               Community
             </h2>
             <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
