@@ -421,6 +421,7 @@ This section captures the "why" behind design choices. Claude should reference t
 |------|----------|---------|
 | 2026-01-01 | Agent toggle: green when active, contrast with logo | User feedback: "too blended" |
 | 2026-01-01 | Dark mode topbar: primary-dark not charcoal | Maintain brand consistency |
+| 2026-01-01 | Replace Geist with Jost font | Better pairing with Cormorant Garamond, Art Deco elegance |
 | | | |
 
 ---

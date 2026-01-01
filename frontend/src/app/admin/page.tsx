@@ -31,7 +31,7 @@ import {
   TestTube,
   GitBranch,
 } from 'lucide-react';
-import { Button, IconButton } from '@/components/ui';
+import { Button, IconButton, PageHeader } from '@/components/ui';
 
 // Test coverage data interface
 interface TestCoverageData {
@@ -603,73 +603,53 @@ export default function AdminPage() {
 
   const overallHealth = getOverallHealth();
 
-  return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1
-            className="text-3xl italic mb-2"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
-          >
-            Admin Dashboard
-          </h1>
-          <p style={{ color: 'var(--foreground-secondary)' }}>
-            Monitor integrations, debug issues, and manage your development environment
-          </p>
-        </div>
-
-        {/* Server Status Pills */}
-        <div className="flex gap-2">
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
-            style={{
-              backgroundColor: frontendRunning ? 'rgba(76, 112, 49, 0.2)' : 'rgba(168, 64, 50, 0.2)',
-            }}
-          >
-            {frontendRunning ? (
-              <Wifi size={14} style={{ color: 'var(--success)' }} />
-            ) : (
-              <WifiOff size={14} style={{ color: 'var(--error)' }} />
-            )}
-            <span style={{ color: frontendRunning ? 'var(--success)' : 'var(--error)' }}>
-              Frontend
-            </span>
-          </div>
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
-            style={{
-              backgroundColor: backendRunning ? 'rgba(76, 112, 49, 0.2)' : 'rgba(168, 64, 50, 0.2)',
-            }}
-          >
-            {backendRunning ? (
-              <Wifi size={14} style={{ color: 'var(--success)' }} />
-            ) : (
-              <WifiOff size={14} style={{ color: 'var(--error)' }} />
-            )}
-            <span style={{ color: backendRunning ? 'var(--success)' : 'var(--error)' }}>
-              Backend
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Banner */}
-      {error && (
-        <div
-          className="mb-6 p-4 rounded-lg flex items-center gap-3"
-          style={{ backgroundColor: 'rgba(168, 64, 50, 0.2)' }}
-        >
-          <AlertCircle size={20} style={{ color: 'var(--error)' }} />
-          <span style={{ color: 'var(--error)' }}>{error}</span>
-        </div>
+  // Server status pill component
+  const StatusPill = ({ running, label }: { running: boolean | null; label: string }) => (
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
+      style={{
+        backgroundColor: running ? 'rgba(76, 112, 49, 0.2)' : 'rgba(168, 64, 50, 0.2)',
+      }}
+    >
+      {running ? (
+        <Wifi size={14} style={{ color: 'var(--success)' }} />
+      ) : (
+        <WifiOff size={14} style={{ color: 'var(--error)' }} />
       )}
+      <span style={{ color: running ? 'var(--success)' : 'var(--error)' }}>
+        {label}
+      </span>
+    </div>
+  );
 
-      {/* Tabs */}
+  return (
+    <div>
+      <PageHeader
+        title="Admin Dashboard"
+        subtitle="Monitor integrations, debug issues, and manage your development environment"
+        size="md"
+        maxWidth="5xl"
+        actions={
+          <div className="flex gap-2">
+            <StatusPill running={frontendRunning} label="Frontend" />
+            <StatusPill running={backendRunning} label="Backend" />
+          </div>
+        }
+      />
+
+      <div className="px-8 pb-8 max-w-5xl mx-auto">
+        {/* Error Banner */}
+        {error && (
+          <div
+            className="mb-6 p-4 rounded-lg flex items-center gap-3"
+            style={{ backgroundColor: 'rgba(168, 64, 50, 0.2)' }}
+          >
+            <AlertCircle size={20} style={{ color: 'var(--error)' }} />
+            <span style={{ color: 'var(--error)' }}>{error}</span>
+          </div>
+        )}
+
+        {/* Tabs */}
       <div
         className="flex gap-1 mb-6 p-1 rounded-lg"
         style={{ backgroundColor: 'var(--surface-light)' }}
@@ -1416,7 +1396,7 @@ export default function AdminPage() {
           </section>
         </div>
       )}
-
+      </div>
     </div>
   );
 }

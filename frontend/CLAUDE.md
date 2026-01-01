@@ -26,6 +26,34 @@ The goal is a codebase where tests genuinely validate behavior, not tests that a
 - Stores use Zustand and are in `src/stores/`
 - API calls should have action-based error messages that explain what went wrong and what to do
 
+### UI Component Reusability
+
+**Always use existing UI components instead of inline elements with repeated styles.**
+
+When adding or updating page layouts:
+- ❌ **Don't**: Create inline `<h1>` with Cormorant font styles repeated across pages
+- ✅ **Do**: Use `PageHeader` component which handles elegant typography consistently
+
+Available components in `src/components/ui/`:
+| Component | Use Case |
+|-----------|----------|
+| `PageHeader` | Page titles with optional subtitle and actions |
+| `EmptyState` | Empty content placeholders with icon, title, description, and CTA |
+| `Button` | All interactive buttons (primary, secondary, ghost variants) |
+| `Card` | Content containers with optional interactive states |
+| `Modal` | Dialogs and overlays |
+| `Input`, `Textarea`, `Select` | Form elements |
+
+**If a pattern doesn't fit existing components:**
+1. First check if an existing component can be extended with a new prop/variant
+2. If not, create a new reusable component rather than adding inline styles
+3. Example: Centered wizard headers → create `WizardHeader` component
+
+This ensures:
+- Style changes propagate automatically to all pages
+- Consistent typography and spacing across the app
+- Less code duplication and easier maintenance
+
 ## UI Guidelines
 
 Refer to `UI_GUIDELINES.md` for design system details including:

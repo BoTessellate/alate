@@ -313,6 +313,7 @@ export default function LooksPage() {
               );
             })}
           </div>
+          </ErrorBoundary>
         )}
       </div>
 

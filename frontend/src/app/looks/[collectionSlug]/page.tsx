@@ -28,6 +28,7 @@ import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductImage } from '@/utils/placeholder';
 import CollectionInspiration from '@/components/CollectionInspiration';
 import VirtualizedSidebarProducts from '@/components/VirtualizedSidebarProducts';
+import { SectionHeader } from '@/components/ui';
 import type { CollectionMetadata, Product } from '@/types';
 import Link from 'next/link';
 
@@ -1291,48 +1292,43 @@ export default function MoodboardEditorPage() {
           />
 
           <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center justify-between">
-              <h3
-                className="text-lg italic"
-                style={{
-                  fontFamily: 'var(--font-cormorant)',
-                  fontWeight: 500,
-                  color: 'var(--foreground)',
-                }}
-              >
-                Add Products
-              </h3>
-              <div className="flex items-center gap-2">
-                {loadingProducts ? (
-                  <>
-                    <div
-                      className="w-2 h-2 rounded-full animate-pulse"
-                      style={{ backgroundColor: 'var(--warning, #f59e0b)' }}
-                    />
+            <SectionHeader
+              title="Add Products"
+              size="sm"
+              className="mb-0"
+              actions={
+                <div className="flex items-center gap-2">
+                  {loadingProducts ? (
+                    <>
+                      <div
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{ backgroundColor: 'var(--warning, #f59e0b)' }}
+                      />
+                      <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                        Loading...
+                      </span>
+                    </>
+                  ) : (
                     <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                      Loading...
+                      {products.length} products available
                     </span>
-                  </>
-                ) : (
-                  <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                    {products.length} products available
-                  </span>
-                )}
-                {activeSearchQuery && (
-                  <button
-                    onClick={() => {
-                      setActiveSearchQuery('');
-                      setIsCollectionFilterActive(false);
-                      fetchProducts('');
-                    }}
-                    className="text-xs hover:underline"
-                    style={{ color: 'var(--primary)' }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
+                  )}
+                  {activeSearchQuery && (
+                    <button
+                      onClick={() => {
+                        setActiveSearchQuery('');
+                        setIsCollectionFilterActive(false);
+                        fetchProducts('');
+                      }}
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              }
+            />
             {activeSearchQuery && !loadingProducts && (
               <div className="flex items-center gap-2 mt-1.5">
                 <div

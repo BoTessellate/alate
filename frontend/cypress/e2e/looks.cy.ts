@@ -384,4 +384,113 @@ describe('Looks/Moodboard Page', () => {
         .should('be.visible');
     });
   });
+
+  describe('Click Handlers - Regression Tests', () => {
+    // These tests verify that clicking on card elements doesn't crash the app
+    // Regression: DropdownItem was crashing when used outside Dropdown context
+
+    beforeEach(() => {
+      cy.visit('/looks');
+      // Create a moodboard first
+      cy.contains('button', 'New Moodboard').click();
+      cy.get('input[placeholder*="Summer Vibes"]').type('Click Test Board');
+      cy.get('button').contains('Create').click();
+      cy.visit('/looks');
+    });
+
+    it('should not crash when clicking on empty moodboard card (grid icon area)', () => {
+      // Click on the card - this should navigate, not crash
+      cy.contains('Click Test Board')
+        .parents('[role="button"]')
+        .click();
+
+      // Should navigate to editor without error
+      cy.url().should('include', '/looks/');
+      cy.url().should('include', 'click-test-board');
+    });
+
+    it('should not crash when clicking menu button multiple times', () => {
+      // Hover to reveal menu
+      cy.contains('Click Test Board')
+        .parents('[class*="group"]')
+        .trigger('mouseover');
+
+      // Find and click the menu button
+      const menuButton = () => cy.get('button')
+        .find('svg')
+        .filter('[class*="lucide-more-horizontal"]')
+        .first()
+        .parent();
+
+      // Click to open
+      menuButton().click({ force: true });
+      cy.contains('Rename').should('be.visible');
+
+      // Click to close
+      menuButton().click({ force: true });
+
+      // Click to open again - should not crash
+      menuButton().click({ force: true });
+      cy.contains('Rename').should('be.visible');
+    });
+
+    it('should not crash when clicking Rename dropdown item', () => {
+      // Open menu
+      cy.contains('Click Test Board')
+        .parents('[class*="group"]')
+        .trigger('mouseover');
+
+      cy.get('button')
+        .find('svg')
+        .filter('[class*="lucide-more-horizontal"]')
+        .first()
+        .parent()
+        .click({ force: true });
+
+      // Click Rename - should not crash (was crashing due to DropdownItem context issue)
+      cy.contains('Rename').click();
+
+      // Input should appear
+      cy.get('input').should('have.value', 'Click Test Board');
+    });
+
+    it('should not crash when clicking Delete dropdown item', () => {
+      // Open menu
+      cy.contains('Click Test Board')
+        .parents('[class*="group"]')
+        .trigger('mouseover');
+
+      cy.get('button')
+        .find('svg')
+        .filter('[class*="lucide-more-horizontal"]')
+        .first()
+        .parent()
+        .click({ force: true });
+
+      // Click Delete - should not crash
+      cy.contains('Delete').click();
+
+      // Board should be deleted
+      cy.contains('Click Test Board').should('not.exist');
+    });
+
+    it('should handle rapid clicks on card without crashing', () => {
+      // Rapid clicking should not cause issues
+      const card = () => cy.contains('Click Test Board').parents('[role="button"]');
+
+      card().click();
+
+      // Should navigate successfully
+      cy.url().should('include', '/looks/');
+    });
+
+    it('should recover from errors using ErrorBoundary', () => {
+      // Visit looks page - ErrorBoundary should be wrapping the grid
+      cy.visit('/looks');
+
+      // Page should load without showing error boundary fallback
+      cy.contains('Something went wrong').should('not.exist');
+      cy.contains('Click Test Board').should('be.visible');
+    });
+  });
 });

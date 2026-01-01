@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { useUserStore } from '@/stores/useUserStore';
 import { STYLE_CATEGORIES } from '@/types';
-import { Button } from '@/components/ui';
+import { Button, PageHeader } from '@/components/ui';
 
 const API_BASE_URL = 'https://backend-tml.vercel.app';
 
@@ -37,46 +37,67 @@ export default function OnboardingPage() {
     }
   }, [isHydrated, hasCompletedOnboarding, router]);
 
+  // Fallback tags when API is unavailable
+  const FALLBACK_TAGS = [
+    'modern', 'vintage', 'natural', 'elegant', 'rustic',
+    'cozy', 'minimal', 'bold', 'neutral', 'colorful',
+    'scandinavian', 'bohemian', 'industrial', 'coastal', 'farmhouse',
+  ];
+
   // Fetch popular tags from database
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
     const fetchPopularTags = async () => {
       setLoadingTags(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/search?limit=100`);
-        if (response.ok) {
-          const data = await response.json();
-          const products = data.products || [];
+        const response = await fetch(`${API_BASE_URL}/api/search?limit=100`, {
+          signal: controller.signal,
+        });
 
-          // Count tag frequency
-          const tagCounts = new Map<string, number>();
-          products.forEach((p: { tags?: string[] }) => {
-            (p.tags || []).forEach((tag: string) => {
-              tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-            });
-          });
-
-          // Get top 20 tags, filter out very short or generic ones
-          const sortedTags = [...tagCounts.entries()]
-            .filter(([tag]) => tag.length > 2)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 20)
-            .map(([tag]) => tag);
-
-          setPopularTags(sortedTags);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+
+        const data = await response.json();
+        const products = data.products || [];
+
+        // Count tag frequency
+        const tagCounts = new Map<string, number>();
+        products.forEach((p: { tags?: string[] }) => {
+          (p.tags || []).forEach((tag: string) => {
+            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+          });
+        });
+
+        // Get top 20 tags, filter out very short or generic ones
+        const sortedTags = [...tagCounts.entries()]
+          .filter(([tag]) => tag.length > 2)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .map(([tag]) => tag);
+
+        // Use fetched tags or fallback if none found
+        setPopularTags(sortedTags.length > 0 ? sortedTags : FALLBACK_TAGS);
       } catch (error) {
-        console.error('Failed to fetch tags:', error);
-        // Set some fallback tags
-        setPopularTags([
-          'modern', 'vintage', 'natural', 'elegant', 'rustic',
-          'cozy', 'minimal', 'bold', 'neutral', 'colorful',
-        ]);
+        // Silently use fallback tags - network errors are expected when backend is down
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.warn('[Onboarding] Using fallback tags - API unavailable');
+        }
+        setPopularTags(FALLBACK_TAGS);
       } finally {
+        clearTimeout(timeoutId);
         setLoadingTags(false);
       }
     };
 
     fetchPopularTags();
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const toggleCategory = (categoryId: string) => {
@@ -171,22 +192,17 @@ export default function OnboardingPage() {
 
       {/* Step 1: Style Categories */}
       {step === 1 && (
-        <div className="max-w-2xl w-full text-center">
-          <h1
-            className="text-3xl italic mb-3"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
-          >
-            Hi I'm Moody, tell me a little about your style
-          </h1>
-          <p className="mb-8" style={{ color: 'var(--foreground-secondary)' }}>
-            Select at least 2 styles that vibe with you.
-          </p>
+        <div className="max-w-2xl w-full">
+          <PageHeader
+            variant="centered"
+            size="md"
+            maxWidth="none"
+            title="Hi I'm Moody, tell me a little about your style"
+            subtitle="Select at least 2 styles that vibe with you."
+            className="px-0 pt-0 pb-0 mb-8"
+          />
 
-          <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-xl">
+          <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-xl mx-auto">
             {STYLE_CATEGORIES.map((category) => {
               const isSelected = selectedCategories.includes(category.id);
               return (
@@ -218,21 +234,15 @@ export default function OnboardingPage() {
 
       {/* Step 2: Popular Tags */}
       {step === 2 && (
-        <div className="max-w-2xl w-full text-center">
-          <h1
-            className="text-3xl italic mb-3"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
-          >
-            Pick your favorites
-          </h1>
-          <p className="mb-8" style={{ color: 'var(--foreground-secondary)' }}>
-            Select at least 3 tags that catch your eye. These are popular in our
-            catalog.
-          </p>
+        <div className="max-w-2xl w-full">
+          <PageHeader
+            variant="centered"
+            size="md"
+            maxWidth="none"
+            title="Pick your favorites"
+            subtitle="Select at least 3 tags that catch your eye. These are popular in our catalog."
+            className="px-0 pt-0 pb-0 mb-8"
+          />
 
           {loadingTags ? (
             <div className="flex justify-center py-12">
@@ -279,20 +289,14 @@ export default function OnboardingPage() {
           >
             <Sparkles size={40} style={{ color: 'var(--primary)' }} />
           </div>
-          <h1
-            className="text-3xl italic mb-3"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
-          >
-            You're all set!
-          </h1>
-          <p className="mb-8" style={{ color: 'var(--foreground-secondary)' }}>
-            Your personalized mood layer is ready. Start discovering products
-            that match your style.
-          </p>
+          <PageHeader
+            variant="centered"
+            size="md"
+            maxWidth="none"
+            title="You're all set!"
+            subtitle="Your personalized mood layer is ready. Start discovering products that match your style."
+            className="px-0 pt-0 pb-0"
+          />
         </div>
       )}
 

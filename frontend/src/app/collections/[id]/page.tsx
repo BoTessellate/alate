@@ -15,6 +15,7 @@ import {
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductUrl } from '@/utils/placeholder';
+import { EmptyState, Button } from '@/components/ui';
 import type { Product } from '@/types';
 
 // Normalize text: remove underscores, handle TEST_ prefix, title case
@@ -288,32 +289,16 @@ export default function CollectionDetailPage() {
 
       {/* Empty State */}
       {collection.products.length === 0 && (
-        <div
-          className="text-center py-20 rounded-lg border"
-          style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
-        >
-          <FolderOpen size={48} className="mx-auto mb-4" style={{ color: 'var(--foreground-muted)' }} />
-          <h3
-            className="text-lg italic mb-2"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
-          >
-            No products yet
-          </h3>
-          <p className="mb-6" style={{ color: 'var(--foreground-secondary)' }}>
-            Browse the Discover page to add products to this collection.
-          </p>
-          <button
-            onClick={() => router.push('/discover')}
-            className="px-4 py-2 rounded-lg font-medium"
-            style={{ backgroundColor: 'var(--primary)', color: 'white' }}
-          >
-            Go to Discover
-          </button>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title="No products yet"
+          description="Browse the Discover page to add products to this collection."
+          action={{
+            label: 'Go to Discover',
+            onClick: () => router.push('/discover'),
+          }}
+          size="lg"
+        />
       )}
 
       {/* Products Grid */}

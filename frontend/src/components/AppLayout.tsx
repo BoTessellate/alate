@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
 import FloatingActionButton from './FloatingActionButton';
+import { ErrorBoundary } from '@/components/ui';
 import { useUserStore } from '@/stores/useUserStore';
 import { Loader2 } from 'lucide-react';
 
@@ -63,7 +64,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
           className="h-screen w-screen overflow-hidden"
           style={{ backgroundColor: 'var(--background)' }}
         >
-          {children}
+          <ErrorBoundary
+            onError={(error) => console.error('[Onboarding] Error:', error.message)}
+            showReset
+          >
+            {children}
+          </ErrorBoundary>
         </div>
       </ThemeProvider>
     );
@@ -96,7 +102,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
             marginTop: 'calc(var(--topbar-height) + 20px)', // 20px for curved bottom
           }}
         >
-          {children}
+          <ErrorBoundary
+            onError={(error, errorInfo) => {
+              console.error('[AppLayout] Page error:', error.message);
+              console.error('[AppLayout] Component stack:', errorInfo.componentStack);
+            }}
+            showReset
+          >
+            {children}
+          </ErrorBoundary>
         </main>
 
         {/* Floating Action Button - Upload Product Photo */}

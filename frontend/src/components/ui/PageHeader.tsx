@@ -9,22 +9,53 @@ export interface PageHeaderProps {
   subtitle?: string;
   /** Optional badge/count next to title */
   badge?: ReactNode;
-  /** Actions on the right side */
+  /** Actions on the right side (or below title in centered layout) */
   actions?: ReactNode;
+  /** Layout variant */
+  variant?: 'default' | 'centered';
+  /** Size variant */
+  size?: 'sm' | 'md' | 'lg';
+  /** Max width container */
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | '7xl' | 'none';
   /** Custom className */
   className?: string;
 }
+
+const sizeStyles = {
+  sm: { title: 'text-2xl', padding: 'px-6 pt-6 pb-4' },
+  md: { title: 'text-3xl', padding: 'px-8 pt-8 pb-6' },
+  lg: { title: 'text-4xl', padding: 'px-8 pt-8 pb-6' },
+};
+
+const maxWidthStyles = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '5xl': 'max-w-5xl',
+  '7xl': 'max-w-7xl',
+  none: '',
+};
 
 /**
  * PageHeader - Consistent page header with title and actions
  *
  * Usage:
  * ```tsx
+ * // Default layout (left-aligned with actions on right)
  * <PageHeader
  *   title="Layers"
  *   subtitle="Your moodboards"
  *   badge={<span>12</span>}
  *   actions={<Button icon={Plus}>New Layer</Button>}
+ * />
+ *
+ * // Centered layout (for wizards/onboarding)
+ * <PageHeader
+ *   variant="centered"
+ *   title="Tell me about your style"
+ *   subtitle="Select at least 2 styles that vibe with you."
  * />
  * ```
  */
@@ -33,40 +64,74 @@ export function PageHeader({
   subtitle,
   badge,
   actions,
+  variant = 'default',
+  size = 'lg',
+  maxWidth = '7xl',
   className = '',
 }: PageHeaderProps) {
-  return (
-    <div className={`px-8 pt-8 pb-6 max-w-7xl mx-auto ${className}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-baseline gap-3">
-          <h1
-            className="text-4xl italic"
-            style={{
-              fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
-              color: 'var(--foreground)',
-            }}
+  const styles = sizeStyles[size];
+  const maxWidthClass = maxWidthStyles[maxWidth];
+
+  if (variant === 'centered') {
+    return (
+      <div className={`text-center ${styles.padding} ${maxWidthClass} mx-auto ${className}`}>
+        <h1
+          className={`${styles.title} italic mb-2`}
+          style={{
+            fontFamily: 'var(--font-cormorant)',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+          }}
+        >
+          {title}
+        </h1>
+        {subtitle && (
+          <p
+            className="text-sm mb-6"
+            style={{ color: 'var(--foreground-secondary)' }}
           >
-            {title}
-          </h1>
-          {badge && (
-            <span
-              className="text-sm font-medium px-2 py-0.5 rounded-full"
+            {subtitle}
+          </p>
+        )}
+        {actions && <div className="flex items-center justify-center gap-3">{actions}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${styles.padding} ${maxWidthClass} mx-auto ${className}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-baseline gap-3">
+            <h1
+              className={`${styles.title} italic`}
               style={{
-                backgroundColor: 'var(--surface-light)',
-                color: 'var(--foreground-muted)',
+                fontFamily: 'var(--font-cormorant)',
+                fontWeight: 500,
+                color: 'var(--foreground)',
               }}
             >
-              {badge}
-            </span>
-          )}
+              {title}
+            </h1>
+            {badge && (
+              <span
+                className="text-sm font-medium px-2 py-0.5 rounded-full"
+                style={{
+                  backgroundColor: 'var(--surface-light)',
+                  color: 'var(--foreground-muted)',
+                }}
+              >
+                {badge}
+              </span>
+            )}
+          </div>
           {subtitle && (
-            <span
-              className="text-sm"
-              style={{ color: 'var(--foreground-muted)' }}
+            <p
+              className="text-sm mt-1"
+              style={{ color: 'var(--foreground-secondary)' }}
             >
               {subtitle}
-            </span>
+            </p>
           )}
         </div>
         {actions && <div className="flex items-center gap-3">{actions}</div>}
@@ -75,20 +140,51 @@ export function PageHeader({
   );
 }
 
+export interface SectionHeaderProps {
+  /** Section title */
+  title: string;
+  /** Optional subtitle */
+  subtitle?: string;
+  /** Actions on the right side */
+  actions?: ReactNode;
+  /** Size variant */
+  size?: 'sm' | 'md' | 'lg';
+  /** Custom className */
+  className?: string;
+}
+
+const sectionSizeStyles = {
+  sm: { title: 'text-lg', gap: 'gap-2' },
+  md: { title: 'text-xl', gap: 'gap-3' },
+  lg: { title: 'text-2xl', gap: 'gap-4' },
+};
+
 /**
  * SectionHeader - Smaller header for page sections
+ *
+ * Usage:
+ * ```tsx
+ * // Default size
+ * <SectionHeader title="Add Products" actions={<Button size="sm">Refresh</Button>} />
+ *
+ * // Small size for sidebars
+ * <SectionHeader size="sm" title="Add Products" />
+ * ```
  */
 export function SectionHeader({
   title,
   subtitle,
   actions,
+  size = 'lg',
   className = '',
-}: Omit<PageHeaderProps, 'badge'>) {
+}: SectionHeaderProps) {
+  const styles = sectionSizeStyles[size];
+
   return (
-    <div className={`flex items-center justify-between gap-4 mb-4 ${className}`}>
+    <div className={`flex items-center justify-between ${styles.gap} mb-4 ${className}`}>
       <div>
         <h2
-          className="text-2xl italic"
+          className={`${styles.title} italic`}
           style={{
             fontFamily: 'var(--font-cormorant)',
             fontWeight: 500,

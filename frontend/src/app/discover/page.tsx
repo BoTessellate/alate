@@ -55,7 +55,7 @@ export default function DiscoverPage() {
         <p
           className="text-sm tracking-[0.3em] uppercase mb-4"
           style={{
-            color: 'var(--foreground-muted)',
+            color: 'var(--highlight)',
             letterSpacing: '0.3em',
           }}
         >
@@ -67,7 +67,7 @@ export default function DiscoverPage() {
           style={{
             fontFamily: 'var(--font-cormorant)',
             fontWeight: 500,
-            color: 'var(--foreground)',
+            color: 'var(--highlight)',
             lineHeight: 1,
           }}
         >
