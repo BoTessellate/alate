@@ -6,6 +6,8 @@
  * components call this hook once and get all computed colors.
  */
 
+export type TopbarVariant = 'default' | 'warm' | 'highlight';
+
 export interface TopbarColors {
   // Text colors
   text: string;
@@ -21,11 +23,13 @@ export interface TopbarColors {
 }
 
 /**
- * Get topbar colors based on whether we're on the looks list page
- * (which has a warm/cream topbar vs the default green topbar)
+ * Get topbar colors based on the topbar variant
+ * - default: green topbar (most pages)
+ * - warm: cream topbar (/looks page)
+ * - highlight: golden topbar (/discover page)
  */
-export function getTopbarColors(isWarmTopbar: boolean): TopbarColors {
-  if (isWarmTopbar) {
+export function getTopbarColors(variant: TopbarVariant): TopbarColors {
+  if (variant === 'warm') {
     // Warm topbar (looks list page) - dark text on cream background
     return {
       text: 'var(--charcoal)',
@@ -34,6 +38,16 @@ export function getTopbarColors(isWarmTopbar: boolean): TopbarColors {
       hoverBg: 'rgba(0, 0, 0, 0.15)',
       activeBg: 'rgba(0, 0, 0, 0.1)',
       border: 'rgba(0, 0, 0, 0.15)',
+    };
+  } else if (variant === 'highlight') {
+    // Highlight topbar (discover page) - light text on golden background
+    return {
+      text: 'white',
+      textMuted: 'rgba(255, 255, 255, 0.8)',
+      defaultBg: 'rgba(255, 255, 255, 0.15)',
+      hoverBg: 'rgba(255, 255, 255, 0.25)',
+      activeBg: 'rgba(255, 255, 255, 0.2)',
+      border: 'rgba(255, 255, 255, 0.2)',
     };
   } else {
     // Default topbar (green) - light text on dark background

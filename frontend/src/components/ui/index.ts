@@ -104,6 +104,7 @@ export {
   Logo,
   AgentModeToggle,
   type TopbarColors,
+  type TopbarVariant,
   type TopbarIconButtonProps,
   type TopbarTextButtonProps,
   type LogoProps,

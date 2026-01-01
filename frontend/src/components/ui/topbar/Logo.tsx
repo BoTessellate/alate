@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import type { TopbarVariant } from './useTopbarColors';
 
 export interface LogoProps {
-  /** Whether we're on the looks list page (warm topbar) */
-  isWarmTopbar: boolean;
+  /** The topbar variant for theming */
+  topbarVariant: TopbarVariant;
   /** The effective theme (light or dark) */
   effectiveTheme: 'light' | 'dark';
 }
@@ -12,29 +13,31 @@ export interface LogoProps {
 /**
  * Logo - Brand logo with context-aware theming
  *
- * The logo needs to consider BOTH the page context (warm vs green topbar)
+ * The logo needs to consider BOTH the page context (warm/green/highlight topbar)
  * AND the theme (light vs dark) for proper contrast.
  *
  * Circle color logic:
- * - Looks list page (warm topbar): always charcoal (dark on cream)
- * - Other pages in light mode (green topbar): charcoal (dark on green)
- * - Other pages in dark mode (dark topbar): cream (light on dark)
+ * - Warm topbar (cream): charcoal (dark on cream)
+ * - Highlight topbar (golden): charcoal (dark on gold for contrast)
+ * - Default topbar (green) light mode: charcoal (dark on green)
+ * - Default topbar (green) dark mode: cream (light on dark)
  *
  * Pill color logic:
- * - Looks list page: primary green
+ * - Warm topbar: primary green
+ * - Highlight topbar: primary green
  * - Light mode: primary green
  * - Dark mode: primary-dark (slightly darker green)
  */
-export function Logo({ isWarmTopbar, effectiveTheme }: LogoProps) {
-  // Circle: dark on warm/light topbar, light on dark topbar
-  const circleColor = isWarmTopbar
+export function Logo({ topbarVariant, effectiveTheme }: LogoProps) {
+  // Circle: dark on warm/highlight/light topbar, light on dark topbar
+  const circleColor = topbarVariant === 'warm' || topbarVariant === 'highlight'
     ? 'var(--charcoal)'
     : effectiveTheme === 'dark'
       ? 'var(--cream)'
       : 'var(--charcoal)';
 
   // Pill: primary green, darker variant on dark theme
-  const pillColor = isWarmTopbar
+  const pillColor = topbarVariant === 'warm' || topbarVariant === 'highlight'
     ? 'var(--primary)'
     : effectiveTheme === 'dark'
       ? 'var(--primary-dark)'

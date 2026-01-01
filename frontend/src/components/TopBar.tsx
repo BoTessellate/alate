@@ -84,10 +84,15 @@ export default function TopBar() {
 
   // Check if on My Looks page (not editor) for warm topbar
   const isLooksListPage = pathname === '/looks';
+  // Check if on Discover page for highlight topbar
+  const isDiscoverPage = pathname === '/discover' || pathname.startsWith('/discover?');
   const pathSegments = pathname.split('/').filter(Boolean);
 
+  // Determine topbar variant: warm (cream), highlight (golden), or default (green)
+  const topbarVariant = isLooksListPage ? 'warm' : isDiscoverPage ? 'highlight' : 'default';
+
   // Compute topbar colors once - used by all icon buttons
-  const colors = getTopbarColors(isLooksListPage);
+  const colors = getTopbarColors(topbarVariant);
 
   // Get moodboard name if on editor page (only after hydration to avoid mismatch)
   let moodboardName: string | null = null;
@@ -277,12 +282,12 @@ export default function TopBar() {
         className="flex items-center justify-between px-4 backdrop-blur-md transition-all duration-300 ease-out relative z-10"
         style={{
           height: isTopBarExpanded ? 'calc(var(--topbar-height) + 28px)' : 'var(--topbar-height)',
-          backgroundColor: isLooksListPage ? 'var(--topbar-bg-warm)' : 'var(--topbar-bg)',
+          backgroundColor: topbarVariant === 'warm' ? 'var(--topbar-bg-warm)' : topbarVariant === 'highlight' ? 'var(--topbar-bg-highlight)' : 'var(--topbar-bg)',
         }}
       >
       {/* Left side - Logo + Breadcrumb Navigation */}
       <div className="flex items-center gap-3">
-        <Logo isWarmTopbar={isLooksListPage} effectiveTheme={effectiveTheme} />
+        <Logo topbarVariant={topbarVariant} effectiveTheme={effectiveTheme} />
         <BreadcrumbNav />
       </div>
 
@@ -293,11 +298,12 @@ export default function TopBar() {
             (item.href !== '/' && pathname.startsWith(item.href));
           const Icon = item.icon;
 
-          // Colors based on topbar theme
-          const activeColor = isLooksListPage ? 'var(--charcoal)' : 'white';
-          const inactiveColor = isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.75)';
-          const activeBg = isLooksListPage ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.25)';
-          const hoverBg = isLooksListPage ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
+          // Colors based on topbar theme - warm uses dark text, highlight/default use light text
+          const isWarmTheme = topbarVariant === 'warm';
+          const activeColor = isWarmTheme ? 'var(--charcoal)' : 'white';
+          const inactiveColor = isWarmTheme ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.75)';
+          const activeBg = isWarmTheme ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.25)';
+          const hoverBg = isWarmTheme ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.15)';
 
           return (
             <Link
@@ -330,7 +336,7 @@ export default function TopBar() {
               <span
                 className="absolute top-full mt-1 text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
                 style={{
-                  color: isLooksListPage ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+                  color: isWarmTheme ? 'rgba(34, 34, 34, 0.7)' : 'rgba(255, 255, 255, 0.7)',
                 }}
               >
                 {item.name}
@@ -663,7 +669,7 @@ export default function TopBar() {
         className="w-full backdrop-blur-md"
         style={{
           height: '16px',
-          backgroundColor: isLooksListPage ? 'var(--topbar-bg-warm)' : 'var(--topbar-bg)',
+          backgroundColor: topbarVariant === 'warm' ? 'var(--topbar-bg-warm)' : topbarVariant === 'highlight' ? 'var(--topbar-bg-highlight)' : 'var(--topbar-bg)',
           borderRadius: '0 0 100% 100% / 0 0 100% 100%',
         }}
       />

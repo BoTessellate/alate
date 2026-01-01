@@ -16,7 +16,7 @@
  * ```
  */
 
-export { getTopbarColors, type TopbarColors } from './useTopbarColors';
+export { getTopbarColors, type TopbarColors, type TopbarVariant } from './useTopbarColors';
 export { TopbarIconButton, type TopbarIconButtonProps } from './TopbarIconButton';
 export { TopbarTextButton, type TopbarTextButtonProps } from './TopbarTextButton';
 export { Logo, type LogoProps } from './Logo';
