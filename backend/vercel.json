@@ -6,7 +6,7 @@
       "main": true
     }
   },
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- api/ sdk/ package.json package-lock.json vercel.json tsconfig.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- backend/",
   "functions": {
     "api/*.ts": {
       "memory": 1024,
