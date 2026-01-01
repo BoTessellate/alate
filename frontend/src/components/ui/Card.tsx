@@ -108,15 +108,17 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
  */
 export function CardHeader({
   children,
-  className = ''
+  className = '',
+  style,
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
   return (
     <div
       className={`px-4 py-3 border-b ${className}`}
-      style={{ borderColor: 'var(--border)' }}
+      style={{ borderColor: 'var(--border)', ...style }}
     >
       {children}
     </div>

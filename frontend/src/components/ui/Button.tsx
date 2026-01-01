@@ -1,15 +1,18 @@
 'use client';
 
-import { forwardRef, useState, type ReactNode, type ButtonHTMLAttributes } from 'react';
-import { Loader2, type LucideIcon } from 'lucide-react';
+import { forwardRef, useState, type ReactNode, type ButtonHTMLAttributes, type ComponentType } from 'react';
+import { Loader2, type LucideIcon, type LucideProps } from 'lucide-react';
+
+/** Icon can be a Lucide icon or a render function returning JSX */
+export type IconProp = LucideIcon | ComponentType<LucideProps> | (() => ReactNode);
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Visual variant */
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive' | 'link';
   /** Size preset */
   size?: 'sm' | 'md' | 'lg';
-  /** Icon to display before text */
-  icon?: LucideIcon;
+  /** Icon to display before text (Lucide icon or render function) */
+  icon?: IconProp;
   /** Icon to display after text */
   iconRight?: LucideIcon;
   /** Loading state */
@@ -154,7 +157,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {loading ? (
         <Loader2 size={iconSizes[size]} className="animate-spin" />
       ) : Icon ? (
-        <Icon size={iconSizes[size]} />
+        // Check if icon is a render function (returns ReactNode) or a component
+        typeof Icon === 'function' && Icon.length === 0 ? (
+          (Icon as () => ReactNode)()
+        ) : (
+          <Icon size={iconSizes[size]} />
+        )
       ) : null}
       {children}
       {IconRight && !loading && <IconRight size={iconSizes[size]} />}
@@ -163,15 +171,26 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 /**
+ * IconButton props - explicitly allows render functions for icons
+ */
+export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  /** Icon component or render function */
+  icon?: LucideIcon | (() => ReactNode);
+  /** Visual variant */
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive' | 'link';
+  /** Size preset */
+  size?: 'sm' | 'md' | 'lg';
+  /** Accessibility label (required) */
+  'aria-label': string;
+}
+
+/**
  * IconButton - Square icon-only button
  *
  * Supports custom styling via className and style props.
  * When custom styles are provided, they override the variant styles.
  */
-export const IconButton = forwardRef<
-  HTMLButtonElement,
-  Omit<ButtonProps, 'children' | 'iconRight'> & { 'aria-label': string }
->(function IconButton(
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { icon: Icon, size = 'md', variant = 'ghost', className = '', style, ...props },
   ref
 ) {
@@ -221,7 +240,14 @@ export const IconButton = forwardRef<
       onMouseLeave={() => setIsHovered(false)}
       {...props}
     >
-      {Icon && <Icon size={iconSizes[size]} />}
+      {Icon && (
+        // Check if icon is a render function (returns ReactNode) or a component
+        typeof Icon === 'function' && Icon.length === 0 ? (
+          (Icon as () => ReactNode)()
+        ) : (
+          <Icon size={iconSizes[size]} />
+        )
+      )}
     </button>
   );
 });
