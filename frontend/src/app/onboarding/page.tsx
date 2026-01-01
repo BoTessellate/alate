@@ -7,7 +7,7 @@ import { useUserStore } from '@/stores/useUserStore';
 import { STYLE_CATEGORIES } from '@/types';
 import { Button, PageHeader } from '@/components/ui';
 
-const API_BASE_URL = 'https://backend-tml.vercel.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
 
 export default function OnboardingPage() {
   const router = useRouter();

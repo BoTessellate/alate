@@ -2,7 +2,7 @@ import useSWR from 'swr';
 import { useState, useEffect } from 'react';
 import type { Product } from '@/types';
 
-const API_BASE_URL = 'https://backend-tml.vercel.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
 
 interface SearchResponse {
   products: Product[];

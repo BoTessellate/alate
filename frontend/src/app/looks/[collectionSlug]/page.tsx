@@ -32,7 +32,7 @@ import { SectionHeader } from '@/components/ui';
 import type { CollectionMetadata, Product } from '@/types';
 import Link from 'next/link';
 
-const API_BASE_URL = 'https://backend-tml.vercel.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
 
 export default function MoodboardEditorPage() {
   const params = useParams();

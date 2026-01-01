@@ -3,7 +3,7 @@ import { useUploadStore, DetectedProduct } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import type { Product } from '@/types';
 
-const API_BASE_URL = 'https://backend-tml.vercel.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
 
 // Multi-product detection response types
 interface MultiDetectionResponse {
