@@ -241,27 +241,53 @@ throw new ConfigurationError('API key missing');
 
 ### Page Creation
 
-All pages should follow a consistent header pattern:
+Pages have two header patterns based on their hierarchy:
+
+#### Main Pages (Home, Closet, Discover, Layers)
+Use a **centered hero section** for brand presence:
 
 ```tsx
-{/* Page Header */}
-<div className="px-8 pt-8 pb-6 max-w-7xl mx-auto flex items-baseline gap-3">
-  <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
+{/* Hero Section */}
+<div className="px-8 py-16 max-w-6xl mx-auto text-center">
+  <p className="text-sm tracking-[0.3em] uppercase mb-4" style={{ color: 'var(--foreground-muted)' }}>
+    Tagline or welcome message
+  </p>
+  <h1 className="text-6xl md:text-7xl italic mb-4" style={{
+    fontFamily: 'var(--font-cormorant)',
+    fontWeight: 500,
+    color: 'var(--foreground)',
+  }}>
     Page Title
   </h1>
-  <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
-    Brief description of the page
-  </span>
+  <p className="text-lg max-w-lg mx-auto" style={{
+    fontFamily: 'var(--font-cormorant)',
+    color: 'var(--foreground-secondary)',
+  }}>
+    Page description
+  </p>
 </div>
 ```
 
-**Page Header Rules:**
-- Heading: `text-3xl font-bold` with `var(--foreground)`
-- Subheading: `text-sm` with `var(--foreground-muted)`
+#### Sub-pages (Personal, Community, Collections, Settings, Admin)
+Use the **PageHeader component** with inline baseline layout:
+
+```tsx
+import { PageHeader } from '@/components/ui';
+
+<PageHeader
+  title="Page Title"
+  subtitle="Brief description"
+  actions={<Button>Action</Button>}
+/>
+```
+
+**Sub-page Header Rules:**
+- Heading: `text-3xl italic` with Cormorant Garamond font
+- Subheading: `text-sm` with `var(--foreground-muted)` - **inline, not stacked**
 - Layout: `flex items-baseline gap-3` (inline, baseline aligned)
 - Container: `px-8 pt-8 pb-6 max-w-7xl mx-auto`
 - Background: `var(--background)` on page wrapper
-- **No stacked layouts** - always use inline baseline alignment
+- **No stacked layouts** - always use inline baseline alignment for sub-pages
 
 ### CTA & Interactive States
 

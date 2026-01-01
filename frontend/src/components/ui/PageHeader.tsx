@@ -103,8 +103,12 @@ export function PageHeader({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-baseline gap-3 flex-1">
           <h1
-            className={`${styles.title} font-bold`}
-            style={{ color: 'var(--foreground)' }}
+            className={`${styles.title} italic`}
+            style={{
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+              color: 'var(--foreground)',
+            }}
           >
             {title}
           </h1>

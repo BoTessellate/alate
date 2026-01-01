@@ -180,8 +180,13 @@ export default function CollectionDetailPage() {
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="text-3xl font-bold w-full bg-transparent border-b-2 outline-none"
-                style={{ color: 'var(--foreground)', borderColor: 'var(--primary)' }}
+                className="text-3xl italic w-full bg-transparent border-b-2 outline-none"
+                style={{
+                  fontFamily: 'var(--font-cormorant)',
+                  fontWeight: 500,
+                  color: 'var(--foreground)',
+                  borderColor: 'var(--primary)',
+                }}
                 autoFocus
               />
               <textarea
@@ -214,9 +219,9 @@ export default function CollectionDetailPage() {
               </div>
             </div>
           ) : (
-            <>
+            <div className="flex items-baseline gap-3 flex-wrap">
               <h1
-                className="text-3xl italic mb-2"
+                className="text-3xl italic"
                 style={{
                   fontFamily: 'var(--font-cormorant)',
                   fontWeight: 500,
@@ -225,17 +230,17 @@ export default function CollectionDetailPage() {
               >
                 {collection.name}
               </h1>
-              {collection.description && (
-                <p className="mb-3" style={{ color: 'var(--foreground-secondary)' }}>
-                  {collection.description}
-                </p>
-              )}
-              <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+              <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
                 {collection.products.length} {collection.products.length === 1 ? 'item' : 'items'}
                 {' · '}
                 Updated {formatDate(collection.updatedAt)}
-              </p>
-            </>
+              </span>
+              {collection.description && (
+                <p className="w-full text-sm mt-1" style={{ color: 'var(--foreground-secondary)' }}>
+                  {collection.description}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
