@@ -225,3 +225,60 @@ When implementing new features, spawn a test agent to verify:
 - User interactions work as expected
 - API calls succeed with proper payloads
 - Edge cases are handled gracefully
+
+## Vercel Deployment
+
+### Project Structure
+This is a monorepo with two separate Vercel projects:
+- **Backend** (backend-tml.vercel.app): Serverless API functions
+- **Frontend** (frontend-tml.vercel.app): Next.js application
+
+### Required Vercel Dashboard Settings
+Both projects MUST have their **Root Directory** configured:
+- Backend project → Settings → General → Root Directory: `backend`
+- Frontend project → Settings → General → Root Directory: `frontend`
+
+If root directory is not set, Vercel will run from repo root and use root `package.json`, which causes cross-project build failures.
+
+### Debugging Vercel Deployments via CLI
+
+```bash
+# List recent deployments
+cd backend && npx vercel ls
+
+# Inspect a specific deployment
+npx vercel inspect <deployment-url>
+
+# Get build logs for failed deployment
+npx vercel inspect <deployment-id> --logs
+
+# Example:
+npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
+```
+
+### Common Issues
+
+**"supabaseUrl is required" in backend build:**
+- Cause: Backend project is building from repo root, triggering frontend build
+- Fix: Set Root Directory to `backend` in Vercel dashboard
+
+**Frontend cancelled:**
+- Cause: Usually linked to backend failure in same push
+- Fix: Fix backend first, frontend will build on next push
+
+**ignoreCommand not working:**
+- Each project's `vercel.json` has `ignoreCommand` to skip builds when that folder hasn't changed
+- Only works when Root Directory is properly set
+
+### Environment Variables Required
+**Backend project needs:**
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `PINECONE_API_KEY`
+
+**Frontend project needs:**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_URL` (points to backend-tml.vercel.app)
