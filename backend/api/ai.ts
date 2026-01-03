@@ -28,8 +28,9 @@ import { extractAndNameColors } from '../sdk/productEnrichment/colorExtractor';
 
 const log = createModuleLogger('ai');
 
-// Demo mode flag
-const DEMO_MODE = process.env.DEMO_MODE !== 'false';
+// Demo mode flag - defaults to false (real AI processing)
+// Set DEMO_MODE=true to return mock data without API calls
+const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 // Initialize Supabase for image storage (lazy)
 const supabaseUrl = process.env.SUPABASE_URL || '';

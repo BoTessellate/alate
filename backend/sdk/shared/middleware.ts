@@ -91,6 +91,8 @@ const DEFAULT_CORS_CONFIG: CorsConfig = {
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'Accept',
+    'X-Requested-With',
     'X-Request-ID',
     'X-API-Key',
   ],
