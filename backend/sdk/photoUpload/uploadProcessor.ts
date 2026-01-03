@@ -4,6 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabaseClient } from '../shared/supabaseClient';
 import { createImageGenerator } from '../imageGeneration';
 import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
@@ -21,6 +22,9 @@ const logger = createModuleLogger('photoUpload');
 
 // Default to real processing (false). Set DEMO_MODE=true to return mock data
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
+
+// Gemini model for vision tasks (fallback when Claude is unavailable)
+const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.0-flash-exp';
 
 /**
  * Process an uploaded photo through the full pipeline
@@ -206,6 +210,7 @@ async function removeBackground(productId: string, input: PhotoUploadInput): Pro
 
 /**
  * Enrich product with AI-generated metadata
+ * Tries Claude first, falls back to Gemini, then to basic defaults
  */
 async function enrichProduct(
   productId: string,
@@ -238,7 +243,6 @@ async function enrichProduct(
     };
   }
 
-  // Real AI enrichment with vision
   const prompt = `You are analyzing a product image for a style/shopping app.
 
 Product Type Context: ${input.productType === 'fashion' ? 'Clothing, shoes, or accessories' : 'Furniture, home decor, or interior items'}
@@ -254,16 +258,16 @@ Analyze the image and return a JSON object with:
   "tone": "Aesthetic mood (e.g., 'warm', 'cool', 'earthy', 'modern', 'rustic')"
 }
 
-Image URL: ${imageUrl}
-
 Return ONLY valid JSON, no explanation.`;
 
+  // Try Claude first
   try {
-    const response = await callClaude(prompt, { maxTokens: 500 });
+    const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
 
     if (response.success && response.text) {
       const parsed = parseJSONFromResponse(response.text);
       if (parsed) {
+        logger.info({ productId, provider: 'claude' }, 'Enrichment successful');
         return {
           product_name: parsed.product_name || 'Uploaded Product',
           tags: parsed.tags || [],
@@ -275,11 +279,59 @@ Return ONLY valid JSON, no explanation.`;
         };
       }
     }
+    logger.warn({ productId }, 'Claude enrichment returned invalid response, trying Gemini');
   } catch (error) {
-    logger.warn({ productId, error }, 'AI enrichment failed, using defaults');
+    logger.warn({ productId, error }, 'Claude enrichment failed, trying Gemini fallback');
   }
 
-  // Fallback defaults
+  // Fallback to Gemini
+  try {
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      const gemini = new GoogleGenerativeAI(geminiApiKey);
+      const model = gemini.getGenerativeModel({ model: GEMINI_VISION_MODEL });
+
+      // Fetch image and convert to base64 for Gemini vision
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const base64Image = Buffer.from(imageBuffer).toString('base64');
+      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+      const imagePart = {
+        inlineData: {
+          mimeType,
+          data: base64Image,
+        },
+      };
+
+      const result = await model.generateContent([prompt, imagePart]);
+      const response = await result.response;
+      const text = response.text();
+
+      // Parse JSON from response (handle markdown code blocks)
+      let jsonText = text;
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+      }
+
+      const parsed = JSON.parse(jsonText);
+      logger.info({ productId, provider: 'gemini' }, 'Enrichment successful');
+      return {
+        product_name: parsed.product_name || 'Uploaded Product',
+        tags: parsed.tags || [],
+        color_palette: parsed.color_palette || [],
+        category: parsed.category || 'general',
+        material: parsed.material,
+        texture: parsed.texture,
+        tone: parsed.tone,
+      };
+    }
+  } catch (error) {
+    logger.warn({ productId, error }, 'Gemini enrichment also failed, using defaults');
+  }
+
+  // Final fallback defaults
   return {
     product_name: 'Uploaded Product',
     tags: ['uploaded'],
