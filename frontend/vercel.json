@@ -8,6 +8,5 @@
       "master": true,
       "main": true
     }
-  },
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- frontend/"
+  }
 }
