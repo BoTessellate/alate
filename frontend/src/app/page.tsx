@@ -138,30 +138,48 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Stats Bar */}
-      <div
-        className="py-4"
-        style={{
-          backgroundColor: 'var(--surface)',
-          borderTop: '1px solid var(--border)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
+      {/* Stats Bar - Transparent with animated stat items */}
+      <div className="py-6">
         <div className="px-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             {/* Left side - Weather & Time */}
-            <div className="flex items-center gap-8">
-              <WeatherWidget />
-
-              {/* Subtle Divider */}
+            <div className="flex items-center gap-6">
+              {/* Weather - with hover animation */}
               <div
-                className="h-8 w-px"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
+                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: 'transparent',
+                  borderColor: 'var(--border)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <WeatherWidget />
+              </div>
 
-              {/* Time of Day */}
+              {/* Time of Day - with hover animation */}
               {formattedTime && timeContext && (
-                <div className="flex items-center gap-4">
+                <div
+                  className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
+                  style={{
+                    backgroundColor: 'transparent',
+                    borderColor: 'var(--border)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--primary-dark)';
+                    e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                >
                   <Clock size={20} style={{ color: 'var(--foreground-muted)' }} />
                   <span
                     className="text-2xl"
@@ -193,9 +211,23 @@ export default function Home() {
             </div>
 
             {/* Right side - Closet Stats */}
-            <div className="flex items-center gap-8">
-              {/* Closet Items */}
-              <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
+              {/* Closet Items - with hover animation */}
+              <div
+                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: 'transparent',
+                  borderColor: 'var(--border)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
                 <Shirt size={20} style={{ color: 'var(--foreground-muted)' }} />
                 <span
                   className="text-2xl"
@@ -224,14 +256,22 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Subtle Divider */}
+              {/* Avg Price Per Wear - with hover animation */}
               <div
-                className="h-8 w-px"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
-
-              {/* Avg Price Per Wear */}
-              <div className="flex items-center gap-4">
+                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
+                style={{
+                  backgroundColor: 'transparent',
+                  borderColor: 'var(--border)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
                 <TrendingDown size={20} style={{ color: 'var(--foreground-muted)' }} />
                 <span
                   className="text-2xl"
