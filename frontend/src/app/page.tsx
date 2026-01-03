@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3, Shirt, TrendingDown, Clock } from 'lucide-react';
+import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore, type LocalCurrency } from '@/stores/useSettingsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
-import { Card, SectionHeader, WeatherWidget } from '@/components/ui';
+import { Card, SectionHeader, WeatherWidget, StatCard, StatDivider } from '@/components/ui';
 
 // Currency symbols map
 const CURRENCY_SYMBOLS: Record<LocalCurrency, string> = {
@@ -143,162 +143,41 @@ export default function Home() {
         <div className="px-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             {/* Left side - Weather & Time */}
-            <div className="flex items-center gap-6">
-              {/* Weather - with hover animation */}
-              <div
-                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--border)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
+            <div className="flex items-center gap-4">
+              {/* Weather */}
+              <StatCard value="" label="">
                 <WeatherWidget />
-              </div>
+              </StatCard>
 
-              {/* Time of Day - with hover animation */}
+              <StatDivider />
+
+              {/* Time of Day */}
               {formattedTime && timeContext && (
-                <div
-                  className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
-                  style={{
-                    backgroundColor: 'transparent',
-                    borderColor: 'var(--border)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--primary-dark)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <Clock size={20} style={{ color: 'var(--foreground-muted)' }} />
-                  <span
-                    className="text-2xl"
-                    style={{
-                      color: 'var(--foreground)',
-                      fontFamily: 'var(--font-cormorant)',
-                      fontWeight: 400,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {formattedTime}
-                  </span>
-                  <div className="flex flex-col">
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
-                    >
-                      {timeContext.period}
-                    </span>
-                    <span
-                      className="text-xs"
-                      style={{ color: 'var(--foreground-muted)' }}
-                    >
-                      {timeContext.suggestion}
-                    </span>
-                  </div>
-                </div>
+                <StatCard
+                  value={formattedTime}
+                  label={timeContext.period}
+                  sublabel={timeContext.suggestion}
+                />
               )}
             </div>
 
             {/* Right side - Closet Stats */}
-            <div className="flex items-center gap-6">
-              {/* Closet Items - with hover animation */}
-              <div
-                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--border)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <Shirt size={20} style={{ color: 'var(--foreground-muted)' }} />
-                <span
-                  className="text-2xl"
-                  style={{
-                    color: 'var(--foreground)',
-                    fontFamily: 'var(--font-cormorant)',
-                    fontWeight: 400,
-                    lineHeight: 1,
-                  }}
-                >
-                  {isHydrated ? totalClosetItems : '—'}
-                </span>
-                <div className="flex flex-col">
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
-                  >
-                    Items
-                  </span>
-                  <span
-                    className="text-xs"
-                    style={{ color: 'var(--foreground-muted)' }}
-                  >
-                    in closet
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center gap-4">
+              {/* Closet Items */}
+              <StatCard
+                value={isHydrated ? totalClosetItems : '—'}
+                label="Items"
+                sublabel="in closet"
+              />
 
-              {/* Avg Price Per Wear - with hover animation */}
-              <div
-                className="group flex items-center gap-4 px-4 py-3 rounded-lg border transition-all duration-200 cursor-default hover:-translate-y-0.5"
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--border)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--primary-dark)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(0, 0, 0, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <TrendingDown size={20} style={{ color: 'var(--foreground-muted)' }} />
-                <span
-                  className="text-2xl"
-                  style={{
-                    color: 'var(--foreground)',
-                    fontFamily: 'var(--font-cormorant)',
-                    fontWeight: 400,
-                    lineHeight: 1,
-                  }}
-                >
-                  {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(0)}` : '—'}
-                </span>
-                <div className="flex flex-col">
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
-                  >
-                    Avg cost
-                  </span>
-                  <span
-                    className="text-xs"
-                    style={{ color: 'var(--foreground-muted)' }}
-                  >
-                    per wear
-                  </span>
-                </div>
-              </div>
+              <StatDivider />
+
+              {/* Avg Price Per Wear */}
+              <StatCard
+                value={isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(0)}` : '—'}
+                label="Avg cost"
+                sublabel="per wear"
+              />
             </div>
           </div>
         </div>

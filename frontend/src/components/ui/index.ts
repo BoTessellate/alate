@@ -168,3 +168,6 @@ export {
 
 // Weather Widget
 export { WeatherWidget } from './WeatherWidget';
+
+// Stat Card
+export { StatCard, StatDivider } from './StatCard';
