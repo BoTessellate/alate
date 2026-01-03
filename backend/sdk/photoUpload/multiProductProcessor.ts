@@ -422,12 +422,70 @@ Return ONLY valid JSON, no explanation.`;
         tone: parsed.tone,
       };
     }
-    logger.warn({ productId }, 'GEMINI_API_KEY not configured, trying Claude');
+    logger.warn({ productId }, 'GEMINI_API_KEY not configured, trying GPT-4o');
   } catch (error) {
-    logger.warn({ productId, error }, 'Gemini enrichment failed, trying Claude fallback');
+    logger.warn({ productId, error }, 'Gemini enrichment failed, trying GPT-4o fallback');
   }
 
-  // Fallback to Claude
+  // Fallback to GPT-4o (also good for vision)
+  try {
+    const OpenAI = (await import('openai')).default;
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (openaiApiKey) {
+      const openai = new OpenAI({ apiKey: openaiApiKey });
+
+      // Fetch image and convert to base64 for GPT-4o vision
+      const imageResponse = await fetch(imageUrl);
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const base64Image = Buffer.from(imageBuffer).toString('base64');
+      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const text = response.choices[0]?.message?.content || '';
+
+      // Parse JSON from response
+      let jsonText = text;
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonMatch) {
+        jsonText = jsonMatch[1].trim();
+      }
+
+      const parsed = JSON.parse(jsonText);
+      logger.info({ productId, provider: 'gpt-4o' }, 'Enrichment successful');
+      return {
+        product_name: selected.customName || parsed.product_name || detected.suggestedName,
+        tags: parsed.tags || detected.colors,
+        color_palette: parsed.color_palette || detected.colors,
+        category: parsed.category || detected.category,
+        material: parsed.material,
+        texture: parsed.texture,
+        tone: parsed.tone,
+      };
+    }
+    logger.warn({ productId }, 'OPENAI_API_KEY not configured, trying Claude');
+  } catch (error) {
+    logger.warn({ productId, error }, 'GPT-4o enrichment failed, trying Claude fallback');
+  }
+
+  // Last resort: Claude (text-only, no vision)
   try {
     const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
 
