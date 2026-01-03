@@ -2,19 +2,42 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
+import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3, Shirt, TrendingDown } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useSettingsStore, type LocalCurrency } from '@/stores/useSettingsStore';
+import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { Card, SectionHeader, WeatherWidget } from '@/components/ui';
+
+// Currency symbols map
+const CURRENCY_SYMBOLS: Record<LocalCurrency, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+  JPY: '¥',
+  AUD: 'A$',
+  CAD: 'C$',
+};
 
 export default function Home() {
   const { moodboards } = useLooksStore();
   const userName = useSettingsStore(state => state.userName);
+  const localCurrency = useSettingsStore(state => state.localCurrency);
+  const { collections } = useCollectionsStore();
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Calculate total items in closet (all products across all collections)
+  const totalClosetItems = isHydrated
+    ? collections.reduce((total, col) => total + col.products.length, 0)
+    : 0;
+
+  // Placeholder for average price per wear (to be implemented later)
+  const avgPricePerWear = 42.50; // Placeholder value
+  const currencySymbol = CURRENCY_SYMBOLS[localCurrency] || '$';
 
   // Get recent layers (up to 3, sorted by updatedAt)
   const recentLayers = isHydrated
@@ -54,11 +77,6 @@ export default function Home() {
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Section */}
       <div className="px-8 py-16 max-w-6xl mx-auto text-center">
-        {/* Weather Widget */}
-        <div className="mb-6">
-          <WeatherWidget />
-        </div>
-
         <p
           className="text-sm tracking-[0.3em] uppercase mb-4"
           style={{
@@ -82,7 +100,7 @@ export default function Home() {
         </h1>
 
         <p
-          className="text-lg md:text-xl max-w-lg mx-auto mb-10"
+          className="text-lg md:text-xl max-w-lg mx-auto mb-8"
           style={{
             fontFamily: 'var(--font-cormorant)',
             color: 'var(--foreground-secondary)',
@@ -92,6 +110,65 @@ export default function Home() {
         >
           Ready to create something beautiful?
         </p>
+      </div>
+
+      {/* Stats Bar */}
+      <div
+        className="border-t border-b py-4 mb-8"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        <div className="px-8 max-w-6xl mx-auto">
+          <div className="flex items-center justify-between">
+            {/* Left side - Weather */}
+            <div className="flex items-center">
+              <WeatherWidget />
+            </div>
+
+            {/* Right side - Closet Stats */}
+            <div className="flex items-center gap-6">
+              {/* Closet Items */}
+              <div className="flex items-center gap-2">
+                <Shirt size={18} style={{ color: 'var(--foreground-muted)' }} />
+                <div className="flex flex-col">
+                  <span
+                    className="text-lg font-medium"
+                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
+                  >
+                    {isHydrated ? totalClosetItems : '—'}
+                  </span>
+                  <span
+                    className="text-xs"
+                    style={{ color: 'var(--foreground-muted)', lineHeight: 1.2 }}
+                  >
+                    items in closet
+                  </span>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-8 w-px" style={{ backgroundColor: 'var(--border)' }} />
+
+              {/* Avg Price Per Wear */}
+              <div className="flex items-center gap-2">
+                <TrendingDown size={18} style={{ color: 'var(--primary)' }} />
+                <div className="flex flex-col">
+                  <span
+                    className="text-lg font-medium"
+                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
+                  >
+                    {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(2)}` : '—'}
+                  </span>
+                  <span
+                    className="text-xs"
+                    style={{ color: 'var(--foreground-muted)', lineHeight: 1.2 }}
+                  >
+                    avg. price/wear
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
