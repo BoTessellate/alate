@@ -189,8 +189,8 @@ export function UnifiedChatInput({
           disabled={disabled || isLoading}
           className="w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0"
           style={{
-            color: attachedImage ? 'var(--primary)' : 'var(--foreground-secondary)',
-            backgroundColor: attachedImage ? 'var(--primary-light)' : 'transparent',
+            color: attachedImage ? 'white' : 'var(--foreground-secondary)',
+            backgroundColor: attachedImage ? 'var(--primary)' : 'transparent',
           }}
           onMouseEnter={(e) => {
             if (!attachedImage) {
@@ -214,8 +214,8 @@ export function UnifiedChatInput({
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
           style={{
-            color: isUrlDetected ? 'var(--primary)' : 'var(--foreground-secondary)',
-            backgroundColor: isUrlDetected ? 'var(--primary-light)' : 'transparent',
+            color: isUrlDetected ? 'white' : 'var(--foreground-secondary)',
+            backgroundColor: isUrlDetected ? 'var(--primary)' : 'transparent',
           }}
           title={isUrlDetected ? 'URL detected' : 'Paste a product URL'}
         >
