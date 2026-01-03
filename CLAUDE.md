@@ -109,8 +109,7 @@ API Response includes:
 4. `fashion_name`: Industry term (e.g., "slate")
 
 ### Future Enhancements
-- [ ] Add OpenAI GPT-4 Vision or Gemini for texture/material analysis
-- [ ] Client-side canvas-based color picking for real-time feedback
+See "Notes for Later" section at bottom of file.
 
 ## AI Feedback Loop (Learning System)
 
@@ -132,9 +131,7 @@ The system learns from user tag corrections through a 3-layer approach:
 - Function: `get_recent_tag_corrections(brand, category, limit)`
 
 ### Layer 3: Periodic Fine-tuning (Future)
-- Aggregate feedback data monthly
-- Fine-tune a model on correction patterns
-- Deploy as custom enrichment model
+See "Notes for Later" section at bottom of file.
 
 ## Layout Feedback System (AI Learning for Layouts)
 
@@ -283,12 +280,47 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_API_URL` (points to backend-tml.vercel.app)
 
-## Future Tasks
+## Notes for Later (Remind Me)
 
-### Time-Context Personalization
-**Current state:** The home page shows time of day with generic suggestions (e.g., "Evening" → "dinner, dates")
+### 1. Background Removal - DISABLED FOR NOW
+**Status:** Temporarily disabled while perfecting product detection
+**Context:** Background removal should be the LAST step in the image upload process, happening AFTER product detection and other processing steps.
+**Action Required:** Once product detection is perfected, re-enable background removal as the final step in the upload pipeline.
+**Priority:** Pick this up after product detection is complete.
 
-**Future enhancement:** Adapt to user's personal schedule
+---
+
+### 2. AI Vision for Texture/Material Analysis
+**Status:** Not started
+**Context:** Current color extraction uses pixel-level analysis which is accurate for colors but doesn't understand textures or materials.
+**Action Required:** Add OpenAI GPT-4 Vision or Google Gemini for texture/material analysis (leather, silk, wool, etc.).
+**Priority:** Medium - enhances enrichment quality.
+
+---
+
+### 3. Client-Side Color Picking
+**Status:** Not started
+**Context:** Currently colors are extracted server-side during enrichment.
+**Action Required:** Implement client-side canvas-based color picking for real-time feedback during product upload.
+**Priority:** Low - nice-to-have UX improvement.
+
+---
+
+### 4. Periodic Model Fine-tuning
+**Status:** Not started (Layer 3 of AI Learning System)
+**Context:** Currently using few-shot learning from `tag_feedback` table. This works but has limits.
+**Action Required:**
+- Aggregate feedback data monthly
+- Fine-tune a model on correction patterns
+- Deploy as custom enrichment model
+**Priority:** Low - requires significant feedback data first.
+
+---
+
+### 5. Time-Context Personalization
+**Status:** Not started
+**Context:** The home page shows time of day with generic suggestions (e.g., "Evening" → "dinner, dates").
+**Action Required:** Adapt to user's personal schedule:
 - Allow users to set their typical schedule in Settings (work hours, gym time, etc.)
 - Integrate with calendar APIs (Google Calendar, Outlook) for real context
 - Use ML to learn user patterns from app usage (when they create layers, what types)
@@ -298,3 +330,4 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
   - "Working from home" → suggest comfortable loungewear
 - Store schedule preferences in user settings (useSettingsStore)
 - Display personalized suggestions like "Meeting in 2 hours" or "Gym at 6pm"
+**Priority:** Low - future personalization feature.

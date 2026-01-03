@@ -81,7 +81,7 @@ export interface UploadConfig {
 export const DEFAULT_UPLOAD_CONFIG: UploadConfig = {
   maxFileSizeBytes: 10 * 1024 * 1024, // 10MB
   allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-  skipBackgroundRemoval: false,
+  skipBackgroundRemoval: true, // DISABLED: Re-enable after product detection is perfected (see CLAUDE.md notes)
   skipEnrichment: false,
 };
 
