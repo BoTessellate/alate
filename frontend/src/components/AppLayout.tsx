@@ -2,18 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
 import FloatingActionButton from './FloatingActionButton';
-import { ErrorBoundary } from '@/components/ui';
+import { ErrorBoundary, SidePanelProvider, SidePanelLayout } from '@/components/ui';
 import { useUserStore } from '@/stores/useUserStore';
 import { Loader2 } from 'lucide-react';
-
-// Lazy load the photo upload modal - only needed when user clicks upload
-const PhotoUploadModal = dynamic(() => import('./PhotoUploadModal'), {
-  loading: () => null,
-});
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -77,48 +71,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <ThemeProvider>
-      <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
-        {/* Skip link for keyboard users */}
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-medium"
-          style={{
-            backgroundColor: 'var(--primary)',
-            color: 'white',
-          }}
-        >
-          Skip to main content
-        </a>
-
-        {/* Top bar with navigation */}
-        <TopBar />
-
-        {/* Scrollable content */}
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="flex-1 overflow-y-auto focus:outline-none"
-          style={{
-            marginTop: 'calc(var(--topbar-height) + 20px)', // 20px for curved bottom
-          }}
-        >
-          <ErrorBoundary
-            onError={(error, errorInfo) => {
-              console.error('[AppLayout] Page error:', error.message);
-              console.error('[AppLayout] Component stack:', errorInfo.componentStack);
+      <SidePanelProvider>
+        <div className="flex flex-col h-screen w-screen overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
+          {/* Skip link for keyboard users */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-medium"
+            style={{
+              backgroundColor: 'var(--primary)',
+              color: 'white',
             }}
-            showReset
           >
-            {children}
-          </ErrorBoundary>
-        </main>
+            Skip to main content
+          </a>
 
-        {/* Floating Action Button - Upload Product Photo */}
-        <FloatingActionButton />
+          {/* Top bar with navigation */}
+          <TopBar />
 
-        {/* Photo Upload Modal */}
-        <PhotoUploadModal />
-      </div>
+          {/* Main content with side panel layout */}
+          <SidePanelLayout>
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="overflow-y-auto focus:outline-none"
+              style={{
+                marginTop: 'calc(var(--topbar-height) + 20px)', // 20px for curved bottom
+                height: 'calc(100vh - var(--topbar-height) - 20px)',
+              }}
+            >
+              <ErrorBoundary
+                onError={(error, errorInfo) => {
+                  console.error('[AppLayout] Page error:', error.message);
+                  console.error('[AppLayout] Component stack:', errorInfo.componentStack);
+                }}
+                showReset
+              >
+                {children}
+              </ErrorBoundary>
+            </main>
+          </SidePanelLayout>
+
+          {/* Floating Action Button - Opens side panel */}
+          <FloatingActionButton />
+        </div>
+      </SidePanelProvider>
     </ThemeProvider>
   );
 }

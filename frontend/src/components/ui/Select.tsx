@@ -73,7 +73,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary)';
+    if (isFocused) return 'var(--primary-dark)';
     return 'var(--border)';
   };
 

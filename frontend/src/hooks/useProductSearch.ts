@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import type { Product } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
+console.log('[useProductSearch] API_BASE_URL:', API_BASE_URL);
 
 interface SearchResponse {
   products: Product[];
@@ -11,22 +12,25 @@ interface SearchResponse {
 
 // Fetcher function for SWR - gracefully handles failures
 const fetcher = async (url: string): Promise<SearchResponse> => {
+  console.log('[useProductSearch] Fetching:', url);
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const response = await fetch(url);
 
     if (!response.ok) {
-      // Return empty on server errors instead of throwing
-      console.warn('Search API returned error:', response.status);
+      console.warn('[useProductSearch] API returned error:', response.status);
       return { products: [], total: 0 };
     }
-    return response.json();
+    const data = await response.json();
+    console.log('[useProductSearch] Got', data.products?.length || 0, 'products');
+    return data;
   } catch (error) {
-    // Network errors, timeouts - fail silently with empty results
-    console.warn('Search API unavailable:', error);
+    // Network errors - fail silently with empty results
+    // AbortError is expected when requests are canceled by SWR
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('[useProductSearch] Request aborted (expected during typing)');
+    } else {
+      console.error('[useProductSearch] API error:', error);
+    }
     return { products: [], total: 0 };
   }
 };

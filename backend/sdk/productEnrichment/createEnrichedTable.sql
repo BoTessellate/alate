@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS enriched_products (
     material TEXT,
     dimensions TEXT,
     tone TEXT,
+    vibe_layer TEXT,
+    pairs_with TEXT[],
+    image_url TEXT,
+    source_url TEXT,
     flags TEXT[],
     enriched_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -26,6 +30,8 @@ CREATE INDEX IF NOT EXISTS idx_enriched_products_brand ON enriched_products(bran
 CREATE INDEX IF NOT EXISTS idx_enriched_products_category ON enriched_products(category);
 CREATE INDEX IF NOT EXISTS idx_enriched_products_region ON enriched_products(region);
 CREATE INDEX IF NOT EXISTS idx_enriched_products_tags ON enriched_products USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_vibe_layer ON enriched_products(vibe_layer);
+CREATE INDEX IF NOT EXISTS idx_enriched_products_pairs_with ON enriched_products USING GIN(pairs_with);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE enriched_products ENABLE ROW LEVEL SECURITY;

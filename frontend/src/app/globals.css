@@ -6,6 +6,7 @@
   --primary: #4c7031;           /* Primary Green - logo, highlights, accent buttons */
   --primary-light: #546c22;     /* Deeper forest green - logo pill */
   --primary-dark: #3D522D;      /* Darker green - headings, bold typefaces */
+  --primary-alpha: rgba(76, 112, 49, 0.15); /* Translucent primary for highlights */
 
   --cream: #F4EFED;             /* Parchment - logo background, accent contrast */
   --cream-dark: #e8d9b8;
@@ -39,11 +40,18 @@
   --border-light: #C5C8BE;
 
   --topbar-height: 56px;
+  --topbar-curve-offset: 20px;  /* Space for curved bottom of topbar - DO NOT CHANGE without updating SidePanel */
+  --topbar-total-height: calc(var(--topbar-height) + var(--topbar-curve-offset)); /* Total height including curve */
 
   /* Translucent topbar - brand green */
   --topbar-bg: rgba(76, 112, 49, 0.92);
   --topbar-bg-warm: rgba(254, 250, 242, 0.95); /* Cream white for /looks page */
-  --topbar-bg-highlight: rgba(76, 112, 49, 0.92); /* Same green as main topbar */
+  --topbar-bg-highlight: rgba(86, 98, 83, 0.95); /* Muted sage green for /discover page */
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+  --topbar-bg-highlight: rgba(52, 65, 49, 0.95); /* #344131 with transparency for /discover page */
 }
 
 @theme inline {
@@ -90,7 +98,7 @@ body {
 
 /* Focus outline */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--primary-dark);
   outline-offset: 2px;
 }
 
@@ -167,4 +175,41 @@ select,
   .agent-pill-blink {
     animation: none;
   }
+}
+
+/* Number input spinner styling - dark theme compatible */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Custom number input with styled spinners */
+.number-input-wrapper {
+  position: relative;
+}
+
+.number-input-wrapper input[type="number"] {
+  padding-right: 2rem;
+}
+
+/* Form input styling - ensure consistent borders */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  color-scheme: dark;
+}
+
+/* Focus ring consistency */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: none;
 }

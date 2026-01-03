@@ -3,11 +3,10 @@
 import { useState, useRef, memo } from 'react';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { Heart, Bookmark, ExternalLink, Shirt } from 'lucide-react';
+import { Heart, Bookmark, Shirt } from 'lucide-react';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
-import { usePriceFormatter } from '@/hooks/useCurrency';
-import { getProductUrl, generatePlaceholderSVG } from '@/utils/placeholder';
-import { Card, IconButton } from '@/components/ui';
+import { usePriceTier } from '@/hooks/useCurrency';
+import { Card, IconButton, PlaceholderImage, generatePlaceholderStarsSVG } from '@/components/ui';
 import type { Product } from '@/types';
 
 // Lazy load modals - they're only needed when user clicks
@@ -20,7 +19,6 @@ const VirtualTryOnModal = dynamic(() => import('./VirtualTryOnModal'), {
 
 interface ProductCardProps {
   product: Product;
-  onExternalLink?: (product: Product) => void;
 }
 
 // Normalize text: remove underscores, handle TEST_ prefix, title case
@@ -35,15 +33,25 @@ const normalizeText = (text: string): string => {
     .join(' ');
 };
 
-function ProductCard({ product, onExternalLink }: ProductCardProps) {
+// Check if URL is valid for next/image (must be http/https URL, not local file path)
+const isValidImageUrl = (url: string | undefined | null): boolean => {
+  if (!url) return false;
+  // Reject local file paths (Windows or Unix style)
+  if (url.startsWith('C:') || url.startsWith('/Users/') || url.startsWith('/home/')) return false;
+  // Must be http or https URL
+  return url.startsWith('http://') || url.startsWith('https://');
+};
+
+function ProductCard({ product }: ProductCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showTryOnModal, setShowTryOnModal] = useState(false);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const isProductInAnyCollection = useCollectionsStore(state => state.isProductInAnyCollection);
-  const { format } = usePriceFormatter();
+  const { getPriceTierInfo } = usePriceTier();
 
   const collectionsContainingProduct = isProductInAnyCollection(product.id);
+  const priceTierInfo = getPriceTierInfo(product.price, product.currency);
   const isInCollection = collectionsContainingProduct.length > 0;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
@@ -56,16 +64,6 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
     setShowSaveModal(true);
   };
 
-  const handleExternalClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onExternalLink) {
-      onExternalLink(product);
-    } else {
-      const url = getProductUrl(product.brand, product.product_name);
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  };
-
   const handleTryOnClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowTryOnModal(true);
@@ -73,13 +71,13 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
 
   return (
     <>
-      <Card variant="interactive" className="group">
+      <Card variant="interactive" className="group h-full">
         {/* Product Image */}
         <div
-          className="relative aspect-square"
+          className="relative w-full h-full"
           style={{ backgroundColor: 'var(--background-secondary)' }}
         >
-          {product.image_url ? (
+          {isValidImageUrl(product.image_url) ? (
             <Image
               src={product.image_url}
               alt={product.product_name}
@@ -87,17 +85,44 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
               className="object-cover"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               placeholder="blur"
-              blurDataURL={generatePlaceholderSVG(product.product_name, 20, 20)}
+              blurDataURL={generatePlaceholderStarsSVG(20, 20)}
             />
           ) : (
-            <div
-              className="w-full h-full flex items-center justify-center"
-              style={{
-                backgroundImage: 'linear-gradient(135deg, var(--primary) 0%, var(--cream-dark) 100%)',
-                opacity: 0.5,
-              }}
-            />
+            <PlaceholderImage className="w-full h-full" />
           )}
+
+          {/* Product Info Overlay - Bottom */}
+          <div
+            className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{
+              background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)',
+            }}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p
+                  className="text-xs font-medium uppercase tracking-wide mb-0.5"
+                  style={{ color: 'var(--primary-light)' }}
+                >
+                  {normalizeText(product.brand)}
+                </p>
+                <h3 className="font-medium text-sm text-white line-clamp-2">
+                  {normalizeText(product.product_name)}
+                </h3>
+              </div>
+              {/* Price Tier Indicator */}
+              <div
+                className="flex-shrink-0 px-2 py-1 rounded-full text-sm font-bold"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  color: 'var(--primary-light)',
+                }}
+                title={`Price tier: ${priceTierInfo.symbol}`}
+              >
+                {priceTierInfo.symbol}
+              </div>
+            </div>
+          </div>
 
           {/* Action Buttons - Top Right */}
           <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -144,34 +169,6 @@ function ProductCard({ product, onExternalLink }: ProductCardProps) {
               className="w-11 h-11"
               style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: 'white' }}
               aria-label="Virtual try-on"
-            />
-          </div>
-        </div>
-
-        {/* Product Info */}
-        <div className="p-4">
-          <p
-            className="text-xs font-medium uppercase tracking-wide mb-1"
-            style={{ color: 'var(--primary)' }}
-          >
-            {normalizeText(product.brand)}
-          </p>
-          <h3
-            className="font-medium text-sm mb-2 line-clamp-2"
-            style={{ color: 'var(--foreground)' }}
-          >
-            {normalizeText(product.product_name)}
-          </h3>
-          <div className="flex items-center justify-between">
-            <p className="font-semibold" style={{ color: 'var(--foreground)' }}>
-              {format(product.price, product.currency)}
-            </p>
-            <IconButton
-              icon={ExternalLink}
-              aria-label={`Shop ${normalizeText(product.product_name)} on external site`}
-              onClick={handleExternalClick}
-              size="lg"
-              className="-mr-2"
             />
           </div>
         </div>

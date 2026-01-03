@@ -17,6 +17,7 @@ export const THEME_TOKENS = {
     border: '#D0D3C9',
     borderLight: '#C5C8BE',
     topbarBg: 'rgba(76, 112, 49, 0.92)',
+    topbarBgHighlight: 'rgba(86, 98, 83, 0.95)', // Muted sage green for /discover page
   },
   dark: {
     background: '#0d0d0d',
@@ -31,6 +32,7 @@ export const THEME_TOKENS = {
     border: '#2a2a2a',
     borderLight: '#3a3a3a',
     topbarBg: 'rgba(61, 82, 45, 0.95)', // primary-dark with transparency
+    topbarBgHighlight: 'rgba(52, 65, 49, 0.95)', // #344131 for /discover page in dark mode
   },
   // Brand colors (theme-independent)
   brand: {
@@ -143,6 +145,7 @@ export function applyThemeTokens(theme: ThemeMode): void {
   root.style.setProperty('--border', tokens.border);
   root.style.setProperty('--border-light', tokens.borderLight);
   root.style.setProperty('--topbar-bg', tokens.topbarBg);
+  root.style.setProperty('--topbar-bg-highlight', tokens.topbarBgHighlight);
   root.setAttribute('data-theme', theme);
 }
 
@@ -178,6 +181,7 @@ export function getThemeInitScript(): string {
     root.style.setProperty('--border', tokens.border);
     root.style.setProperty('--border-light', tokens.borderLight);
     root.style.setProperty('--topbar-bg', tokens.topbarBg);
+    root.style.setProperty('--topbar-bg-highlight', tokens.topbarBgHighlight);
     root.setAttribute('data-theme', effectiveTheme);
   } catch (e) {}
 })();`;

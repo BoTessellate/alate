@@ -197,8 +197,8 @@ export default function BreadcrumbNav() {
                         <div
                           className="w-6 h-6 rounded flex items-center justify-center transition-colors"
                           style={{
-                            backgroundColor: isActive ? 'rgba(76, 112, 49, 0.15)' : 'transparent',
-                            color: isActive ? 'var(--primary)' : 'var(--foreground-muted)',
+                            backgroundColor: isActive ? 'var(--primary-alpha)' : 'transparent',
+                            color: isActive ? 'var(--primary-dark)' : 'var(--foreground-muted)',
                           }}
                         >
                           <Icon size={16} />

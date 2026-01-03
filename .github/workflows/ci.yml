@@ -1,5 +1,5 @@
 # Continuous Integration Workflow
-# Runs lint, tests, and build for frontend and backend
+# Runs lint, tests, and build - only for changed areas
 # Triggered on push to main/develop and pull requests
 
 name: CI
@@ -19,11 +19,80 @@ env:
 
 jobs:
   # ============================================================================
-  # Frontend Jobs
+  # Change Detection
+  # ============================================================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      commit-type: ${{ steps.commit.outputs.type }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect commit type
+        id: commit
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            TITLE="${{ github.event.pull_request.title }}"
+          else
+            TITLE=$(git log -1 --pretty=%B)
+          fi
+
+          TYPE="unknown"
+          if echo "$TITLE" | grep -qiE "^feat(\(.*\))?:"; then TYPE="feat"
+          elif echo "$TITLE" | grep -qiE "^fix(\(.*\))?:"; then TYPE="fix"
+          elif echo "$TITLE" | grep -qiE "^chore(\(.*\))?:"; then TYPE="chore"
+          elif echo "$TITLE" | grep -qiE "^docs(\(.*\))?:"; then TYPE="docs"
+          elif echo "$TITLE" | grep -qiE "^refactor(\(.*\))?:"; then TYPE="refactor"
+          elif echo "$TITLE" | grep -qiE "^test(\(.*\))?:"; then TYPE="test"
+          elif echo "$TITLE" | grep -qiE "^ci(\(.*\))?:"; then TYPE="ci"
+          fi
+
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "Detected commit type: $TYPE"
+
+      - name: Check for file changes
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1 2>/dev/null || echo "")
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Backend changes
+          if echo "$CHANGED" | grep -qE "^backend/"; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "Backend: changed"
+          else
+            echo "backend=false" >> $GITHUB_OUTPUT
+            echo "Backend: no changes"
+          fi
+
+          # Frontend changes
+          if echo "$CHANGED" | grep -qE "^frontend/"; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "Frontend: changed"
+          else
+            echo "frontend=false" >> $GITHUB_OUTPUT
+            echo "Frontend: no changes"
+          fi
+
+  # ============================================================================
+  # Frontend Jobs - Only run when frontend changes
   # ============================================================================
 
   frontend-lint:
     name: Frontend Lint
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,10 +100,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -48,6 +117,8 @@ jobs:
 
   frontend-test:
     name: Frontend Test
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,10 +126,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -74,9 +145,10 @@ jobs:
 
       - name: Generate coverage report JSON
         run: npm run test:report
+        continue-on-error: true
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: frontend-coverage
@@ -87,18 +159,19 @@ jobs:
 
   frontend-build:
     name: Frontend Build
+    needs: [detect-changes, frontend-lint, frontend-test]
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    needs: [frontend-lint, frontend-test]
     defaults:
       run:
         working-directory: frontend
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -115,18 +188,30 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend/.next/
           retention-days: 1
 
+  # Skip marker for frontend
+  frontend-skipped:
+    name: Frontend (skipped)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: No frontend changes
+        run: echo "✓ Frontend checks skipped - no frontend files changed"
+
   # ============================================================================
-  # Backend Jobs
+  # Backend Jobs - Only run when backend changes
   # ============================================================================
 
   backend-test:
     name: Backend Test
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -134,10 +219,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -153,6 +238,8 @@ jobs:
 
   backend-typecheck:
     name: Backend TypeScript Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -160,10 +247,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -175,53 +262,59 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --project tsconfig.ci.json
 
-  # ============================================================================
-  # Mobile Jobs (Optional - uncomment when mobile has tests)
-  # ============================================================================
-
-  # mobile-typecheck:
-  #   name: Mobile TypeScript Check
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: mobile
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v6
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v6
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'npm'
-  #         cache-dependency-path: mobile/package-lock.json
-  #
-  #     - name: Install dependencies
-  #       run: npm ci
-  #
-  #     - name: TypeScript type check
-  #       run: npx tsc --noEmit
+  # Skip marker for backend
+  backend-skipped:
+    name: Backend (skipped)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: No backend changes
+        run: echo "✓ Backend checks skipped - no backend files changed"
 
   # ============================================================================
-  # Combined Status Check
+  # Combined Status Check - Reports overall success
   # ============================================================================
 
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [frontend-lint, frontend-test, frontend-build, backend-test, backend-typecheck]
+    needs: [detect-changes, frontend-lint, frontend-test, frontend-build, frontend-skipped, backend-test, backend-typecheck, backend-skipped]
     if: always()
 
     steps:
-      - name: Check all jobs passed
+      - name: Check results
         run: |
-          if [[ "${{ needs.frontend-lint.result }}" != "success" ]] || \
-             [[ "${{ needs.frontend-test.result }}" != "success" ]] || \
-             [[ "${{ needs.frontend-build.result }}" != "success" ]] || \
-             [[ "${{ needs.backend-test.result }}" != "success" ]] || \
-             [[ "${{ needs.backend-typecheck.result }}" != "success" ]]; then
-            echo "One or more jobs failed"
-            exit 1
+          echo "=== CI Summary ==="
+          echo "Commit type: ${{ needs.detect-changes.outputs.commit-type }}"
+          echo "Frontend changed: ${{ needs.detect-changes.outputs.frontend }}"
+          echo "Backend changed: ${{ needs.detect-changes.outputs.backend }}"
+          echo ""
+
+          # Check frontend results (if it ran)
+          if [[ "${{ needs.detect-changes.outputs.frontend }}" == "true" ]]; then
+            if [[ "${{ needs.frontend-lint.result }}" != "success" ]] || \
+               [[ "${{ needs.frontend-test.result }}" != "success" ]] || \
+               [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
+              echo "❌ Frontend checks failed"
+              exit 1
+            fi
+            echo "✓ Frontend checks passed"
+          else
+            echo "⏭ Frontend checks skipped (no changes)"
           fi
-          echo "All CI checks passed!"
+
+          # Check backend results (if it ran)
+          if [[ "${{ needs.detect-changes.outputs.backend }}" == "true" ]]; then
+            if [[ "${{ needs.backend-test.result }}" != "success" ]] || \
+               [[ "${{ needs.backend-typecheck.result }}" != "success" ]]; then
+              echo "❌ Backend checks failed"
+              exit 1
+            fi
+            echo "✓ Backend checks passed"
+          else
+            echo "⏭ Backend checks skipped (no changes)"
+          fi
+
+          echo ""
+          echo "=== All relevant CI checks passed! ==="

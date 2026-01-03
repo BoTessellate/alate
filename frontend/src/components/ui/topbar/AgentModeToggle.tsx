@@ -29,14 +29,14 @@ export function AgentModeToggle({
   const circleColor =
     effectiveTheme === 'dark' ? 'var(--charcoal)' : 'var(--cream)';
 
-  // Pill color: cream→primary in dark mode, charcoal→primary in light mode
+  // Pill color: cream→primary-dark in dark mode, charcoal→primary-dark in light mode
   const pillColor =
     effectiveTheme === 'dark'
       ? isActive
-        ? 'var(--primary)'
+        ? 'var(--primary-dark)'
         : 'var(--cream)'
       : isActive
-        ? 'var(--primary)'
+        ? 'var(--primary-dark)'
         : 'var(--charcoal)';
 
   return (

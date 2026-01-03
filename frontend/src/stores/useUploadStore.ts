@@ -72,6 +72,7 @@ interface UploadState {
   toggleCollection: (collectionId: string) => void;
   setSelectedCollections: (ids: string[]) => void;
   reset: () => void;
+  clearError: () => void;
 
   // Multi-product actions
   setMultiMode: (isMulti: boolean) => void;
@@ -171,6 +172,8 @@ export const useUploadStore = create<UploadState>()((set, get) => ({
     }
     set({ ...initialState, selectedProductIds: new Set<string>() });
   },
+
+  clearError: () => set({ error: null, status: 'idle', progress: 0 }),
 
   // Multi-product actions
   setMultiMode: (isMulti) => set({ isMultiMode: isMulti }),

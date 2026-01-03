@@ -18,21 +18,34 @@ MemoizedProductCard.displayName = 'MemoizedProductCard';
 
 /**
  * Virtualized product grid that only renders visible items
- * Significantly improves performance for large product lists
+ * Uses the main content scroll container for virtualization
  */
 export default function VirtualizedProductGrid({
   products,
   gap = 24,
 }: VirtualizedProductGridProps) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
   const [columns, setColumns] = useState(4);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  // Find the main scroll container on mount
+  useEffect(() => {
+    const mainElement = document.getElementById('main-content');
+    if (mainElement) {
+      setScrollElement(mainElement);
+    }
+  }, []);
 
   // Calculate columns based on container width
   useEffect(() => {
     const updateColumns = () => {
-      if (!parentRef.current) return;
-      const width = parentRef.current.offsetWidth;
+      if (!containerRef.current) return;
+      const width = containerRef.current.offsetWidth;
+
+      // Skip if width is 0 (element not visible)
+      if (width === 0) return;
+
       setContainerWidth(width);
 
       // Match Tailwind breakpoints: sm:2, md:3, lg:4
@@ -49,12 +62,22 @@ export default function VirtualizedProductGrid({
 
     updateColumns();
 
-    const resizeObserver = new ResizeObserver(updateColumns);
-    if (parentRef.current) {
-      resizeObserver.observe(parentRef.current);
+    // Use ResizeObserver with debounce to handle panel transitions smoothly
+    let resizeTimeout: NodeJS.Timeout;
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce resize events during panel transitions
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(updateColumns, 50);
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
     }
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      clearTimeout(resizeTimeout);
+      resizeObserver.disconnect();
+    };
   }, []);
 
   // Calculate row count
@@ -64,23 +87,36 @@ export default function VirtualizedProductGrid({
   const itemWidth = containerWidth > 0
     ? (containerWidth - gap * (columns - 1)) / columns
     : 200;
-  // Aspect ratio ~1.4 for product cards (image + info)
-  const itemHeight = itemWidth * 1.4;
+  // Square aspect ratio for image-only cards
+  const itemHeight = itemWidth;
+  const rowHeight = itemHeight + gap;
 
+  // Calculate scroll margin (distance from scroll container top to grid)
+  const scrollMargin = containerRef.current?.offsetTop ?? 0;
+
+  // Use virtualizer with main scroll container
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => itemHeight + gap,
-    overscan: 2, // Render 2 extra rows above/below viewport
+    getScrollElement: () => scrollElement,
+    estimateSize: () => rowHeight,
+    overscan: 3,
+    scrollMargin,
   });
 
-  // Don't render virtualizer until we have container dimensions
-  if (containerWidth === 0) {
+  // Force virtualizer to remeasure when dimensions change
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, containerWidth, columns, rowHeight, scrollElement]);
+
+  // Don't render virtualizer until we have container dimensions and scroll element
+  if (containerWidth === 0 || !scrollElement) {
     return (
-      <div ref={parentRef} className="w-full min-h-[200px]">
+      <div ref={containerRef} className="w-full min-h-[200px]">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {products.slice(0, 8).map((product) => (
-            <MemoizedProductCard key={product.id} product={product} />
+            <div key={product.id} className="aspect-square">
+              <MemoizedProductCard product={product} />
+            </div>
           ))}
         </div>
       </div>
@@ -88,15 +124,10 @@ export default function VirtualizedProductGrid({
   }
 
   return (
-    <div
-      ref={parentRef}
-      className="w-full overflow-auto"
-      style={{
-        height: '100%',
-        maxHeight: 'calc(100vh - 250px)', // Account for header/nav
-      }}
-    >
+    <div ref={containerRef} className="w-full">
+      {/* Key forces remount when columns change to clear stale DOM */}
       <div
+        key={`grid-${columns}-${containerWidth}`}
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
           width: '100%',
@@ -109,21 +140,23 @@ export default function VirtualizedProductGrid({
 
           return (
             <div
-              key={virtualRow.key}
+              key={`row-${virtualRow.index}-${columns}-${containerWidth}`}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: `${virtualRow.size - gap}px`,
-                transform: `translateY(${virtualRow.start}px)`,
+                height: `${itemHeight}px`,
+                transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                 display: 'grid',
                 gridTemplateColumns: `repeat(${columns}, 1fr)`,
                 gap: `${gap}px`,
               }}
             >
               {rowProducts.map((product) => (
-                <MemoizedProductCard key={product.id} product={product} />
+                <div key={product.id} className="h-full">
+                  <MemoizedProductCard product={product} />
+                </div>
               ))}
             </div>
           );

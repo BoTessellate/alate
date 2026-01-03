@@ -103,8 +103,8 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
       case 'selected':
         return {
           backgroundColor: isHovered && isClickable && !disabled
-            ? 'var(--primary-light)'
-            : 'var(--primary)',
+            ? 'var(--primary)'
+            : 'var(--primary-dark)',
           color: 'white',
           borderColor: 'transparent',
         };
@@ -117,7 +117,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
             ? 'var(--foreground)'
             : 'var(--foreground-secondary)',
           borderColor: isHovered && isClickable && !disabled
-            ? 'var(--primary)'
+            ? 'var(--primary-dark)'
             : 'var(--border)',
         };
       case 'default':
@@ -128,7 +128,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
             : 'var(--surface)',
           color: 'var(--foreground)',
           borderColor: isHovered && isClickable && !disabled
-            ? 'var(--primary)'
+            ? 'var(--primary-dark)'
             : 'var(--border)',
         };
     }

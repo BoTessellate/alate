@@ -177,6 +177,119 @@ async function callAnthropicDirect(
 }
 
 /**
+ * Call Claude with vision support (image analysis)
+ * Accepts image URL or base64 data along with text prompt
+ */
+export async function callClaudeWithVision(
+  prompt: string,
+  imageUrl?: string,
+  options?: { model?: string; maxTokens?: number }
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'ANTHROPIC_API_KEY not configured' };
+  }
+
+  const defaultModel = process.env.ENRICHMENT_MODEL || 'claude-3-5-sonnet-20241022';
+  const model = options?.model || defaultModel;
+  const maxTokens = options?.maxTokens || 1024;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s for vision
+
+  try {
+    // Build message content - text only or text + image
+    const content: Array<{ type: string; text?: string; source?: any }> = [];
+
+    // Add image if provided
+    if (imageUrl) {
+      // Check if it's a URL or base64
+      if (imageUrl.startsWith('data:')) {
+        // Base64 data URL
+        const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          content.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: matches[1],
+              data: matches[2],
+            },
+          });
+        }
+      } else if (imageUrl.startsWith('http')) {
+        // Fetch image and convert to base64
+        try {
+          const imageResponse = await fetch(imageUrl, { signal: controller.signal });
+          if (imageResponse.ok) {
+            const buffer = await imageResponse.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+            content.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: contentType,
+                data: base64,
+              },
+            });
+          }
+        } catch (imgError) {
+          console.warn('[secureAI] Failed to fetch image, continuing without:', imgError);
+        }
+      }
+    }
+
+    // Add text prompt
+    content.push({ type: 'text', text: prompt });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (errorData as any)?.error?.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const responseContent = (data as any)?.content;
+
+    if (responseContent && Array.isArray(responseContent) && responseContent[0]?.type === 'text') {
+      return { success: true, text: responseContent[0].text };
+    }
+
+    return { success: false, error: 'Invalid response format from Claude' };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out after 45 seconds' };
+    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to call Anthropic API with vision',
+    };
+  }
+}
+
+/**
  * Call Claude via secure Edge Function or direct API
  * Default model is Sonnet for speed/cost balance
  * Use 'claude-opus-4-5-20251101' for complex reasoning tasks

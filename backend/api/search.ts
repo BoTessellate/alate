@@ -305,6 +305,53 @@ async function keywordSearch(
 // UTILITY FUNCTIONS
 // ============================================================================
 
+// British to American spelling map for common words
+const spellingVariants: Record<string, string[]> = {
+  'colour': ['color'],
+  'colourful': ['colorful'],
+  'coloured': ['colored'],
+  'grey': ['gray'],
+  'favour': ['favor'],
+  'favourite': ['favorite'],
+  'honour': ['honor'],
+  'behaviour': ['behavior'],
+  'centre': ['center'],
+  'fibre': ['fiber'],
+  'metre': ['meter'],
+  'litre': ['liter'],
+  'jewellery': ['jewelry'],
+  'travelling': ['traveling'],
+  'catalogue': ['catalog'],
+  'defence': ['defense'],
+  'offence': ['offense'],
+  'licence': ['license'],
+  'practise': ['practice'],
+  'analyse': ['analyze'],
+  'organise': ['organize'],
+  'realise': ['realize'],
+  'minimise': ['minimize'],
+  'maximise': ['maximize'],
+  'customise': ['customize'],
+  // Add reverse mappings (American to British)
+  'color': ['colour'],
+  'colorful': ['colourful'],
+  'colored': ['coloured'],
+  'gray': ['grey'],
+  'favor': ['favour'],
+  'favorite': ['favourite'],
+};
+
+/**
+ * Expand search term with spelling variants
+ */
+function expandWithVariants(term: string): string[] {
+  const variants = spellingVariants[term.toLowerCase()];
+  if (variants) {
+    return [term, ...variants];
+  }
+  return [term];
+}
+
 function extractSearchTerms(query: string): string[] {
   const stopWords = new Set([
     'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been',
@@ -318,11 +365,17 @@ function extractSearchTerms(query: string): string[] {
     'want', 'looking', 'find', 'show', 'get', 'some', 'any'
   ]);
 
-  return query
+  const baseTerms = query
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 1 && !stopWords.has(word));
+
+  // Expand with spelling variants
+  const expandedTerms = baseTerms.flatMap(expandWithVariants);
+
+  // Return unique terms
+  return [...new Set(expandedTerms)];
 }
 
 function isSimpleQuery(query: string): boolean {

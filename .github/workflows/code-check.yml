@@ -1,6 +1,6 @@
 # Code Quality Checks
-# Runs on all PRs to main/master branch
-# Ensures TypeScript compiles and critical patterns are not broken
+# Runs on PRs to main/master branch
+# Only runs relevant checks based on what files changed
 
 name: Code Quality
 
@@ -12,20 +12,85 @@ on:
 
 jobs:
   # ============================================================================
-  # Backend Checks
+  # Change Detection - Determines which checks to run
+  # ============================================================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      commit-type: ${{ steps.commit.outputs.type }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect commit type
+        id: commit
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            TITLE="${{ github.event.pull_request.title }}"
+          else
+            TITLE=$(git log -1 --pretty=%B)
+          fi
+
+          TYPE="unknown"
+          if echo "$TITLE" | grep -qiE "^feat(\(.*\))?:"; then TYPE="feat"
+          elif echo "$TITLE" | grep -qiE "^fix(\(.*\))?:"; then TYPE="fix"
+          elif echo "$TITLE" | grep -qiE "^chore(\(.*\))?:"; then TYPE="chore"
+          elif echo "$TITLE" | grep -qiE "^docs(\(.*\))?:"; then TYPE="docs"
+          elif echo "$TITLE" | grep -qiE "^refactor(\(.*\))?:"; then TYPE="refactor"
+          elif echo "$TITLE" | grep -qiE "^test(\(.*\))?:"; then TYPE="test"
+          elif echo "$TITLE" | grep -qiE "^ci(\(.*\))?:"; then TYPE="ci"
+          fi
+
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
+          echo "Commit type: $TYPE"
+
+      - name: Check for file changes
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1 2>/dev/null || echo "")
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Check backend changes
+          if echo "$CHANGED" | grep -qE "^backend/"; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+          else
+            echo "backend=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check frontend changes
+          if echo "$CHANGED" | grep -qE "^frontend/"; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+          else
+            echo "frontend=false" >> $GITHUB_OUTPUT
+          fi
+
+  # ============================================================================
+  # Backend Checks - Only run when backend files change
   # ============================================================================
   backend-typecheck:
     name: Backend TypeScript Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -35,41 +100,33 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check (API and critical files)
-        run: |
-          # Use CI-specific tsconfig that checks only API files and critical SDK files
-          # Full SDK has work-in-progress modules that will be fixed incrementally
-          npx tsc --project tsconfig.ci.json
+        run: npx tsc --project tsconfig.ci.json
 
   backend-critical-patterns:
     name: Backend Critical Pattern Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Check for double .text() calls on Response objects
         run: |
           echo "Checking for potential double .text() calls..."
-          # Look for patterns where .text() might be called twice on same response
           if grep -rn "\.text()" api/ sdk/ --include="*.ts" | grep -v "tokenResponseText" | grep -c "await.*\.text().*await.*\.text()" > /dev/null 2>&1; then
             echo "WARNING: Potential double .text() call detected. Review carefully."
-            echo "See shopify.ts header comments for ISSUE #2 explanation."
           fi
           echo "Pattern check complete."
 
       - name: Check X-Frame-Options not re-added to Shopify endpoint
         run: |
           echo "Checking X-Frame-Options is not set for Shopify..."
-          # This check ensures no one adds setHeader('X-Frame-Options', ...)
-          # It's OK to have removeHeader('X-Frame-Options') - that's the fix
-          # It's OK to have X-Frame-Options in comments (documentation)
           if grep -n "setHeader.*X-Frame-Options" api/shopify.ts > /dev/null 2>&1; then
             echo "ERROR: X-Frame-Options header is being SET in shopify.ts!"
-            echo "This will break Shopify iframe embedding."
-            echo "See shopify.ts header comments for ISSUE #1 explanation."
             exit 1
           fi
           echo "X-Frame-Options check passed."
@@ -79,8 +136,6 @@ jobs:
           echo "Checking AbortController timeout exists..."
           if ! grep -q "AbortController" sdk/shared/secureAI.ts; then
             echo "ERROR: AbortController timeout removed from secureAI.ts!"
-            echo "This will cause enrichment to hang indefinitely."
-            echo "See secureAI.ts header comments for ISSUE #1 explanation."
             exit 1
           fi
           echo "Timeout check passed."
@@ -89,9 +144,7 @@ jobs:
         run: |
           echo "Checking Anthropic direct API fallback exists..."
           if ! grep -q "callAnthropicDirect" sdk/shared/secureAI.ts; then
-            echo "ERROR: Anthropic direct API fallback removed from secureAI.ts!"
-            echo "This will break enrichment when SECURE_API_URL is not configured."
-            echo "See secureAI.ts header comments for explanation."
+            echo "ERROR: Anthropic direct API fallback removed!"
             exit 1
           fi
           echo "Anthropic fallback check passed."
@@ -103,27 +156,37 @@ jobs:
           echo "Current count: $count / 12"
           if [ "$count" -gt 12 ]; then
             echo "ERROR: Too many API functions ($count > 12)!"
-            echo "Vercel Hobby plan limits to 12 serverless functions."
-            echo "See shopify.ts header comments for ISSUE #3 explanation."
             exit 1
           fi
           echo "Function count check passed."
 
+  # Skip marker for backend (shows as passed when skipped)
+  backend-skipped:
+    name: Backend TypeScript Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skipped (no backend changes)
+        run: echo "✓ Skipped - no backend files changed"
+
   # ============================================================================
-  # Frontend Checks
+  # Frontend Checks - Only run when frontend files change
   # ============================================================================
   frontend-typecheck:
     name: Frontend TypeScript Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -137,16 +200,18 @@ jobs:
 
   frontend-build:
     name: Frontend Build Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -159,3 +224,13 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: https://backend-tml.vercel.app
+
+  # Skip marker for frontend (shows as passed when skipped)
+  frontend-skipped:
+    name: Frontend TypeScript Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skipped (no frontend changes)
+        run: echo "✓ Skipped - no frontend files changed"

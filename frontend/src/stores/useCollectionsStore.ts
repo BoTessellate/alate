@@ -1,26 +1,169 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from '@/lib/supabase';
 import type { Collection, Product, CollectionMetadata } from '@/types';
+
+// Generate or retrieve a device ID for anonymous users
+function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'server';
+
+  let deviceId = localStorage.getItem('tml-device-id');
+  if (!deviceId) {
+    deviceId = `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('tml-device-id', deviceId);
+  }
+  return deviceId;
+}
+
+// Supabase sync helpers
+async function syncCollectionToSupabase(collection: Collection, deviceId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('user_collections')
+      .upsert({
+        id: collection.id,
+        device_id: deviceId,
+        name: collection.name,
+        description: collection.description || null,
+        products: collection.products,
+        cover_images: collection.coverImages,
+        created_at: collection.createdAt,
+        updated_at: collection.updatedAt,
+      }, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Failed to sync collection to Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('Supabase sync error:', err);
+  }
+}
+
+async function deleteCollectionFromSupabase(collectionId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('user_collections')
+      .delete()
+      .eq('id', collectionId);
+
+    if (error) {
+      console.warn('Failed to delete collection from Supabase:', error.message);
+    }
+  } catch (err) {
+    console.warn('Supabase delete error:', err);
+  }
+}
+
+async function fetchCollectionsFromSupabase(deviceId: string): Promise<Collection[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_collections')
+      .select('*')
+      .eq('device_id', deviceId)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.warn('Failed to fetch collections from Supabase:', error.message);
+      return [];
+    }
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description || undefined,
+      products: row.products || [],
+      coverImages: row.cover_images || [],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  } catch (err) {
+    console.warn('Supabase fetch error:', err);
+    return [];
+  }
+}
 
 interface CollectionsState {
   collections: Collection[];
+  isHydrated: boolean;
+  isSyncing: boolean;
+  lastSyncedAt: string | null;
+
+  // Core actions
   createCollection: (name: string, description?: string) => Collection;
   deleteCollection: (id: string) => void;
   renameCollection: (id: string, name: string) => void;
   updateCollectionDescription: (id: string, description: string) => void;
   addProductToCollection: (collectionId: string, product: Product) => void;
   removeProductFromCollection: (collectionId: string, productId: string) => void;
+
+  // Query helpers
   getCollectionById: (id: string) => Collection | undefined;
   getCollectionMetadata: (id: string) => CollectionMetadata | null;
   getAggregatedMetadata: (collectionIds: string[]) => CollectionMetadata;
   isProductInCollection: (collectionId: string, productId: string) => boolean;
   isProductInAnyCollection: (productId: string) => string[];
+
+  // Sync actions
+  syncWithSupabase: () => Promise<void>;
+  setHydrated: (hydrated: boolean) => void;
 }
 
 export const useCollectionsStore = create<CollectionsState>()(
   persist(
     (set, get) => ({
       collections: [],
+      isHydrated: false,
+      isSyncing: false,
+      lastSyncedAt: null,
+
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
+
+      syncWithSupabase: async () => {
+        if (typeof window === 'undefined') return;
+
+        const deviceId = getDeviceId();
+        set({ isSyncing: true });
+
+        try {
+          // Fetch from Supabase
+          const remoteCollections = await fetchCollectionsFromSupabase(deviceId);
+          const localCollections = get().collections;
+
+          // Merge strategy: use the most recently updated version of each collection
+          const mergedMap = new Map<string, Collection>();
+
+          // Add all local collections
+          localCollections.forEach((c) => mergedMap.set(c.id, c));
+
+          // Merge remote collections (prefer more recent)
+          remoteCollections.forEach((remote) => {
+            const local = mergedMap.get(remote.id);
+            if (!local || new Date(remote.updatedAt) > new Date(local.updatedAt)) {
+              mergedMap.set(remote.id, remote);
+            }
+          });
+
+          const merged = Array.from(mergedMap.values())
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+          set({
+            collections: merged,
+            lastSyncedAt: new Date().toISOString(),
+            isSyncing: false,
+          });
+
+          // Push any local-only or newer local collections to Supabase
+          for (const collection of merged) {
+            const remote = remoteCollections.find((r) => r.id === collection.id);
+            if (!remote || new Date(collection.updatedAt) > new Date(remote.updatedAt)) {
+              await syncCollectionToSupabase(collection, deviceId);
+            }
+          }
+        } catch (err) {
+          console.warn('Sync with Supabase failed:', err);
+          set({ isSyncing: false });
+        }
+      },
 
       createCollection: (name, description) => {
         const id = `col-${Date.now()}`;
@@ -40,6 +183,11 @@ export const useCollectionsStore = create<CollectionsState>()(
           collections: [newCollection, ...state.collections],
         }));
 
+        // Sync to Supabase in background
+        if (typeof window !== 'undefined') {
+          syncCollectionToSupabase(newCollection, getDeviceId());
+        }
+
         return newCollection;
       },
 
@@ -47,25 +195,54 @@ export const useCollectionsStore = create<CollectionsState>()(
         set((state) => ({
           collections: state.collections.filter((c) => c.id !== id),
         }));
+
+        // Delete from Supabase in background
+        if (typeof window !== 'undefined') {
+          deleteCollectionFromSupabase(id);
+        }
       },
 
       renameCollection: (id, name) => {
+        let updatedCollection: Collection | undefined;
+
         set((state) => ({
-          collections: state.collections.map((c) =>
-            c.id === id ? { ...c, name, updatedAt: new Date().toISOString() } : c
-          ),
+          collections: state.collections.map((c) => {
+            if (c.id === id) {
+              updatedCollection = { ...c, name, updatedAt: new Date().toISOString() };
+              return updatedCollection;
+            }
+            return c;
+          }),
         }));
+
+        // Sync to Supabase
+        if (updatedCollection && typeof window !== 'undefined') {
+          syncCollectionToSupabase(updatedCollection, getDeviceId());
+        }
       },
 
       updateCollectionDescription: (id, description) => {
+        let updatedCollection: Collection | undefined;
+
         set((state) => ({
-          collections: state.collections.map((c) =>
-            c.id === id ? { ...c, description, updatedAt: new Date().toISOString() } : c
-          ),
+          collections: state.collections.map((c) => {
+            if (c.id === id) {
+              updatedCollection = { ...c, description, updatedAt: new Date().toISOString() };
+              return updatedCollection;
+            }
+            return c;
+          }),
         }));
+
+        // Sync to Supabase
+        if (updatedCollection && typeof window !== 'undefined') {
+          syncCollectionToSupabase(updatedCollection, getDeviceId());
+        }
       },
 
       addProductToCollection: (collectionId, product) => {
+        let updatedCollection: Collection | undefined;
+
         set((state) => ({
           collections: state.collections.map((c) => {
             if (c.id !== collectionId) return c;
@@ -79,17 +256,25 @@ export const useCollectionsStore = create<CollectionsState>()(
               .map((p) => p.image_url)
               .filter(Boolean);
 
-            return {
+            updatedCollection = {
               ...c,
               products: updatedProducts,
               coverImages,
               updatedAt: new Date().toISOString(),
             };
+            return updatedCollection;
           }),
         }));
+
+        // Sync to Supabase
+        if (updatedCollection && typeof window !== 'undefined') {
+          syncCollectionToSupabase(updatedCollection, getDeviceId());
+        }
       },
 
       removeProductFromCollection: (collectionId, productId) => {
+        let updatedCollection: Collection | undefined;
+
         set((state) => ({
           collections: state.collections.map((c) => {
             if (c.id !== collectionId) return c;
@@ -100,14 +285,20 @@ export const useCollectionsStore = create<CollectionsState>()(
               .map((p) => p.image_url)
               .filter(Boolean);
 
-            return {
+            updatedCollection = {
               ...c,
               products: updatedProducts,
               coverImages,
               updatedAt: new Date().toISOString(),
             };
+            return updatedCollection;
           }),
         }));
+
+        // Sync to Supabase
+        if (updatedCollection && typeof window !== 'undefined') {
+          syncCollectionToSupabase(updatedCollection, getDeviceId());
+        }
       },
 
       getCollectionById: (id) => {
@@ -149,6 +340,16 @@ export const useCollectionsStore = create<CollectionsState>()(
     }),
     {
       name: 'tml-collections-storage',
+      onRehydrateStorage: () => (state) => {
+        // After rehydrating from localStorage, sync with Supabase
+        if (state) {
+          state.setHydrated(true);
+          // Delay sync slightly to allow the app to render first
+          setTimeout(() => {
+            state.syncWithSupabase();
+          }, 1000);
+        }
+      },
     }
   )
 );

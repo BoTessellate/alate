@@ -62,7 +62,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
 
   const baseStyles: CSSProperties = {
     backgroundColor: 'var(--surface)',
-    borderColor: isHovered && hoverHighlight ? 'var(--primary)' : 'var(--border)',
+    borderColor: isHovered && hoverHighlight ? 'var(--primary-dark)' : 'var(--border)',
     transform: variant === 'elevated' && isHovered ? 'translateY(-2px)' : undefined,
     boxShadow: variant === 'elevated'
       ? isHovered

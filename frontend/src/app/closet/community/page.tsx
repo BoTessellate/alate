@@ -17,7 +17,7 @@ export default function CommunityClosetPage() {
       />
 
       {/* Content area */}
-      <div className="px-8 pb-8 max-w-7xl mx-auto">
+      <div className="px-8 pb-24 max-w-7xl mx-auto">
         {collections.length === 0 ? (
           <EmptyState
             icon={Users}

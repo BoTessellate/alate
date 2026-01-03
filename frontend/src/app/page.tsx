@@ -90,7 +90,7 @@ export default function Home() {
       </div>
 
       {/* Content */}
-      <div className="px-8 pb-8 max-w-6xl mx-auto">
+      <div className="px-8 pb-24 max-w-6xl mx-auto">
 
         {/* Main CTA Card */}
         <Card
@@ -138,6 +138,7 @@ export default function Home() {
               <>
                 <SectionHeader
                   title="Curated Layers"
+                  italic
                   actions={
                     <Link
                       href="/looks"

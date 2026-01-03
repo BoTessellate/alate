@@ -147,6 +147,8 @@ export interface SectionHeaderProps {
   actions?: ReactNode;
   /** Size variant */
   size?: 'sm' | 'md' | 'lg';
+  /** Use italic editorial style (Cormorant font) */
+  italic?: boolean;
   /** Custom className */
   className?: string;
 }
@@ -174,6 +176,7 @@ export function SectionHeader({
   subtitle,
   actions,
   size = 'lg',
+  italic = false,
   className = '',
 }: SectionHeaderProps) {
   const styles = sectionSizeStyles[size];
@@ -182,8 +185,14 @@ export function SectionHeader({
     <div className={`flex items-center justify-between ${styles.gap} mb-4 ${className}`}>
       <div className="flex items-baseline gap-3">
         <h2
-          className={`${styles.title} font-semibold`}
-          style={{ color: 'var(--foreground)' }}
+          className={`${styles.title} ${italic ? 'italic' : 'font-semibold'}`}
+          style={{
+            color: 'var(--foreground)',
+            ...(italic && {
+              fontFamily: 'var(--font-cormorant)',
+              fontWeight: 500,
+            }),
+          }}
         >
           {title}
         </h2>

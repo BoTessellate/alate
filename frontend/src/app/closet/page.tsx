@@ -55,7 +55,7 @@ export default function ClosetPage() {
               borderColor: 'var(--border)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--primary)';
+              e.currentTarget.style.borderColor = 'var(--primary-dark)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
             onMouseLeave={(e) => {
@@ -65,7 +65,7 @@ export default function ClosetPage() {
           >
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center mb-5"
-              style={{ backgroundColor: 'var(--primary)', opacity: 0.9 }}
+              style={{ backgroundColor: 'var(--primary-dark)', opacity: 0.9 }}
             >
               <Shirt size={28} className="text-white" />
             </div>
@@ -84,7 +84,7 @@ export default function ClosetPage() {
             </p>
             <div
               className="flex items-center gap-2 text-sm font-medium group-hover:gap-3 transition-all"
-              style={{ color: 'var(--primary)' }}
+              style={{ color: 'var(--primary-dark)' }}
             >
               <span>View your closet</span>
               <ArrowRight size={16} />

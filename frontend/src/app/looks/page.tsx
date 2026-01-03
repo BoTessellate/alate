@@ -105,7 +105,7 @@ export default function LooksPage() {
             <div className="h-5 w-64 rounded" style={{ backgroundColor: 'var(--surface)' }} />
           </div>
         </div>
-        <div className="px-8 pb-8 max-w-7xl mx-auto">
+        <div className="px-8 pb-24 max-w-7xl mx-auto">
           <div className="animate-pulse grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i}>
@@ -166,7 +166,7 @@ export default function LooksPage() {
       </div>
 
       {/* Content */}
-      <div className="px-8 pb-8 max-w-7xl mx-auto">
+      <div className="px-8 pb-24 max-w-7xl mx-auto">
         {/* Empty State */}
         {moodboards.length === 0 && (
           <EmptyState

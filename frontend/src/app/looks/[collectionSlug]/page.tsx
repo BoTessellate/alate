@@ -26,8 +26,6 @@ import {
 import { useLooksStore, parseSlugId, generateMoodboardPath, CanvasItem } from '@/stores/useLooksStore';
 import { usePriceFormatter } from '@/hooks/useCurrency';
 import { getProductImage } from '@/utils/placeholder';
-import CollectionInspiration from '@/components/CollectionInspiration';
-import VirtualizedSidebarProducts from '@/components/VirtualizedSidebarProducts';
 import { SectionHeader } from '@/components/ui';
 import type { CollectionMetadata, Product } from '@/types';
 import Link from 'next/link';
@@ -73,6 +71,18 @@ export default function MoodboardEditorPage() {
   // Layout generator state
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const [applyingLayout, setApplyingLayout] = useState(false);
+
+  // Layout feedback tracking state
+  const [aiGeneratedLayout, setAiGeneratedLayout] = useState<CanvasItem[] | null>(null);
+  const [layoutType, setLayoutType] = useState<string | null>(null);
+  const [layoutStartTime, setLayoutStartTime] = useState<number | null>(null);
+  const [adjustmentHistory, setAdjustmentHistory] = useState<{
+    type: 'move' | 'resize' | 'rotate' | 'delete' | 'add';
+    itemId: string;
+    from?: { x?: number; y?: number; width?: number; height?: number; rotation?: number };
+    to?: { x?: number; y?: number; width?: number; height?: number; rotation?: number };
+    timestamp: number;
+  }[]>([]);
 
   // AI Composition state
   const [aiComposedImage, setAiComposedImage] = useState<string | null>(null);
@@ -197,6 +207,56 @@ export default function MoodboardEditorPage() {
     };
   }, []);
 
+  // Listen for addProductsToCanvas events from SearchPanelContent
+  useEffect(() => {
+    const handleAddProductsToCanvas = (e: CustomEvent<{ products: Product[] }>) => {
+      const productsToAdd = e.detail.products;
+      if (!productsToAdd || productsToAdd.length === 0) return;
+
+      setItems((prevItems) => {
+        // Calculate position based on existing items count to spread them out
+        const currentCount = prevItems.length;
+
+        const newItems: CanvasItem[] = productsToAdd.map((product, index) => {
+          const itemIndex = currentCount + index;
+          // Spread items in a grid pattern with some randomness
+          const col = itemIndex % 3;
+          const row = Math.floor(itemIndex / 3);
+          const baseX = 80 + col * 220;
+          const baseY = 80 + row * 220;
+          // Add slight randomness to avoid perfect grid look
+          const randomX = (Math.random() - 0.5) * 40;
+          const randomY = (Math.random() - 0.5) * 40;
+
+          return {
+            id: `item-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'image' as const,
+            x: Math.max(20, Math.min(580, baseX + randomX)),
+            y: Math.max(20, Math.min(380, baseY + randomY)),
+            width: 180,
+            height: 180,
+            rotation: 0,
+            zIndex: itemIndex,
+            content: product.id,
+            src: getProductImage(product.image_url, product.product_name),
+            alt: product.product_name,
+            productName: product.product_name,
+            productBrand: product.brand,
+            productPrice: product.price,
+            productCurrency: product.currency,
+          };
+        });
+
+        return [...prevItems, ...newItems];
+      });
+    };
+
+    window.addEventListener('addProductsToCanvas', handleAddProductsToCanvas as EventListener);
+    return () => {
+      window.removeEventListener('addProductsToCanvas', handleAddProductsToCanvas as EventListener);
+    };
+  }, []);
+
   // Initial fetch on mount
   useEffect(() => {
     fetchProducts();
@@ -295,10 +355,27 @@ export default function MoodboardEditorPage() {
 
   const deleteSelectedItems = useCallback(() => {
     if (selectedItems.size > 0) {
+      // Track deletions for layout feedback
+      if (aiGeneratedLayout) {
+        selectedItems.forEach((itemId) => {
+          const item = items.find((i) => i.id === itemId);
+          if (item) {
+            setAdjustmentHistory((prev) => [
+              ...prev,
+              {
+                type: 'delete',
+                itemId,
+                from: { x: item.x, y: item.y, width: item.width, height: item.height },
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+        });
+      }
       setItems(items.filter((item) => !selectedItems.has(item.id)));
       setSelectedItems(new Set());
     }
-  }, [selectedItems, items]);
+  }, [selectedItems, items, aiGeneratedLayout]);
 
   const duplicateSelectedItems = () => {
     if (selectedItems.size > 0) {
@@ -467,6 +544,25 @@ export default function MoodboardEditorPage() {
     if (draggedItem) {
       const deltaX = x - dragOffset.x - (items.find((i) => i.id === draggedItem)?.x || 0);
       const deltaY = y - dragOffset.y - (items.find((i) => i.id === draggedItem)?.y || 0);
+
+      // Track movement for layout feedback (only if we have an AI-generated layout)
+      if (aiGeneratedLayout && (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1)) {
+        selectedItems.forEach((itemId) => {
+          const item = items.find((i) => i.id === itemId);
+          if (item) {
+            setAdjustmentHistory((prev) => [
+              ...prev,
+              {
+                type: 'move',
+                itemId,
+                from: { x: item.x, y: item.y },
+                to: { x: item.x + deltaX, y: item.y + deltaY },
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+        });
+      }
 
       setItems(
         items.map((item) => {
@@ -753,8 +849,129 @@ export default function MoodboardEditorPage() {
         updatedItems = items;
     }
 
+    // Store the AI-generated layout for feedback tracking
+    setAiGeneratedLayout([...updatedItems]);
+    setLayoutType(layoutType);
+    setLayoutStartTime(Date.now());
+    setAdjustmentHistory([]); // Reset adjustment history for new layout
+
     setItems(updatedItems);
     setApplyingLayout(false);
+  };
+
+  // Submit layout feedback to the API
+  const submitLayoutFeedback = async (wasExported: boolean = false) => {
+    if (!aiGeneratedLayout || !layoutType || !moodboard) return;
+
+    const timeSpent = layoutStartTime ? Date.now() - layoutStartTime : 0;
+
+    // Calculate adjustment metrics
+    const elementsMoved = new Set(
+      adjustmentHistory.filter((a) => a.type === 'move').map((a) => a.itemId)
+    ).size;
+    const elementsResized = new Set(
+      adjustmentHistory.filter((a) => a.type === 'resize').map((a) => a.itemId)
+    ).size;
+
+    // Build the feedback payload
+    const feedback = {
+      moodboard_id: moodboard.id,
+      layout_type: layoutType,
+      product_count: items.length,
+      canvas_width: 800,
+      canvas_height: 600,
+      product_categories: items
+        .filter((i) => i.type === 'image')
+        .map((i) => i.productBrand || 'unknown')
+        .filter((v, i, a) => a.indexOf(v) === i), // unique values
+      ai_generated_layout: {
+        items: aiGeneratedLayout.map((item) => ({
+          id: item.id,
+          type: item.type,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          rotation: item.rotation,
+          zIndex: item.zIndex,
+        })),
+      },
+      user_final_layout: {
+        items: items.map((item) => ({
+          id: item.id,
+          type: item.type,
+          x: item.x,
+          y: item.y,
+          width: item.width,
+          height: item.height,
+          rotation: item.rotation,
+          zIndex: item.zIndex,
+        })),
+      },
+      adjustments: adjustmentHistory,
+      was_exported: wasExported,
+      time_spent_adjusting: Math.round(timeSpent / 1000), // Convert to seconds
+      elements_moved: elementsMoved,
+      elements_resized: elementsResized,
+      labels_repositioned: 0, // Text items repositioned
+    };
+
+    try {
+      await fetch(`${API_BASE_URL}/api/ai?action=layout-feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(feedback),
+      });
+      console.log('[LayoutFeedback] Submitted successfully');
+    } catch (error) {
+      console.error('[LayoutFeedback] Failed to submit:', error);
+    }
+  };
+
+  // Export canvas as image and submit layout feedback
+  const handleExportCanvas = async () => {
+    if (!canvasRef.current || items.length === 0) return;
+
+    try {
+      // Dynamic import html2canvas for client-side rendering
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Temporarily reset zoom for clean capture
+      const currentZoom = zoom;
+      setZoom(1);
+
+      // Wait for re-render
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const canvas = await html2canvas(canvasRef.current, {
+        backgroundColor: null,
+        scale: 2, // Higher quality export
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      // Restore zoom
+      setZoom(currentZoom);
+
+      // Convert to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${moodboardName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/png');
+
+      // Submit layout feedback with export flag
+      await submitLayoutFeedback(true);
+    } catch (error) {
+      console.error('[Export] Failed to export canvas:', error);
+    }
   };
 
   // Don't render until hydrated
@@ -795,13 +1012,50 @@ export default function MoodboardEditorPage() {
   }
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--background)' }}>
+    <div
+      className="flex flex-col overflow-hidden"
+      style={{
+        backgroundColor: 'var(--background)',
+        height: 'calc(100vh - var(--topbar-height) - 20px)',
+      }}
+    >
       <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Left Side - Canvas Area */}
+        {/* Canvas Area - Full width now that sidebar is removed */}
         <div
-          className="flex-1 relative min-w-0 flex items-center justify-center p-4"
+          className="flex-1 relative min-w-0 flex items-center justify-center p-4 overflow-hidden"
           style={{ backgroundColor: 'var(--background-secondary)' }}
         >
+          {/* Layout Learning Indicator */}
+          {aiGeneratedLayout && (
+            <div
+              className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full"
+              style={{
+                backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                border: '1px solid rgba(147, 51, 234, 0.3)',
+              }}
+              title="Your adjustments help improve future layouts"
+            >
+              <div
+                className="w-2 h-2 rounded-full animate-pulse"
+                style={{ backgroundColor: 'rgb(147, 51, 234)' }}
+              />
+              <span className="text-xs font-medium" style={{ color: 'rgb(147, 51, 234)' }}>
+                Learning from adjustments
+              </span>
+              {adjustmentHistory.length > 0 && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: 'rgba(147, 51, 234, 0.2)',
+                    color: 'rgb(147, 51, 234)',
+                  }}
+                >
+                  {adjustmentHistory.length}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Floating Tools */}
           <div
             className="absolute top-4 left-4 z-10 flex flex-col gap-1 p-2 rounded-full"
@@ -985,6 +1239,29 @@ export default function MoodboardEditorPage() {
 
             <div className="h-px my-1" style={{ backgroundColor: 'var(--border)' }} />
 
+            {/* Export Button */}
+            <button
+              onClick={handleExportCanvas}
+              disabled={items.length === 0}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
+              style={{ color: 'var(--foreground-secondary)' }}
+              onMouseEnter={(e) => {
+                if (items.length > 0) {
+                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  e.currentTarget.style.color = 'var(--primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--foreground-secondary)';
+              }}
+              title={items.length === 0 ? 'Add items to export' : 'Export Moodboard'}
+            >
+              <Download size={18} />
+            </button>
+
+            <div className="h-px my-1" style={{ backgroundColor: 'var(--border)' }} />
+
             <button
               onClick={() => setZoom(Math.min(zoom + 0.1, 2))}
               className="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
@@ -1035,15 +1312,18 @@ export default function MoodboardEditorPage() {
             </button>
           </div>
 
-          {/* Canvas */}
+          {/* Canvas - responsive sizing that fits any viewport */}
           <div
             ref={canvasRef}
             className="relative"
             style={{
-              width: 'min(calc(100% - 32px), 800px)',
-              height: 'min(calc(100% - 32px), 600px)',
-              maxWidth: '800px',
-              maxHeight: '600px',
+              // Use container query approach: fit within parent with 4:3 aspect ratio
+              // Height-based: use available height, calculate width from aspect ratio
+              // Width-based: use available width, calculate height from aspect ratio
+              // Take the smaller of the two to ensure it always fits
+              width: 'min(calc((100vh - var(--topbar-height) - 60px) * 4 / 3), calc(100vw - 120px), 1000px)',
+              height: 'min(calc(100vh - var(--topbar-height) - 60px), calc((100vw - 120px) * 3 / 4), 750px)',
+              aspectRatio: '4 / 3',
               background: backgroundOptions[backgroundIndex]?.value || 'var(--surface)',
               borderRadius: '8px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
@@ -1077,7 +1357,7 @@ export default function MoodboardEditorPage() {
                     letterSpacing: '0.02em',
                   }}
                 >
-                  Click on products from the right panel to add them
+                  Use the search button to find and add products
                 </p>
               </div>
             )}
@@ -1284,112 +1564,6 @@ export default function MoodboardEditorPage() {
           </div>
         </div>
 
-        {/* Right Side - Product Suggestions */}
-        <div
-          className="w-[400px] xl:w-[500px] 2xl:w-[600px] border-l flex flex-col shrink-0 min-h-0"
-          style={{
-            backgroundColor: 'var(--surface)',
-            borderColor: 'var(--border)',
-          }}
-        >
-          <CollectionInspiration
-            onApplyFilters={handleApplyCollectionFilters}
-            onClearFilters={handleClearCollectionFilters}
-            isFilterActive={isCollectionFilterActive}
-          />
-
-          <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <SectionHeader
-              title="Add Products"
-              size="sm"
-              className="mb-0"
-              actions={
-                <div className="flex items-center gap-2">
-                  {loadingProducts ? (
-                    <>
-                      <div
-                        className="w-2 h-2 rounded-full animate-pulse"
-                        style={{ backgroundColor: 'var(--warning, #f59e0b)' }}
-                      />
-                      <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                        Loading...
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                      {products.length} products available
-                    </span>
-                  )}
-                  {activeSearchQuery && (
-                    <button
-                      onClick={() => {
-                        setActiveSearchQuery('');
-                        setIsCollectionFilterActive(false);
-                        fetchProducts('');
-                      }}
-                      className="text-xs hover:underline"
-                      style={{ color: 'var(--primary)' }}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              }
-            />
-            {activeSearchQuery && !loadingProducts && (
-              <div className="flex items-center gap-2 mt-1.5">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: 'var(--primary)' }}
-                />
-                <span className="text-xs truncate" style={{ color: 'var(--foreground-secondary)' }}>
-                  {isCollectionFilterActive
-                    ? activeSearchQuery
-                    : `Searching: "${activeSearchQuery}"`}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-3">
-            {loadingProducts && (
-              <div className="flex items-center justify-center py-12">
-                <Loader2
-                  size={24}
-                  className="animate-spin"
-                  style={{ color: 'var(--primary)' }}
-                />
-                <span className="ml-2 text-sm" style={{ color: 'var(--foreground-secondary)' }}>
-                  Loading...
-                </span>
-              </div>
-            )}
-
-            {!loadingProducts && products.length === 0 && (
-              <p
-                className="text-center py-8 italic"
-                style={{
-                  fontFamily: 'var(--font-cormorant)',
-                  color: 'var(--foreground-muted)',
-                }}
-              >
-                No products found
-              </p>
-            )}
-
-            {!loadingProducts && products.length > 0 && (
-              <VirtualizedSidebarProducts
-                products={products}
-                favorites={favorites}
-                onAddToCanvas={addProductToCanvas}
-                onToggleFavorite={toggleFavorite}
-                formatPrice={formatPrice}
-                normalizeText={normalizeText}
-                getProductImage={getProductImage}
-              />
-            )}
-          </div>
-        </div>
       </div>
 
       {/* AI Compose Preview Modal */}
@@ -1442,10 +1616,19 @@ export default function MoodboardEditorPage() {
               className="flex items-center justify-end gap-3 px-4 py-3 border-t"
               style={{ borderColor: 'var(--border)' }}
             >
-              <a
-                href={aiComposedImage}
-                download={`moodboard-${moodboardId}-${Date.now()}.png`}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              <button
+                onClick={async () => {
+                  // Trigger download
+                  const link = document.createElement('a');
+                  link.href = aiComposedImage;
+                  link.download = `moodboard-${moodboardId}-${Date.now()}.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  // Submit layout feedback for AI compose
+                  await submitLayoutFeedback(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
                 style={{
                   backgroundColor: 'var(--primary)',
                   color: 'white',
@@ -1453,7 +1636,7 @@ export default function MoodboardEditorPage() {
               >
                 <Download size={16} />
                 Download
-              </a>
+              </button>
               <button
                 onClick={() => setShowAiPreview(false)}
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"

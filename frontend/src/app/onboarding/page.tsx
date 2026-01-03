@@ -212,9 +212,9 @@ export default function OnboardingPage() {
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full border transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none"
                   style={{
                     backgroundColor: isSelected
-                      ? 'var(--primary)'
+                      ? 'var(--primary-dark)'
                       : 'var(--surface)',
-                    borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+                    borderColor: isSelected ? 'var(--primary-dark)' : 'var(--border)',
                     color: isSelected ? 'white' : 'var(--foreground)',
                   }}
                 >
@@ -263,10 +263,10 @@ export default function OnboardingPage() {
                     className="px-4 py-2 rounded-full border transition-all cursor-pointer outline-none focus:outline-none focus-visible:outline-none"
                     style={{
                       backgroundColor: isSelected
-                        ? 'var(--primary)'
+                        ? 'var(--primary-dark)'
                         : 'var(--surface)',
                       borderColor: isSelected
-                        ? 'var(--primary)'
+                        ? 'var(--primary-dark)'
                         : 'var(--border)',
                       color: isSelected ? 'white' : 'var(--foreground)',
                     }}

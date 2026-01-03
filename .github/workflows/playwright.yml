@@ -1,0 +1,315 @@
+# Playwright Layout Tests
+# Intelligent test selection based on commit type and changed files
+
+name: Playwright Layout Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      test-scope:
+        description: 'Test scope to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - global
+          - pages
+          - modals
+          - components
+          - interactions
+
+jobs:
+  # ============================================================================
+  # Determine what tests to run
+  # ============================================================================
+  determine-tests:
+    name: Analyze Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.analysis.outputs.should-run }}
+      test-scope: ${{ steps.analysis.outputs.scope }}
+      commit-type: ${{ steps.analysis.outputs.commit-type }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Analyze commit and changes
+        id: analysis
+        run: |
+          # ============================================================
+          # STEP 1: Detect commit type
+          # ============================================================
+          COMMIT_TYPE="unknown"
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            if echo "$PR_TITLE" | grep -qiE "^feat(\(.*\))?:"; then COMMIT_TYPE="feat"
+            elif echo "$PR_TITLE" | grep -qiE "^fix(\(.*\))?:"; then COMMIT_TYPE="fix"
+            elif echo "$PR_TITLE" | grep -qiE "^chore(\(.*\))?:"; then COMMIT_TYPE="chore"
+            elif echo "$PR_TITLE" | grep -qiE "^docs(\(.*\))?:"; then COMMIT_TYPE="docs"
+            elif echo "$PR_TITLE" | grep -qiE "^refactor(\(.*\))?:"; then COMMIT_TYPE="refactor"
+            elif echo "$PR_TITLE" | grep -qiE "^test(\(.*\))?:"; then COMMIT_TYPE="test"
+            elif echo "$PR_TITLE" | grep -qiE "^ci(\(.*\))?:"; then COMMIT_TYPE="ci"
+            fi
+          else
+            COMMIT_MSG=$(git log -1 --pretty=%B)
+            if echo "$COMMIT_MSG" | grep -qiE "^feat(\(.*\))?:"; then COMMIT_TYPE="feat"
+            elif echo "$COMMIT_MSG" | grep -qiE "^fix(\(.*\))?:"; then COMMIT_TYPE="fix"
+            elif echo "$COMMIT_MSG" | grep -qiE "^chore(\(.*\))?:"; then COMMIT_TYPE="chore"
+            elif echo "$COMMIT_MSG" | grep -qiE "^docs(\(.*\))?:"; then COMMIT_TYPE="docs"
+            elif echo "$COMMIT_MSG" | grep -qiE "^refactor(\(.*\))?:"; then COMMIT_TYPE="refactor"
+            elif echo "$COMMIT_MSG" | grep -qiE "^test(\(.*\))?:"; then COMMIT_TYPE="test"
+            elif echo "$COMMIT_MSG" | grep -qiE "^ci(\(.*\))?:"; then COMMIT_TYPE="ci"
+            fi
+          fi
+
+          echo "commit-type=$COMMIT_TYPE" >> $GITHUB_OUTPUT
+
+          # ============================================================
+          # STEP 2: Get changed files
+          # ============================================================
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            CHANGED=$(git diff --name-only HEAD~1 2>/dev/null || echo "")
+          fi
+
+          # ============================================================
+          # STEP 3: Check if frontend UI files changed
+          # ============================================================
+          UI_CHANGED="false"
+          if echo "$CHANGED" | grep -qE "^frontend/src/(components|app|styles)/"; then
+            UI_CHANGED="true"
+          fi
+          if echo "$CHANGED" | grep -qE "^frontend/(playwright.config|tailwind.config)"; then
+            UI_CHANGED="true"
+          fi
+          if echo "$CHANGED" | grep -qE "^frontend/e2e-playwright/"; then
+            UI_CHANGED="true"
+          fi
+
+          # ============================================================
+          # STEP 4: Determine if tests should run based on commit type
+          # ============================================================
+          SHOULD_RUN="false"
+          SCOPE="none"
+
+          case "$COMMIT_TYPE" in
+            feat|fix|refactor|style)
+              if [ "$UI_CHANGED" == "true" ]; then SHOULD_RUN="true"; fi
+              ;;
+            test)
+              if echo "$CHANGED" | grep -qE "^frontend/e2e-playwright/"; then
+                SHOULD_RUN="true"
+                SCOPE="all"
+              fi
+              ;;
+            chore)
+              if echo "$CHANGED" | grep -qE "^frontend/(playwright.config|tailwind.config)"; then
+                SHOULD_RUN="true"
+                SCOPE="all"
+              fi
+              ;;
+            docs|ci)
+              # Skip unless touching UI code
+              if echo "$CHANGED" | grep -qE "^frontend/src/(components|app)/"; then
+                SHOULD_RUN="true"
+              fi
+              ;;
+            *)
+              if [ "$UI_CHANGED" == "true" ]; then SHOULD_RUN="true"; fi
+              ;;
+          esac
+
+          # ============================================================
+          # STEP 5: Determine test scope based on changed files
+          # ============================================================
+          if [ "$SHOULD_RUN" == "true" ] && [ "$SCOPE" == "none" ]; then
+            # Global layout changes
+            if echo "$CHANGED" | grep -qE "(TopBar|Sidebar|FloatingAction|AppLayout|SidePanel)"; then
+              SCOPE="global"
+            fi
+
+            # Modal changes
+            if echo "$CHANGED" | grep -qE "(Modal|Dialog|Overlay)"; then
+              [ "$SCOPE" == "none" ] && SCOPE="modals" || SCOPE="$SCOPE,modals"
+            fi
+
+            # Page changes
+            if echo "$CHANGED" | grep -qE "frontend/src/app/(settings|discover|looks|collections|closet|onboarding|admin)"; then
+              [ "$SCOPE" == "none" ] && SCOPE="pages" || SCOPE="$SCOPE,pages"
+            fi
+
+            # Component changes
+            if echo "$CHANGED" | grep -qE "frontend/src/components/(ui/|Button|Input|Card|Toggle|Chip)"; then
+              [ "$SCOPE" == "none" ] && SCOPE="components" || SCOPE="$SCOPE,components"
+            fi
+
+            # Test file changes - run all
+            if echo "$CHANGED" | grep -qE "^frontend/e2e-playwright/"; then
+              SCOPE="all"
+            fi
+
+            # Config changes - run all
+            if echo "$CHANGED" | grep -qE "^frontend/(playwright.config|tailwind.config)"; then
+              SCOPE="all"
+            fi
+
+            # Feature to main = full suite
+            if [ "$COMMIT_TYPE" == "feat" ] && [ "${{ github.base_ref }}" == "main" ]; then
+              SCOPE="all"
+            fi
+
+            # Default if nothing specific matched
+            [ "$SCOPE" == "none" ] && SCOPE="global,components"
+          fi
+
+          # Manual trigger override
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            SHOULD_RUN="true"
+            SCOPE="${{ inputs.test-scope }}"
+          fi
+
+          echo "scope=$SCOPE" >> $GITHUB_OUTPUT
+          echo "should-run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+
+          echo "========================================"
+          echo "Commit type: $COMMIT_TYPE"
+          echo "UI changed: $UI_CHANGED"
+          echo "Should run: $SHOULD_RUN"
+          echo "Test scope: $SCOPE"
+          echo "========================================"
+
+  # ============================================================================
+  # Run Playwright tests
+  # ============================================================================
+  layout-tests:
+    name: Layout Tests
+    needs: determine-tests
+    if: needs.determine-tests.outputs.should-run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Display test info
+        run: |
+          echo "🧪 Playwright Layout Tests"
+          echo "=========================="
+          echo "Commit type: ${{ needs.determine-tests.outputs.commit-type }}"
+          echo "Test scope: ${{ needs.determine-tests.outputs.test-scope }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://backend-tml.vercel.app
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Run selective Playwright tests
+        run: |
+          SCOPE="${{ needs.determine-tests.outputs.test-scope }}"
+          echo "Running tests for scope: $SCOPE"
+
+          if [ "$SCOPE" == "all" ]; then
+            npm run test:layout
+          elif [ "$SCOPE" == "global" ]; then
+            npx playwright test e2e-playwright/layout/global.spec.ts
+          elif [ "$SCOPE" == "modals" ]; then
+            npx playwright test e2e-playwright/layout/modals.spec.ts
+          elif [ "$SCOPE" == "pages" ]; then
+            npx playwright test e2e-playwright/layout/pages.spec.ts
+          elif [ "$SCOPE" == "components" ]; then
+            npx playwright test e2e-playwright/layout/components.spec.ts
+          else
+            TEST_FILES=""
+            echo "$SCOPE" | grep -q "global" && TEST_FILES="$TEST_FILES e2e-playwright/layout/global.spec.ts"
+            echo "$SCOPE" | grep -q "modals" && TEST_FILES="$TEST_FILES e2e-playwright/layout/modals.spec.ts"
+            echo "$SCOPE" | grep -q "pages" && TEST_FILES="$TEST_FILES e2e-playwright/layout/pages.spec.ts"
+            echo "$SCOPE" | grep -q "components" && TEST_FILES="$TEST_FILES e2e-playwright/layout/components.spec.ts"
+            echo "$SCOPE" | grep -q "interactions" && TEST_FILES="$TEST_FILES e2e-playwright/layout/interactions.spec.ts"
+
+            if [ -n "$TEST_FILES" ]; then
+              npx playwright test $TEST_FILES
+            else
+              echo "No specific tests to run"
+            fi
+          fi
+        env:
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload test screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: frontend/test-results/
+          retention-days: 7
+
+  # ============================================================================
+  # Skip marker - shows as passed when tests are skipped
+  # ============================================================================
+  layout-tests-skipped:
+    name: Layout Tests (skipped)
+    needs: determine-tests
+    if: needs.determine-tests.outputs.should-run != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tests skipped
+        run: |
+          echo "⏭️ Playwright tests skipped"
+          echo "Commit type: ${{ needs.determine-tests.outputs.commit-type }}"
+          echo "No UI-related changes detected"
+
+  # ============================================================================
+  # Summary job for branch protection
+  # ============================================================================
+  layout-tests-success:
+    name: Layout Tests Success
+    runs-on: ubuntu-latest
+    needs: [determine-tests, layout-tests, layout-tests-skipped]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.determine-tests.outputs.should-run }}" == "true" ]; then
+            if [ "${{ needs.layout-tests.result }}" != "success" ]; then
+              echo "❌ Layout tests failed"
+              exit 1
+            fi
+            echo "✓ Layout tests passed"
+          else
+            echo "⏭ Layout tests skipped (no UI changes)"
+          fi

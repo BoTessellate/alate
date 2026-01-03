@@ -90,7 +90,7 @@ export default function Sidebar() {
                   href={item.href}
                   className="flex items-center rounded-md transition-all duration-200 group relative mx-2"
                   style={{
-                    backgroundColor: isActive ? 'var(--primary)' : 'transparent',
+                    backgroundColor: isActive ? 'var(--primary-dark)' : 'transparent',
                     color: isActive ? 'white' : 'var(--foreground-secondary)',
                     height: '40px',
                     // Center icons when collapsed, left-align when expanded

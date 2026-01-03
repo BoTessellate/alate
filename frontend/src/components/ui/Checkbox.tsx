@@ -50,8 +50,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (checked) return 'var(--primary)';
-    if (isFocused) return 'var(--primary)';
+    if (checked) return 'var(--primary-dark)';
+    if (isFocused) return 'var(--primary-dark)';
     return 'var(--border)';
   };
 
@@ -74,7 +74,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
           className={`${config.box} rounded border-2 flex items-center justify-center transition-colors`}
           style={{
             borderColor: getBorderColor(),
-            backgroundColor: checked ? 'var(--primary)' : 'transparent',
+            backgroundColor: checked ? 'var(--primary-dark)' : 'transparent',
           }}
         >
           {checked && (

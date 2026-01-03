@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Image from 'next/image';
 import { Heart, Plus } from 'lucide-react';
-import { generatePlaceholderSVG } from '@/utils/placeholder';
+import { generatePlaceholderStarsSVG } from '@/components/ui';
 import type { Product } from '@/types';
 
 interface VirtualizedSidebarProductsProps {
@@ -63,7 +63,7 @@ const SidebarProductCard = memo(function SidebarProductCard({
           className="object-cover"
           sizes="150px"
           placeholder="blur"
-          blurDataURL={generatePlaceholderSVG(product.product_name, 10, 10)}
+          blurDataURL={generatePlaceholderStarsSVG(10, 10)}
         />
 
         <div

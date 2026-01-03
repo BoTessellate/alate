@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, HelpCircle, User, X, Loader2, ChevronRight, Cloud, MessageSquare, Home, Compass, Layers2, Settings, AlignHorizontalSpaceAround } from 'lucide-react';
+import { HelpCircle, User, Loader2, Cloud, Compass, Layers2, Settings, AlignHorizontalSpaceAround } from 'lucide-react';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { getCurrencySymbol } from '@/utils/currency';
 import { useLooksStore, parseSlugId } from '@/stores/useLooksStore';
-import { useProductSearch } from '@/hooks/useProductSearch';
 import BreadcrumbNav from './BreadcrumbNav';
 import {
   getTopbarColors,
@@ -37,21 +36,6 @@ export default function TopBar() {
   const userName = useSettingsStore(state => state.userName);
   const getMoodboardById = useLooksStore(state => state.getMoodboardById);
   const saveStatus = useLooksStore(state => state.saveStatus);
-
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  // Use SWR-based search with automatic caching and deduplication
-  const { products: searchResults, isSearching } = useProductSearch(searchQuery, {
-    debounceMs: 300,
-    limit: 10,
-  });
-
-  // Callback to update Look Editor products (will be set by Look Editor page)
-  const onSearchSelect = useRef<((query: string) => void) | null>(null);
 
   // Track hydration to avoid SSR/client mismatch
   const [isHydrated, setIsHydrated] = useState(false);
@@ -130,97 +114,6 @@ export default function TopBar() {
 
     breadcrumbs.push({ name, href, isLast });
   });
-
-  // Reset selected index when search results change
-  useEffect(() => {
-    setSelectedResultIndex(-1);
-  }, [searchResults]);
-
-  // Focus search input when opened
-  useEffect(() => {
-    if (showSearch && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [showSearch]);
-
-  // Close search on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
-        setShowSearch(false);
-        setSearchQuery(''); // This will clear results via SWR hook
-      }
-    };
-
-    if (showSearch) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSearch]);
-
-  // Select a search result (navigate or filter products)
-  const selectSearchResult = (query: string) => {
-    if (isLookEditorPage) {
-      // Dispatch custom event to update Look Editor products
-      window.dispatchEvent(new CustomEvent('searchProducts', { detail: { query } }));
-    } else {
-      // Navigate to discover page with search
-      router.push(`/discover?q=${encodeURIComponent(query)}`);
-    }
-    setShowSearch(false);
-    setSearchQuery('');
-    setSelectedResultIndex(-1);
-  };
-
-  // Handle search submit
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-
-    // If a result is selected, use that; otherwise use the query
-    if (selectedResultIndex >= 0 && searchResults[selectedResultIndex]) {
-      selectSearchResult(searchResults[selectedResultIndex].product_name);
-    } else {
-      selectSearchResult(searchQuery);
-    }
-  };
-
-  // Handle keyboard navigation in search results
-  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (!searchResults.length) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedResultIndex(prev =>
-        prev < searchResults.length - 1 ? prev + 1 : 0
-      );
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedResultIndex(prev =>
-        prev > 0 ? prev - 1 : searchResults.length - 1
-      );
-    }
-  };
-
-  // Keyboard shortcut for search (Cmd/Ctrl + K)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowSearch(true);
-      }
-      if (e.key === 'Escape') {
-        setShowSearch(false);
-        setSearchQuery('');
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // State for user dropdown
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -379,97 +272,6 @@ export default function TopBar() {
             )}
           </div>
         )}
-
-        {/* Search - Icon that expands on click */}
-        <div ref={searchContainerRef} className="relative">
-          <form onSubmit={handleSearchSubmit}>
-            {showSearch ? (
-              <div
-                className="flex items-center gap-2 px-3 h-8 rounded-full"
-                style={{
-                  backgroundColor: 'var(--background)',
-                  width: '280px',
-                  transition: 'width 200ms ease-out',
-                }}
-              >
-                <Search size={16} style={{ color: 'var(--foreground-muted)', flexShrink: 0 }} />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Search a mood or product..."
-                  className="flex-1 bg-transparent text-sm min-w-0"
-                  style={{ color: 'var(--foreground)', border: 'none', outline: 'none', boxShadow: 'none' }}
-                />
-                {isSearching && (
-                  <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: 'var(--foreground-muted)' }} />
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowSearch(false);
-                    setSearchQuery('');
-                  }}
-                  className="flex-shrink-0 transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--foreground-muted)' }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <TopbarIconButton
-                icon={Search}
-                aria-label="Search"
-                title="Search (Ctrl+K)"
-                onClick={() => setShowSearch(true)}
-                colors={colors}
-              />
-            )}
-          </form>
-
-          {/* Search Results Dropdown with fade-in animation */}
-          {showSearch && searchResults.length > 0 && (
-            <div
-              className="absolute top-full left-0 right-0 mt-1 rounded-lg border shadow-lg overflow-hidden max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-1 duration-150"
-              style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              {searchResults.map((product, index) => (
-                <button
-                  key={product.id}
-                  onClick={() => selectSearchResult(product.product_name)}
-                  className="w-full flex items-center gap-3 p-2 text-left transition-colors duration-150"
-                  style={{
-                    borderBottom: '1px solid var(--border)',
-                    backgroundColor: index === selectedResultIndex ? 'var(--surface-light)' : 'transparent',
-                  }}
-                  onMouseEnter={() => setSelectedResultIndex(index)}
-                >
-                  {product.image_url && (
-                    <img
-                      src={product.image_url}
-                      alt={product.product_name}
-                      className="w-8 h-8 rounded object-cover"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>
-                      {product.product_name.replace(/^TEST_/i, '').replace(/_/g, ' ')}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
-                      {product.brand.replace(/^TEST_/i, '').replace(/_/g, ' ')}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Currency Dropdown */}
         <div ref={currencyMenuRef} className="relative">

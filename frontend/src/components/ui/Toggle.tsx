@@ -53,7 +53,7 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(function Toggle
       onClick={() => !disabled && onChange(!checked)}
       className={`relative ${s.track} rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       style={{
-        backgroundColor: checked ? 'var(--primary)' : 'var(--surface-light)',
+        backgroundColor: checked ? 'var(--primary-dark)' : 'var(--surface-light)',
       }}
     >
       <div

@@ -16,7 +16,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyMiddleware } from '../sdk/shared/middleware';
 import { createModuleLogger } from '../sdk/shared/logger';
-import { callClaude, parseJSONFromResponse } from '../sdk/shared/secureAI';
+import { callClaude, callClaudeWithVision, parseJSONFromResponse } from '../sdk/shared/secureAI';
 import {
   createImageGenerator,
   MoodboardCompositionInput,
@@ -24,6 +24,7 @@ import {
   TryOnType,
 } from '../sdk/imageGeneration';
 import { createClient } from '@supabase/supabase-js';
+import { extractAndNameColors } from '../sdk/productEnrichment/colorExtractor';
 
 const log = createModuleLogger('ai');
 
@@ -56,6 +57,8 @@ interface EnrichedProduct extends RawProduct {
   texture?: string;
   tone?: string;
   category?: string;
+  vibe_layer?: string;
+  pairs_with?: string[];
   enriched_at: string;
 }
 
@@ -571,53 +574,286 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Extract brand from URL if not provided or if it's a generic site name
+    let inferredBrand = product.brand || '';
+    const sourceUrl = product.source_url || '';
+
+    // Multi-brand houses with sub-brands - extract sub-brand from URL path
+    // Format: { domain: { pathPattern: 'Brand Name', ... } }
+    const multiBrandHouses: Record<string, Record<string, string>> = {
+      'armani.com': {
+        'giorgio-armani': 'Giorgio Armani',
+        'emporio-armani': 'Emporio Armani',
+        'armani-exchange': 'Armani Exchange',
+        'ea7': 'EA7 Emporio Armani',
+        'armani-casa': 'Armani/Casa',
+        'armani-fiori': 'Armani/Fiori',
+        'armani-beauty': 'Armani Beauty',
+        'armani-prive': 'Armani Privé',
+        'armani-ristorante': 'Armani/Ristorante',
+        'armani-hotel': 'Armani Hotel',
+        'armani-silos': 'Armani/Silos',
+      },
+      'lvmh.com': {
+        'louis-vuitton': 'Louis Vuitton',
+        'dior': 'Dior',
+        'fendi': 'Fendi',
+        'givenchy': 'Givenchy',
+        'celine': 'Celine',
+        'loewe': 'Loewe',
+        'kenzo': 'Kenzo',
+        'marc-jacobs': 'Marc Jacobs',
+      },
+      'kering.com': {
+        'gucci': 'Gucci',
+        'saint-laurent': 'Saint Laurent',
+        'bottega-veneta': 'Bottega Veneta',
+        'balenciaga': 'Balenciaga',
+        'alexander-mcqueen': 'Alexander McQueen',
+      },
+    };
+
+    // Simple brand mappings (single brand per domain)
+    const simpleBrandPatterns: Record<string, string> = {
+      'gucci.com': 'Gucci',
+      'prada.com': 'Prada',
+      'louisvuitton.com': 'Louis Vuitton',
+      'hermes.com': 'Hermès',
+      'chanel.com': 'Chanel',
+      'dior.com': 'Dior',
+      'burberry.com': 'Burberry',
+      'versace.com': 'Versace',
+      'balenciaga.com': 'Balenciaga',
+      'fendi.com': 'Fendi',
+      'zara.com': 'Zara',
+      'hm.com': 'H&M',
+      'uniqlo.com': 'Uniqlo',
+      'nike.com': 'Nike',
+      'adidas.com': 'Adidas',
+      'amazon.com': '', // Don't use marketplace as brand
+      'amazon.in': '',
+      'flipkart.com': '',
+      'etsy.com': '',
+    };
+
+    // Extract brand from URL
+    if (sourceUrl) {
+      try {
+        const urlObj = new URL(sourceUrl);
+        const hostname = urlObj.hostname.replace('www.', '');
+        const pathname = urlObj.pathname.toLowerCase();
+
+        // Check multi-brand houses first - extract sub-brand from URL path
+        for (const [domain, subBrands] of Object.entries(multiBrandHouses)) {
+          if (hostname.includes(domain)) {
+            // Look for sub-brand in URL path
+            for (const [pathKey, brandName] of Object.entries(subBrands)) {
+              if (pathname.includes(pathKey) || pathname.includes(`/${pathKey}/`)) {
+                inferredBrand = brandName;
+                log.info({ hostname, pathname, inferredBrand }, 'Extracted sub-brand from multi-brand house');
+                break;
+              }
+            }
+            break;
+          }
+        }
+
+        // If no sub-brand found, check simple brand patterns
+        if (!inferredBrand) {
+          for (const [pattern, brandName] of Object.entries(simpleBrandPatterns)) {
+            if (hostname.includes(pattern.replace('www.', ''))) {
+              if (brandName) inferredBrand = brandName;
+              break;
+            }
+          }
+        }
+
+        // For armani.com specifically, also check URL path segments
+        if (hostname.includes('armani.com') && !inferredBrand) {
+          const pathSegments = pathname.split('/').filter(s => s.length > 0);
+          // Look for brand indicator in path (e.g., /en-wx/giorgio-armani/product)
+          for (const segment of pathSegments) {
+            const normalizedSegment = segment.toLowerCase();
+            if (normalizedSegment.includes('giorgio')) {
+              inferredBrand = 'Giorgio Armani';
+              break;
+            } else if (normalizedSegment.includes('emporio')) {
+              inferredBrand = 'Emporio Armani';
+              break;
+            } else if (normalizedSegment.includes('exchange') || normalizedSegment === 'ax') {
+              inferredBrand = 'Armani Exchange';
+              break;
+            } else if (normalizedSegment.includes('casa')) {
+              inferredBrand = 'Armani/Casa';
+              break;
+            } else if (normalizedSegment.includes('fiori')) {
+              inferredBrand = 'Armani/Fiori';
+              break;
+            } else if (normalizedSegment.includes('beauty')) {
+              inferredBrand = 'Armani Beauty';
+              break;
+            } else if (normalizedSegment === 'ea7') {
+              inferredBrand = 'EA7 Emporio Armani';
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // Invalid URL, ignore
+      }
+    }
+
+    // Check if brand/sub-brand in product name (e.g., "Single-breasted jacket | Giorgio Armani")
+    const nameParts = product.name.split('|').map(s => s.trim());
+    if (nameParts.length > 1) {
+      const possibleBrand = nameParts[nameParts.length - 1];
+      // Prefer sub-brand from title if it's more specific
+      if (possibleBrand && possibleBrand.length < 50 && possibleBrand.length > 2) {
+        // Only override if we don't have a sub-brand yet, or title has more specific info
+        if (!inferredBrand ||
+            (possibleBrand.toLowerCase().includes('armani') && inferredBrand === 'Armani') ||
+            possibleBrand.split(' ').length > inferredBrand.split(' ').length) {
+          inferredBrand = possibleBrand;
+        }
+      }
+    }
+
+    // Clean up generic/invalid brand names
+    if (inferredBrand && (
+      inferredBrand.toLowerCase().includes('production') ||
+      inferredBrand.toLowerCase().includes('website') ||
+      inferredBrand.toLowerCase().includes('shop') ||
+      inferredBrand.toLowerCase() === 'armani' || // Too generic, need sub-brand
+      inferredBrand.length < 2
+    )) {
+      // For armani.com without sub-brand, default to Giorgio Armani (main line)
+      if (sourceUrl.includes('armani.com') && inferredBrand.toLowerCase() === 'armani') {
+        inferredBrand = 'Giorgio Armani';
+      } else if (inferredBrand.toLowerCase().includes('production')) {
+        inferredBrand = '';
+      }
+    }
+
+    // Extract colors from image using pixel-level analysis (not AI)
+    // This gives us accurate hex codes that we can map to fashion names
+    let extractedColors: { hexCodes: string[]; colorNames: string[]; warmth: 'warm' | 'cool' | 'neutral' } | null = null;
+    if (product.image_url) {
+      log.info({ imageUrl: product.image_url }, 'Extracting colors from image using pixel analysis...');
+      try {
+        extractedColors = await extractAndNameColors(
+          product.image_url,
+          supabaseUrl,
+          supabaseKey,
+          5 // Extract top 5 dominant colors
+        );
+        if (extractedColors) {
+          log.info({
+            colorNames: extractedColors.colorNames,
+            hexCodes: extractedColors.hexCodes,
+            warmth: extractedColors.warmth
+          }, 'Colors extracted from image');
+        }
+      } catch (colorError) {
+        log.warn({ error: colorError }, 'Color extraction failed, will use AI fallback');
+      }
+    }
+
     // Demo mode - return realistic mock data without API calls
     if (DEMO_MODE) {
-      log.info({ productName: product.name, demoMode: true }, 'Using demo enrichment data');
+      log.info({ productName: product.name, brand: inferredBrand, demoMode: true }, 'Using demo enrichment data');
       const demoEnrichment = getDemoEnrichment(product.name);
 
       const enrichedProduct: EnrichedProduct = {
         ...product,
+        brand: inferredBrand || product.brand,
         tags: demoEnrichment.tags,
-        color_palette: demoEnrichment.color_palette,
+        // Use extracted colors if available, otherwise use demo colors
+        color_palette: extractedColors?.colorNames || demoEnrichment.color_palette,
         material: demoEnrichment.material,
         texture: demoEnrichment.texture,
-        tone: demoEnrichment.tone,
+        tone: extractedColors?.warmth || demoEnrichment.tone,
         category: demoEnrichment.category,
         enriched_at: new Date().toISOString()
       };
+
+      // Save to database
+      await saveEnrichedProduct(enrichedProduct);
 
       return res.status(200).json({
         success: true,
         product: enrichedProduct,
         model_used: 'demo-mode',
+        color_extraction: extractedColors ? 'pixel-accurate' : 'demo-fallback',
         _demo: true,
         _note: 'Demo mode active. Set DEMO_MODE=false and add API credits for real AI enrichment.'
       });
     }
 
-    const prompt = `You are a product enrichment AI. Analyze this product and return structured metadata.
+    // Fetch recent tag corrections for few-shot learning
+    const recentCorrections = await getRecentTagCorrections(inferredBrand, undefined, 5);
+    const fewShotExamples = buildFewShotExamples(recentCorrections);
 
-Product:
+    // Check if we have an image to analyze
+    const hasImage = !!product.image_url;
+
+    // Build color context for AI prompt (if we have extracted colors)
+    const colorContext = extractedColors
+      ? `\nACCURATE COLORS (from pixel analysis): ${extractedColors.colorNames.join(', ')} (${extractedColors.warmth} palette)`
+      : '';
+
+    const prompt = `You are a luxury lifestyle and product analyst specializing in fashion, home decor, fragrance, and floral design. Analyze this product and return comprehensive metadata for mood/vibe curation.
+${hasImage ? '\nIMPORTANT: A product image is provided. Use visual analysis to identify textures, materials, and style details.' : ''}${colorContext}
+Product Information:
 - Name: ${product.name}
 - Description: ${product.description || 'N/A'}
-- Brand: ${product.brand || 'N/A'}
+- Detected Brand/Sub-brand: ${inferredBrand || product.brand || 'Unknown'}
 - Price: ${product.price ? `${product.currency || ''} ${product.price}` : 'N/A'}
+- Source URL: ${sourceUrl || 'N/A'}
+${hasImage ? '- Image: [Provided - analyze for texture, material, style details]' : '- Image: Not available'}
 
+IMPORTANT BRAND RULES:
+1. For multi-brand houses, use the SPECIFIC sub-brand (e.g., "Giorgio Armani" not just "Armani", "Emporio Armani" for younger line, "Armani/Fiori" for florals, "Armani/Casa" for home)
+2. Extract the sub-brand from the URL path or product title
+3. Each sub-brand has distinct positioning - capture that in the tone
+${fewShotExamples}
 Return a JSON object with these fields:
 {
-  "tags": ["3-5 descriptive style keywords like 'bohemian', 'minimalist', 'handmade'"],
-  "color_palette": ["2-5 colors found in/associated with the product, e.g. 'cream', 'terracotta', 'forest green'"],
-  "material": "primary material if detectable (e.g., 'cotton', 'ceramic', 'wood')",
-  "texture": "texture description (e.g., 'woven', 'smooth', 'textured')",
-  "tone": "aesthetic mood (e.g., 'warm', 'cool', 'earthy', 'modern')",
-  "category": "product category (e.g., 'home decor', 'furniture', 'textiles', 'lighting')"
+  "brand": "The specific brand/sub-brand name (e.g., 'Giorgio Armani', 'Emporio Armani', 'Armani/Fiori', 'Armani/Casa')",
+  "tags": ["10-15 descriptive tags covering multiple dimensions:
+    - Style: minimalist, bohemian, classic, modern, contemporary, avant-garde
+    - Occasion: formal, casual, evening, day-to-night, special-occasion, everyday
+    - Season: summer, winter, all-season, transitional, resort
+    - Aesthetic: elegant, edgy, sophisticated, romantic, dramatic, refined
+    - Mood/Vibe: serene, energetic, cozy, luxurious, understated, bold
+    - Lifestyle: urban, resort-living, countryside, metropolitan
+    - Sensory: aromatic, tactile, visual-impact
+    For fashion: tailored, structured, flowing, oversized, fitted
+    For decor: statement-piece, accent, functional, decorative
+    For florals: fresh, dried, sculptural, romantic, wild, curated
+    For fragrance: woody, floral, citrus, oriental, fresh, warm"],
+  "material": "primary material (identify from image if possible - for fabric: 'cupro blend', 'silk charmeuse'; for decor: 'ceramic', 'brass'; for florals: 'fresh orchids', 'dried pampas')",
+  "texture": "tactile quality FROM THE IMAGE (e.g., 'smooth', 'textured', 'matte', 'lustrous', 'soft', 'crisp')",
+  "tone": "overall mood/atmosphere (e.g., 'luxurious refinement', 'understated elegance', 'modern sophistication', 'relaxed luxury')",
+  "category": "specific category from:
+    Fashion: blazers-jackets, dresses, tops, bottoms, outerwear, accessories, footwear, bags
+    Home: furniture, lighting, textiles, tableware, decorative-objects, art
+    Lifestyle: floral-arrangements, fragrance, candles, wellness, stationery
+    Beauty: skincare, makeup, haircare",
+  "vibe_layer": "how this fits into a lifestyle mood board (e.g., 'evening-sophistication', 'weekend-retreat', 'power-dressing', 'cozy-evening', 'garden-party')",
+  "pairs_with": ["2-3 complementary categories this would pair with in a mood board, e.g., 'neutral-knits', 'statement-jewelry', 'fresh-florals', 'ambient-candles']
 }
 
+NOTE: Colors are extracted separately using pixel-level analysis for accuracy. Focus on tags, material, texture, and semantic understanding.
+
+Be specific and evocative. For luxury items, capture the brand's DNA and positioning. Think about how this product contributes to an overall lifestyle aesthetic and mood.
 Return ONLY valid JSON, no explanation.`;
 
-    log.info({ productName: product.name }, 'Calling Claude for enrichment...');
-    const aiResponse = await callClaude(prompt, { maxTokens: 500 });
+    log.info({ productName: product.name, inferredBrand, hasImage, fewShotCount: recentCorrections.length }, 'Calling Claude for enrichment...');
+
+    // Use vision API if image is available, otherwise use text-only
+    const aiResponse = hasImage
+      ? await callClaudeWithVision(prompt, product.image_url, { maxTokens: 1000 })
+      : await callClaude(prompt, { maxTokens: 800 });
 
     let enrichment;
     if (aiResponse.success && aiResponse.text) {
@@ -630,8 +866,8 @@ Return ONLY valid JSON, no explanation.`;
     if (!enrichment) {
       log.warn({ productName: product.name }, 'Failed to parse AI response, using defaults');
       enrichment = {
-        tags: ['product'],
-        color_palette: ['neutral'],
+        brand: inferredBrand || product.brand || 'Unknown',
+        tags: ['product', 'fashion'],
         material: null,
         texture: null,
         tone: 'neutral',
@@ -639,25 +875,43 @@ Return ONLY valid JSON, no explanation.`;
       };
     }
 
+    // IMPORTANT: Use pixel-extracted colors (accurate hex codes mapped to fashion names)
+    // Fall back to AI-suggested colors only if pixel extraction failed
+    const finalColorPalette = extractedColors?.colorNames || enrichment.color_palette || ['neutral'];
+
     const enrichedProduct: EnrichedProduct = {
       ...product,
+      brand: enrichment.brand || inferredBrand || product.brand,
       tags: enrichment.tags || [],
-      color_palette: enrichment.color_palette || [],
+      // Pixel-accurate colors take priority over AI-suggested colors
+      color_palette: finalColorPalette,
       material: enrichment.material,
       texture: enrichment.texture,
-      tone: enrichment.tone,
+      // Use extracted warmth for tone if available, otherwise use AI tone
+      tone: extractedColors?.warmth || enrichment.tone,
       category: enrichment.category,
+      vibe_layer: enrichment.vibe_layer,
+      pairs_with: enrichment.pairs_with || [],
       enriched_at: new Date().toISOString()
     };
 
+    // Save to database
+    const savedProduct = await saveEnrichedProduct(enrichedProduct);
+
     return res.status(200).json({
       success: true,
-      product: enrichedProduct,
+      product: { ...enrichedProduct, id: savedProduct?.id },
       model_used: 'claude-via-edge-function',
+      color_extraction: extractedColors ? 'pixel-accurate' : 'ai-fallback',
+      color_hex_codes: extractedColors?.hexCodes || [],
+      saved_to_db: !!savedProduct,
       _debug: {
         aiSuccess: aiResponse.success,
         aiError: aiResponse.error,
-        usedDefaults: !aiResponse.success || !aiResponse.text
+        usedDefaults: !aiResponse.success || !aiResponse.text,
+        inferredBrand,
+        colorMethod: extractedColors ? 'pixel-sampling' : 'ai-vision',
+        extractedWarmth: extractedColors?.warmth
       }
     });
   } catch (error) {
@@ -667,6 +921,230 @@ Return ONLY valid JSON, no explanation.`;
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+}
+
+// Save enriched product to Supabase
+async function saveEnrichedProduct(product: EnrichedProduct): Promise<{ id: string } | null> {
+  if (!supabaseUrl || !supabaseKey) {
+    log.warn('Supabase not configured, skipping database save');
+    return null;
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Map to database schema
+    const dbProduct = {
+      product_name: product.name,
+      brand: product.brand || 'Unknown',
+      category: product.category || 'general',
+      price: product.price || null,
+      color_palette: product.color_palette || [],
+      tags: product.tags || [],
+      texture: product.texture || null,
+      material: product.material || null,
+      tone: product.tone || null,
+      vibe_layer: product.vibe_layer || null,
+      pairs_with: product.pairs_with || [],
+      image_url: product.image_url || null,
+      source_url: product.source_url || null,
+      enriched_at: product.enriched_at || new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('enriched_products')
+      .insert(dbProduct)
+      .select('id')
+      .single();
+
+    if (error) {
+      log.error({ error, product: product.name }, 'Failed to save to database');
+      return null;
+    }
+
+    log.info({ id: data.id, product: product.name }, 'Product saved to enriched_products');
+    return data;
+  } catch (err) {
+    log.error({ error: err }, 'Database save error');
+    return null;
+  }
+}
+
+// ============================================================================
+// TAG FEEDBACK FUNCTIONS (AI Learning)
+// ============================================================================
+
+interface TagFeedback {
+  product_id?: string;
+  brand?: string;
+  category?: string;
+  price_range?: string;
+  ai_generated_tags: string[];
+  user_final_tags: string[];
+  source_url?: string;
+  session_id?: string;
+}
+
+/**
+ * Save tag feedback for AI learning
+ * Called when user finishes editing tags
+ */
+async function saveTagFeedback(feedback: TagFeedback): Promise<boolean> {
+  if (!supabaseUrl || !supabaseKey) {
+    log.warn('Supabase not configured, skipping tag feedback save');
+    return false;
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Calculate what was added and removed
+    const aiTags = new Set(feedback.ai_generated_tags);
+    const userTags = new Set(feedback.user_final_tags);
+
+    const tags_added = feedback.user_final_tags.filter(t => !aiTags.has(t));
+    const tags_removed = feedback.ai_generated_tags.filter(t => !userTags.has(t));
+
+    // Only save if there were actual changes
+    if (tags_added.length === 0 && tags_removed.length === 0) {
+      log.info('No tag changes, skipping feedback save');
+      return true;
+    }
+
+    const { error } = await supabase
+      .from('tag_feedback')
+      .insert({
+        product_id: feedback.product_id || null,
+        brand: feedback.brand || null,
+        category: feedback.category || null,
+        price_range: feedback.price_range || null,
+        ai_generated_tags: feedback.ai_generated_tags,
+        user_final_tags: feedback.user_final_tags,
+        tags_added,
+        tags_removed,
+        source_url: feedback.source_url || null,
+        session_id: feedback.session_id || null,
+      });
+
+    if (error) {
+      log.error({ error }, 'Failed to save tag feedback');
+      return false;
+    }
+
+    log.info({ tags_added, tags_removed }, 'Tag feedback saved for AI learning');
+    return true;
+  } catch (err) {
+    log.error({ error: err }, 'Tag feedback save error');
+    return false;
+  }
+}
+
+/**
+ * Get recent tag corrections for few-shot learning
+ * Returns examples of user corrections to include in AI prompt
+ */
+async function getRecentTagCorrections(
+  brand?: string,
+  category?: string,
+  limit: number = 5
+): Promise<Array<{ brand: string; category: string; removed: string[]; added: string[] }>> {
+  if (!supabaseUrl || !supabaseKey) {
+    return [];
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    let query = supabase
+      .from('tag_feedback')
+      .select('brand, category, tags_removed, tags_added')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    // Filter by brand if provided (partial match)
+    if (brand) {
+      query = query.ilike('brand', `%${brand}%`);
+    }
+
+    // Filter by category if provided
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data) {
+      return [];
+    }
+
+    // Only return entries that have actual corrections
+    return data
+      .filter((d: any) =>
+        (d.tags_removed && d.tags_removed.length > 0) ||
+        (d.tags_added && d.tags_added.length > 0)
+      )
+      .map((d: any) => ({
+        brand: d.brand || 'Unknown',
+        category: d.category || 'general',
+        removed: d.tags_removed || [],
+        added: d.tags_added || [],
+      }));
+  } catch (err) {
+    log.error({ error: err }, 'Failed to fetch tag corrections');
+    return [];
+  }
+}
+
+/**
+ * Build few-shot examples string for AI prompt
+ */
+function buildFewShotExamples(
+  corrections: Array<{ brand: string; category: string; removed: string[]; added: string[] }>
+): string {
+  if (corrections.length === 0) {
+    return '';
+  }
+
+  const examples = corrections.map(c => {
+    const parts: string[] = [];
+    if (c.removed.length > 0) {
+      parts.push(`removed: [${c.removed.join(', ')}]`);
+    }
+    if (c.added.length > 0) {
+      parts.push(`added: [${c.added.join(', ')}]`);
+    }
+    return `- ${c.brand} (${c.category}): ${parts.join(', ')}`;
+  });
+
+  return `
+LEARNING FROM USER FEEDBACK:
+Recent corrections users made to AI-generated tags:
+${examples.join('\n')}
+
+Use these patterns to improve your tag suggestions. Avoid tags that users frequently remove, and consider including tags that users often add.
+`;
+}
+
+/**
+ * Handle tag feedback submission
+ */
+async function handleTagFeedback(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { feedback } = req.body as { feedback: TagFeedback };
+
+  if (!feedback || !feedback.ai_generated_tags || !feedback.user_final_tags) {
+    return res.status(400).json({ error: 'feedback with ai_generated_tags and user_final_tags is required' });
+  }
+
+  const success = await saveTagFeedback(feedback);
+
+  return res.status(200).json({
+    success,
+    message: success ? 'Feedback saved for AI learning' : 'Failed to save feedback',
+  });
 }
 
 async function handleCompose(body: ComposeRequest, res: VercelResponse) {
@@ -898,11 +1376,13 @@ async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
   const {
     image_positions,
     label_style,
-    canvas_size
+    canvas_size,
+    layout_type
   } = req.body as {
     image_positions: ImagePosition[];
     label_style: LabelStyle;
     canvas_size: { width: number; height: number };
+    layout_type?: string;
   };
 
   if (!image_positions || !Array.isArray(image_positions)) {
@@ -913,8 +1393,29 @@ async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
   const defaultCanvasSize = canvas_size || { width: 1200, height: 800 };
 
   try {
-    const prompt = buildVisionPrompt(image_positions, defaultLabelStyle, defaultCanvasSize);
-    const aiResponse = await callClaude(prompt, { maxTokens: 1024 });
+    // Fetch past corrections and successful examples for few-shot learning
+    const productCount = image_positions.length;
+    const [recentCorrections, successfulExamples] = await Promise.all([
+      getRecentLayoutCorrections(layout_type, productCount, 3),
+      getSuccessfulLayoutExamples(layout_type, productCount, 2)
+    ]);
+
+    const fewShotExamples = buildLayoutFewShotExamples(recentCorrections, successfulExamples);
+
+    // Build enhanced prompt with few-shot learning
+    const basePrompt = buildVisionPrompt(image_positions, defaultLabelStyle, defaultCanvasSize);
+    const enhancedPrompt = fewShotExamples
+      ? `${fewShotExamples}\n\n${basePrompt}`
+      : basePrompt;
+
+    log.info({
+      productCount,
+      layout_type,
+      correctionsCount: recentCorrections.length,
+      successfulCount: successfulExamples.length
+    }, 'Calling AI for smart label placement with few-shot learning...');
+
+    const aiResponse = await callClaude(enhancedPrompt, { maxTokens: 1024 });
 
     let placements: LabelPlacement[] = [];
 
@@ -940,7 +1441,11 @@ async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
       success: true,
       label_placements: placements,
       method: 'ai',
-      model_used: 'claude-via-edge-function'
+      model_used: 'claude-via-edge-function',
+      learning_context: {
+        corrections_used: recentCorrections.length,
+        successful_examples_used: successfulExamples.length
+      }
     });
   } catch (error) {
     log.error({ error }, 'Smart label generation failed');
@@ -954,6 +1459,278 @@ async function handleSmartLabels(req: VercelRequest, res: VercelResponse) {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+}
+
+// ============================================================================
+// LAYOUT FEEDBACK FUNCTIONS (AI Learning)
+// ============================================================================
+
+interface LayoutFeedback {
+  moodboard_id?: string;
+  look_id?: string;
+  layout_type: string;
+  product_count: number;
+  canvas_width: number;
+  canvas_height: number;
+  product_categories?: string[];
+  product_brands?: string[];
+  color_palettes?: string[];
+  vibe_layer?: string;
+  ai_generated_layout: any;
+  user_final_layout: any;
+  adjustments?: any[];
+  user_rating?: number;
+  was_exported?: boolean;
+  time_spent_adjusting?: number;
+  session_id?: string;
+}
+
+/**
+ * Save layout feedback for AI learning
+ * Called when user finishes adjusting a layout
+ */
+async function saveLayoutFeedback(feedback: LayoutFeedback): Promise<boolean> {
+  if (!supabaseUrl || !supabaseKey) {
+    log.warn('Supabase not configured, skipping layout feedback save');
+    return false;
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Calculate adjustment metrics
+    let elements_moved = 0;
+    let elements_resized = 0;
+    let elements_rotated = 0;
+    let labels_repositioned = 0;
+    let z_order_changed = false;
+
+    if (feedback.adjustments && Array.isArray(feedback.adjustments)) {
+      for (const adj of feedback.adjustments) {
+        switch (adj.type) {
+          case 'move': elements_moved++; break;
+          case 'resize': elements_resized++; break;
+          case 'rotate': elements_rotated++; break;
+          case 'label_move': labels_repositioned++; break;
+          case 'z_order': z_order_changed = true; break;
+        }
+      }
+    }
+
+    const { error } = await supabase
+      .from('layout_feedback')
+      .insert({
+        moodboard_id: feedback.moodboard_id || null,
+        look_id: feedback.look_id || null,
+        layout_type: feedback.layout_type,
+        product_count: feedback.product_count,
+        canvas_width: feedback.canvas_width,
+        canvas_height: feedback.canvas_height,
+        product_categories: feedback.product_categories || [],
+        product_brands: feedback.product_brands || [],
+        color_palettes: feedback.color_palettes || [],
+        vibe_layer: feedback.vibe_layer || null,
+        ai_generated_layout: feedback.ai_generated_layout,
+        user_final_layout: feedback.user_final_layout,
+        elements_moved,
+        elements_resized,
+        elements_rotated,
+        z_order_changed,
+        labels_repositioned,
+        adjustments: feedback.adjustments || [],
+        user_rating: feedback.user_rating || null,
+        was_exported: feedback.was_exported || false,
+        time_spent_adjusting: feedback.time_spent_adjusting || null,
+        session_id: feedback.session_id || null,
+      });
+
+    if (error) {
+      log.error({ error }, 'Failed to save layout feedback');
+      return false;
+    }
+
+    log.info({
+      layout_type: feedback.layout_type,
+      elements_moved,
+      elements_resized,
+      labels_repositioned,
+      was_exported: feedback.was_exported
+    }, 'Layout feedback saved for AI learning');
+    return true;
+  } catch (err) {
+    log.error({ error: err }, 'Layout feedback save error');
+    return false;
+  }
+}
+
+/**
+ * Get recent layout corrections for few-shot learning
+ */
+async function getRecentLayoutCorrections(
+  layoutType?: string,
+  productCount?: number,
+  limit: number = 3
+): Promise<Array<{ layout_type: string; adjustments: any; was_exported: boolean }>> {
+  if (!supabaseUrl || !supabaseKey) {
+    return [];
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    let query = supabase
+      .from('layout_feedback')
+      .select('layout_type, product_count, adjustments, was_exported, ai_generated_layout, user_final_layout')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (layoutType) {
+      query = query.eq('layout_type', layoutType);
+    }
+
+    if (productCount) {
+      query = query.gte('product_count', productCount - 1).lte('product_count', productCount + 1);
+    }
+
+    // Only get layouts that had adjustments
+    query = query.or('elements_moved.gt.0,elements_resized.gt.0,labels_repositioned.gt.0');
+
+    const { data, error } = await query;
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data.map((d: any) => ({
+      layout_type: d.layout_type,
+      adjustments: d.adjustments,
+      was_exported: d.was_exported,
+    }));
+  } catch (err) {
+    log.error({ error: err }, 'Failed to fetch layout corrections');
+    return [];
+  }
+}
+
+/**
+ * Get successful layout examples for context
+ */
+async function getSuccessfulLayoutExamples(
+  layoutType?: string,
+  productCount?: number,
+  limit: number = 2
+): Promise<Array<{ layout_type: string; product_count: number; final_layout: any }>> {
+  if (!supabaseUrl || !supabaseKey) {
+    return [];
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    let query = supabase
+      .from('layout_feedback')
+      .select('layout_type, product_count, user_final_layout, user_rating')
+      .eq('was_exported', true)
+      .lte('elements_moved', 2)  // Minimal corrections = good initial layout
+      .order('user_rating', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (layoutType) {
+      query = query.eq('layout_type', layoutType);
+    }
+
+    if (productCount) {
+      query = query.gte('product_count', productCount - 1).lte('product_count', productCount + 1);
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data.map((d: any) => ({
+      layout_type: d.layout_type,
+      product_count: d.product_count,
+      final_layout: d.user_final_layout,
+    }));
+  } catch (err) {
+    log.error({ error: err }, 'Failed to fetch successful layouts');
+    return [];
+  }
+}
+
+/**
+ * Build few-shot examples for layout/label AI prompt
+ */
+function buildLayoutFewShotExamples(
+  corrections: Array<{ layout_type: string; adjustments: any; was_exported: boolean }>,
+  successfulExamples: Array<{ layout_type: string; product_count: number; final_layout: any }>
+): string {
+  if (corrections.length === 0 && successfulExamples.length === 0) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  // Add correction patterns
+  if (corrections.length > 0) {
+    parts.push('LEARNING FROM PAST ADJUSTMENTS:');
+    parts.push('Users typically make these corrections to AI-generated layouts:');
+    for (const c of corrections) {
+      if (c.adjustments && Array.isArray(c.adjustments)) {
+        const moveCount = c.adjustments.filter((a: any) => a.type === 'move').length;
+        const labelMoves = c.adjustments.filter((a: any) => a.type === 'label_move').length;
+        if (moveCount > 0 || labelMoves > 0) {
+          parts.push(`- ${c.layout_type}: ${moveCount} elements repositioned, ${labelMoves} labels moved`);
+        }
+      }
+    }
+    parts.push('');
+  }
+
+  // Add successful examples
+  if (successfulExamples.length > 0) {
+    parts.push('EXAMPLES OF SUCCESSFUL LAYOUTS (minimal user corrections needed):');
+    for (const ex of successfulExamples) {
+      if (ex.final_layout && ex.final_layout.products) {
+        const products = ex.final_layout.products;
+        parts.push(`- ${ex.layout_type} with ${ex.product_count} products:`);
+        // Summarize positioning patterns
+        const avgX = products.reduce((sum: number, p: any) => sum + p.x, 0) / products.length;
+        const avgY = products.reduce((sum: number, p: any) => sum + p.y, 0) / products.length;
+        parts.push(`  Average position: (${Math.round(avgX)}, ${Math.round(avgY)})`);
+      }
+    }
+    parts.push('');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Handle layout feedback submission
+ */
+async function handleLayoutFeedback(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { feedback } = req.body as { feedback: LayoutFeedback };
+
+  if (!feedback || !feedback.layout_type || !feedback.ai_generated_layout || !feedback.user_final_layout) {
+    return res.status(400).json({
+      error: 'feedback with layout_type, ai_generated_layout, and user_final_layout is required'
+    });
+  }
+
+  const success = await saveLayoutFeedback(feedback);
+
+  return res.status(200).json({
+    success,
+    message: success ? 'Layout feedback saved for AI learning' : 'Failed to save feedback',
+  });
 }
 
 // ============================================================================
@@ -993,10 +1770,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'labels':
         return handleSmartLabels(req, res);
 
+      case 'feedback':
+        return handleTagFeedback(req, res);
+
+      case 'layout-feedback':
+        return handleLayoutFeedback(req, res);
+
       default:
         return res.status(400).json({
           error: 'Invalid action',
-          hint: 'Use ?action=enrich|compose|tryon|layouts|layout|labels',
+          hint: 'Use ?action=enrich|compose|tryon|layouts|layout|labels|feedback|layout-feedback',
           examples: {
             enrich: 'POST /api/ai?action=enrich',
             compose: 'POST /api/ai?action=compose',
@@ -1004,6 +1787,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             layouts: 'GET /api/ai?action=layouts',
             layout: 'POST /api/ai?action=layout',
             labels: 'POST /api/ai?action=labels',
+            feedback: 'POST /api/ai?action=feedback (tag feedback)',
+            'layout-feedback': 'POST /api/ai?action=layout-feedback (layout adjustments)',
           },
         });
     }

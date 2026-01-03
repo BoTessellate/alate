@@ -109,7 +109,7 @@ export default function CollectionsPage() {
         }
       />
 
-      <div className="px-8 pb-8 max-w-7xl mx-auto">
+      <div className="px-8 pb-24 max-w-7xl mx-auto">
         {/* Empty State */}
         {collections.length === 0 && (
           <EmptyState

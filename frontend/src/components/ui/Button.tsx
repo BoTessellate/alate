@@ -88,7 +88,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: isHovered && !isDisabled ? 'var(--primary-light)' : 'var(--primary)',
+          backgroundColor: isHovered && !isDisabled ? 'var(--primary)' : 'var(--primary-dark)',
           color: 'white',
           borderColor: 'transparent',
         };
@@ -211,7 +211,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   const getStyles = () => {
     if (variant === 'primary') {
       return {
-        backgroundColor: isHovered ? 'var(--primary-light)' : 'var(--primary)',
+        backgroundColor: isHovered ? 'var(--primary)' : 'var(--primary-dark)',
         color: 'white',
       };
     }

@@ -76,7 +76,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary)';
+    if (isFocused) return 'var(--primary-dark)';
     return 'var(--border)';
   };
 
@@ -182,7 +182,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary)';
+    if (isFocused) return 'var(--primary-dark)';
     return 'var(--border)';
   };
 
@@ -345,7 +345,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary)';
+    if (isFocused) return 'var(--primary-dark)';
     return 'var(--border)';
   };
 

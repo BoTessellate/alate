@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, Loader2, X, ShoppingBag } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Loader2, ShoppingBag } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import VirtualizedProductGrid from '@/components/VirtualizedProductGrid';
 import { useProducts } from '@/hooks/useProductSearch';
@@ -10,43 +9,14 @@ import {
   Button,
   Card,
   EmptyState,
-  IconButton,
-  Divider,
 } from '@/components/ui';
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const urlQuery = searchParams.get('q') || '';
-
-  const [searchQuery, setSearchQuery] = useState(urlQuery);
-  const [showFloatingSearch, setShowFloatingSearch] = useState(false);
-  const floatingInputRef = useRef<HTMLInputElement>(null);
 
   // Use SWR-based products hook with automatic caching
   const { products, isLoading: loading, error, mutate } = useProducts(urlQuery, 100);
-
-  // Sync search input with URL query
-  useEffect(() => {
-    setSearchQuery(urlQuery);
-  }, [urlQuery]);
-
-  // Focus input when floating search opens
-  useEffect(() => {
-    if (showFloatingSearch && floatingInputRef.current) {
-      floatingInputRef.current.focus();
-    }
-  }, [showFloatingSearch]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/discover?q=${encodeURIComponent(searchQuery)}`);
-    } else {
-      router.push('/discover');
-    }
-    setShowFloatingSearch(false);
-  };
 
   return (
     <div style={{ backgroundColor: 'var(--background)' }}>
@@ -88,7 +58,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* Content */}
-      <div className="px-8 pb-8 max-w-7xl mx-auto">
+      <div className="px-8 pb-24 max-w-7xl mx-auto">
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-20">
@@ -136,6 +106,11 @@ export default function DiscoverPage() {
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
                 {products.length} products found
+                {urlQuery && (
+                  <span style={{ color: 'var(--foreground-muted)' }}>
+                    {' '}for "{urlQuery}"
+                  </span>
+                )}
               </p>
             </div>
 
@@ -151,68 +126,6 @@ export default function DiscoverPage() {
           </>
         )}
       </div>
-
-      {/* Floating Search FAB */}
-      <IconButton
-        icon={Search}
-        aria-label="Search products"
-        onClick={() => setShowFloatingSearch(true)}
-        className="fixed z-50 w-14 h-14 shadow-lg transition-all duration-200 cursor-pointer hover:scale-105"
-        style={{
-          bottom: '96px',
-          right: '24px',
-          backgroundColor: 'var(--primary)',
-          color: 'white',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1)',
-          opacity: showFloatingSearch ? 0 : 1,
-          pointerEvents: showFloatingSearch ? 'none' : 'auto',
-        }}
-        title="Search Products"
-      />
-
-      {/* Expanded Floating Search Modal */}
-      {showFloatingSearch && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowFloatingSearch(false)}
-          />
-
-          {/* Search Panel */}
-          <Card
-            className="fixed z-50 left-4 right-4 md:left-auto md:right-6 md:w-[500px] rounded-2xl shadow-2xl"
-            style={{ bottom: '100px' }}
-            hoverHighlight={false}
-          >
-            <form onSubmit={handleSearch} className="p-4">
-              <div className="flex items-center gap-3">
-                <Search size={20} style={{ color: 'var(--foreground-muted)' }} />
-                <input
-                  ref={floatingInputRef}
-                  type="text"
-                  placeholder="Search for products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 bg-transparent outline-none focus:outline-none focus-visible:outline-none text-base"
-                  style={{ color: 'var(--foreground)' }}
-                />
-                <IconButton
-                  icon={X}
-                  aria-label="Close search"
-                  onClick={() => setShowFloatingSearch(false)}
-                />
-              </div>
-              <Divider spacing="sm" />
-              <div className="flex justify-end">
-                <Button type="submit" variant="primary">
-                  Search
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </>
-      )}
     </div>
   );
 }

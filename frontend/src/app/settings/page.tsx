@@ -17,6 +17,7 @@ import {
   Download,
   LogOut,
   Edit2,
+  DollarSign,
 } from 'lucide-react';
 import { useSettingsStore, Theme } from '@/stores/useSettingsStore';
 import {
@@ -185,8 +186,8 @@ function SelectionButton({
       variant="outline"
       className={`h-auto p-4 text-left transition-all border-2 outline-none focus:outline-none focus-visible:outline-none ${className}`}
       style={{
-        backgroundColor: isSelected ? 'rgba(76, 112, 49, 0.1)' : 'var(--surface-light)',
-        borderColor: isSelected ? 'var(--primary)' : 'transparent',
+        backgroundColor: isSelected ? 'var(--primary-alpha)' : 'var(--surface-light)',
+        borderColor: isSelected ? 'var(--primary-dark)' : 'transparent',
         color: 'var(--foreground)',
       }}
     >
@@ -201,11 +202,14 @@ export default function SettingsPage() {
     emailNotifications,
     pushNotifications,
     userName,
+    priceRange,
+    localCurrency,
     setTheme,
     setEmailNotifications,
     setPushNotifications,
     setUserName,
     setIsLoggedIn,
+    setPriceRange,
   } = useSettingsStore();
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -253,6 +257,14 @@ export default function SettingsPage() {
 
   const updateTheme = async (newTheme: Theme) => {
     setTheme(newTheme);
+    await showSaveStatus();
+  };
+
+  const updatePriceRange = async (field: 'min' | 'max', value: number) => {
+    setPriceRange({
+      ...priceRange,
+      [field]: value,
+    });
     await showSaveStatus();
   };
 
@@ -576,6 +588,62 @@ export default function SettingsPage() {
                   </SelectionButton>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Price Range Section */}
+        <Card>
+          <SectionHeader icon={DollarSign} title="Price Range" description="Set your budget range for price indicators ($, $$, $$$)" />
+          <CardContent className="p-4 space-y-4">
+            <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+              Products will show $ (budget), $$ (mid-range), or $$$ (premium) based on how their price compares to your range in {localCurrency}.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                  Minimum ({localCurrency})
+                </label>
+                <Input
+                  type="number"
+                  value={priceRange.min}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    updatePriceRange('min', value);
+                  }}
+                  placeholder="0"
+                  data-testid="price-range-min"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block" style={{ color: 'var(--foreground)' }}>
+                  Maximum ({localCurrency})
+                </label>
+                <Input
+                  type="number"
+                  value={priceRange.max}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 0;
+                    updatePriceRange('max', value);
+                  }}
+                  placeholder="100000"
+                  data-testid="price-range-max"
+                />
+              </div>
+            </div>
+
+            <div
+              className="p-3 rounded-lg text-sm"
+              style={{ backgroundColor: 'var(--surface-elevated)' }}
+            >
+              <p style={{ color: 'var(--foreground-secondary)' }}>
+                <strong style={{ color: 'var(--primary)' }}>$</strong> = up to {Math.round(priceRange.max / 3).toLocaleString()} {localCurrency}
+                <span className="mx-2">•</span>
+                <strong style={{ color: 'var(--primary)' }}>$$</strong> = up to {Math.round((priceRange.max * 2) / 3).toLocaleString()} {localCurrency}
+                <span className="mx-2">•</span>
+                <strong style={{ color: 'var(--primary)' }}>$$$</strong> = above {Math.round((priceRange.max * 2) / 3).toLocaleString()} {localCurrency}
+              </p>
             </div>
           </CardContent>
         </Card>

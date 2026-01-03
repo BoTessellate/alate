@@ -16,6 +16,7 @@ import {
   Brain,
   Search,
   Image,
+  ImagePlus,
   Palette,
   Server,
   Wifi,
@@ -31,7 +32,7 @@ import {
   TestTube,
   GitBranch,
 } from 'lucide-react';
-import { Button, IconButton, PageHeader } from '@/components/ui';
+import { Button, PageHeader } from '@/components/ui';
 
 // Test coverage data interface
 interface TestCoverageData {
@@ -242,7 +243,7 @@ interface AIProviderStatus {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'health' | 'shopify'>('health');
+  const [activeTab, setActiveTab] = useState<'health' | 'enrich' | 'shopify'>('health');
   const [integrationStatuses, setIntegrationStatuses] = useState<IntegrationStatus[]>([]);
   const [isTestingAll, setIsTestingAll] = useState(false);
 
@@ -265,6 +266,26 @@ export default function AdminPage() {
 
   // Test coverage state
   const [testCoverage, setTestCoverage] = useState<TestCoverageData | null>(null);
+
+  // Fetch images state
+  const [isFetchingImages, setIsFetchingImages] = useState(false);
+  const [fetchImagesResult, setFetchImagesResult] = useState<{
+    success: boolean;
+    total_missing: number;
+    updated: number;
+    failed: number;
+    duration_ms: number;
+    message?: string;
+    error?: string;
+  } | null>(null);
+
+  // Product stats state
+  const [productStats, setProductStats] = useState<{
+    total: number;
+    missing_images: number;
+    with_images: number;
+    loading: boolean;
+  }>({ total: 0, missing_images: 0, with_images: 0, loading: true });
 
   // Load cached test results on mount
   useEffect(() => {
@@ -329,6 +350,93 @@ export default function AdminPage() {
   useEffect(() => {
     checkAIProviderStatus();
   }, []);
+
+  // Fetch product stats
+  const fetchProductStats = async () => {
+    setProductStats(prev => ({ ...prev, loading: true }));
+    try {
+      const response = await fetch(`${API_URL}/api/fetch-images?stats=true`);
+      const data = await response.json();
+      if (data.stats) {
+        setProductStats({
+          total: data.stats.total,
+          missing_images: data.stats.missing_images,
+          with_images: data.stats.with_images,
+          loading: false,
+        });
+      }
+    } catch {
+      setProductStats(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Load product stats when enrich tab is active
+  useEffect(() => {
+    if (activeTab === 'enrich') {
+      fetchProductStats();
+    }
+  }, [activeTab]);
+
+  // Reset duplicate images (clears images that appear on multiple products)
+  const resetDuplicateImages = async () => {
+    setIsFetchingImages(true);
+    setFetchImagesResult(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/fetch-images?action=reset-duplicates`);
+      const data = await response.json();
+      setFetchImagesResult({
+        success: true,
+        total_missing: data.reset || 0,
+        updated: 0,
+        failed: 0,
+        duration_ms: 0,
+        message: data.message,
+      });
+    } catch (err) {
+      setFetchImagesResult({
+        success: false,
+        total_missing: 0,
+        updated: 0,
+        failed: 0,
+        duration_ms: 0,
+        error: err instanceof Error ? err.message : 'Failed to reset duplicates',
+      });
+    } finally {
+      setIsFetchingImages(false);
+      fetchProductStats();
+    }
+  };
+
+  // Fetch missing product images
+  const fetchMissingImages = async () => {
+    setIsFetchingImages(true);
+    setFetchImagesResult(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/fetch-images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 50 }),
+      });
+
+      const data = await response.json();
+      setFetchImagesResult(data);
+    } catch (err) {
+      setFetchImagesResult({
+        success: false,
+        total_missing: 0,
+        updated: 0,
+        failed: 0,
+        duration_ms: 0,
+        error: err instanceof Error ? err.message : 'Failed to fetch images',
+      });
+    } finally {
+      setIsFetchingImages(false);
+      // Refresh stats after fetching
+      fetchProductStats();
+    }
+  };
 
   // Test all integrations
   const testAllIntegrations = async () => {
@@ -623,7 +731,7 @@ export default function AdminPage() {
   );
 
   return (
-    <div>
+    <div className="pb-24">
       <PageHeader
         title="Admin Dashboard"
         subtitle="Monitor integrations, debug issues, and manage your development environment"
@@ -637,7 +745,7 @@ export default function AdminPage() {
         }
       />
 
-      <div className="px-8 pb-8 max-w-5xl mx-auto">
+      <div className="px-8 pb-24 max-w-5xl mx-auto">
         {/* Error Banner */}
         {error && (
           <div
@@ -656,6 +764,7 @@ export default function AdminPage() {
       >
         {[
           { id: 'health', label: 'Health', icon: Activity },
+          { id: 'enrich', label: 'Enrich', icon: Sparkles },
           { id: 'shopify', label: 'Shopify', icon: Store },
         ].map((tab) => {
           const isActive = activeTab === tab.id;
@@ -1182,6 +1291,285 @@ export default function AdminPage() {
                 >
                   {SUPABASE_URL ? 'Configured' : 'Not configured'}
                 </code>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Enrich Tab */}
+      {activeTab === 'enrich' && (
+        <div className="space-y-6">
+          {/* Product Stats */}
+          <section
+            className="rounded-lg border"
+            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}>
+                  <Database size={20} style={{ color: 'var(--primary)' }} />
+                </div>
+                <div>
+                  <h2
+                    className="text-lg italic"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
+                    Product Statistics
+                  </h2>
+                  <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                    Overview of your product catalog
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={RefreshCw}
+                onClick={fetchProductStats}
+                disabled={productStats.loading}
+                loading={productStats.loading}
+              >
+                Refresh
+              </Button>
+            </div>
+
+            <div className="p-4">
+              {productStats.loading ? (
+                <div className="flex items-center justify-center py-8 gap-2">
+                  <Loader2 size={20} className="animate-spin" style={{ color: 'var(--foreground-muted)' }} />
+                  <span style={{ color: 'var(--foreground-muted)' }}>Loading stats...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: 'var(--surface-light)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{ fontFamily: 'var(--font-cormorant)', color: 'var(--foreground)' }}
+                    >
+                      {productStats.total}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      Total Products
+                    </div>
+                  </div>
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: 'rgba(76, 112, 49, 0.1)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{ fontFamily: 'var(--font-cormorant)', color: 'var(--success)' }}
+                    >
+                      {productStats.with_images}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      With Images
+                    </div>
+                  </div>
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: productStats.missing_images > 0 ? 'rgba(245, 158, 11, 0.1)' : 'var(--surface-light)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{
+                        fontFamily: 'var(--font-cormorant)',
+                        color: productStats.missing_images > 0 ? 'var(--warning, #f59e0b)' : 'var(--foreground)',
+                      }}
+                    >
+                      {productStats.missing_images}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      Missing Images
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Fetch Missing Images Tool */}
+          <section
+            className="rounded-lg border"
+            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div
+              className="p-4 border-b flex items-center gap-3"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(196, 163, 90, 0.2)' }}>
+                <ImagePlus size={20} style={{ color: 'var(--highlight)' }} />
+              </div>
+              <div>
+                <h2
+                  className="text-lg italic"
+                  style={{
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 500,
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  Fetch Missing Images
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                  Automatically search and add images for products without them
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Reset Duplicates */}
+              <div
+                className="p-4 rounded-lg flex items-center justify-between"
+                style={{ backgroundColor: 'rgba(168, 64, 50, 0.05)' }}
+              >
+                <div>
+                  <p className="font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+                    Reset Duplicate Images
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                    Clears images that appear on multiple products (likely bad scrape results).
+                    Run this first if you see the same image on many products.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  icon={RefreshCw}
+                  onClick={resetDuplicateImages}
+                  disabled={isFetchingImages}
+                  loading={isFetchingImages}
+                >
+                  Reset Duplicates
+                </Button>
+              </div>
+
+              {/* Fetch Images */}
+              <div
+                className="p-4 rounded-lg flex items-center justify-between"
+                style={{ backgroundColor: 'var(--surface-light)' }}
+              >
+                <div>
+                  <p className="font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+                    Search for product images
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                    Finds images based on product name and brand, then updates the database.
+                    Processes up to 50 products per run.
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  icon={ImagePlus}
+                  onClick={fetchMissingImages}
+                  disabled={isFetchingImages || productStats.missing_images === 0}
+                  loading={isFetchingImages}
+                >
+                  {isFetchingImages ? 'Fetching...' : 'Fetch Images'}
+                </Button>
+              </div>
+
+              {/* Result display */}
+              {fetchImagesResult && (
+                <div
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: fetchImagesResult.success
+                      ? 'rgba(76, 112, 49, 0.1)'
+                      : 'rgba(168, 64, 50, 0.1)',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    {fetchImagesResult.success ? (
+                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <XCircle size={18} style={{ color: 'var(--error)' }} />
+                    )}
+                    <span
+                      className="font-medium"
+                      style={{ color: fetchImagesResult.success ? 'var(--success)' : 'var(--error)' }}
+                    >
+                      {fetchImagesResult.message || (fetchImagesResult.success ? 'Image fetch complete' : 'Failed')}
+                    </span>
+                  </div>
+                  {fetchImagesResult.error ? (
+                    <p className="text-sm" style={{ color: 'var(--error)' }}>
+                      {fetchImagesResult.error}
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-4 text-sm">
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{ backgroundColor: 'var(--background)' }}
+                      >
+                        <div className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                          {fetchImagesResult.total_missing}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Processed
+                        </div>
+                      </div>
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{ backgroundColor: 'var(--background)' }}
+                      >
+                        <div className="font-semibold" style={{ color: 'var(--success)' }}>
+                          {fetchImagesResult.updated}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Updated
+                        </div>
+                      </div>
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{ backgroundColor: 'var(--background)' }}
+                      >
+                        <div
+                          className="font-semibold"
+                          style={{ color: fetchImagesResult.failed > 0 ? 'var(--error)' : 'var(--foreground)' }}
+                        >
+                          {fetchImagesResult.failed}
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Failed
+                        </div>
+                      </div>
+                      <div
+                        className="p-3 rounded-lg text-center"
+                        style={{ backgroundColor: 'var(--background)' }}
+                      >
+                        <div className="font-semibold" style={{ color: 'var(--foreground)' }}>
+                          {(fetchImagesResult.duration_ms / 1000).toFixed(1)}s
+                        </div>
+                        <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Duration
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Info note */}
+              <div
+                className="p-3 rounded-lg flex items-start gap-3"
+                style={{ backgroundColor: 'var(--background)' }}
+              >
+                <Info size={16} style={{ color: 'var(--foreground-muted)', marginTop: 2 }} />
+                <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                  <p>Images are fetched from Bing search results based on product names.</p>
+                  <p className="mt-1">For best results, ensure products have accurate names and brands.</p>
+                </div>
               </div>
             </div>
           </section>
