@@ -260,31 +260,7 @@ Analyze the image and return a JSON object with:
 
 Return ONLY valid JSON, no explanation.`;
 
-  // Try Claude first
-  try {
-    const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
-
-    if (response.success && response.text) {
-      const parsed = parseJSONFromResponse(response.text);
-      if (parsed) {
-        logger.info({ productId, provider: 'claude' }, 'Enrichment successful');
-        return {
-          product_name: parsed.product_name || 'Uploaded Product',
-          tags: parsed.tags || [],
-          color_palette: parsed.color_palette || [],
-          category: parsed.category || 'general',
-          material: parsed.material,
-          texture: parsed.texture,
-          tone: parsed.tone,
-        };
-      }
-    }
-    logger.warn({ productId }, 'Claude enrichment returned invalid response, trying Gemini');
-  } catch (error) {
-    logger.warn({ productId, error }, 'Claude enrichment failed, trying Gemini fallback');
-  }
-
-  // Fallback to Gemini
+  // Try Gemini first (best for vision tasks)
   try {
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (geminiApiKey) {
@@ -327,8 +303,32 @@ Return ONLY valid JSON, no explanation.`;
         tone: parsed.tone,
       };
     }
+    logger.warn({ productId }, 'GEMINI_API_KEY not configured, trying Claude');
   } catch (error) {
-    logger.warn({ productId, error }, 'Gemini enrichment also failed, using defaults');
+    logger.warn({ productId, error }, 'Gemini enrichment failed, trying Claude fallback');
+  }
+
+  // Fallback to Claude
+  try {
+    const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
+
+    if (response.success && response.text) {
+      const parsed = parseJSONFromResponse(response.text);
+      if (parsed) {
+        logger.info({ productId, provider: 'claude' }, 'Enrichment successful');
+        return {
+          product_name: parsed.product_name || 'Uploaded Product',
+          tags: parsed.tags || [],
+          color_palette: parsed.color_palette || [],
+          category: parsed.category || 'general',
+          material: parsed.material,
+          texture: parsed.texture,
+          tone: parsed.tone,
+        };
+      }
+    }
+  } catch (error) {
+    logger.warn({ productId, error }, 'Claude enrichment also failed, using defaults');
   }
 
   // Final fallback defaults

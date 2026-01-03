@@ -357,7 +357,7 @@ async function enrichProduct(
     };
   }
 
-  // Real AI enrichment - try Claude first, then Gemini
+  // Real AI enrichment - try Gemini first (best for vision), then Claude
   const prompt = `You are analyzing a cropped product image for a style/shopping app.
 
 This product was detected as: "${detected.suggestedName}"
@@ -378,31 +378,7 @@ Analyze the image and return a JSON object with refined metadata:
 
 Return ONLY valid JSON, no explanation.`;
 
-  // Try Claude first
-  try {
-    const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
-
-    if (response.success && response.text) {
-      const parsed = parseJSONFromResponse(response.text);
-      if (parsed) {
-        logger.info({ productId, provider: 'claude' }, 'Enrichment successful');
-        return {
-          product_name: selected.customName || parsed.product_name || detected.suggestedName,
-          tags: parsed.tags || detected.colors,
-          color_palette: parsed.color_palette || detected.colors,
-          category: parsed.category || detected.category,
-          material: parsed.material,
-          texture: parsed.texture,
-          tone: parsed.tone,
-        };
-      }
-    }
-    logger.warn({ productId }, 'Claude enrichment returned invalid response, trying Gemini');
-  } catch (error) {
-    logger.warn({ productId, error }, 'Claude enrichment failed, trying Gemini fallback');
-  }
-
-  // Fallback to Gemini (already imported in this file via multiProductDetector)
+  // Try Gemini first (best for vision tasks)
   try {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const geminiApiKey = process.env.GEMINI_API_KEY;
@@ -446,8 +422,32 @@ Return ONLY valid JSON, no explanation.`;
         tone: parsed.tone,
       };
     }
+    logger.warn({ productId }, 'GEMINI_API_KEY not configured, trying Claude');
   } catch (error) {
-    logger.warn({ productId, error }, 'Gemini enrichment also failed, using detected data');
+    logger.warn({ productId, error }, 'Gemini enrichment failed, trying Claude fallback');
+  }
+
+  // Fallback to Claude
+  try {
+    const response = await callClaude(`${prompt}\n\nImage URL: ${imageUrl}`, { maxTokens: 500 });
+
+    if (response.success && response.text) {
+      const parsed = parseJSONFromResponse(response.text);
+      if (parsed) {
+        logger.info({ productId, provider: 'claude' }, 'Enrichment successful');
+        return {
+          product_name: selected.customName || parsed.product_name || detected.suggestedName,
+          tags: parsed.tags || detected.colors,
+          color_palette: parsed.color_palette || detected.colors,
+          category: parsed.category || detected.category,
+          material: parsed.material,
+          texture: parsed.texture,
+          tone: parsed.tone,
+        };
+      }
+    }
+  } catch (error) {
+    logger.warn({ productId, error }, 'Claude enrichment also failed, using detected data');
   }
 
   // Final fallback to detected data
