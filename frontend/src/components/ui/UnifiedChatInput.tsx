@@ -189,7 +189,7 @@ export function UnifiedChatInput({
           disabled={disabled || isLoading}
           className="w-8 h-8 rounded-full flex items-center justify-center transition-all flex-shrink-0"
           style={{
-            color: attachedImage ? 'var(--primary)' : 'var(--foreground-muted)',
+            color: attachedImage ? 'var(--primary)' : 'var(--foreground-secondary)',
             backgroundColor: attachedImage ? 'var(--primary-light)' : 'transparent',
           }}
           onMouseEnter={(e) => {
@@ -201,7 +201,7 @@ export function UnifiedChatInput({
           onMouseLeave={(e) => {
             if (!attachedImage) {
               e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.color = 'var(--foreground-muted)';
+              e.currentTarget.style.color = 'var(--foreground-secondary)';
             }
           }}
           aria-label="Attach image"
@@ -214,9 +214,8 @@ export function UnifiedChatInput({
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all"
           style={{
-            color: isUrlDetected ? 'var(--primary)' : 'var(--foreground-muted)',
+            color: isUrlDetected ? 'var(--primary)' : 'var(--foreground-secondary)',
             backgroundColor: isUrlDetected ? 'var(--primary-light)' : 'transparent',
-            opacity: isUrlDetected ? 1 : 0.5,
           }}
           title={isUrlDetected ? 'URL detected' : 'Paste a product URL'}
         >
