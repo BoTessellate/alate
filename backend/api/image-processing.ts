@@ -30,7 +30,8 @@ const logger = createModuleLogger('image-processing');
 // CONFIGURATION
 // ============================================================================
 
-const PROCESSING_ENABLED = false; // Set to true when ready to process real products
+// Enable real processing via env var (defaults to true now that we're ready)
+const PROCESSING_ENABLED = process.env.PROCESSING_ENABLED !== 'false';
 const MAX_PAYLOAD_SIZE = 15 * 1024 * 1024; // 15MB to account for base64 overhead
 
 // Lazy initialization for OpenAI (only when needed)

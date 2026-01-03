@@ -15,7 +15,8 @@ import { BoundingBox, DetectedProduct } from './multiProductDetector';
 
 const logger = createModuleLogger('multiProductProcessor');
 
-const DEMO_MODE = process.env.DEMO_MODE !== 'false';
+// Default to real processing (false). Set DEMO_MODE=true to return mock data
+const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 // ============================================================================
 // TYPES

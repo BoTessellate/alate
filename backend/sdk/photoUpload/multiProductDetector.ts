@@ -12,7 +12,8 @@ import { ConfigurationError, ExternalServiceError } from '../shared/errors';
 
 const logger = createModuleLogger('multiProductDetector');
 
-const DEMO_MODE = process.env.DEMO_MODE !== 'false';
+// Default to real processing (false). Set DEMO_MODE=true to return mock data
+const DEMO_MODE = process.env.DEMO_MODE === 'true';
 
 // Gemini model for vision tasks
 const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || 'gemini-2.0-flash-exp';
