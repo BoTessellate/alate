@@ -7,6 +7,7 @@ import {
   assertNoOverlap,
   assertSidePanelBelowTopbar,
   assertBubbleDimensions,
+  assertFabBubbleNoOverlap,
   getBoundingBox,
 } from '../utils/layout-assertions';
 import { setupMockRoutes, skipOnboarding } from '../fixtures/mock-data';
@@ -236,6 +237,28 @@ test.describe('Global Layout', () => {
 
       if (await bubble.isVisible().catch(() => false)) {
         await assertWithinViewport(bubble, page);
+      }
+    });
+
+    test('has adequate spacing from FAB (no overlap)', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      // Open the bubble
+      await page.click('[aria-label="Open assistant"]');
+      await page.waitForTimeout(300);
+
+      const fab = page.locator('[aria-label="Open assistant"]');
+      const bubble = page.locator('[class*="fixed"]').filter({
+        has: page.locator('input, textarea'),
+      }).first();
+
+      // FAB should still be visible when bubble is open (it acts as a toggle)
+      await expect(fab).toBeVisible();
+
+      if (await bubble.isVisible().catch(() => false)) {
+        // Assert that FAB and bubble have adequate spacing
+        await assertFabBubbleNoOverlap(fab, bubble);
       }
     });
   });

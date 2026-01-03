@@ -282,3 +282,19 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `NEXT_PUBLIC_API_URL` (points to backend-tml.vercel.app)
+
+## Future Tasks
+
+### Time-Context Personalization
+**Current state:** The home page shows time of day with generic suggestions (e.g., "Evening" → "dinner, dates")
+
+**Future enhancement:** Adapt to user's personal schedule
+- Allow users to set their typical schedule in Settings (work hours, gym time, etc.)
+- Integrate with calendar APIs (Google Calendar, Outlook) for real context
+- Use ML to learn user patterns from app usage (when they create layers, what types)
+- Combine time + weather + schedule for smart layer suggestions:
+  - "Rainy morning commute" → suggest rain-appropriate work outfits
+  - "Saturday evening, date night on calendar" → suggest date outfits
+  - "Working from home" → suggest comfortable loungewear
+- Store schedule preferences in user settings (useSettingsStore)
+- Display personalized suggestions like "Meeting in 2 hours" or "Gym at 6pm"

@@ -21,11 +21,12 @@ export const CSS_VARS = {
   topbarTotalHeight: 76, // 56 + 20
   sidePanelWidth: 480,
   bubbleWidth: 280,
-  bubbleBottom: 80,
+  bubbleBottom: 88, // Increased from 80 to leave 16px clearance above FAB
   bubbleRight: 24,
   fabBottom: 24,
   fabRight: 24,
-  fabSize: 44,
+  fabSize: 48, // Updated from 44 to match actual button size
+  fabBubbleMinGap: 16, // Minimum gap between FAB top and bubble bottom
 } as const;
 
 // =============================================================================
@@ -398,6 +399,39 @@ export async function assertFabPosition(fab: Locator, page: Page): Promise<void>
 
   expect(Math.abs(box.x - expectedRight), 'FAB should be positioned from right').toBeLessThanOrEqual(5);
   // FAB has two buttons stacked, so check bottom button
+}
+
+/**
+ * Assert FAB and bubble panel do not visually overlap
+ * Ensures minimum gap between FAB top edge and bubble bottom edge
+ */
+export async function assertFabBubbleNoOverlap(fab: Locator, bubble: Locator): Promise<void> {
+  const fabBox = await getBoundingBox(fab);
+  const bubbleBox = await getBoundingBox(bubble);
+
+  // FAB top edge
+  const fabTop = fabBox.y;
+  // Bubble bottom edge
+  const bubbleBottom = bubbleBox.y + bubbleBox.height;
+
+  // Gap between FAB top and bubble bottom
+  const gap = fabTop - bubbleBottom;
+
+  expect(
+    gap,
+    `FAB and bubble should have at least ${CSS_VARS.fabBubbleMinGap}px gap. Actual gap: ${gap}px`
+  ).toBeGreaterThanOrEqual(CSS_VARS.fabBubbleMinGap);
+
+  // Also ensure they don't overlap horizontally in a confusing way
+  const fabRight = fabBox.x + fabBox.width;
+  const bubbleRight = bubbleBox.x + bubbleBox.width;
+
+  // Both are right-aligned, so their right edges should be close
+  const rightEdgeDiff = Math.abs(fabRight - bubbleRight);
+  expect(
+    rightEdgeDiff,
+    `FAB and bubble should be aligned on right edge. Difference: ${rightEdgeDiff}px`
+  ).toBeLessThanOrEqual(30); // Allow some tolerance
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3, Shirt, TrendingDown } from 'lucide-react';
+import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3, Shirt, TrendingDown, Clock } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore, type LocalCurrency } from '@/stores/useSettingsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
@@ -19,15 +19,35 @@ const CURRENCY_SYMBOLS: Record<LocalCurrency, string> = {
   CAD: 'C$',
 };
 
+// Get time of day context for layer suggestions
+const getTimeContext = (hour: number): { period: string; suggestion: string } => {
+  if (hour >= 5 && hour < 9) return { period: 'Early Morning', suggestion: 'workout, commute' };
+  if (hour >= 9 && hour < 12) return { period: 'Morning', suggestion: 'work, meetings' };
+  if (hour >= 12 && hour < 14) return { period: 'Midday', suggestion: 'lunch, errands' };
+  if (hour >= 14 && hour < 17) return { period: 'Afternoon', suggestion: 'work, study' };
+  if (hour >= 17 && hour < 20) return { period: 'Evening', suggestion: 'dinner, dates' };
+  if (hour >= 20 && hour < 23) return { period: 'Night', suggestion: 'lounge, events' };
+  return { period: 'Late Night', suggestion: 'home, rest' };
+};
+
 export default function Home() {
   const { moodboards } = useLooksStore();
   const userName = useSettingsStore(state => state.userName);
   const localCurrency = useSettingsStore(state => state.localCurrency);
   const { collections } = useCollectionsStore();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
+    setCurrentTime(new Date());
+
+    // Update time every minute
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Calculate total items in closet (all products across all collections)
@@ -38,6 +58,12 @@ export default function Home() {
   // Placeholder for average price per wear (to be implemented later)
   const avgPricePerWear = 42.50; // Placeholder value
   const currencySymbol = CURRENCY_SYMBOLS[localCurrency] || '$';
+
+  // Time context for layer suggestions
+  const timeContext = currentTime ? getTimeContext(currentTime.getHours()) : null;
+  const formattedTime = currentTime
+    ? currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    : null;
 
   // Get recent layers (up to 3, sorted by updatedAt)
   const recentLayers = isHydrated
@@ -108,13 +134,13 @@ export default function Home() {
             letterSpacing: '0.05em',
           }}
         >
-          Ready to create something beautiful?
+          is ready with something beautiful for you
         </p>
       </div>
 
       {/* Stats Bar */}
       <div
-        className="py-5"
+        className="py-4"
         style={{
           backgroundColor: 'var(--surface)',
           borderTop: '1px solid var(--border)',
@@ -123,29 +149,71 @@ export default function Home() {
       >
         <div className="px-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
-            {/* Left side - Weather */}
-            <WeatherWidget />
+            {/* Left side - Weather & Time */}
+            <div className="flex items-center gap-8">
+              <WeatherWidget />
+
+              {/* Subtle Divider */}
+              <div
+                className="h-8 w-px"
+                style={{ backgroundColor: 'var(--border)' }}
+              />
+
+              {/* Time of Day */}
+              {formattedTime && timeContext && (
+                <div className="flex items-center gap-4">
+                  <Clock size={20} style={{ color: 'var(--foreground-muted)' }} />
+                  <span
+                    className="text-2xl"
+                    style={{
+                      color: 'var(--foreground)',
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 400,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {formattedTime}
+                  </span>
+                  <div className="flex flex-col">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
+                    >
+                      {timeContext.period}
+                    </span>
+                    <span
+                      className="text-xs"
+                      style={{ color: 'var(--foreground-muted)' }}
+                    >
+                      {timeContext.suggestion}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Right side - Closet Stats */}
             <div className="flex items-center gap-8">
               {/* Closet Items */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--background)' }}
+              <div className="flex items-center gap-4">
+                <Shirt size={20} style={{ color: 'var(--foreground-muted)' }} />
+                <span
+                  className="text-2xl"
+                  style={{
+                    color: 'var(--foreground)',
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 400,
+                    lineHeight: 1,
+                  }}
                 >
-                  <Shirt size={18} style={{ color: 'var(--secondary)' }} />
-                </div>
+                  {isHydrated ? totalClosetItems : '—'}
+                </span>
                 <div className="flex flex-col">
                   <span
-                    className="text-xl font-medium"
-                    style={{
-                      color: 'var(--foreground)',
-                      fontFamily: 'var(--font-cormorant)',
-                      lineHeight: 1,
-                    }}
+                    className="text-sm font-medium"
+                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
                   >
-                    {isHydrated ? totalClosetItems : '—'}
+                    Items
                   </span>
                   <span
                     className="text-xs"
@@ -158,34 +226,36 @@ export default function Home() {
 
               {/* Subtle Divider */}
               <div
-                className="h-10 w-px"
+                className="h-8 w-px"
                 style={{ backgroundColor: 'var(--border)' }}
               />
 
               {/* Avg Price Per Wear */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--background)' }}
+              <div className="flex items-center gap-4">
+                <TrendingDown size={20} style={{ color: 'var(--foreground-muted)' }} />
+                <span
+                  className="text-2xl"
+                  style={{
+                    color: 'var(--foreground)',
+                    fontFamily: 'var(--font-cormorant)',
+                    fontWeight: 400,
+                    lineHeight: 1,
+                  }}
                 >
-                  <TrendingDown size={18} style={{ color: 'var(--primary)' }} />
-                </div>
+                  {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(0)}` : '—'}
+                </span>
                 <div className="flex flex-col">
                   <span
-                    className="text-xl font-medium"
-                    style={{
-                      color: 'var(--foreground)',
-                      fontFamily: 'var(--font-cormorant)',
-                      lineHeight: 1,
-                    }}
+                    className="text-sm font-medium"
+                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
                   >
-                    {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(0)}` : '—'}
+                    Avg cost
                   </span>
                   <span
                     className="text-xs"
                     style={{ color: 'var(--foreground-muted)' }}
                   >
-                    avg/wear
+                    per wear
                   </span>
                 </div>
               </div>
