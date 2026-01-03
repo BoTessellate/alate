@@ -1,46 +1,97 @@
 'use client';
 
-import { Plus } from 'lucide-react';
-import { useUploadStore } from '@/stores/useUploadStore';
+import { useSidePanel } from '@/components/ui';
+import { useChatStore } from '@/stores/useChatStore';
+import UnifiedChatContent from './UnifiedChatContent';
 
 /**
- * Floating Action Button for uploading product photos
- * Fixed position, bottom-right, visible on all pages
+ * Floating Action Button - Unified Assistant
+ *
+ * Single branded button (circle with pill/band) that opens the unified chat interface.
+ * Features a subtle periodic pulse animation to draw attention.
+ *
+ * Opens in bubble mode (minimal: one-liner status + input) by default.
  */
 export default function FloatingActionButton() {
-  const openModal = useUploadStore((state) => state.openModal);
+  const { openBubble, isOpen, activeContent, close } = useSidePanel();
+  const { bubbleStatusText } = useChatStore();
+
+  const handleClick = () => {
+    if (isOpen && activeContent?.id === 'assistant') {
+      // Toggle off if already open
+      close();
+    } else {
+      openBubble({
+        id: 'assistant',
+        title: bubbleStatusText,
+        content: <UnifiedChatContent />,
+        // Custom flag for minimal bubble mode
+        minimal: true,
+      } as any);
+    }
+  };
+
+  const isActive = isOpen && activeContent?.id === 'assistant';
 
   return (
-    <button
-      onClick={openModal}
-      className="fixed z-50 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 cursor-pointer"
+    <div
+      className="fixed z-50"
       style={{
-        width: '56px',
-        height: '56px',
-        backgroundColor: 'var(--primary)',
-        // Position: bottom-right, accounting for sidebar on desktop
         bottom: '24px',
         right: '24px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1)',
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05)';
-        e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.backgroundColor = 'var(--primary)';
-      }}
-      onMouseDown={(e) => {
-        e.currentTarget.style.transform = 'scale(0.95)';
-      }}
-      onMouseUp={(e) => {
-        e.currentTarget.style.transform = 'scale(1.05)';
-      }}
-      title="Upload Product Photo"
-      aria-label="Upload Product Photo"
     >
-      <Plus size={28} color="white" strokeWidth={2.5} />
-    </button>
+      <button
+        onClick={handleClick}
+        className={`
+          flex items-center justify-center rounded-full cursor-pointer
+          transition-transform duration-200
+          ${!isActive ? 'fab-pulse' : ''}
+        `}
+        style={{
+          width: '48px',
+          height: '48px',
+          backgroundColor: 'var(--charcoal)',
+          boxShadow: isActive
+            ? '0 4px 20px rgba(0, 0, 0, 0.25)'
+            : '0 2px 12px rgba(0, 0, 0, 0.15)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.08)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+        }}
+        title="Assistant"
+        aria-label="Open assistant"
+      >
+        {/* Brand logo: horizontal pill inside circle */}
+        <div
+          className="rounded-full"
+          style={{
+            width: '20px',
+            height: '6px',
+            backgroundColor: isActive ? 'white' : 'var(--primary)',
+            transition: 'background-color 0.2s ease',
+          }}
+        />
+      </button>
+
+      {/* Pulse animation styles */}
+      <style jsx>{`
+        @keyframes fab-pulse {
+          0%, 100% {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+          }
+          50% {
+            box-shadow: 0 2px 20px rgba(76, 175, 80, 0.35);
+          }
+        }
+
+        .fab-pulse {
+          animation: fab-pulse 3s ease-in-out infinite;
+        }
+      `}</style>
+    </div>
   );
 }

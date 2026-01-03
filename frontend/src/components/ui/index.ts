@@ -62,6 +62,18 @@ export {
 // Select
 export { Select, type SelectProps } from './Select';
 
+// SelectDropdown (custom styled dropdown)
+export { SelectDropdown, type SelectDropdownProps, type SelectOption } from './SelectDropdown';
+
+// CurrencySelect
+export { CurrencySelect, type CurrencySelectProps } from './CurrencySelect';
+
+// SegmentedControl
+export { SegmentedControl, type SegmentedControlProps, type SegmentOption } from './SegmentedControl';
+
+// TagList
+export { TagList, type TagListProps } from './TagList';
+
 // Page Structure
 export {
   PageHeader,
@@ -96,6 +108,12 @@ export {
   type ErrorBoundaryProps,
 } from './ErrorBoundary';
 
+// Placeholder Image
+export {
+  PlaceholderImage,
+  generatePlaceholderStarsSVG,
+} from './PlaceholderImage';
+
 // Topbar-specific components
 export {
   getTopbarColors,
@@ -110,3 +128,40 @@ export {
   type LogoProps,
   type AgentModeToggleProps,
 } from './topbar';
+
+// Expandable Panel
+export {
+  ExpandablePanel,
+  type ExpandablePanelProps,
+} from './ExpandablePanel';
+
+// Chat Components
+export {
+  ChatMessage,
+  type ChatMessageProps,
+  type MessageRole,
+} from './ChatMessage';
+
+export {
+  ChatInput,
+  type ChatInputProps,
+} from './ChatInput';
+
+export {
+  ChatPanel,
+  type ChatPanelProps,
+  type Message,
+} from './ChatPanel';
+
+export {
+  UnifiedChatInput,
+  type UnifiedChatInputProps,
+  type ChatInputPayload,
+} from './UnifiedChatInput';
+
+// Side Panel (push layout)
+export {
+  SidePanelProvider,
+  SidePanelLayout,
+  useSidePanel,
+} from './SidePanel';

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Upload, Loader2, Check, AlertCircle, Plus, Layers, Image as ImageIcon } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { Upload, Loader2, Check, AlertCircle, Plus, Layers, Image as ImageIcon, X } from 'lucide-react';
 import { useUploadStore, ProductType } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
-import { Button, IconButton, Input, Select, Checkbox } from '@/components/ui';
+import { Button, IconButton, Input, CurrencySelect, Checkbox, SegmentedControl, TagList, ExpandablePanel } from '@/components/ui';
 import MultiProductSelectionGrid from './MultiProductSelectionGrid';
 
 /**
@@ -39,6 +39,7 @@ export default function PhotoUploadModal() {
     deselectAllProducts,
     updateDetectedProductName,
     updateProcessedProduct,
+    clearError,
   } = useUploadStore();
 
   const { collections, createCollection } = useCollectionsStore();
@@ -54,17 +55,7 @@ export default function PhotoUploadModal() {
   const [expandedProductIndex, setExpandedProductIndex] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
   const newCollectionInputRef = useRef<HTMLInputElement>(null);
-
-  // Close on escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isModalOpen) closeModal();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isModalOpen, closeModal]);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,8 +118,6 @@ export default function PhotoUploadModal() {
     }
   }, [saveMultipleToCollections, closeModal]);
 
-  if (!isModalOpen) return null;
-
   const isProcessing = status === 'uploading' || status === 'processing';
   const canEdit = status === 'editing' || status === 'error';
   const isSaving = status === 'saving';
@@ -142,31 +131,15 @@ export default function PhotoUploadModal() {
   const isAnyMultiState = isDetecting || isSelecting || isProcessingMulti || isEditingMulti;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end justify-end p-4 pb-24 pr-6"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.6)' }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeModal();
-      }}
+    <ExpandablePanel
+      isOpen={isModalOpen}
+      onClose={closeModal}
+      title="Upload Product Photo"
+      subtitle="Add products to your collection"
+      data-testid="photo-upload-panel"
     >
-      <div
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="photo-upload-modal-title"
-        className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl"
-        style={{ backgroundColor: 'var(--surface)', maxHeight: '70vh', overflowY: 'auto' }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 id="photo-upload-modal-title" className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>
-            Upload Product Photo
-          </h2>
-          <IconButton icon={X} aria-label="Close modal" onClick={closeModal} />
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4">
+      {/* Content */}
+      <div className="p-4 space-y-4 overflow-y-auto h-full">
           {/* Drop Zone / Preview */}
           <div
             className="relative rounded-lg border-2 border-dashed overflow-hidden transition-colors"
@@ -231,9 +204,17 @@ export default function PhotoUploadModal() {
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--error)', color: 'white' }}>
-              <AlertCircle size={18} aria-hidden="true" />
-              <p className="text-sm">{error}</p>
+            <div className="flex items-center justify-between gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--error)', color: 'white' }}>
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} aria-hidden="true" />
+                <p className="text-sm">{error}</p>
+              </div>
+              <button
+                onClick={clearError}
+                className="text-sm font-medium px-3 py-1 rounded hover:bg-white/20 transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -268,42 +249,18 @@ export default function PhotoUploadModal() {
 
           {/* Mode Toggle */}
           {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
-            <div>
-              <label className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
-                Detection Mode
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setMultiMode(false)}
-                  className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors"
-                  style={{
-                    borderColor: !isMultiMode ? 'var(--primary)' : 'var(--border)',
-                    backgroundColor: !isMultiMode ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
-                    color: 'var(--foreground)',
-                  }}
-                >
-                  <ImageIcon size={16} />
-                  <span className="text-sm">Single</span>
-                </button>
-                <button
-                  onClick={() => setMultiMode(true)}
-                  className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-colors"
-                  style={{
-                    borderColor: isMultiMode ? 'var(--primary)' : 'var(--border)',
-                    backgroundColor: isMultiMode ? 'rgba(76, 112, 49, 0.1)' : 'transparent',
-                    color: 'var(--foreground)',
-                  }}
-                >
-                  <Layers size={16} />
-                  <span className="text-sm">Multiple</span>
-                </button>
-              </div>
-              <p className="text-xs mt-1" style={{ color: 'var(--foreground-muted)' }}>
-                {isMultiMode
-                  ? 'Detect multiple products in one image (e.g., an outfit)'
-                  : 'Process as a single product'}
-              </p>
-            </div>
+            <SegmentedControl
+              label="Detection Mode"
+              value={isMultiMode ? 'multiple' : 'single'}
+              onChange={(value) => setMultiMode(value === 'multiple')}
+              options={[
+                { value: 'single', label: 'Single', icon: <ImageIcon size={16} /> },
+                { value: 'multiple', label: 'Multiple', icon: <Layers size={16} /> },
+              ]}
+              helperText={isMultiMode
+                ? 'Detect multiple products in one image (e.g., an outfit)'
+                : 'Process as a single product'}
+            />
           )}
 
           {/* Upload / Detect Button */}
@@ -372,40 +329,21 @@ export default function PhotoUploadModal() {
                   placeholder="0"
                   className="flex-1"
                 />
-                <Select
+                <CurrencySelect
                   label="Currency"
                   value={productData.currency || 'USD'}
-                  onChange={(e) => updateProductField('currency', e.target.value)}
-                  className="w-24"
+                  onChange={(value) => updateProductField('currency', value)}
+                  className="w-28"
                   fullWidth={false}
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="INR">INR</option>
-                </Select>
+                />
               </div>
 
               {/* AI Tags */}
-              <div>
-                <span className="text-sm font-medium mb-2 block" style={{ color: 'var(--foreground)' }}>
-                  Tags
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {(productData.tags || []).map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs"
-                      style={{ backgroundColor: 'var(--primary)', color: 'white' }}
-                    >
-                      {tag}
-                      <button onClick={() => handleRemoveTag(tag)} aria-label={`Remove tag ${tag}`} className="hover:opacity-70 cursor-pointer">
-                        <X size={12} aria-hidden="true" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <TagList
+                label="Tags"
+                tags={productData.tags || []}
+                onRemove={handleRemoveTag}
+              />
 
               {/* Collection Selection */}
               <div>
@@ -534,22 +472,11 @@ export default function PhotoUploadModal() {
                   </div>
 
                   {/* Tags */}
-                  <div>
-                    <span className="text-xs font-medium mb-1 block" style={{ color: 'var(--foreground-secondary)' }}>
-                      Tags
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {(processedProducts[expandedProductIndex].tags || []).map((tag: string) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 rounded-full text-xs"
-                          style={{ backgroundColor: 'var(--primary)', color: 'white' }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <TagList
+                    label="Tags"
+                    tags={(processedProducts[expandedProductIndex].tags || []) as string[]}
+                    size="sm"
+                  />
                 </div>
               )}
 
@@ -616,7 +543,6 @@ export default function PhotoUploadModal() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ExpandablePanel>
   );
 }

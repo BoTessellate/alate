@@ -13,11 +13,15 @@
     "test:report": "node scripts/generate-coverage-json.js",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
-    "e2e": "start-server-and-test 'npm run dev' http://localhost:3000 'cypress run'"
+    "e2e": "start-server-and-test 'npm run dev' http://localhost:3000 'cypress run'",
+    "test:layout": "playwright test",
+    "test:layout:ui": "playwright test --ui",
+    "test:layout:report": "playwright show-report"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-virtual": "^3.13.14",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.0",
     "react": "19.2.3",
@@ -26,6 +30,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/cypress": "^10.1.0",
     "@testing-library/jest-dom": "^6.9.1",
