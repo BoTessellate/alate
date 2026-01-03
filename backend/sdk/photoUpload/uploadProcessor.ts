@@ -5,7 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import OpenAI from 'openai';
+// OpenAI is dynamically imported to avoid Vercel serverless function issues
 import { getSupabaseClient } from '../shared/supabaseClient';
 import { createImageGenerator } from '../imageGeneration';
 import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
@@ -311,6 +311,7 @@ Return ONLY valid JSON, no explanation.`;
 
   // Fallback to GPT-4o (also good for vision)
   try {
+    const OpenAI = (await import('openai')).default;
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (openaiApiKey) {
       const openai = new OpenAI({ apiKey: openaiApiKey });
