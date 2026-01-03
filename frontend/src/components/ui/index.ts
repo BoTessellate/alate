@@ -165,3 +165,6 @@ export {
   SidePanelLayout,
   useSidePanel,
 } from './SidePanel';
+
+// Weather Widget
+export { WeatherWidget } from './WeatherWidget';

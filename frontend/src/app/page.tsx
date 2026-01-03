@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Plus, BookHeart, Compass, ArrowRight, Sparkles, Grid3X3 } from 'lucide-react';
 import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { Card, SectionHeader, Button } from '@/components/ui';
+import { Card, SectionHeader, WeatherWidget } from '@/components/ui';
 
 export default function Home() {
   const { moodboards } = useLooksStore();
@@ -54,6 +54,11 @@ export default function Home() {
     <div className="min-h-full" style={{ backgroundColor: 'var(--background)' }}>
       {/* Hero Section */}
       <div className="px-8 py-16 max-w-6xl mx-auto text-center">
+        {/* Weather Widget */}
+        <div className="mb-6">
+          <WeatherWidget />
+        </div>
+
         <p
           className="text-sm tracking-[0.3em] uppercase mb-4"
           style={{
