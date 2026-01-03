@@ -114,55 +114,78 @@ export default function Home() {
 
       {/* Stats Bar */}
       <div
-        className="border-t border-b py-4 mb-8"
-        style={{ borderColor: 'var(--border)' }}
+        className="py-5"
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          borderBottom: '1px solid var(--border)',
+        }}
       >
         <div className="px-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             {/* Left side - Weather */}
-            <div className="flex items-center">
-              <WeatherWidget />
-            </div>
+            <WeatherWidget />
 
             {/* Right side - Closet Stats */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-8">
               {/* Closet Items */}
-              <div className="flex items-center gap-2">
-                <Shirt size={18} style={{ color: 'var(--foreground-muted)' }} />
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--background)' }}
+                >
+                  <Shirt size={18} style={{ color: 'var(--secondary)' }} />
+                </div>
                 <div className="flex flex-col">
                   <span
-                    className="text-lg font-medium"
-                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
+                    className="text-xl font-medium"
+                    style={{
+                      color: 'var(--foreground)',
+                      fontFamily: 'var(--font-cormorant)',
+                      lineHeight: 1,
+                    }}
                   >
                     {isHydrated ? totalClosetItems : '—'}
                   </span>
                   <span
                     className="text-xs"
-                    style={{ color: 'var(--foreground-muted)', lineHeight: 1.2 }}
+                    style={{ color: 'var(--foreground-muted)' }}
                   >
-                    items in closet
+                    in closet
                   </span>
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="h-8 w-px" style={{ backgroundColor: 'var(--border)' }} />
+              {/* Subtle Divider */}
+              <div
+                className="h-10 w-px"
+                style={{ backgroundColor: 'var(--border)' }}
+              />
 
               {/* Avg Price Per Wear */}
-              <div className="flex items-center gap-2">
-                <TrendingDown size={18} style={{ color: 'var(--primary)' }} />
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--background)' }}
+                >
+                  <TrendingDown size={18} style={{ color: 'var(--primary)' }} />
+                </div>
                 <div className="flex flex-col">
                   <span
-                    className="text-lg font-medium"
-                    style={{ color: 'var(--foreground)', lineHeight: 1.2 }}
+                    className="text-xl font-medium"
+                    style={{
+                      color: 'var(--foreground)',
+                      fontFamily: 'var(--font-cormorant)',
+                      lineHeight: 1,
+                    }}
                   >
-                    {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(2)}` : '—'}
+                    {isHydrated ? `${currencySymbol}${avgPricePerWear.toFixed(0)}` : '—'}
                   </span>
                   <span
                     className="text-xs"
-                    style={{ color: 'var(--foreground-muted)', lineHeight: 1.2 }}
+                    style={{ color: 'var(--foreground-muted)' }}
                   >
-                    avg. price/wear
+                    avg/wear
                   </span>
                 </div>
               </div>
