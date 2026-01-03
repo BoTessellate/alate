@@ -3,7 +3,7 @@
  * Orchestrates the upload -> background removal -> enrichment pipeline
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 // OpenAI is dynamically imported to avoid Vercel serverless function issues
 import { getSupabaseClient } from '../shared/supabaseClient';
@@ -35,7 +35,7 @@ export async function processPhotoUpload(
   config: UploadConfig = DEFAULT_UPLOAD_CONFIG
 ): Promise<PhotoUploadResponse> {
   const startTime = Date.now();
-  const productId = uuidv4();
+  const productId = randomUUID();
   const timings = {
     uploadMs: 0,
     backgroundRemovalMs: 0,

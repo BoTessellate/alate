@@ -3,7 +3,7 @@
  * Crops, removes background, and enriches each selected product from detection
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 // Sharp is dynamically imported to avoid Vercel serverless function issues
 // with native bindings at module load time
 import { getSupabaseClient } from '../shared/supabaseClient';
@@ -91,7 +91,7 @@ export async function processSelectedProducts(
   // Process each selected product
   for (const selected of input.selectedProducts) {
     const productStart = Date.now();
-    const productId = uuidv4();
+    const productId = randomUUID();
 
     logger.info({ tempId: selected.tempId, productId }, 'Processing product');
 

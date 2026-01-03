@@ -3,7 +3,7 @@
  * Uses Gemini Vision to detect multiple products in a single image
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSupabaseClient } from '../shared/supabaseClient';
 import { createModuleLogger, logApiCall } from '../shared/logger';
@@ -219,7 +219,7 @@ export async function detectMultipleProducts(
     // Demo mode - return mock data
     detectedProducts = DEMO_DETECTIONS[input.context].map(p => ({
       ...p,
-      tempId: uuidv4(),
+      tempId: randomUUID(),
     }));
     logger.info({ count: detectedProducts.length }, 'Returning demo detections');
   } else {
@@ -244,7 +244,7 @@ export async function detectMultipleProducts(
  */
 async function uploadOriginalImage(input: MultiProductDetectionInput): Promise<string> {
   const supabase = getSupabaseClient();
-  const imageId = uuidv4();
+  const imageId = randomUUID();
   const ext = input.mimeType.split('/')[1] || 'png';
   const fileName = `multi-detect/${imageId}.${ext}`;
 
@@ -315,7 +315,7 @@ async function runVisionDetection(input: MultiProductDetectionInput): Promise<De
 
     // Convert to our DetectedProduct format
     return validated.products.map(p => ({
-      tempId: uuidv4(),
+      tempId: randomUUID(),
       boundingBox: p.boundingBox,
       suggestedName: p.name,
       category: p.category,
