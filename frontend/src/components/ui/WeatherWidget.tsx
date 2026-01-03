@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Droplets, CloudFog } from 'lucide-react';
+import { Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Droplets, CloudFog } from 'lucide-react';
 
 interface WeatherData {
   temperature: number;
@@ -35,19 +35,19 @@ export function WeatherWidget() {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        // Get user's location
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          if (!navigator.geolocation) {
-            reject(new Error('Geolocation not supported'));
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            timeout: 10000,
-            enableHighAccuracy: false,
-          });
-        });
+        // Get location from IP (no permission needed)
+        // ip-api.com provides free IP geolocation
+        const ipRes = await fetch('http://ip-api.com/json/?fields=status,city,lat,lon');
 
-        const { latitude, longitude } = position.coords;
+        if (!ipRes.ok) throw new Error('IP geolocation failed');
+
+        const ipData = await ipRes.json();
+
+        if (ipData.status !== 'success') {
+          throw new Error('IP geolocation failed');
+        }
+
+        const { lat: latitude, lon: longitude, city: locationName } = ipData;
 
         // Fetch weather from Open-Meteo (free, no API key required)
         const weatherRes = await fetch(
@@ -58,38 +58,15 @@ export function WeatherWidget() {
 
         const weatherData = await weatherRes.json();
 
-        // Reverse geocode for location name
-        let locationName = 'Your Location';
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-          );
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            locationName = geoData.address?.city ||
-                          geoData.address?.town ||
-                          geoData.address?.village ||
-                          geoData.address?.suburb ||
-                          geoData.address?.county ||
-                          'Your Location';
-          }
-        } catch {
-          // Keep default location name
-        }
-
         setWeather({
           temperature: Math.round(weatherData.current.temperature_2m),
           weatherCode: weatherData.current.weather_code,
           humidity: weatherData.current.relative_humidity_2m,
           windSpeed: Math.round(weatherData.current.wind_speed_10m),
-          location: locationName,
+          location: locationName || 'Your Location',
         });
-      } catch (err) {
-        if (err instanceof GeolocationPositionError) {
-          setError('Location access needed');
-        } else {
-          setError('Weather unavailable');
-        }
+      } catch {
+        setError('Weather unavailable');
       } finally {
         setLoading(false);
       }
