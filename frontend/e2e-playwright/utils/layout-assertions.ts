@@ -585,6 +585,29 @@ export async function assertButtonContentCentered(
 }
 
 /**
+ * Assert textarea/input text is vertically centered within its container
+ * Tests that the input element is centered within the styled container
+ */
+export async function assertInputTextCentered(
+  input: Locator,
+  container: Locator,
+  tolerance: number = 5
+): Promise<void> {
+  const inputBox = await getBoundingBox(input);
+  const containerBox = await getBoundingBox(container);
+
+  const inputCenterY = inputBox.y + inputBox.height / 2;
+  const containerCenterY = containerBox.y + containerBox.height / 2;
+
+  const diff = Math.abs(inputCenterY - containerCenterY);
+
+  expect(
+    diff,
+    `Input text should be vertically centered. Container center: ${containerCenterY}px, Input center: ${inputCenterY}px, Difference: ${diff}px`
+  ).toBeLessThanOrEqual(tolerance);
+}
+
+/**
  * Assert bubble panel dimensions and position
  */
 export async function assertBubbleDimensions(bubble: Locator, page: Page): Promise<void> {

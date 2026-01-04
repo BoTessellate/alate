@@ -61,6 +61,15 @@ describe('UnifiedChatInput', () => {
       expect(sendButton.className).toContain('items-center');
       expect(sendButton.className).toContain('justify-center');
     });
+
+    it('text input container has centered content styling', () => {
+      render(<UnifiedChatInput onSubmit={() => {}} data-testid="chat-input" />);
+      const inputContainer = screen.getByTestId('chat-input-input-container');
+
+      // Container should have flex centering to vertically center textarea text
+      expect(inputContainer.className).toContain('flex');
+      expect(inputContainer.className).toContain('items-center');
+    });
   });
 
   describe('Input Behavior', () => {

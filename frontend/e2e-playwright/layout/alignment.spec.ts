@@ -6,6 +6,7 @@ import {
   assertCheckboxLabelAligned,
   assertModalCenteredInViewport,
   assertButtonContentCentered,
+  assertInputTextCentered,
   getBoundingBox,
   getCenter,
 } from '../utils/layout-assertions';
@@ -96,6 +97,22 @@ test.describe('Center Alignment Tests', () => {
 
       if (await cameraButton.isVisible().catch(() => false) && await sendButton.isVisible().catch(() => false)) {
         await assertVerticallyAligned(cameraButton, sendButton, 5);
+      }
+    });
+
+    test('textarea text is vertically centered within input container', async ({ page }) => {
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+
+      await page.click('[aria-label="Open assistant"]');
+      await page.waitForTimeout(300);
+
+      // Find the input container and textarea using test IDs
+      const inputContainer = page.locator('[data-testid*="input-container"]').first();
+      const textarea = page.locator('textarea').first();
+
+      if (await inputContainer.isVisible().catch(() => false) && await textarea.isVisible().catch(() => false)) {
+        await assertInputTextCentered(textarea, inputContainer, 5);
       }
     });
   });

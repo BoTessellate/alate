@@ -224,8 +224,9 @@ export function UnifiedChatInput({
 
         {/* Text input */}
         <div
-          className="flex-1 rounded-xl px-3 py-1.5"
+          className="flex-1 flex items-center rounded-xl px-3 min-h-[32px]"
           style={{ backgroundColor: 'var(--surface-light)' }}
+          data-testid={testId ? `${testId}-input-container` : undefined}
         >
           <textarea
             ref={textareaRef}
@@ -235,7 +236,7 @@ export function UnifiedChatInput({
             placeholder={attachedImage ? 'Add a description...' : placeholder}
             disabled={disabled || isLoading}
             rows={1}
-            className="w-full bg-transparent resize-none text-sm outline-none focus:outline-none"
+            className="w-full bg-transparent resize-none text-sm outline-none focus:outline-none leading-normal py-1"
             style={{
               color: 'var(--foreground)',
               minHeight: '24px',
