@@ -127,25 +127,64 @@ export const ProductResultCard = memo(function ProductResultCard({
 
         {/* Actions based on source */}
         <div className="mt-1.5 flex items-center gap-2">
-          {/* Wishlist checkbox for URL scrapes */}
-          {source === 'scrape' && (
-            <label
-              className="flex items-center gap-1.5 cursor-pointer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <input
-                type="checkbox"
-                checked={product.isWishlisted || false}
-                onChange={handleWishlistChange}
-                className="w-3.5 h-3.5 rounded border cursor-pointer accent-[var(--primary)]"
-              />
-              <span
-                className="text-xs"
-                style={{ color: 'var(--foreground-secondary)' }}
+          {/* Two buttons for URL scrapes - Closet and Wishlist */}
+          {source === 'scrape' && !product.isAddedToCloset && !product.isWishlisted && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddClick();
+                }}
+                className="text-xs px-2 py-0.5 rounded-full transition-colors"
+                style={{
+                  backgroundColor: 'var(--primary-light)',
+                  color: 'var(--primary-dark)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--primary)';
+                  e.currentTarget.style.color = 'white';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+                  e.currentTarget.style.color = 'var(--primary-dark)';
+                }}
               >
-                Add to Wishlist
-              </span>
-            </label>
+                Closet
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleWishlistChange();
+                }}
+                className="text-xs px-2 py-0.5 rounded-full transition-colors"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--foreground-secondary)',
+                  border: '1px solid var(--border)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  e.currentTarget.style.color = 'var(--foreground)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--foreground-secondary)';
+                }}
+              >
+                Wishlist
+              </button>
+            </>
+          )}
+
+          {/* Wishlisted indicator for scraped products */}
+          {source === 'scrape' && product.isWishlisted && (
+            <span
+              className="text-xs flex items-center gap-1"
+              style={{ color: 'var(--primary)' }}
+            >
+              <Check size={12} />
+              Wishlisted
+            </span>
           )}
 
           {/* Add to closet button for search results */}
@@ -173,8 +212,19 @@ export const ProductResultCard = memo(function ProductResultCard({
             </button>
           )}
 
-          {/* Added indicator */}
-          {(source === 'upload' || product.isAddedToCloset) && (
+          {/* Added indicator - for uploads and items added to closet */}
+          {(source === 'upload' || (source === 'scrape' && product.isAddedToCloset)) && (
+            <span
+              className="text-xs flex items-center gap-1"
+              style={{ color: 'var(--success)' }}
+            >
+              <Check size={12} />
+              In Closet
+            </span>
+          )}
+
+          {/* Added indicator - for search results added to closet */}
+          {source === 'search' && product.isAddedToCloset && (
             <span
               className="text-xs flex items-center gap-1"
               style={{ color: 'var(--success)' }}

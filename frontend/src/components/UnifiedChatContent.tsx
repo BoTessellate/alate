@@ -225,12 +225,12 @@ export default function UnifiedChatContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product: {
-            title: scrapeData.title,
+            name: scrapeData.title,
             brand: scrapeData.brandName,
-            price: scrapeData.price,
+            price: parseFloat(scrapeData.price) || 0,
             currency: scrapeData.currency,
-            imageUrl: scrapeData.imageUrl,
-            url,
+            image_url: scrapeData.imageUrl,
+            source_url: url,
           },
         }),
       });
@@ -383,17 +383,12 @@ export default function UnifiedChatContent() {
   }, [toggleProductWishlist, messages, ensureWishlistCollection, addProductToCollection]);
 
   // Handle add to closet
+  // Closet = flat storage in enriched_products, NO collection
+  // Product is already saved to DB during enrichment, just update UI state
   const handleAddToCloset = useCallback((messageId: string, productId: string) => {
     markProductAddedToCloset(messageId, productId);
-
-    const message = messages.find(m => m.id === messageId);
-    const product = message?.products?.find(p => p.id === productId);
-
-    if (product) {
-      const collectionId = getDefaultCollection();
-      addProductToCollection(collectionId, product as Product);
-    }
-  }, [markProductAddedToCloset, messages, getDefaultCollection, addProductToCollection]);
+    // No collection assignment - closet is just the enriched_products table
+  }, [markProductAddedToCloset]);
 
   // Handle expand to discover
   const handleExpandToDiscover = useCallback((query: string) => {
