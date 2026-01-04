@@ -14,19 +14,34 @@ import {
   EmptyState,
   DropdownItem,
   ErrorBoundary,
+  Checkbox,
+  SelectDropdown,
 } from '@/components/ui';
+import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import type { CanvasItem } from '@/stores/useLooksStore';
+import type { Product } from '@/types';
 
 export default function LooksPage() {
   const router = useRouter();
-  const { moodboards, createMoodboard, deleteMoodboard, updateMoodboard } = useLooksStore();
+  const { moodboards, createMoodboard, deleteMoodboard, updateMoodboard, updateMoodboardItems } = useLooksStore();
+  const { collections } = useCollectionsStore();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newMoodboardName, setNewMoodboardName] = useState('');
-  const [newMoodboardDescription, setNewMoodboardDescription] = useState('');
+  const [moodSearch, setMoodSearch] = useState('');
+  const [exploreNewProducts, setExploreNewProducts] = useState(false);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
+  const [isCreating, setIsCreating] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Collection options for dropdown
+  const collectionOptions = collections.map(c => ({
+    value: c.id,
+    label: c.name,
+  }));
 
   useEffect(() => {
     setIsHydrated(true);
@@ -41,13 +56,101 @@ export default function LooksPage() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [activeMenu]);
 
-  const handleCreateMoodboard = () => {
-    if (!newMoodboardName.trim()) return;
-    const newMoodboard = createMoodboard(newMoodboardName.trim(), newMoodboardDescription.trim() || undefined);
+  // Search user's closet (excluding Wishlist)
+  const searchCloset = (query: string): Product[] => {
+    const queryLower = query.toLowerCase();
+    const closetProducts = collections
+      .filter(c => c.name.toLowerCase() !== 'wishlist')
+      .flatMap(c => c.products);
+
+    return closetProducts.filter(p =>
+      p.product_name?.toLowerCase().includes(queryLower) ||
+      p.brand?.toLowerCase().includes(queryLower) ||
+      p.tags?.some(t => t.toLowerCase().includes(queryLower)) ||
+      p.category?.toLowerCase().includes(queryLower)
+    ).slice(0, 10);
+  };
+
+  // Search external catalog via API
+  const searchCatalog = async (query: string): Promise<Product[]> => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: query, limit: 10 }),
+      });
+      const data = await res.json();
+      return data.products || [];
+    } catch (error) {
+      console.error('Failed to search catalog:', error);
+      return [];
+    }
+  };
+
+  // Convert products to canvas items with grid layout
+  const productsToCanvasItems = (products: Product[]): CanvasItem[] => {
+    const ITEM_SIZE = 150;
+    const GAP = 20;
+    const COLS = 3;
+
+    return products.map((p, i) => ({
+      id: `item-${Date.now()}-${i}`,
+      type: 'image' as const,
+      x: (i % COLS) * (ITEM_SIZE + GAP) + 50,
+      y: Math.floor(i / COLS) * (ITEM_SIZE + GAP) + 50,
+      width: ITEM_SIZE,
+      height: ITEM_SIZE,
+      rotation: 0,
+      zIndex: i,
+      content: p.product_name || '',
+      src: p.image_url,
+      alt: p.product_name,
+      productName: p.product_name,
+      productBrand: p.brand,
+      productPrice: p.price,
+      productCurrency: p.currency,
+    }));
+  };
+
+  const resetCreateForm = () => {
     setNewMoodboardName('');
-    setNewMoodboardDescription('');
+    setMoodSearch('');
+    setExploreNewProducts(false);
+    setSelectedCollectionId('');
     setShowCreateModal(false);
-    router.push(`/looks/${generateMoodboardPath(newMoodboard.name, newMoodboard.id)}`);
+  };
+
+  const handleCreateMoodboard = async () => {
+    if (!newMoodboardName.trim()) return;
+    setIsCreating(true);
+
+    try {
+      // Create the layer
+      const newMoodboard = createMoodboard(
+        newMoodboardName.trim(),
+        moodSearch.trim() || undefined
+      );
+
+      // Pre-populate with products if mood search provided
+      if (moodSearch.trim()) {
+        const products = exploreNewProducts
+          ? await searchCatalog(moodSearch)
+          : searchCloset(moodSearch);
+
+        if (products.length > 0) {
+          const items = productsToCanvasItems(products);
+          updateMoodboardItems(newMoodboard.id, items);
+        }
+      }
+
+      // Reset and navigate
+      resetCreateForm();
+      router.push(`/looks/${generateMoodboardPath(newMoodboard.name, newMoodboard.id)}`);
+    } catch (error) {
+      console.error('Failed to create layer:', error);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleDeleteMoodboard = (id: string) => {
@@ -320,17 +423,17 @@ export default function LooksPage() {
       {/* Create Layer Modal */}
       <Modal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={resetCreateForm}
         title="Create New Layer"
         size="sm"
       >
-        <ModalContent className="space-y-4">
+        <ModalContent className="space-y-3">
           <Input
             label="Name"
             value={newMoodboardName}
             onChange={(e) => setNewMoodboardName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && newMoodboardName.trim()) {
+              if (e.key === 'Enter' && newMoodboardName.trim() && !isCreating) {
                 handleCreateMoodboard();
               }
             }}
@@ -338,22 +441,37 @@ export default function LooksPage() {
             autoFocus
           />
           <Input
-            label="Description (optional)"
-            value={newMoodboardDescription}
-            onChange={(e) => setNewMoodboardDescription(e.target.value)}
-            placeholder="What's this layer about?"
+            label="Mood"
+            value={moodSearch}
+            onChange={(e) => setMoodSearch(e.target.value)}
+            placeholder="cozy neutrals, linen textures..."
+          />
+          <Checkbox
+            label="Explore new products"
+            helperText="Discover beyond your closet"
+            checked={exploreNewProducts}
+            onChange={(e) => setExploreNewProducts(e.target.checked)}
+            size="sm"
+          />
+          <SelectDropdown
+            label="Collection"
+            value={selectedCollectionId}
+            onChange={setSelectedCollectionId}
+            options={collectionOptions}
+            placeholder="None"
+            size="sm"
           />
         </ModalContent>
         <ModalFooter>
-          <Button variant="ghost" onClick={() => setShowCreateModal(false)}>
+          <Button variant="ghost" onClick={resetCreateForm}>
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleCreateMoodboard}
-            disabled={!newMoodboardName.trim()}
+            disabled={!newMoodboardName.trim() || isCreating}
           >
-            Create
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </ModalFooter>
       </Modal>
