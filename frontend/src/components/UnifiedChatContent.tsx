@@ -46,7 +46,7 @@ export default function UnifiedChatContent() {
     setPendingImage,
     clearPendingImage,
     toggleProductWishlist,
-    markProductAddedToCloset,
+    toggleProductCloset,
   } = useChatStore();
 
   const {
@@ -386,13 +386,13 @@ export default function UnifiedChatContent() {
     }
   }, [toggleProductWishlist, messages, ensureWishlistCollection, addProductToCollection]);
 
-  // Handle add to closet
+  // Handle closet toggle (mutually exclusive with wishlist)
   // Closet = flat storage in enriched_products, NO collection
   // Product is already saved to DB during enrichment, just update UI state
-  const handleAddToCloset = useCallback((messageId: string, productId: string) => {
-    markProductAddedToCloset(messageId, productId);
+  const handleClosetToggle = useCallback((messageId: string, productId: string) => {
+    toggleProductCloset(messageId, productId);
     // No collection assignment - closet is just the enriched_products table
-  }, [markProductAddedToCloset]);
+  }, [toggleProductCloset]);
 
   // Handle expand to discover
   const handleExpandToDiscover = useCallback((query: string) => {
@@ -451,7 +451,7 @@ export default function UnifiedChatContent() {
                 product={product}
                 source={product.source as 'upload' | 'scrape' | 'search'}
                 onWishlistToggle={(productId) => handleWishlistToggle(message.id, productId)}
-                onAddToCloset={(productId) => handleAddToCloset(message.id, productId)}
+                onClosetToggle={(productId) => handleClosetToggle(message.id, productId)}
                 compact
               />
             ))}

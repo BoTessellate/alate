@@ -90,9 +90,9 @@ interface ChatState {
   setPendingImage: (file: File | null, previewUrl?: string | null) => void;
   clearPendingImage: () => void;
 
-  // Product actions
+  // Product actions (mutually exclusive - selecting one clears the other)
   toggleProductWishlist: (messageId: string, productId: string) => void;
-  markProductAddedToCloset: (messageId: string, productId: string) => void;
+  toggleProductCloset: (messageId: string, productId: string) => void;
 }
 
 // =============================================================================
@@ -285,7 +285,7 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      // Product actions
+      // Product actions (mutually exclusive - selecting one clears the other)
       toggleProductWishlist: (messageId, productId) => {
         set((state) => ({
           messages: state.messages.map((msg) => {
@@ -293,21 +293,25 @@ export const useChatStore = create<ChatState>()(
             return {
               ...msg,
               products: msg.products.map((p) =>
-                p.id === productId ? { ...p, isWishlisted: !p.isWishlisted } : p
+                p.id === productId
+                  ? { ...p, isWishlisted: !p.isWishlisted, isAddedToCloset: false }
+                  : p
               ),
             };
           }),
         }));
       },
 
-      markProductAddedToCloset: (messageId, productId) => {
+      toggleProductCloset: (messageId, productId) => {
         set((state) => ({
           messages: state.messages.map((msg) => {
             if (msg.id !== messageId || !msg.products) return msg;
             return {
               ...msg,
               products: msg.products.map((p) =>
-                p.id === productId ? { ...p, isAddedToCloset: true } : p
+                p.id === productId
+                  ? { ...p, isAddedToCloset: !p.isAddedToCloset, isWishlisted: false }
+                  : p
               ),
             };
           }),

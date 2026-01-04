@@ -9,7 +9,7 @@ export interface ProductResultCardProps {
   product: ChatProduct;
   source: 'upload' | 'scrape' | 'search';
   onWishlistToggle?: (productId: string) => void;
-  onAddToCloset?: (productId: string) => void;
+  onClosetToggle?: (productId: string) => void;
   onClick?: (productId: string) => void;
   compact?: boolean;
 }
@@ -19,27 +19,28 @@ export interface ProductResultCardProps {
  *
  * Shows:
  * - Thumbnail image (48x48 or 64x64)
- * - Product name and brand
- * - Price (if available)
- * - Wishlist checkbox (for URL scrapes)
- * - Added checkmark (for uploaded products)
+ * - Brand, product name, and price as tag pills
+ * - Product tags from enrichment
+ * - Radio buttons for Closet/Wishlist (mutually exclusive)
  */
 export const ProductResultCard = memo(function ProductResultCard({
   product,
   source,
   onWishlistToggle,
-  onAddToCloset,
+  onClosetToggle,
   onClick,
   compact = false,
 }: ProductResultCardProps) {
   const imageSize = compact ? 48 : 64;
 
-  const handleWishlistChange = () => {
+  const handleWishlistChange = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onWishlistToggle?.(product.id);
   };
 
-  const handleAddClick = () => {
-    onAddToCloset?.(product.id);
+  const handleClosetChange = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClosetToggle?.(product.id);
   };
 
   const handleCardClick = () => {
@@ -49,11 +50,14 @@ export const ProductResultCard = memo(function ProductResultCard({
   // Format price
   const formatPrice = (price: number, currency?: string) => {
     if (!price || price === 0) return null;
-    const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+    const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'INR' ? '₹' : '$';
     return `${currencySymbol}${price.toFixed(0)}`;
   };
 
   const priceDisplay = formatPrice(product.price, product.currency);
+
+  // Get display tags (limit to 3)
+  const displayTags = product.tags?.slice(0, 3) || [];
 
   return (
     <div
@@ -111,35 +115,77 @@ export const ProductResultCard = memo(function ProductResultCard({
 
       {/* Product info */}
       <div className="flex-1 min-w-0">
-        <h4
-          className="text-sm font-medium truncate"
-          style={{ color: 'var(--foreground)' }}
-        >
-          {product.product_name}
-        </h4>
-        <p
-          className="text-xs truncate"
-          style={{ color: 'var(--foreground-muted)' }}
-        >
-          {product.brand}
-          {priceDisplay && ` · ${priceDisplay}`}
-        </p>
+        {/* Brand, Name, Price as tag pills */}
+        <div className="flex flex-wrap gap-1 mb-1.5">
+          {product.brand && (
+            <span
+              className="px-2 py-0.5 text-xs rounded-full"
+              style={{
+                backgroundColor: 'var(--surface-light)',
+                color: 'var(--foreground-secondary)',
+              }}
+            >
+              {product.brand}
+            </span>
+          )}
+          <span
+            className="px-2 py-0.5 text-xs rounded-full font-medium truncate max-w-[150px]"
+            style={{
+              backgroundColor: 'var(--surface-light)',
+              color: 'var(--foreground)',
+            }}
+            title={product.product_name}
+          >
+            {product.product_name}
+          </span>
+          {priceDisplay && (
+            <span
+              className="px-2 py-0.5 text-xs rounded-full font-medium"
+              style={{
+                backgroundColor: 'var(--primary-alpha)',
+                color: 'var(--primary-dark)',
+              }}
+            >
+              {priceDisplay}
+            </span>
+          )}
+        </div>
+
+        {/* Product tags from enrichment */}
+        {displayTags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {displayTags.map((tag, i) => (
+              <span
+                key={i}
+                className="px-1.5 py-0.5 text-[10px] rounded"
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  color: 'var(--foreground-muted)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Actions based on source */}
-        <div className="mt-1.5 flex items-center gap-2">
-          {/* Checkbox toggles for URL scrapes - both can be selected */}
+        <div className="flex items-center gap-3">
+          {/* Radio buttons for URL scrapes - mutually exclusive */}
           {source === 'scrape' && (
             <>
-              {/* Closet checkbox */}
+              {/* Closet radio */}
               <label
                 className="flex items-center gap-1.5 cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleClosetChange}
               >
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name={`product-dest-${product.id}`}
                   checked={product.isAddedToCloset || false}
-                  onChange={handleAddClick}
-                  className="w-3.5 h-3.5 rounded border cursor-pointer accent-[var(--primary)]"
+                  onChange={() => {}}
+                  className="w-3.5 h-3.5 cursor-pointer accent-[var(--primary)]"
                 />
                 <span
                   className="text-xs"
@@ -148,16 +194,17 @@ export const ProductResultCard = memo(function ProductResultCard({
                   Closet
                 </span>
               </label>
-              {/* Wishlist checkbox - checked by default */}
+              {/* Wishlist radio */}
               <label
                 className="flex items-center gap-1.5 cursor-pointer"
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleWishlistChange}
               >
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name={`product-dest-${product.id}`}
                   checked={product.isWishlisted || false}
-                  onChange={handleWishlistChange}
-                  className="w-3.5 h-3.5 rounded border cursor-pointer accent-[var(--primary)]"
+                  onChange={() => {}}
+                  className="w-3.5 h-3.5 cursor-pointer accent-[var(--primary)]"
                 />
                 <span
                   className="text-xs"
@@ -174,7 +221,7 @@ export const ProductResultCard = memo(function ProductResultCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleAddClick();
+                onClosetToggle?.(product.id);
               }}
               className="text-xs px-2 py-0.5 rounded-full transition-colors"
               style={{
@@ -194,7 +241,7 @@ export const ProductResultCard = memo(function ProductResultCard({
             </button>
           )}
 
-          {/* Added indicator - for uploads only (scrapes use checkboxes) */}
+          {/* Added indicator - for uploads only (scrapes use radio buttons) */}
           {source === 'upload' && (
             <span
               className="text-xs flex items-center gap-1"
