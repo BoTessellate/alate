@@ -173,7 +173,7 @@ export function UnifiedChatInput({
       )}
 
       {/* Input row */}
-      <div className="flex items-end gap-1.5 p-2">
+      <div className="flex items-center gap-1.5 p-2">
         {/* Hidden file input */}
         <input
           ref={fileInputRef}

@@ -266,12 +266,12 @@ describe('SidePanel Layout Positioning', () => {
     expect(panel).toHaveStyle({ width: '480px' });
   });
 
-  it('bubble appears above FAB area (bottom: 80px)', () => {
+  it('bubble appears above FAB area (bottom: 90px)', () => {
     render(<TestWrapper>Content</TestWrapper>);
 
     fireEvent.click(screen.getByText('Open Bubble'));
 
     const bubble = screen.getByText('Bubble Content').closest('div[class*="fixed z-50"]');
-    expect(bubble).toHaveStyle({ bottom: '80px' });
+    expect(bubble).toHaveStyle({ bottom: '90px' });
   });
 });

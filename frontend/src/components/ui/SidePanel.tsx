@@ -197,7 +197,7 @@ export function SidePanelLayout({ children }: SidePanelLayoutProps) {
         <div
           className="fixed z-50 flex flex-col border shadow-xl overflow-hidden transition-all duration-300 ease-out"
           style={{
-            bottom: '88px',
+            bottom: '90px',
             right: '24px',
             width: '280px',
             maxWidth: 'calc(100vw - 48px)',
@@ -269,8 +269,9 @@ interface MinimalBubbleProps {
  *
  * No scrollable message area - that's only in panel mode.
  *
- * POSITIONING: bottom: 88px leaves 16px clearance above the FloatingActionButton
+ * POSITIONING: bottom: 90px leaves 18px clearance above the FloatingActionButton
  * (which is 48px tall positioned at bottom: 24px, so its top is at 72px).
+ * Extra 2px accounts for border/sub-pixel rendering to ensure 16px+ visual gap.
  */
 function MinimalBubble({ content, onExpand, onClose }: MinimalBubbleProps) {
   const { bubbleStatusText } = useChatStore();
@@ -279,7 +280,7 @@ function MinimalBubble({ content, onExpand, onClose }: MinimalBubbleProps) {
     <div
       className="fixed z-50 flex flex-col border shadow-xl overflow-hidden transition-all duration-300 ease-out"
       style={{
-        bottom: '88px',
+        bottom: '90px',
         right: '24px',
         width: '300px',
         maxWidth: 'calc(100vw - 48px)',

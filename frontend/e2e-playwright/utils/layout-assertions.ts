@@ -21,7 +21,7 @@ export const CSS_VARS = {
   topbarTotalHeight: 76, // 56 + 20
   sidePanelWidth: 480,
   bubbleWidth: 280,
-  bubbleBottom: 88, // Increased from 80 to leave 16px clearance above FAB
+  bubbleBottom: 90, // Increased from 88 to ensure 16px+ clearance above FAB with borders
   bubbleRight: 24,
   fabBottom: 24,
   fabRight: 24,
@@ -432,6 +432,156 @@ export async function assertFabBubbleNoOverlap(fab: Locator, bubble: Locator): P
     rightEdgeDiff,
     `FAB and bubble should be aligned on right edge. Difference: ${rightEdgeDiff}px`
   ).toBeLessThanOrEqual(30); // Allow some tolerance
+}
+
+/**
+ * Assert all children of a flex container are vertically centered relative to container
+ * Useful for: icon rows, button groups, input containers with icons
+ */
+export async function assertFlexChildrenVerticallyCentered(
+  container: Locator,
+  childSelector: string,
+  tolerance: number = 3
+): Promise<void> {
+  const containerBox = await getBoundingBox(container);
+  const containerCenterY = containerBox.y + containerBox.height / 2;
+
+  const children = container.locator(childSelector);
+  const count = await children.count();
+
+  for (let i = 0; i < count; i++) {
+    const child = children.nth(i);
+    if (await child.isVisible()) {
+      const childBox = await getBoundingBox(child);
+      const childCenterY = childBox.y + childBox.height / 2;
+
+      const diff = Math.abs(childCenterY - containerCenterY);
+      expect(
+        diff,
+        `Child ${i} should be vertically centered. Container center: ${containerCenterY}px, Child center: ${childCenterY}px, Difference: ${diff}px`
+      ).toBeLessThanOrEqual(tolerance);
+    }
+  }
+}
+
+/**
+ * Assert icon is vertically centered within its container (button, input row, etc.)
+ * Specifically tests that icons inside buttons/inputs are properly centered
+ */
+export async function assertIconCenteredInContainer(
+  icon: Locator,
+  container: Locator,
+  tolerance: number = 3
+): Promise<void> {
+  const iconBox = await getBoundingBox(icon);
+  const containerBox = await getBoundingBox(container);
+
+  const iconCenterY = iconBox.y + iconBox.height / 2;
+  const containerCenterY = containerBox.y + containerBox.height / 2;
+
+  const yDiff = Math.abs(iconCenterY - containerCenterY);
+
+  expect(
+    yDiff,
+    `Icon should be vertically centered. Container center: ${containerCenterY}px, Icon center: ${iconCenterY}px`
+  ).toBeLessThanOrEqual(tolerance);
+
+  // Also check horizontal centering if icon is meant to be centered (like in icon-only buttons)
+  const iconCenterX = iconBox.x + iconBox.width / 2;
+  const containerCenterX = containerBox.x + containerBox.width / 2;
+
+  // Only check horizontal if container is roughly square (icon button)
+  if (Math.abs(containerBox.width - containerBox.height) < 10) {
+    const xDiff = Math.abs(iconCenterX - containerCenterX);
+    expect(
+      xDiff,
+      `Icon should be horizontally centered in square container. Container center: ${containerCenterX}px, Icon center: ${iconCenterX}px`
+    ).toBeLessThanOrEqual(tolerance);
+  }
+}
+
+/**
+ * Assert checkbox/toggle indicator is vertically centered with its label
+ */
+export async function assertCheckboxLabelAligned(
+  checkbox: Locator,
+  label: Locator,
+  tolerance: number = 3
+): Promise<void> {
+  const checkboxBox = await getBoundingBox(checkbox);
+  const labelBox = await getBoundingBox(label);
+
+  const checkboxCenterY = checkboxBox.y + checkboxBox.height / 2;
+  const labelCenterY = labelBox.y + labelBox.height / 2;
+
+  const diff = Math.abs(checkboxCenterY - labelCenterY);
+
+  expect(
+    diff,
+    `Checkbox and label should be vertically aligned. Checkbox center: ${checkboxCenterY}px, Label center: ${labelCenterY}px`
+  ).toBeLessThanOrEqual(tolerance);
+}
+
+/**
+ * Assert modal content is centered in viewport
+ */
+export async function assertModalCenteredInViewport(
+  modal: Locator,
+  page: Page,
+  tolerance: number = 50
+): Promise<void> {
+  const modalBox = await getBoundingBox(modal);
+  const viewport = page.viewportSize();
+
+  if (!viewport) {
+    throw new Error('Viewport size not available');
+  }
+
+  const modalCenterX = modalBox.x + modalBox.width / 2;
+  const modalCenterY = modalBox.y + modalBox.height / 2;
+  const viewportCenterX = viewport.width / 2;
+  const viewportCenterY = viewport.height / 2;
+
+  const xDiff = Math.abs(modalCenterX - viewportCenterX);
+  const yDiff = Math.abs(modalCenterY - viewportCenterY);
+
+  expect(
+    xDiff,
+    `Modal should be horizontally centered. Viewport center: ${viewportCenterX}px, Modal center: ${modalCenterX}px`
+  ).toBeLessThanOrEqual(tolerance);
+  expect(
+    yDiff,
+    `Modal should be vertically centered. Viewport center: ${viewportCenterY}px, Modal center: ${modalCenterY}px`
+  ).toBeLessThanOrEqual(tolerance);
+}
+
+/**
+ * Assert button content (icon + text) is centered within button
+ */
+export async function assertButtonContentCentered(
+  button: Locator,
+  tolerance: number = 5
+): Promise<void> {
+  const buttonBox = await getBoundingBox(button);
+  const buttonCenterY = buttonBox.y + buttonBox.height / 2;
+
+  // Check any icons inside the button
+  const icons = button.locator('svg');
+  const iconCount = await icons.count();
+
+  for (let i = 0; i < iconCount; i++) {
+    const icon = icons.nth(i);
+    if (await icon.isVisible()) {
+      const iconBox = await getBoundingBox(icon);
+      const iconCenterY = iconBox.y + iconBox.height / 2;
+
+      const diff = Math.abs(iconCenterY - buttonCenterY);
+      expect(
+        diff,
+        `Button icon should be vertically centered. Button center: ${buttonCenterY}px, Icon center: ${iconCenterY}px`
+      ).toBeLessThanOrEqual(tolerance);
+    }
+  }
 }
 
 /**
