@@ -259,8 +259,12 @@ export default function UnifiedChatContent() {
         texture: enrichedData.texture,
         tone: enrichedData.tone,
         source: 'scrape',
-        isWishlisted: false,
+        isWishlisted: true, // Default to wishlisted
       };
+
+      // Auto-add to wishlist collection since it's wishlisted by default
+      ensureWishlistCollection();
+      addProductToCollection(WISHLIST_COLLECTION_ID, product as Product);
 
       updateProgress(100);
 
@@ -280,7 +284,7 @@ export default function UnifiedChatContent() {
         statusType: 'error',
       });
     }
-  }, [addMessage, startProcessing, updateProgress, updateStage, finishProcessing, setProcessingError]);
+  }, [addMessage, startProcessing, updateProgress, updateStage, finishProcessing, setProcessingError, ensureWishlistCollection, addProductToCollection]);
 
   // Process text search
   const processTextSearch = useCallback(async (query: string) => {
@@ -406,7 +410,7 @@ export default function UnifiedChatContent() {
             className="ml-auto max-w-[85%] px-3 py-2 rounded-2xl rounded-br-sm"
             style={{ backgroundColor: 'var(--primary-light)' }}
           >
-            <p className="text-sm break-words" style={{ color: 'var(--foreground)' }}>
+            <p className="text-sm break-words" style={{ color: 'white' }}>
               {message.content}
             </p>
           </div>
@@ -427,7 +431,7 @@ export default function UnifiedChatContent() {
                 className="px-3 py-2 rounded-2xl rounded-br-sm"
                 style={{ backgroundColor: 'var(--primary-light)' }}
               >
-                <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                <p className="text-sm" style={{ color: 'white' }}>
                   {message.content}
                 </p>
               </div>
