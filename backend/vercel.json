@@ -9,9 +9,11 @@
   "functions": {
     "api/*.ts": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "excludeFiles": "api/index.ts"
     }
   },
+  "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "headers": [
     {
       "source": "/api/shopify",

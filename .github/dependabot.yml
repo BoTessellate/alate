@@ -99,14 +99,23 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      # Group testing dependencies
+      # Group testing dependencies (including major versions to prevent peer conflicts)
       testing:
         patterns:
           - "vitest*"
           - "@vitest/*"
         update-types:
+          - "major"
           - "minor"
           - "patch"
+      # Group zod with SDKs that depend on it
+      validation:
+        patterns:
+          - "zod"
+        update-types:
+          - "minor"
+          - "patch"
+        # Note: zod major versions should be reviewed manually due to SDK compatibility
 
   # Mobile dependencies
   - package-ecosystem: "npm"

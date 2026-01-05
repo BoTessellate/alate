@@ -75,6 +75,41 @@ jobs:
           fi
 
   # ============================================================================
+  # Dependency Compatibility Check - Runs on Dependabot PRs
+  # ============================================================================
+  dependency-check:
+    name: Dependency Compatibility
+    if: github.actor == 'dependabot[bot]' || contains(github.event.pull_request.labels.*.name, 'dependencies')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Check if directory has changes
+        id: check
+        run: |
+          if [ -f "${{ matrix.directory }}/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies (catches peer conflicts)
+        if: steps.check.outputs.exists == 'true'
+        working-directory: ${{ matrix.directory }}
+        run: |
+          echo "Testing npm install for ${{ matrix.directory }}..."
+          npm ci
+          echo "✓ Dependencies installed successfully - no peer conflicts"
+
+  # ============================================================================
   # Backend Checks - Only run when backend files change
   # ============================================================================
   backend-typecheck:

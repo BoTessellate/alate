@@ -1,0 +1,13 @@
+# Exclude local development server
+api/index.ts
+
+# Exclude scheduler functions (not serverless - run via cron elsewhere)
+functions/
+
+# Exclude test files
+**/*.test.ts
+**/__tests__/
+
+# Exclude development files
+.env.local
+.env.development
