@@ -331,3 +331,41 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
 - Store schedule preferences in user settings (useSettingsStore)
 - Display personalized suggestions like "Meeting in 2 hours" or "Gym at 6pm"
 **Priority:** Low - future personalization feature.
+
+---
+
+### 6. Settings UI for Location Override
+**Status:** Not started
+**Context:** WeatherWidget now uses browser geolocation (navigator.geolocation) with IP fallback. Location is cached in useSettingsStore.
+**Action Required:** Add a "Location" section to Settings page allowing users to:
+- See their detected location
+- Manually type a city name to override
+- Clear cached location to re-detect
+**Priority:** Low - nice-to-have UX improvement.
+
+---
+
+### 7. User-Configurable API Keys
+**Status:** Not started
+**Context:** Currently AI features (enrichment, chat, search) use backend API keys. Users may want to use their own keys for:
+- Higher rate limits
+- Cost control
+- Privacy (their requests don't go through our backend)
+**Action Required:**
+- Add "AI Settings" section to Settings page
+- Allow users to input their own API keys:
+  - OpenAI API key (for image generation, embeddings)
+  - Anthropic API key (for Claude - fallback enrichment)
+  - Google Gemini API key (for primary enrichment)
+- Secure storage options:
+  - Option A: Store encrypted in Supabase user_settings table
+  - Option B: Store in localStorage (client-side only, not synced)
+- UI considerations:
+  - Show masked key with "Edit" button
+  - "Test" button to verify key works
+  - Clear explanation of what each key is used for
+  - Link to each provider's API key page
+- Backend changes:
+  - Accept user API key in request headers
+  - Use user key if provided, fall back to system keys
+**Priority:** Medium - enables power users and reduces backend costs.

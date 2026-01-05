@@ -229,6 +229,48 @@ class ProductExtractor {
       const hostname = urlObj.hostname.replace('www.', '');
       const brandFromDomain = hostname.split('.')[0];
       result.brandName = brandFromDomain.charAt(0).toUpperCase() + brandFromDomain.slice(1);
+
+      // Infer currency from country-specific TLDs
+      const tld = hostname.split('.').pop()?.toLowerCase();
+      const tldCurrencyMap: { [key: string]: string } = {
+        'in': 'INR',   // India
+        'uk': 'GBP',   // United Kingdom
+        'eu': 'EUR',   // European Union
+        'de': 'EUR',   // Germany
+        'fr': 'EUR',   // France
+        'it': 'EUR',   // Italy
+        'es': 'EUR',   // Spain
+        'jp': 'JPY',   // Japan
+        'cn': 'CNY',   // China
+        'au': 'AUD',   // Australia
+        'ca': 'CAD',   // Canada
+        'br': 'BRL',   // Brazil
+        'mx': 'MXN',   // Mexico
+        'kr': 'KRW',   // South Korea
+        'sg': 'SGD',   // Singapore
+        'ae': 'AED',   // UAE
+        'sa': 'SAR',   // Saudi Arabia
+        'za': 'ZAR',   // South Africa
+        'ru': 'RUB',   // Russia
+        'se': 'SEK',   // Sweden
+        'no': 'NOK',   // Norway
+        'dk': 'DKK',   // Denmark
+        'ch': 'CHF',   // Switzerland
+        'nz': 'NZD',   // New Zealand
+        'hk': 'HKD',   // Hong Kong
+        'th': 'THB',   // Thailand
+        'my': 'MYR',   // Malaysia
+        'id': 'IDR',   // Indonesia
+        'ph': 'PHP',   // Philippines
+        'vn': 'VND',   // Vietnam
+        'pl': 'PLN',   // Poland
+        'tr': 'TRY',   // Turkey
+      };
+
+      if (tld && tldCurrencyMap[tld]) {
+        result.currency = tldCurrencyMap[tld];
+        log.debug({ tld, currency: result.currency }, 'Inferred currency from TLD');
+      }
     } catch (e) {
       // Invalid URL
     }
@@ -272,7 +314,7 @@ class ProductExtractor {
       title: jsonLD.title || jsData.title || metaTags.title || htmlPatterns.title || '',
       brandName: jsonLD.brandName || metaTags.brandName || urlData.brandName || '',
       price: jsonLD.price || jsData.price || metaTags.price || htmlPatterns.price || '',
-      currency: jsonLD.currency || metaTags.currency || htmlPatterns.currency || '',
+      currency: jsonLD.currency || metaTags.currency || htmlPatterns.currency || urlData.currency || '',
       imageUrl: jsonLD.imageUrl || metaTags.imageUrl || '',
     };
 

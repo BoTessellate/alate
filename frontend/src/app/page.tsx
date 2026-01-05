@@ -166,7 +166,7 @@ export default function Home() {
               {/* Closet Items */}
               <StatCard
                 value={isHydrated ? totalClosetItems : '—'}
-                label="Items"
+                label={totalClosetItems === 1 ? 'Item' : 'Items'}
                 sublabel="in closet"
               />
 

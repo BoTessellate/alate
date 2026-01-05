@@ -18,8 +18,10 @@ import {
   LogOut,
   Edit2,
   DollarSign,
+  MessageCircle,
 } from 'lucide-react';
 import { useSettingsStore, Theme } from '@/stores/useSettingsStore';
+import { useChatStore } from '@/stores/useChatStore';
 import {
   Button,
   Card,
@@ -212,10 +214,14 @@ export default function SettingsPage() {
     setPriceRange,
   } = useSettingsStore();
 
+  const { messages, clearHistory } = useChatStore();
+
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isClearingChat, setIsClearingChat] = useState(false);
+  const [showChatClearConfirm, setShowChatClearConfirm] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(userName || '');
@@ -313,6 +319,24 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Sign out failed:', error);
       setIsSigningOut(false);
+    }
+  };
+
+  const handleClearChatHistory = async () => {
+    if (!showChatClearConfirm) {
+      setShowChatClearConfirm(true);
+      return;
+    }
+    setIsClearingChat(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      clearHistory();
+      setShowChatClearConfirm(false);
+      await showSaveStatus();
+    } catch (error) {
+      console.error('Clear chat failed:', error);
+    } finally {
+      setIsClearingChat(false);
     }
   };
 
@@ -661,6 +685,53 @@ export default function SettingsPage() {
               loadingText="Exporting..."
               testId="export-data-btn"
             />
+
+            {/* Clear Chat History */}
+            {showChatClearConfirm ? (
+              <div
+                className="p-3 rounded-lg"
+                style={{ backgroundColor: 'var(--surface-light)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <MessageCircle size={20} style={{ color: 'var(--foreground-secondary)' }} />
+                    <div>
+                      <p className="font-medium" style={{ color: 'var(--foreground)' }}>
+                        Clear {messages.length} message{messages.length !== 1 ? 's' : ''}?
+                      </p>
+                      <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                        This action cannot be undone
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowChatClearConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleClearChatHistory}
+                      disabled={isClearingChat}
+                    >
+                      {isClearingChat ? 'Clearing...' : 'Clear'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ActionButton
+                icon={MessageCircle}
+                title="Clear chat history"
+                description={`${messages.length} message${messages.length !== 1 ? 's' : ''} stored locally`}
+                onClick={handleClearChatHistory}
+                testId="clear-chat-btn"
+              />
+            )}
 
             <ActionButton
               icon={LogOut}

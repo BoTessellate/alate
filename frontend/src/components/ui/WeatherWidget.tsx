@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Droplets, CloudFog } from 'lucide-react';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 interface WeatherData {
   temperature: number;
@@ -28,34 +29,86 @@ const getWeatherInfo = (code: number): { icon: React.ReactNode; description: str
 export function WeatherWidget() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { userLocation, setUserLocation } = useSettingsStore();
 
   useEffect(() => {
+    const fetchWeatherForCoords = async (lat: number, lng: number, city: string) => {
+      const weatherRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&timezone=auto`
+      );
+      if (!weatherRes.ok) throw new Error('Weather fetch failed');
+      const weatherData = await weatherRes.json();
+      setWeather({
+        temperature: Math.round(weatherData.current.temperature_2m),
+        weatherCode: weatherData.current.weather_code,
+        location: city,
+      });
+    };
+
+    const getCityFromCoords = async (lat: number, lng: number): Promise<string> => {
+      try {
+        // Use Open-Meteo's geocoding API for reverse lookup
+        const res = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m&timezone=auto`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          // Open-Meteo returns timezone which often contains city info
+          // Fall back to coordinates if no city name available
+          return data.timezone?.split('/').pop()?.replace(/_/g, ' ') || 'Your Location';
+        }
+      } catch {
+        // Ignore reverse geocoding errors
+      }
+      return 'Your Location';
+    };
+
+    const fallbackToIpGeolocation = async () => {
+      const ipRes = await fetch('https://ipapi.co/json/');
+      if (!ipRes.ok) throw new Error('IP geolocation failed');
+      const ipData = await ipRes.json();
+      const { latitude, longitude, city } = ipData;
+      if (!latitude || !longitude) throw new Error('No coordinates');
+      await fetchWeatherForCoords(latitude, longitude, city || 'Your Location');
+    };
+
     const fetchWeather = async () => {
       try {
-        // Use ipapi.co (HTTPS, free tier)
-        const ipRes = await fetch('https://ipapi.co/json/');
+        // 1. Use cached location if available
+        if (userLocation) {
+          await fetchWeatherForCoords(
+            userLocation.latitude,
+            userLocation.longitude,
+            userLocation.city
+          );
+          return;
+        }
 
-        if (!ipRes.ok) throw new Error('IP geolocation failed');
+        // 2. Try browser geolocation (more accurate)
+        if ('geolocation' in navigator) {
+          try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 300000, // Cache for 5 minutes
+              });
+            });
 
-        const ipData = await ipRes.json();
-        const { latitude, longitude, city } = ipData;
+            const { latitude, longitude } = position.coords;
+            const city = await getCityFromCoords(latitude, longitude);
 
-        if (!latitude || !longitude) throw new Error('No coordinates');
+            // Cache the location
+            setUserLocation({ latitude, longitude, city });
+            await fetchWeatherForCoords(latitude, longitude, city);
+            return;
+          } catch {
+            // Geolocation denied or failed, fall back to IP
+          }
+        }
 
-        // Fetch weather from Open-Meteo
-        const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&timezone=auto`
-        );
-
-        if (!weatherRes.ok) throw new Error('Weather fetch failed');
-
-        const weatherData = await weatherRes.json();
-
-        setWeather({
-          temperature: Math.round(weatherData.current.temperature_2m),
-          weatherCode: weatherData.current.weather_code,
-          location: city || 'Your Location',
-        });
+        // 3. Fall back to IP geolocation
+        await fallbackToIpGeolocation();
       } catch {
         // Silently fail - widget just won't show
       } finally {
@@ -64,7 +117,7 @@ export function WeatherWidget() {
     };
 
     fetchWeather();
-  }, []);
+  }, [userLocation, setUserLocation]);
 
   if (loading) {
     return (

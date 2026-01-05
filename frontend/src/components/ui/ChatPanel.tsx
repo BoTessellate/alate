@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { ExpandablePanel, type ExpandablePanelProps } from './ExpandablePanel';
 import { ChatMessage, type MessageRole } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -28,6 +28,8 @@ export interface ChatPanelProps extends Omit<ExpandablePanelProps, 'children'> {
   suggestedPrompts?: string[];
   /** Callback when a suggested prompt is clicked */
   onSuggestedPromptClick?: (prompt: string) => void;
+  /** Callback to clear chat history */
+  onClearHistory?: () => void;
 }
 
 /**
@@ -61,10 +63,25 @@ export function ChatPanel({
   welcomeMessage = 'How can I help you find the perfect products?',
   suggestedPrompts = [],
   onSuggestedPromptClick,
+  onClearHistory,
   ...panelProps
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const handleClearClick = useCallback(() => {
+    setShowClearConfirm(true);
+  }, []);
+
+  const handleConfirmClear = useCallback(() => {
+    onClearHistory?.();
+    setShowClearConfirm(false);
+  }, [onClearHistory]);
+
+  const handleCancelClear = useCallback(() => {
+    setShowClearConfirm(false);
+  }, []);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -148,6 +165,54 @@ export function ChatPanel({
           ) : (
             // Message list
             <>
+              {/* Clear history button and confirmation */}
+              {onClearHistory && (
+                <div className="flex justify-end mb-2">
+                  {showClearConfirm ? (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                      style={{ backgroundColor: 'var(--surface-elevated)' }}
+                    >
+                      <span className="text-xs" style={{ color: 'var(--foreground-secondary)' }}>
+                        Clear all messages?
+                      </span>
+                      <button
+                        onClick={handleConfirmClear}
+                        className="text-xs px-2 py-1 rounded transition-colors"
+                        style={{ backgroundColor: 'var(--error)', color: 'white' }}
+                      >
+                        Clear
+                      </button>
+                      <button
+                        onClick={handleCancelClear}
+                        className="text-xs px-2 py-1 rounded transition-colors"
+                        style={{ backgroundColor: 'var(--surface-light)', color: 'var(--foreground)' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleClearClick}
+                      className="p-1.5 rounded-full transition-colors"
+                      style={{ color: 'var(--foreground-muted)' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--surface-elevated)';
+                        e.currentTarget.style.color = 'var(--foreground)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = 'var(--foreground-muted)';
+                      }}
+                      title="Clear chat history"
+                      aria-label="Clear chat history"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+
               {messages.map((message) => (
                 <ChatMessage
                   key={message.id}

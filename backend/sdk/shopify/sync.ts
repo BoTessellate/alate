@@ -8,7 +8,7 @@ import { createShopifyClient, ShopifyGraphQLClient } from './client';
 import { transformShopifyProducts, generateFitTags, TransformedProduct } from './transformer';
 import { decryptToken, getShopifyConfig } from './auth';
 import type { SyncResult, SyncError, SyncStatus, ShopifySession } from './types';
-import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
+import { callGemini, callOpenAI, callClaude, parseJSONFromResponse } from '../shared/secureAI';
 
 /**
  * Get current time in IST as ISO string
@@ -131,9 +131,28 @@ For texture: Describe the texture (e.g., "smooth", "woven", "matte", "glossy").
 For tone: Describe the aesthetic mood.`;
 
   try {
-    const response = await callClaude(prompt, { maxTokens: 300 });
-    if (!response.success || !response.text) return null;
+    // Use Gemini → GPT-4o-mini → Claude fallback chain
+    let response = await callGemini(prompt, { maxTokens: 300 });
+    let modelUsed = 'gemini';
 
+    if (!response.success) {
+      console.log('[enrichProduct] Gemini failed, trying GPT-4o-mini...', response.error);
+      response = await callOpenAI(prompt, { maxTokens: 300 });
+      modelUsed = 'gpt-4o-mini';
+    }
+
+    if (!response.success) {
+      console.log('[enrichProduct] GPT-4o-mini failed, trying Claude...', response.error);
+      response = await callClaude(prompt, { maxTokens: 300 });
+      modelUsed = 'claude';
+    }
+
+    if (!response.success || !response.text) {
+      console.error('[enrichProduct] All AI models failed:', response.error);
+      return null;
+    }
+
+    console.log('[enrichProduct] Using model:', modelUsed);
     const parsed = parseJSONFromResponse(response.text);
     if (!parsed) return null;
 
@@ -406,12 +425,35 @@ export async function syncShopProducts(
   // Transform products
   console.log('[syncShopProducts] Transforming products...');
   options.onProgress?.('transform', 0, shopifyProducts.length);
+
+  // Debug: Log raw Shopify product structure for first product
+  if (shopifyProducts.length > 0) {
+    const firstRaw = shopifyProducts[0] as any;
+    console.log('[syncShopProducts] First raw product:', {
+      id: firstRaw.id,
+      title: firstRaw.title,
+      hasImages: !!firstRaw.images?.edges?.length,
+      imageCount: firstRaw.images?.edges?.length || 0,
+      firstImageSrc: firstRaw.images?.edges?.[0]?.node?.src || 'NO IMAGE',
+    });
+  }
+
   const transformed = transformShopifyProducts(shopifyProducts as any, {
     shopDomain,
     includeVariants: true,
     includeDimensions: true,
   });
   console.log('[syncShopProducts] Transform complete, got', transformed.length, 'products');
+
+  // Debug: Log transformed product to verify image_url
+  if (transformed.length > 0) {
+    console.log('[syncShopProducts] First transformed product:', {
+      product_name: transformed[0].product_name,
+      image_url: transformed[0].image_url || 'NO IMAGE URL',
+      external_id: transformed[0].external_id,
+    });
+  }
+
   options.onProgress?.('transform', transformed.length, shopifyProducts.length);
 
   // Enrich products (unless skipped)

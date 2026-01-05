@@ -284,8 +284,34 @@ export default function AdminPage() {
     total: number;
     missing_images: number;
     with_images: number;
+    enriched: number;
+    pending_enrichment: number;
+    with_tags: number;
+    shopify: {
+      total: number;
+      enriched: number;
+      pending: number;
+    };
     loading: boolean;
-  }>({ total: 0, missing_images: 0, with_images: 0, loading: true });
+  }>({
+    total: 0,
+    missing_images: 0,
+    with_images: 0,
+    enriched: 0,
+    pending_enrichment: 0,
+    with_tags: 0,
+    shopify: { total: 0, enriched: 0, pending: 0 },
+    loading: true,
+  });
+
+  // Enrichment state
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<{
+    success: boolean;
+    enriched_count: number;
+    failed_count: number;
+    message?: string;
+  } | null>(null);
 
   // Load cached test results on mount
   useEffect(() => {
@@ -362,11 +388,45 @@ export default function AdminPage() {
           total: data.stats.total,
           missing_images: data.stats.missing_images,
           with_images: data.stats.with_images,
+          enriched: data.stats.enriched || 0,
+          pending_enrichment: data.stats.pending_enrichment || 0,
+          with_tags: data.stats.with_tags || 0,
+          shopify: data.stats.shopify || { total: 0, enriched: 0, pending: 0 },
           loading: false,
         });
       }
     } catch {
       setProductStats(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Trigger enrichment for pending products
+  const triggerEnrichment = async () => {
+    setIsEnriching(true);
+    setEnrichResult(null);
+    try {
+      const response = await fetch(`${API_URL}/api/ai?action=enrich-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      setEnrichResult({
+        success: data.success,
+        enriched_count: data.enriched_count || 0,
+        failed_count: data.failed_count || 0,
+        message: data.message,
+      });
+      // Refresh stats after enrichment
+      fetchProductStats();
+    } catch (err) {
+      setEnrichResult({
+        success: false,
+        enriched_count: 0,
+        failed_count: 0,
+        message: err instanceof Error ? err.message : 'Enrichment failed',
+      });
+    } finally {
+      setIsEnriching(false);
     }
   };
 
@@ -1396,6 +1456,240 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* AI Enrichment Dashboard */}
+          <section
+            className="rounded-lg border"
+            style={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(147, 51, 234, 0.2)' }}>
+                  <Brain size={20} style={{ color: '#9333ea' }} />
+                </div>
+                <div>
+                  <h2
+                    className="text-lg italic"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
+                    AI Enrichment Dashboard
+                  </h2>
+                  <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                    Enrich products with AI-generated tags, categories, and metadata
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Enrichment Stats */}
+              {!productStats.loading && (
+                <div className="grid grid-cols-4 gap-4">
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: 'rgba(147, 51, 234, 0.1)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{ fontFamily: 'var(--font-cormorant)', color: '#9333ea' }}
+                    >
+                      {productStats.enriched}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      Enriched
+                    </div>
+                  </div>
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: productStats.pending_enrichment > 0 ? 'rgba(245, 158, 11, 0.1)' : 'var(--surface-light)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{
+                        fontFamily: 'var(--font-cormorant)',
+                        color: productStats.pending_enrichment > 0 ? 'var(--warning, #f59e0b)' : 'var(--foreground)',
+                      }}
+                    >
+                      {productStats.pending_enrichment}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      Pending
+                    </div>
+                  </div>
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: 'var(--surface-light)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{ fontFamily: 'var(--font-cormorant)', color: 'var(--foreground)' }}
+                    >
+                      {productStats.with_tags}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      With Tags
+                    </div>
+                  </div>
+                  <div
+                    className="p-4 rounded-lg text-center"
+                    style={{ backgroundColor: 'var(--surface-light)' }}
+                  >
+                    <div
+                      className="text-3xl font-semibold mb-1"
+                      style={{ fontFamily: 'var(--font-cormorant)', color: 'var(--foreground)' }}
+                    >
+                      {productStats.shopify.total}
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                      Shopify Products
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shopify Enrichment Breakdown */}
+              {productStats.shopify.total > 0 && (
+                <div
+                  className="p-4 rounded-lg"
+                  style={{ backgroundColor: 'var(--surface-light)' }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <Store size={16} style={{ color: 'var(--foreground-muted)' }} />
+                    <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                      Shopify Enrichment Status
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+                      <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                        {productStats.shopify.enriched} enriched
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} style={{ color: 'var(--warning, #f59e0b)' }} />
+                      <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                        {productStats.shopify.pending} pending
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="flex-1">
+                      <div
+                        className="h-2 rounded-full overflow-hidden"
+                        style={{ backgroundColor: 'var(--border)' }}
+                      >
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            backgroundColor: 'var(--success)',
+                            width: `${productStats.shopify.total > 0 ? (productStats.shopify.enriched / productStats.shopify.total) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Enrich Button */}
+              <div
+                className="p-4 rounded-lg flex items-center justify-between"
+                style={{ backgroundColor: productStats.pending_enrichment > 0 ? 'rgba(147, 51, 234, 0.05)' : 'var(--surface-light)' }}
+              >
+                <div>
+                  <p className="font-medium mb-1" style={{ color: 'var(--foreground)' }}>
+                    Run AI Enrichment
+                  </p>
+                  <p className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                    {productStats.pending_enrichment > 0
+                      ? `Enrich ${productStats.pending_enrichment} pending product${productStats.pending_enrichment !== 1 ? 's' : ''} with AI-generated metadata (processes up to 20 at a time)`
+                      : 'All products are enriched!'}
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  icon={Sparkles}
+                  onClick={triggerEnrichment}
+                  disabled={isEnriching || productStats.pending_enrichment === 0}
+                  loading={isEnriching}
+                >
+                  {isEnriching ? 'Enriching...' : 'Enrich Products'}
+                </Button>
+              </div>
+
+              {/* Enrichment Result */}
+              {enrichResult && (
+                <div
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: enrichResult.success
+                      ? 'rgba(76, 112, 49, 0.1)'
+                      : 'rgba(168, 64, 50, 0.1)',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    {enrichResult.success ? (
+                      <CheckCircle size={18} style={{ color: 'var(--success)' }} />
+                    ) : (
+                      <XCircle size={18} style={{ color: 'var(--error)' }} />
+                    )}
+                    <span
+                      className="font-medium"
+                      style={{ color: enrichResult.success ? 'var(--success)' : 'var(--error)' }}
+                    >
+                      {enrichResult.message || (enrichResult.success ? 'Enrichment complete' : 'Enrichment failed')}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div
+                      className="p-3 rounded-lg text-center"
+                      style={{ backgroundColor: 'var(--background)' }}
+                    >
+                      <div className="font-semibold" style={{ color: 'var(--success)' }}>
+                        {enrichResult.enriched_count}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                        Successfully Enriched
+                      </div>
+                    </div>
+                    <div
+                      className="p-3 rounded-lg text-center"
+                      style={{ backgroundColor: 'var(--background)' }}
+                    >
+                      <div
+                        className="font-semibold"
+                        style={{ color: enrichResult.failed_count > 0 ? 'var(--error)' : 'var(--foreground)' }}
+                      >
+                        {enrichResult.failed_count}
+                      </div>
+                      <div className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                        Failed
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info note */}
+              <div
+                className="p-3 rounded-lg flex items-start gap-3"
+                style={{ backgroundColor: 'var(--background)' }}
+              >
+                <Info size={16} style={{ color: 'var(--foreground-muted)', marginTop: 2 }} />
+                <div className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+                  <p>AI enrichment uses Gemini → GPT-4o-mini → Claude fallback chain for reliability.</p>
+                  <p className="mt-1">Products are enriched with tags, materials, textures, categories, and mood metadata.</p>
+                </div>
+              </div>
             </div>
           </section>
 

@@ -738,12 +738,13 @@ async function handleSyncRedirect(req: VercelRequest, res: VercelResponse) {
     return res.redirect(302, `${config.appUrl}/api/shopify?action=auth&shop=${encodeURIComponent(shopDomain)}`);
   }
 
-  // Do the sync
+  // Do the sync WITHOUT enrichment (to avoid Shopify API timeout issues)
+  // Enrichment will be triggered automatically after sync via the embedded app
   console.log('[SYNC-REDIRECT] Starting sync for:', shopDomain);
   const result = await syncShopProducts(shopDomain, {
     supabaseUrl,
     supabaseKey,
-    skipEnrichment: true,
+    skipEnrichment: true,  // Skip enrichment during sync - will auto-trigger after
   });
 
   console.log('[SYNC-REDIRECT] Sync complete:', result.success, result.products_synced, 'products');
@@ -849,8 +850,8 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
 
   console.log('[ENRICH] Found', products.length, 'products to enrich');
 
-  // Import the enrichment function from sync
-  const { callClaude, parseJSONFromResponse } = await import('../sdk/shared/secureAI');
+  // Import AI functions with fallback chain support
+  const { callGemini, callOpenAI, callClaude, parseJSONFromResponse } = await import('../sdk/shared/secureAI');
 
   const enriched: string[] = [];
   const failed: { id: string; error: string }[] = [];
@@ -877,11 +878,27 @@ Return this exact JSON structure:
   "fit_tags": ["layout_hint"]
 }`;
 
-      const response = await callClaude(prompt, { maxTokens: 512 });
+      // Use Gemini → GPT-4o-mini → Claude fallback chain
+      let response = await callGemini(prompt, { maxTokens: 512 });
+      let modelUsed = 'gemini';
+
+      if (!response.success) {
+        console.log('[ENRICH] Gemini failed, trying GPT-4o-mini...', response.error);
+        response = await callOpenAI(prompt, { maxTokens: 512 });
+        modelUsed = 'gpt-4o-mini';
+      }
+
+      if (!response.success) {
+        console.log('[ENRICH] GPT-4o-mini failed, trying Claude...', response.error);
+        response = await callClaude(prompt, { maxTokens: 512 });
+        modelUsed = 'claude';
+      }
 
       if (!response.success || !response.text) {
-        throw new Error(response.error || 'Claude call failed');
+        throw new Error(response.error || 'All AI models failed');
       }
+
+      console.log('[ENRICH] Using model:', modelUsed);
 
       const enrichment = parseJSONFromResponse(response.text);
       if (!enrichment) {
@@ -1447,12 +1464,6 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
           </svg>
           <span id="syncText">Sync Products</span>
         </button>
-        <button class="btn btn-secondary" id="enrichBtn" onclick="enrichProducts()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-          </svg>
-          <span id="enrichText">Enrich with AI</span>
-        </button>
         <a href="${FRONTEND_URL}" target="_blank" class="btn btn-secondary">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1490,8 +1501,8 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
             </svg>
           </div>
           <div class="feature-content">
-            <h3>AI-Powered Enrichment</h3>
-            <p>Products are automatically tagged with style, mood, and aesthetic attributes</p>
+            <h3>Automatic AI Enrichment</h3>
+            <p>Products are automatically tagged with style, mood, and aesthetic attributes after sync</p>
           </div>
         </div>
 
@@ -1519,46 +1530,6 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
       window.top.location.href = apiBase + '/api/shopify?action=sync-redirect&shop=' + encodeURIComponent(shop);
     }
 
-    async function enrichProducts() {
-      const btn = document.getElementById('enrichBtn');
-      const text = document.getElementById('enrichText');
-      const msg = document.getElementById('message');
-
-      btn.disabled = true;
-      text.textContent = 'Enriching...';
-      msg.style.display = 'none';
-
-      try {
-        const response = await fetch(apiBase + '/api/shopify?action=enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop: shop, limit: 20 })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          msg.className = 'message success';
-          if (result.enriched_count === 0) {
-            msg.textContent = 'All products are already enriched';
-          } else {
-            msg.textContent = 'Enriched ' + result.enriched_count + ' product' + (result.enriched_count !== 1 ? 's' : '') + ' with AI';
-          }
-        } else {
-          msg.className = 'message error';
-          msg.textContent = result.error || 'Enrichment failed';
-        }
-        msg.style.display = 'block';
-      } catch (error) {
-        msg.className = 'message error';
-        msg.textContent = 'Failed to enrich products';
-        msg.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        text.textContent = 'Enrich with AI';
-      }
-    }
-
     // Check for sync results in URL
     const urlParams = new URLSearchParams(window.location.search);
     const synced = urlParams.get('synced');
@@ -1566,24 +1537,84 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
     const syncDuration = urlParams.get('duration');
 
     if (synced !== null) {
-      const msg = document.getElementById('message');
-      const count = parseInt(synced);
-      if (syncSuccess === 'true') {
-        msg.className = 'message success';
-        if (count === 0) {
-          msg.textContent = 'Your catalog is up to date — no changes detected';
-        } else {
-          msg.textContent = 'Synced ' + count + ' product' + (count !== 1 ? 's' : '') + (syncDuration ? ' in ' + (parseInt(syncDuration) / 1000).toFixed(1) + 's' : '');
-        }
-      } else {
-        msg.className = 'message error';
-        msg.textContent = 'Sync failed. Please try again.';
-      }
-      msg.style.display = 'block';
+      // Use sessionStorage to prevent showing the same sync result on refresh
+      const syncKey = 'lastSyncShown_' + synced + '_' + syncDuration;
+      const alreadyShown = sessionStorage.getItem(syncKey);
 
-      // Clear URL params so message doesn't show on refresh
+      if (!alreadyShown) {
+        sessionStorage.setItem(syncKey, 'true');
+        const msg = document.getElementById('message');
+        const count = parseInt(synced);
+
+        if (syncSuccess === 'true') {
+          msg.className = 'message success';
+          if (count === 0) {
+            msg.textContent = 'Your catalog is up to date — no changes detected';
+          } else {
+            msg.textContent = 'Synced ' + count + ' product' + (count !== 1 ? 's' : '') + (syncDuration ? ' in ' + (parseInt(syncDuration) / 1000).toFixed(1) + 's' : '') + ' — enriching with AI...';
+
+            // Auto-trigger enrichment after successful sync with products
+            setTimeout(function() {
+              autoEnrichAfterSync(msg, count);
+            }, 1000);
+          }
+        } else {
+          msg.className = 'message error';
+          msg.textContent = 'Sync failed. Please try again.';
+        }
+        msg.style.display = 'block';
+      }
+
+      // Clear URL params
       const cleanUrl = window.location.pathname + '?shop=' + encodeURIComponent(shop);
       window.history.replaceState({}, '', cleanUrl);
+    }
+
+    // Auto-enrich products after sync completes
+    async function autoEnrichAfterSync(msgElement, syncedCount) {
+      try {
+        const response = await fetch(apiBase + '/api/shopify?action=enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shop: shop })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          if (result.enriched_count > 0) {
+            msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' — enriched ' + result.enriched_count + ' with AI ✓';
+          } else {
+            msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' ✓';
+          }
+        } else {
+          // Enrichment failed but sync succeeded - show partial success
+          msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' (enrichment pending)';
+        }
+
+        // Auto-hide after showing final status
+        setTimeout(function() {
+          msgElement.style.opacity = '0';
+          msgElement.style.transition = 'opacity 0.3s ease';
+          setTimeout(function() {
+            msgElement.style.display = 'none';
+            msgElement.style.opacity = '1';
+          }, 300);
+        }, 5000);
+      } catch (error) {
+        console.error('Auto-enrich failed:', error);
+        msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' (enrichment pending)';
+
+        // Auto-hide
+        setTimeout(function() {
+          msgElement.style.opacity = '0';
+          msgElement.style.transition = 'opacity 0.3s ease';
+          setTimeout(function() {
+            msgElement.style.display = 'none';
+            msgElement.style.opacity = '1';
+          }, 300);
+        }, 5000);
+      }
     }
   </script>
 </body>

@@ -16,7 +16,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { applyMiddleware } from '../sdk/shared/middleware';
 import { createModuleLogger } from '../sdk/shared/logger';
-import { callClaude, callClaudeWithVision, parseJSONFromResponse } from '../sdk/shared/secureAI';
+import {
+  callClaude,
+  callClaudeWithVision,
+  callGemini,
+  callGeminiWithVision,
+  callOpenAI,
+  callOpenAIWithVision,
+  parseJSONFromResponse
+} from '../sdk/shared/secureAI';
 import {
   createImageGenerator,
   MoodboardCompositionInput,
@@ -849,19 +857,51 @@ NOTE: Colors are extracted separately using pixel-level analysis for accuracy. F
 Be specific and evocative. For luxury items, capture the brand's DNA and positioning. Think about how this product contributes to an overall lifestyle aesthetic and mood.
 Return ONLY valid JSON, no explanation.`;
 
-    log.info({ productName: product.name, inferredBrand, hasImage, fewShotCount: recentCorrections.length }, 'Calling Claude for enrichment...');
+    log.info({ productName: product.name, inferredBrand, hasImage, fewShotCount: recentCorrections.length }, 'Calling AI for enrichment (Gemini → GPT-4o-mini → Claude)...');
+
+    // Try Gemini first (free tier), then GPT-4o-mini (cheap), then Claude (fallback)
+    let aiResponse: { success: boolean; text?: string; error?: string };
+    let modelUsed = 'gemini';
 
     // Use vision API if image is available, otherwise use text-only
-    const aiResponse = hasImage
-      ? await callClaudeWithVision(prompt, product.image_url, { maxTokens: 1000 })
-      : await callClaude(prompt, { maxTokens: 800 });
+    if (hasImage) {
+      // Try Gemini first
+      aiResponse = await callGeminiWithVision(prompt, product.image_url, { maxTokens: 1000 });
+      if (!aiResponse.success) {
+        log.warn({ productName: product.name, error: aiResponse.error }, 'Gemini vision failed, trying GPT-4o-mini...');
+        // Try GPT-4o-mini as second fallback
+        aiResponse = await callOpenAIWithVision(prompt, product.image_url, { maxTokens: 1000 });
+        modelUsed = 'gpt-4o-mini';
+      }
+      if (!aiResponse.success) {
+        log.warn({ productName: product.name, error: aiResponse.error }, 'GPT-4o-mini vision failed, trying Claude...');
+        // Final fallback to Claude
+        aiResponse = await callClaudeWithVision(prompt, product.image_url, { maxTokens: 1000 });
+        modelUsed = 'claude-fallback';
+      }
+    } else {
+      // Try Gemini first
+      aiResponse = await callGemini(prompt, { maxTokens: 800 });
+      if (!aiResponse.success) {
+        log.warn({ productName: product.name, error: aiResponse.error }, 'Gemini failed, trying GPT-4o-mini...');
+        // Try GPT-4o-mini as second fallback
+        aiResponse = await callOpenAI(prompt, { maxTokens: 800 });
+        modelUsed = 'gpt-4o-mini';
+      }
+      if (!aiResponse.success) {
+        log.warn({ productName: product.name, error: aiResponse.error }, 'GPT-4o-mini failed, trying Claude...');
+        // Final fallback to Claude
+        aiResponse = await callClaude(prompt, { maxTokens: 800 });
+        modelUsed = 'claude-fallback';
+      }
+    }
 
     let enrichment;
     if (aiResponse.success && aiResponse.text) {
-      log.info({ productName: product.name }, 'AI response received, parsing...');
+      log.info({ productName: product.name, modelUsed }, 'AI response received, parsing...');
       enrichment = parseJSONFromResponse(aiResponse.text);
     } else {
-      log.warn({ productName: product.name, error: aiResponse.error }, 'AI call failed');
+      log.warn({ productName: product.name, error: aiResponse.error }, 'All AI providers failed');
     }
 
     if (!enrichment) {
@@ -874,6 +914,7 @@ Return ONLY valid JSON, no explanation.`;
         tone: 'neutral',
         category: 'general'
       };
+      modelUsed = 'defaults';
     }
 
     // IMPORTANT: Use pixel-extracted colors (accurate hex codes mapped to fashion names)
@@ -902,14 +943,14 @@ Return ONLY valid JSON, no explanation.`;
     return res.status(200).json({
       success: true,
       product: { ...enrichedProduct, id: savedProduct?.id },
-      model_used: 'claude-via-edge-function',
+      model_used: modelUsed,
       color_extraction: extractedColors ? 'pixel-accurate' : 'ai-fallback',
       color_hex_codes: extractedColors?.hexCodes || [],
       saved_to_db: !!savedProduct,
       _debug: {
         aiSuccess: aiResponse.success,
         aiError: aiResponse.error,
-        usedDefaults: !aiResponse.success || !aiResponse.text,
+        usedDefaults: modelUsed === 'defaults',
         inferredBrand,
         colorMethod: extractedColors ? 'pixel-sampling' : 'ai-vision',
         extractedWarmth: extractedColors?.warmth
@@ -920,6 +961,180 @@ Return ONLY valid JSON, no explanation.`;
     return res.status(500).json({
       error: 'Enrichment failed',
       message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+/**
+ * Batch enrich all pending products
+ * Used by admin dashboard to retry enrichment for products without enriched_at
+ */
+async function handleEnrichAll(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!supabaseUrl || !supabaseKey) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const startTime = Date.now();
+  const limit = parseInt(req.body?.limit || '20', 10); // Process up to 20 products per request
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get products without enriched_at
+    const { data: pendingProducts, error: fetchError } = await supabase
+      .from('enriched_products')
+      .select('id, product_name, brand, image_url, source_url, price, description')
+      .is('enriched_at', null)
+      .limit(limit);
+
+    if (fetchError) {
+      log.error({ error: fetchError }, 'Failed to fetch pending products');
+      return res.status(500).json({ error: 'Failed to fetch pending products' });
+    }
+
+    if (!pendingProducts || pendingProducts.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No products pending enrichment',
+        enriched_count: 0,
+        failed_count: 0,
+        duration_ms: Date.now() - startTime,
+      });
+    }
+
+    log.info({ count: pendingProducts.length }, 'Starting batch enrichment...');
+
+    let enrichedCount = 0;
+    let failedCount = 0;
+    const results: Array<{ id: string; name: string; success: boolean; error?: string }> = [];
+
+    // Process each product
+    for (const product of pendingProducts) {
+      try {
+        log.info({ id: product.id, name: product.product_name }, 'Enriching product...');
+
+        // Build enrichment prompt
+        const hasImage = !!product.image_url;
+        const prompt = `You are a luxury lifestyle and product analyst. Analyze this product and return comprehensive metadata.
+${hasImage ? '\nIMPORTANT: A product image is provided. Use visual analysis to identify textures, materials, and style details.' : ''}
+Product Information:
+- Name: ${product.product_name || 'Unknown'}
+- Brand: ${product.brand || 'Unknown'}
+- Description: ${product.description || 'N/A'}
+- Price: ${product.price || 'N/A'}
+- Source: ${product.source_url || 'N/A'}
+
+Return a JSON object with these fields:
+{
+  "tags": ["10-15 descriptive tags covering style, occasion, season, aesthetic, mood"],
+  "material": "primary material",
+  "texture": "tactile quality",
+  "tone": "overall mood/atmosphere",
+  "category": "specific category (e.g., blazers-jackets, dresses, tops, bottoms, accessories, furniture, lighting)",
+  "vibe_layer": "how this fits into a lifestyle mood board",
+  "pairs_with": ["2-3 complementary categories"]
+}
+Return ONLY valid JSON.`;
+
+        // Try Gemini → GPT-4o-mini → Claude fallback chain
+        let aiResponse: { success: boolean; text?: string; error?: string };
+        let modelUsed = 'gemini';
+
+        if (hasImage) {
+          aiResponse = await callGeminiWithVision(prompt, product.image_url, { maxTokens: 800 });
+          if (!aiResponse.success) {
+            aiResponse = await callOpenAIWithVision(prompt, product.image_url, { maxTokens: 800 });
+            modelUsed = 'gpt-4o-mini';
+          }
+          if (!aiResponse.success) {
+            aiResponse = await callClaudeWithVision(prompt, product.image_url, { maxTokens: 800 });
+            modelUsed = 'claude';
+          }
+        } else {
+          aiResponse = await callGemini(prompt, { maxTokens: 600 });
+          if (!aiResponse.success) {
+            aiResponse = await callOpenAI(prompt, { maxTokens: 600 });
+            modelUsed = 'gpt-4o-mini';
+          }
+          if (!aiResponse.success) {
+            aiResponse = await callClaude(prompt, { maxTokens: 600 });
+            modelUsed = 'claude';
+          }
+        }
+
+        let enrichment = null;
+        if (aiResponse.success && aiResponse.text) {
+          enrichment = parseJSONFromResponse(aiResponse.text);
+        }
+
+        if (!enrichment) {
+          enrichment = {
+            tags: ['product'],
+            material: null,
+            texture: null,
+            tone: 'neutral',
+            category: 'general',
+          };
+          modelUsed = 'defaults';
+        }
+
+        // Update the product with enrichment data
+        const { error: updateError } = await supabase
+          .from('enriched_products')
+          .update({
+            tags: enrichment.tags || [],
+            material: enrichment.material || null,
+            texture: enrichment.texture || null,
+            tone: enrichment.tone || null,
+            category: enrichment.category || 'general',
+            vibe_layer: enrichment.vibe_layer || null,
+            pairs_with: enrichment.pairs_with || [],
+            enriched_at: new Date().toISOString(),
+          })
+          .eq('id', product.id);
+
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+
+        enrichedCount++;
+        results.push({ id: product.id, name: product.product_name, success: true });
+        log.info({ id: product.id, name: product.product_name, modelUsed }, 'Product enriched successfully');
+
+      } catch (productError) {
+        failedCount++;
+        results.push({
+          id: product.id,
+          name: product.product_name,
+          success: false,
+          error: productError instanceof Error ? productError.message : 'Unknown error',
+        });
+        log.error({ id: product.id, error: productError }, 'Failed to enrich product');
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    log.info({ enrichedCount, failedCount, duration }, 'Batch enrichment complete');
+
+    return res.status(200).json({
+      success: true,
+      message: `Enriched ${enrichedCount} products${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
+      enriched_count: enrichedCount,
+      failed_count: failedCount,
+      total_processed: pendingProducts.length,
+      duration_ms: duration,
+      results,
+    });
+
+  } catch (error) {
+    log.error({ error }, 'Batch enrichment failed');
+    return res.status(500).json({
+      error: 'Batch enrichment failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }
@@ -1759,6 +1974,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'enrich':
         return handleEnrich(req, res);
 
+      case 'enrich-all':
+        return handleEnrichAll(req, res);
+
       case 'compose':
         return handleCompose(req.body as ComposeRequest, res);
 
@@ -1780,9 +1998,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       default:
         return res.status(400).json({
           error: 'Invalid action',
-          hint: 'Use ?action=enrich|compose|tryon|layouts|layout|labels|feedback|layout-feedback',
+          hint: 'Use ?action=enrich|enrich-all|compose|tryon|layouts|layout|labels|feedback|layout-feedback',
           examples: {
             enrich: 'POST /api/ai?action=enrich',
+            'enrich-all': 'POST /api/ai?action=enrich-all (batch enrich pending products)',
             compose: 'POST /api/ai?action=compose',
             tryon: 'POST /api/ai?action=tryon',
             layouts: 'GET /api/ai?action=layouts',

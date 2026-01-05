@@ -15,6 +15,13 @@ export interface PriceRange {
   max: number;
 }
 
+// User location for weather (cached from browser geolocation)
+export interface UserLocation {
+  latitude: number;
+  longitude: number;
+  city: string;
+}
+
 interface SettingsState {
   theme: Theme;
   agentModeEnabled: boolean;
@@ -28,6 +35,8 @@ interface SettingsState {
   // User settings (placeholder until auth is implemented)
   userName: string | null;
   isLoggedIn: boolean;
+  // Location for weather widget (cached from browser geolocation)
+  userLocation: UserLocation | null;
   setTheme: (theme: Theme) => void;
   setAgentMode: (enabled: boolean) => void;
   setEmailNotifications: (enabled: boolean) => void;
@@ -37,6 +46,7 @@ interface SettingsState {
   setPriceRange: (range: PriceRange) => void;
   setUserName: (name: string | null) => void;
   setIsLoggedIn: (loggedIn: boolean) => void;
+  setUserLocation: (location: UserLocation | null) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -51,6 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
       priceRange: { min: 1000, max: 100000 },
       userName: null,
       isLoggedIn: false,
+      userLocation: null,
       setTheme: (theme) => set({ theme }),
       setAgentMode: (enabled) => set({ agentModeEnabled: enabled }),
       setEmailNotifications: (enabled) => set({ emailNotifications: enabled }),
@@ -60,6 +71,7 @@ export const useSettingsStore = create<SettingsState>()(
       setPriceRange: (range) => set({ priceRange: range }),
       setUserName: (name) => set({ userName: name }),
       setIsLoggedIn: (loggedIn) => set({ isLoggedIn: loggedIn }),
+      setUserLocation: (location) => set({ userLocation: location }),
     }),
     {
       name: 'mood-layer-settings',

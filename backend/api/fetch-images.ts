@@ -222,10 +222,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // If stats=true, return product statistics only
   if (req.query.stats === 'true') {
     try {
-      // Get all products to check image URLs properly
+      // Get all products to check image URLs and enrichment status
       const { data: allProducts, count: totalCount } = await supabase
         .from('enriched_products')
-        .select('image_url', { count: 'exact' });
+        .select('image_url, enriched_at, tags, platform', { count: 'exact' });
 
       const total = totalCount || 0;
 
@@ -233,11 +233,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const withValidImages = (allProducts || []).filter(p => isValidWebUrl(p.image_url)).length;
       const missingOrInvalid = total - withValidImages;
 
+      // Enrichment stats
+      const enrichedProducts = (allProducts || []).filter(p => p.enriched_at !== null);
+      const pendingEnrichment = (allProducts || []).filter(p => p.enriched_at === null);
+      const withTags = (allProducts || []).filter(p => p.tags && p.tags.length > 0);
+
+      // Platform breakdown
+      const shopifyProducts = (allProducts || []).filter(p => p.platform === 'shopify');
+      const shopifyEnriched = shopifyProducts.filter(p => p.enriched_at !== null);
+      const shopifyPending = shopifyProducts.filter(p => p.enriched_at === null);
+
       return res.status(200).json({
         stats: {
           total,
           with_images: withValidImages,
           missing_images: missingOrInvalid,
+          // Enrichment stats
+          enriched: enrichedProducts.length,
+          pending_enrichment: pendingEnrichment.length,
+          with_tags: withTags.length,
+          // Shopify breakdown
+          shopify: {
+            total: shopifyProducts.length,
+            enriched: shopifyEnriched.length,
+            pending: shopifyPending.length,
+          },
         },
       });
     } catch (error) {

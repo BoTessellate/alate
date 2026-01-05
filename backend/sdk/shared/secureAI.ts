@@ -334,11 +334,335 @@ export async function callClaude(
 }
 
 /**
+ * Call OpenAI API (GPT-4o-mini) for text generation
+ * Cheap and fast fallback option
+ */
+export async function callOpenAI(
+  prompt: string,
+  options?: { model?: string; maxTokens?: number }
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'OPENAI_API_KEY not configured' };
+  }
+
+  const defaultModel = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
+  const model = options?.model || defaultModel;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options?.maxTokens || 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (errorData as any)?.error?.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const text = (data as any)?.choices?.[0]?.message?.content;
+
+    if (text) {
+      return { success: true, text };
+    }
+
+    return { success: false, error: 'Invalid response format from OpenAI' };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out after 30 seconds' };
+    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to call OpenAI API',
+    };
+  }
+}
+
+/**
+ * Call OpenAI with vision support (GPT-4o-mini with images)
+ */
+export async function callOpenAIWithVision(
+  prompt: string,
+  imageUrl?: string,
+  options?: { model?: string; maxTokens?: number }
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'OPENAI_API_KEY not configured' };
+  }
+
+  // Use gpt-4o-mini for vision (supports images)
+  const defaultModel = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini';
+  const model = options?.model || defaultModel;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+  try {
+    // Build content array
+    const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+
+    // Add image if provided
+    if (imageUrl) {
+      if (imageUrl.startsWith('data:') || imageUrl.startsWith('http')) {
+        content.push({
+          type: 'image_url',
+          image_url: { url: imageUrl },
+        });
+      }
+    }
+
+    // Add text prompt
+    content.push({ type: 'text', text: prompt });
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options?.maxTokens || 1024,
+        messages: [{ role: 'user', content }],
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (errorData as any)?.error?.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const text = (data as any)?.choices?.[0]?.message?.content;
+
+    if (text) {
+      return { success: true, text };
+    }
+
+    return { success: false, error: 'Invalid response format from OpenAI' };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out after 45 seconds' };
+    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to call OpenAI API with vision',
+    };
+  }
+}
+
+/**
+ * Call Gemini API for text generation
+ * Uses Google's Generative AI SDK
+ */
+export async function callGemini(
+  prompt: string,
+  options?: { model?: string; maxTokens?: number }
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'GEMINI_API_KEY not configured' };
+  }
+
+  const defaultModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = options?.model || defaultModel;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    // Use Gemini REST API directly (simpler than SDK for our use case)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: options?.maxTokens || 1024,
+          },
+        }),
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (errorData as any)?.error?.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const text = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (text) {
+      return { success: true, text };
+    }
+
+    return { success: false, error: 'Invalid response format from Gemini' };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out after 30 seconds' };
+    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to call Gemini API',
+    };
+  }
+}
+
+/**
+ * Call Gemini with vision support (image analysis)
+ * Accepts image URL and converts to base64 for Gemini
+ */
+export async function callGeminiWithVision(
+  prompt: string,
+  imageUrl?: string,
+  options?: { model?: string; maxTokens?: number }
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return { success: false, error: 'GEMINI_API_KEY not configured' };
+  }
+
+  // Use gemini-2.0-flash for vision (supports multimodal)
+  const defaultModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = options?.model || defaultModel;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+  try {
+    // Build parts array
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+
+    // Add image if provided
+    if (imageUrl) {
+      if (imageUrl.startsWith('data:')) {
+        // Base64 data URL
+        const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          parts.push({
+            inlineData: {
+              mimeType: matches[1],
+              data: matches[2],
+            },
+          });
+        }
+      } else if (imageUrl.startsWith('http')) {
+        // Fetch image and convert to base64
+        try {
+          const imageResponse = await fetch(imageUrl, { signal: controller.signal });
+          if (imageResponse.ok) {
+            const buffer = await imageResponse.arrayBuffer();
+            const base64 = Buffer.from(buffer).toString('base64');
+            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+            parts.push({
+              inlineData: {
+                mimeType: contentType,
+                data: base64,
+              },
+            });
+          }
+        } catch (imgError) {
+          console.warn('[secureAI] Failed to fetch image for Gemini, continuing without:', imgError);
+        }
+      }
+    }
+
+    // Add text prompt
+    parts.push({ text: prompt });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: options?.maxTokens || 1024,
+          },
+        }),
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: (errorData as any)?.error?.message || `HTTP ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    const text = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (text) {
+      return { success: true, text };
+    }
+
+    return { success: false, error: 'Invalid response format from Gemini' };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Request timed out after 45 seconds' };
+    }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to call Gemini API with vision',
+    };
+  }
+}
+
+/**
  * Parse JSON from Claude response
  */
 export function parseJSONFromResponse(text: string): any {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    // Clean markdown code blocks that AI models sometimes add
+    let cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
