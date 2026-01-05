@@ -129,8 +129,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const styles = getVariantStyles();
 
+  // Enhanced lift transform for boldness
+  const shouldLift = !isDisabled && (variant === 'primary' || variant === 'secondary');
+  const liftTransform = shouldLift && isHovered ? 'var(--lift-md)' : 'translateY(0)';
+  const hoverShadow = shouldLift && isHovered ? 'var(--shadow-hover)' : 'none';
+
   const baseClasses = [
-    'inline-flex items-center justify-center font-medium rounded-lg border transition-all duration-200',
+    'inline-flex items-center justify-center font-medium rounded-lg border',
     // Suppress browser focus ring - we use hover/active states for visual feedback
     'outline-none focus:outline-none focus-visible:outline-none',
     sizeClasses[size],
@@ -149,6 +154,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         backgroundColor: styles.backgroundColor,
         color: styles.color,
         borderColor: styles.borderColor,
+        transform: liftTransform,
+        boxShadow: hoverShadow,
+        transition: 'all var(--transition-base) var(--ease-out)',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -213,23 +221,32 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       return {
         backgroundColor: isHovered ? 'var(--primary)' : 'var(--primary-dark)',
         color: 'white',
+        transform: isHovered ? 'var(--lift-sm)' : 'translateY(0)',
+        boxShadow: isHovered ? 'var(--shadow-md)' : 'none',
       };
     }
     return {
       backgroundColor: isHovered ? 'var(--surface-light)' : 'transparent',
       color: isHovered ? 'var(--foreground)' : 'var(--foreground-muted)',
+      transform: 'translateY(0)',
+      boxShadow: 'none',
     };
   };
 
   const baseStyles = getStyles();
   // Merge custom style with base styles, custom style takes precedence
-  const mergedStyles = style ? { ...baseStyles, ...style } : baseStyles;
+  // Add transition for smooth hover effects
+  const mergedStyles = {
+    ...baseStyles,
+    transition: 'all var(--transition-base) var(--ease-out)',
+    ...(style || {}),
+  };
 
   // Build className - custom className can override size classes
   const hasCustomSize = className.includes('w-') || className.includes('h-');
   const baseClassName = hasCustomSize
-    ? 'rounded-full flex items-center justify-center transition-colors outline-none focus:outline-none focus-visible:outline-none'
-    : `${sizeClasses[size]} rounded-full flex items-center justify-center transition-colors outline-none focus:outline-none focus-visible:outline-none`;
+    ? 'rounded-full flex items-center justify-center outline-none focus:outline-none focus-visible:outline-none'
+    : `${sizeClasses[size]} rounded-full flex items-center justify-center outline-none focus:outline-none focus-visible:outline-none`;
 
   return (
     <button

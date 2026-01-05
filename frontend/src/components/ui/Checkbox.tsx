@@ -71,10 +71,13 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
           {...props}
         />
         <div
-          className={`${config.box} rounded border-2 flex items-center justify-center transition-colors`}
+          className={`${config.box} rounded border-2 flex items-center justify-center`}
           style={{
             borderColor: getBorderColor(),
             backgroundColor: checked ? 'var(--primary-dark)' : 'transparent',
+            transition: 'all var(--transition-base) var(--ease-out)',
+            transform: checked ? 'var(--lift-sm)' : 'none',
+            boxShadow: checked ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
           }}
         >
           {checked && (

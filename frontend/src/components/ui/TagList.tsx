@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { X } from 'lucide-react';
 
 export interface TagListProps {
@@ -37,6 +38,8 @@ export function TagList({
   className = '',
   emptyMessage,
 }: TagListProps) {
+  const [hoveredTag, setHoveredTag] = useState<string | null>(null);
+
   const sizeClasses = {
     sm: 'px-1.5 py-0.5 text-xs',
     md: 'px-2 py-1 text-xs',
@@ -78,7 +81,14 @@ export function TagList({
           <span
             key={tag}
             className={`inline-flex items-center gap-1 rounded-full ${sizeClasses[size]}`}
-            style={{ backgroundColor: 'var(--primary-dark)', color: 'white' }}
+            style={{
+              backgroundColor: 'var(--primary-dark)',
+              color: 'white',
+              transition: 'all var(--transition-base) var(--ease-out)',
+              transform: hoveredTag === tag && onRemove ? 'var(--lift-sm)' : 'none',
+            }}
+            onMouseEnter={() => setHoveredTag(tag)}
+            onMouseLeave={() => setHoveredTag(null)}
           >
             {tag}
             {onRemove && (
@@ -86,7 +96,11 @@ export function TagList({
                 type="button"
                 onClick={() => onRemove(tag)}
                 aria-label={`Remove tag ${tag}`}
-                className="hover:opacity-70 cursor-pointer transition-opacity"
+                className="cursor-pointer"
+                style={{
+                  transition: 'opacity var(--transition-base) var(--ease-out)',
+                  opacity: hoveredTag === tag ? 0.7 : 1,
+                }}
               >
                 <X size={iconSizes[size]} aria-hidden="true" />
               </button>

@@ -173,7 +173,7 @@ export function UnifiedChatInput({
       )}
 
       {/* Input row */}
-      <div className="flex items-center gap-1.5 p-2">
+      <div className="flex items-center gap-2 p-3">
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -224,8 +224,11 @@ export function UnifiedChatInput({
 
         {/* Text input */}
         <div
-          className="flex-1 flex items-center rounded-xl px-3 min-h-[32px]"
-          style={{ backgroundColor: 'var(--surface-light)' }}
+          className="flex-1 flex items-center rounded-xl px-3 min-h-[36px]"
+          style={{
+            backgroundColor: 'var(--surface-light)',
+            transition: 'all var(--transition-base) var(--ease-out)',
+          }}
           data-testid={testId ? `${testId}-input-container` : undefined}
         >
           <textarea
@@ -236,11 +239,12 @@ export function UnifiedChatInput({
             placeholder={attachedImage ? 'Add a description...' : placeholder}
             disabled={disabled || isLoading}
             rows={1}
-            className="w-full bg-transparent resize-none text-sm outline-none focus:outline-none leading-normal py-1"
+            className="w-full bg-transparent resize-none text-sm outline-none focus:outline-none leading-normal py-1.5"
             style={{
               color: 'var(--foreground)',
               minHeight: '24px',
               maxHeight: '80px',
+              transition: 'all var(--transition-base) var(--ease-out)',
             }}
             data-testid={testId ? `${testId}-textarea` : undefined}
           />

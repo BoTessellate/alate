@@ -195,7 +195,7 @@ export function SidePanelLayout({ children }: SidePanelLayoutProps) {
       {/* Standard Bubble Modal - positioned at bottom right */}
       {isBubble && activeContent && !isMinimal && (
         <div
-          className="fixed z-50 flex flex-col border shadow-xl overflow-hidden transition-all duration-300 ease-out"
+          className="fixed z-50 flex flex-col border overflow-hidden transition-all duration-300 ease-out"
           style={{
             bottom: '90px',
             right: '24px',
@@ -206,6 +206,7 @@ export function SidePanelLayout({ children }: SidePanelLayoutProps) {
             borderRadius: '12px',
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           <BubbleHeader
@@ -223,7 +224,7 @@ export function SidePanelLayout({ children }: SidePanelLayoutProps) {
       {/* Full Side Panel - stretches from topbar to bottom */}
       {isPanel && activeContent && (
         <div
-          className="fixed z-30 flex flex-col border-l shadow-xl overflow-hidden transition-transform duration-300 ease-out"
+          className="fixed z-30 flex flex-col border-l overflow-hidden transition-transform duration-300 ease-out"
           style={{
             top: 'var(--topbar-total-height, 76px)',
             right: 0,
@@ -232,6 +233,7 @@ export function SidePanelLayout({ children }: SidePanelLayoutProps) {
             maxWidth: '100vw',
             backgroundColor: 'var(--surface)',
             borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-lg)',
           }}
         >
           <PanelHeader
@@ -433,7 +435,7 @@ function BubbleHeader({ title, onExpand, onClose }: BubbleHeaderProps) {
 function PanelHeader({ title, subtitle, onCollapse, onClose }: PanelHeaderProps) {
   return (
     <div
-      className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0"
+      className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
       style={{ borderColor: 'var(--border)' }}
     >
       {/* Collapse button */}
@@ -456,7 +458,7 @@ function PanelHeader({ title, subtitle, onCollapse, onClose }: PanelHeaderProps)
       </button>
 
       {/* Title */}
-      <div className="flex-1 min-w-0 mx-3">
+      <div className="flex-1 min-w-0 mx-4">
         <h2
           className="text-lg italic truncate"
           style={{

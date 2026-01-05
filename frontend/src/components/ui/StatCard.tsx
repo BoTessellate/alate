@@ -31,9 +31,9 @@ export function StatCard({ value, label, sublabel, children }: StatCardProps) {
       style={{
         backgroundColor: 'transparent',
         boxShadow: isHovered
-          ? '0 8px 25px -5px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--primary-dark)'
+          ? 'var(--shadow-elevated-hover), 0 0 0 1px var(--primary-dark)'
           : '0 2px 8px -2px rgba(0, 0, 0, 0.06)',
-        transform: isHovered ? 'translateY(-2px)' : 'none',
+        transform: isHovered ? 'var(--lift-md)' : 'none',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

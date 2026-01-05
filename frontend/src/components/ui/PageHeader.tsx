@@ -79,7 +79,8 @@ export function PageHeader({
           className={`${styles.title} italic mb-2`}
           style={{
             fontFamily: 'var(--font-cormorant)',
-            fontWeight: 500,
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
             color: 'var(--foreground)',
           }}
         >
@@ -106,7 +107,8 @@ export function PageHeader({
             className={`${styles.title} italic`}
             style={{
               fontFamily: 'var(--font-cormorant)',
-              fontWeight: 500,
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
               color: 'var(--foreground)',
             }}
           >

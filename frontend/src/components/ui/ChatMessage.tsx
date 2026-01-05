@@ -99,6 +99,8 @@ function ChatMessageComponent({
             borderRadius: isUser
               ? '16px 16px 4px 16px'
               : '16px 16px 16px 4px',
+            boxShadow: 'var(--shadow-sm)',
+            transition: 'all var(--transition-base) var(--ease-out)',
           }}
         >
           {/* Content */}

@@ -174,11 +174,13 @@ export function SelectDropdown({
           onBlur={() => !isOpen && setIsFocused(false)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          className={`w-full rounded-lg border outline-none transition-colors cursor-pointer text-left ${sizeClasses[size]} ${paddingClasses[size]}`}
+          className={`w-full rounded-lg border outline-none cursor-pointer text-left ${sizeClasses[size]} ${paddingClasses[size]}`}
           style={{
             backgroundColor: 'var(--background)',
             borderColor: getBorderColor(),
             color: selectedOption ? 'var(--foreground)' : 'var(--foreground-muted)',
+            boxShadow: isFocused || isOpen ? 'var(--shadow-md)' : 'none',
+            transition: 'all var(--transition-base) var(--ease-out)',
             opacity: disabled ? 0.5 : 1,
             cursor: disabled ? 'not-allowed' : 'pointer',
           }}
@@ -202,11 +204,12 @@ export function SelectDropdown({
         {isOpen && (
           <div
             role="listbox"
-            className="absolute top-full left-0 right-0 mt-1 py-1 rounded-lg border shadow-lg overflow-hidden z-50"
+            className="absolute top-full left-0 right-0 mt-1 py-1 rounded-lg border overflow-hidden z-50"
             style={{
               backgroundColor: 'var(--surface)',
               borderColor: 'var(--border)',
-              animation: 'selectDropdownIn 150ms ease-out',
+              boxShadow: 'var(--shadow-lg)',
+              animation: 'selectDropdownIn var(--transition-base) var(--ease-out)',
             }}
           >
             {options.map((option) => (

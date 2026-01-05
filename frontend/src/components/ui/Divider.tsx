@@ -17,16 +17,16 @@ export interface DividerProps {
 
 const spacingClasses = {
   none: '',
-  sm: 'my-2',
-  md: 'my-4',
-  lg: 'my-6',
+  sm: 'my-4',
+  md: 'my-6',
+  lg: 'my-8',
 };
 
 const verticalSpacingClasses = {
   none: '',
-  sm: 'mx-2',
-  md: 'mx-4',
-  lg: 'mx-6',
+  sm: 'mx-4',
+  md: 'mx-6',
+  lg: 'mx-8',
 };
 
 /**

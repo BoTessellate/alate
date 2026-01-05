@@ -98,7 +98,10 @@ export function ChatInput({
       {/* Text input */}
       <div
         className="flex-1 rounded-xl px-4 py-2"
-        style={{ backgroundColor: 'var(--surface-light)' }}
+        style={{
+          backgroundColor: 'var(--surface-light)',
+          transition: 'all var(--transition-base) var(--ease-out)',
+        }}
       >
         <textarea
           ref={textareaRef}
@@ -113,6 +116,7 @@ export function ChatInput({
             color: 'var(--foreground)',
             minHeight: '24px',
             maxHeight: '120px',
+            transition: 'all var(--transition-base) var(--ease-out)',
           }}
           data-testid={testId ? `${testId}-textarea` : undefined}
         />

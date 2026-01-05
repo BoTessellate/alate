@@ -92,11 +92,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         <select
           ref={ref}
           id={selectId}
-          className={`w-full rounded-lg border outline-none transition-colors appearance-none cursor-pointer ${sizeClasses[size]} ${paddingClasses[size]}`}
+          className={`w-full rounded-lg border outline-none appearance-none cursor-pointer ${sizeClasses[size]} ${paddingClasses[size]}`}
           style={{
             backgroundColor: 'var(--background)',
             borderColor: getBorderColor(),
             color: 'var(--foreground)',
+            boxShadow: isFocused ? 'var(--shadow-md)' : 'none',
+            transition: 'all var(--transition-base) var(--ease-out)',
           }}
           onFocus={(e) => {
             setIsFocused(true);

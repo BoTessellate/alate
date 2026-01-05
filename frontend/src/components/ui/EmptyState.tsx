@@ -60,22 +60,22 @@ export function EmptyState({
 }: EmptyStateProps) {
   const sizeStyles = {
     sm: {
-      container: 'py-8',
-      icon: 32,
-      title: 'text-lg',
-      description: 'text-xs',
-    },
-    md: {
       container: 'py-12',
-      icon: 48,
-      title: 'text-2xl',
+      icon: 40,
+      title: 'text-xl',
       description: 'text-sm',
     },
-    lg: {
-      container: 'py-20',
-      icon: 64,
-      title: 'text-3xl',
+    md: {
+      container: 'py-16',
+      icon: 56,
+      title: 'text-2xl',
       description: 'text-base',
+    },
+    lg: {
+      container: 'py-24',
+      icon: 72,
+      title: 'text-3xl',
+      description: 'text-lg',
     },
   };
 
@@ -90,7 +90,7 @@ export function EmptyState({
       }}
     >
       {Icon && (
-        <div className="flex justify-center mb-4">
+        <div className="flex justify-center mb-6">
           <Icon
             size={styles.icon}
             style={{ color: 'var(--foreground-muted)' }}
@@ -119,9 +119,9 @@ export function EmptyState({
           {description}
         </p>
       )}
-      {children && <div className="mt-4">{children}</div>}
+      {children && <div className="mt-6">{children}</div>}
       {(action || secondaryAction) && (
-        <div className="flex items-center justify-center gap-3 mt-6">
+        <div className="flex items-center justify-center gap-4 mt-8">
           {action && (
             <Button
               variant={action.variant || 'primary'}
@@ -158,7 +158,7 @@ export function InlineEmptyState({
 }) {
   return (
     <div
-      className={`flex items-center justify-center gap-3 py-8 ${className}`}
+      className={`flex items-center justify-center gap-4 py-12 ${className}`}
       style={{ color: 'var(--foreground-muted)' }}
     >
       {Icon && <Icon size={20} />}

@@ -176,17 +176,18 @@ export function Modal({
         aria-labelledby={title ? 'modal-title' : undefined}
         tabIndex={-1}
         data-testid={testId}
-        className={`w-full ${sizeClasses[size]} rounded-lg border shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${className}`}
+        className={`w-full ${sizeClasses[size]} rounded-lg border overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${className}`}
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
+          boxShadow: 'var(--shadow-lg)',
           ...modalPositionStyles,
         }}
       >
         {/* Header */}
         {(title || showCloseButton) && (
           <div
-            className="flex items-center justify-between px-4 py-3 border-b"
+            className="flex items-center justify-between px-6 py-4 border-b"
             style={{ borderColor: 'var(--border)' }}
           >
             <div>
@@ -252,7 +253,7 @@ export function ModalContent({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={`p-4 ${className}`}>{children}</div>;
+  return <div className={`p-6 ${className}`}>{children}</div>;
 }
 
 /**
@@ -267,7 +268,7 @@ export function ModalFooter({
 }) {
   return (
     <div
-      className={`flex items-center justify-end gap-3 px-4 py-3 border-t ${className}`}
+      className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${className}`}
       style={{ borderColor: 'var(--border)' }}
     >
       {children}

@@ -137,7 +137,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
   const styles = getVariantStyles();
 
   const baseClasses = [
-    'inline-flex items-center justify-center font-medium rounded-full border transition-all duration-200',
+    'inline-flex items-center justify-center font-medium rounded-full border',
     'outline-none focus:outline-none focus-visible:outline-none',
     sizeClasses[size],
     disabled ? 'opacity-50 cursor-not-allowed' : isClickable ? 'cursor-pointer' : 'cursor-default',
@@ -172,6 +172,8 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
           backgroundColor: styles.backgroundColor,
           color: styles.color,
           borderColor: styles.borderColor,
+          transition: 'all var(--transition-base) var(--ease-out)',
+          transform: isHovered && isClickable && !disabled ? 'var(--lift-sm)' : 'none',
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -207,6 +209,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
         backgroundColor: styles.backgroundColor,
         color: styles.color,
         borderColor: styles.borderColor,
+        transition: 'all var(--transition-base) var(--ease-out)',
       }}
       data-testid={testId}
     >

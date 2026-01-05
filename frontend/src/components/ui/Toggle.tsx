@@ -51,15 +51,20 @@ export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(function Toggle
       aria-checked={checked}
       data-testid={testId}
       onClick={() => !disabled && onChange(!checked)}
-      className={`relative ${s.track} rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      className={`relative ${s.track} rounded-full outline-none focus:outline-none focus-visible:outline-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       style={{
         backgroundColor: checked ? 'var(--primary-dark)' : 'var(--surface-light)',
+        transition: 'all var(--transition-base) var(--ease-out)',
+        boxShadow: checked ? '0 2px 8px rgba(0, 0, 0, 0.2)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.1)',
       }}
     >
       <div
-        className={`absolute top-1 ${s.thumb} rounded-full bg-white transition-all duration-200`}
+        className={`absolute top-1 ${s.thumb} rounded-full bg-white`}
         style={{
           left: checked ? s.translate : '4px',
+          transition: 'all var(--transition-base) var(--ease-out)',
+          transform: checked ? 'scale(1.1)' : 'scale(1)',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
         }}
       />
     </button>

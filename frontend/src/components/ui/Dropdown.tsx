@@ -173,10 +173,11 @@ export function DropdownMenu({
   return (
     <div
       role={role}
-      className={`absolute top-full mt-2 py-1 rounded-lg border shadow-lg overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150 ${alignmentClasses[align]} ${className}`}
+      className={`absolute top-full mt-2 py-1 rounded-lg border overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150 ${alignmentClasses[align]} ${className}`}
       style={{
         backgroundColor: 'var(--surface)',
         borderColor: 'var(--border)',
+        boxShadow: 'var(--shadow-lg)',
         minWidth: width === 'auto' ? '120px' : undefined,
         ...widthStyle,
       }}

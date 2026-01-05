@@ -106,7 +106,8 @@ export function ChatPanel({
         {/* Messages area */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4"
+          className="flex-1 overflow-y-auto space-y-6"
+          style={{ padding: 'var(--space-lg)' }}
         >
           {!hasMessages ? (
             // Welcome state
@@ -134,7 +135,7 @@ export function ChatPanel({
 
               {/* Suggested prompts */}
               {suggestedPrompts.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center">
+                <div className="flex flex-wrap justify-center" style={{ gap: 'var(--space-md)' }}>
                   {suggestedPrompts.map((prompt, index) => (
                     <button
                       key={index}

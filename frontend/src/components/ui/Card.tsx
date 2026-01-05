@@ -63,13 +63,16 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   const baseStyles: CSSProperties = {
     backgroundColor: 'var(--surface)',
     borderColor: isHovered && hoverHighlight ? 'var(--primary-dark)' : 'var(--border)',
-    transform: variant === 'elevated' && isHovered ? 'translateY(-2px)' : undefined,
+    // Enhanced lift: -4px for bolder hover effect
+    transform: variant === 'elevated' && isHovered ? 'var(--lift-md)' : 'translateY(0)',
+    // Enhanced shadows using CSS variables
     boxShadow: variant === 'elevated'
       ? isHovered
-        ? '0 8px 25px -5px rgba(0, 0, 0, 0.15)'
-        : '0 4px 15px -3px rgba(0, 0, 0, 0.1)'
+        ? 'var(--shadow-elevated-hover)'
+        : 'var(--shadow-elevated)'
       : undefined,
     cursor: isInteractive ? 'pointer' : undefined,
+    transition: 'all var(--transition-base) var(--ease-out)',
     ...style,
   };
 

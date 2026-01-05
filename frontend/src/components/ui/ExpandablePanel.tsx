@@ -196,9 +196,12 @@ export function ExpandablePanel({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 transition-all duration-300 ${
+        className={`fixed inset-0 z-40 ${
           isExpanded ? 'bg-black/50 backdrop-blur-sm' : 'bg-black/30'
         }`}
+        style={{
+          transition: 'all var(--transition-base) var(--ease-out)',
+        }}
         onClick={handleBackdropClick}
         data-testid={testId ? `${testId}-backdrop` : undefined}
       />
@@ -211,10 +214,12 @@ export function ExpandablePanel({
         aria-labelledby={title ? 'panel-title' : undefined}
         tabIndex={-1}
         data-testid={testId}
-        className={`flex flex-col border shadow-xl overflow-hidden transition-all duration-300 ease-out ${className}`}
+        className={`flex flex-col border shadow-xl overflow-hidden ${className}`}
         style={{
           backgroundColor: 'var(--surface)',
           borderColor: 'var(--border)',
+          transition: 'all var(--transition-base) var(--ease-out)',
+          transform: isExpanded ? 'translateX(0)' : 'translateY(0) scale(1)',
           ...panelStyles,
         }}
       >
@@ -226,15 +231,20 @@ export function ExpandablePanel({
           {/* Expand/Collapse button - LEFT side with chevron up/down */}
           <button
             onClick={toggleMode}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-            style={{ color: 'var(--foreground-muted)' }}
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{
+              color: 'var(--foreground-muted)',
+              transition: 'all var(--transition-base) var(--ease-out)',
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--surface-light)';
               e.currentTarget.style.color = 'var(--foreground)';
+              e.currentTarget.style.transform = 'var(--lift-sm)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.color = 'var(--foreground-muted)';
+              e.currentTarget.style.transform = 'none';
             }}
             aria-label={isCompact ? 'Expand panel' : 'Collapse panel'}
             data-testid={testId ? `${testId}-toggle` : undefined}
@@ -278,15 +288,20 @@ export function ExpandablePanel({
           {/* Close button - RIGHT side */}
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
-            style={{ color: 'var(--foreground-muted)' }}
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{
+              color: 'var(--foreground-muted)',
+              transition: 'all var(--transition-base) var(--ease-out)',
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = 'var(--surface-light)';
               e.currentTarget.style.color = 'var(--foreground)';
+              e.currentTarget.style.transform = 'var(--lift-sm)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.color = 'var(--foreground-muted)';
+              e.currentTarget.style.transform = 'none';
             }}
             aria-label="Close panel"
             data-testid={testId ? `${testId}-close` : undefined}

@@ -83,11 +83,15 @@ export function SegmentedControl<T extends string>({
               type="button"
               onClick={() => !disabled && onChange(option.value)}
               disabled={disabled}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-lg border transition-colors ${sizeClasses[size]}`}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg border ${sizeClasses[size]}`}
               style={{
                 borderColor: isSelected ? 'var(--primary-dark)' : 'var(--border)',
-                backgroundColor: isSelected ? 'var(--primary-alpha)' : 'transparent',
-                color: 'var(--foreground)',
+                backgroundColor: isSelected ? 'var(--primary)' : 'transparent',
+                color: isSelected ? 'var(--primary-foreground, #fff)' : 'var(--foreground)',
+                fontWeight: isSelected ? 500 : 400,
+                boxShadow: isSelected ? 'var(--shadow-md)' : 'none',
+                transform: isSelected ? 'var(--lift-sm)' : 'none',
+                transition: `all var(--transition-base) var(--ease-out)`,
                 opacity: disabled ? 0.5 : 1,
                 cursor: disabled ? 'not-allowed' : 'pointer',
               }}
