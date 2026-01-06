@@ -209,46 +209,119 @@ async function enrichProductBatch(
 // ============================================================================
 
 /**
- * Upsert products to database (batch operation for performance)
+ * Fetch existing enrichment data for a shop's products
+ * This allows preserving enrichment when re-syncing
+ */
+async function fetchExistingEnrichment(
+  supabase: SupabaseClient,
+  shopDomain: string
+): Promise<Map<string, { enriched_at: string | null; color_palette: string[]; tags: string[]; material: string | null; texture: string | null; tone: string | null }>> {
+  const { data, error } = await supabase
+    .from('enriched_products')
+    .select('external_id, enriched_at, color_palette, tags, material, texture, tone')
+    .eq('shop_domain', shopDomain);
+
+  const map = new Map();
+  if (!error && data) {
+    for (const row of data) {
+      map.set(row.external_id, {
+        enriched_at: row.enriched_at,
+        color_palette: row.color_palette || [],
+        tags: row.tags || [],
+        material: row.material,
+        texture: row.texture,
+        tone: row.tone,
+      });
+    }
+  }
+  return map;
+}
+
+/**
+ * Upsert products to database using UPSERT strategy
+ * Preserves existing enrichment data when re-syncing
  */
 async function upsertProducts(
   supabase: SupabaseClient,
   products: TransformedProduct[],
   enrichments: Map<string, EnrichmentResult>
 ): Promise<{ success: number; failed: number; errorMessage?: string }> {
-  // Get the shop domain from the first product to generate user_id
-  console.log('[upsertProducts] products count:', products.length);
-  console.log('[upsertProducts] First product keys:', products[0] ? Object.keys(products[0]) : 'no products');
-
-  const productShopDomain = products[0]?.shop_domain;
-  console.log('[upsertProducts] productShopDomain:', productShopDomain);
-
-  let userId: string | null = null;
-  if (productShopDomain) {
-    try {
-      userId = generateShopUserId(productShopDomain);
-      console.log('[upsertProducts] Generated user_id:', userId);
-    } catch (err) {
-      console.error('[upsertProducts] Error generating user_id:', err);
-    }
-  } else {
-    console.error('[upsertProducts] No shop_domain found on products!');
+  if (products.length === 0) {
+    return { success: 0, failed: 0 };
   }
 
-  // Prepare all products for batch insert
+  const shopDomain = products[0]?.shop_domain;
+  console.log('[upsertProducts] products count:', products.length);
+  console.log('[upsertProducts] shopDomain:', shopDomain);
+
+  if (!shopDomain) {
+    console.error('[upsertProducts] No shop_domain found on products!');
+    return { success: 0, failed: products.length, errorMessage: 'No shop_domain on products' };
+  }
+
+  // Step 1: Fetch existing enrichment data to preserve it
+  console.log('[upsertProducts] Fetching existing enrichment data...');
+  const existingEnrichment = await fetchExistingEnrichment(supabase, shopDomain);
+  console.log('[upsertProducts] Found', existingEnrichment.size, 'existing products with enrichment');
+
+  // Step 2: Prepare products for upsert, merging with existing enrichment
   const dbProducts = products.map((product) => {
-    const enrichment = enrichments.get(product.external_id);
+    const newEnrichment = enrichments.get(product.external_id);
+    const oldEnrichment = existingEnrichment.get(product.external_id);
     const fitTags = generateFitTags(product);
-    // Generate user_id from shop_domain
-    const productUserId = product.shop_domain ? generateShopUserId(product.shop_domain) : userId;
+    const userId = generateShopUserId(product.shop_domain);
+
+    // Merge logic: Use new enrichment if available, otherwise preserve old
+    const hasNewEnrichment = newEnrichment && (newEnrichment.color_palette?.length > 0 || newEnrichment.tags?.length > 0);
+    const hasOldEnrichment = oldEnrichment && oldEnrichment.enriched_at;
+
+    let finalEnrichment: {
+      color_palette: string[];
+      tags: string[];
+      material: string | null;
+      texture: string | null;
+      tone: string | null;
+      enriched_at: string | null;
+    };
+
+    if (hasNewEnrichment) {
+      // Use new enrichment
+      finalEnrichment = {
+        color_palette: newEnrichment.color_palette || [],
+        tags: newEnrichment.tags || [],
+        material: newEnrichment.material || null,
+        texture: newEnrichment.texture || null,
+        tone: newEnrichment.tone || null,
+        enriched_at: getISTTimestamp(),
+      };
+    } else if (hasOldEnrichment) {
+      // Preserve old enrichment
+      finalEnrichment = {
+        color_palette: oldEnrichment.color_palette || [],
+        tags: oldEnrichment.tags || [],
+        material: oldEnrichment.material || null,
+        texture: oldEnrichment.texture || null,
+        tone: oldEnrichment.tone || null,
+        enriched_at: oldEnrichment.enriched_at,
+      };
+    } else {
+      // No enrichment
+      finalEnrichment = {
+        color_palette: [],
+        tags: [],
+        material: null,
+        texture: null,
+        tone: null,
+        enriched_at: null,
+      };
+    }
 
     return {
-      user_id: productUserId,
+      user_id: userId,
       product_name: product.product_name,
       brand: product.brand,
       category: product.category,
       price: product.price,
-      // Note: currency column not in DB schema, store in metadata if needed
       image_url: product.image_url,
       product_url: product.product_url,
       external_id: product.external_id,
@@ -257,53 +330,55 @@ async function upsertProducts(
       variants: product.variants,
       product_dimensions: product.product_dimensions,
       fit_tags: fitTags,
-      // Enriched fields
-      color_palette: enrichment?.color_palette || [],
-      tags: enrichment?.tags || [],
-      material: enrichment?.material || null,
-      texture: enrichment?.texture || null,
-      tone: enrichment?.tone || null,
-      // Metadata (timestamps in IST)
-      enriched_at: enrichment ? getISTTimestamp() : null,
+      // Enriched fields (merged)
+      color_palette: finalEnrichment.color_palette,
+      tags: finalEnrichment.tags,
+      material: finalEnrichment.material,
+      texture: finalEnrichment.texture,
+      tone: finalEnrichment.tone,
+      enriched_at: finalEnrichment.enriched_at,
       updated_at: getISTTimestamp(),
     };
   });
 
-  // Delete existing products for this shop first, then insert fresh
-  // This is simpler than upsert when there's no unique constraint
-  console.log('[upsertProducts] Attempting to save', dbProducts.length, 'products');
-  console.log('[upsertProducts] FULL FIRST PRODUCT:', JSON.stringify(dbProducts[0]));
+  console.log('[upsertProducts] Attempting to upsert', dbProducts.length, 'products');
 
-  const deleteShopDomain = dbProducts[0]?.shop_domain;
-  if (deleteShopDomain) {
-    console.log('[upsertProducts] Deleting existing products for shop:', deleteShopDomain);
-    const { error: deleteError } = await supabase
-      .from('enriched_products')
-      .delete()
-      .eq('shop_domain', deleteShopDomain);
-
-    if (deleteError) {
-      console.error('[upsertProducts] Delete failed:', deleteError);
-      // Continue anyway - we'll try to insert
-    }
-  }
-
-  // Now insert all products
-  console.log('[upsertProducts] Inserting', dbProducts.length, 'products');
+  // Step 3: Upsert products (update if exists, insert if new)
+  // Uses unique constraint on (shop_domain, external_id)
   const { error, data } = await supabase
     .from('enriched_products')
-    .insert(dbProducts)
+    .upsert(dbProducts, {
+      onConflict: 'shop_domain,external_id',
+      ignoreDuplicates: false,
+    })
     .select();
 
   if (error) {
-    console.error('[upsertProducts] FAILED:', JSON.stringify(error, null, 2));
-    console.error('[upsertProducts] Error code:', error.code);
-    console.error('[upsertProducts] Error message:', error.message);
-    console.error('[upsertProducts] Error details:', error.details);
+    console.error('[upsertProducts] UPSERT FAILED:', JSON.stringify(error, null, 2));
     return { success: 0, failed: products.length, errorMessage: `${error.code}: ${error.message} - ${error.details || ''}` };
   }
 
-  console.log('[upsertProducts] SUCCESS, inserted:', data?.length || 0, 'products');
+  console.log('[upsertProducts] SUCCESS, upserted:', data?.length || 0, 'products');
+
+  // Step 4: Delete products that are no longer in Shopify
+  // (products that exist in DB but weren't in this sync)
+  const syncedExternalIds = products.map(p => p.external_id);
+  const existingExternalIds = Array.from(existingEnrichment.keys());
+  const deletedFromShopify = existingExternalIds.filter(id => !syncedExternalIds.includes(id));
+
+  if (deletedFromShopify.length > 0) {
+    console.log('[upsertProducts] Removing', deletedFromShopify.length, 'products no longer in Shopify');
+    const { error: deleteError } = await supabase
+      .from('enriched_products')
+      .delete()
+      .eq('shop_domain', shopDomain)
+      .in('external_id', deletedFromShopify);
+
+    if (deleteError) {
+      console.warn('[upsertProducts] Warning: Failed to delete removed products:', deleteError);
+    }
+  }
+
   return { success: products.length, failed: 0 };
 }
 

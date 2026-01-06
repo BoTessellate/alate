@@ -139,6 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleEnrich(req, res);
       case 'webhooks':
         return handleWebhooks(req, res);
+      case 'delete-data':
+        return handleDeleteData(req, res);
       case 'health':
         // Health check allowed in all environments
         return handleHealth(req, res);
@@ -236,7 +238,25 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
   // Exchange code for access token
   const tokenResponse = await exchangeCodeForToken(config, shopDomain, code);
 
-  // Encrypt and store the token
+  // Fetch shop info to get display name
+  let shopName: string | null = null;
+  try {
+    const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
+      headers: {
+        'X-Shopify-Access-Token': tokenResponse.access_token,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (shopInfoResponse.ok) {
+      const shopInfo = await shopInfoResponse.json() as { shop?: { name?: string } };
+      shopName = shopInfo.shop?.name || null;
+      console.log('[CALLBACK] Fetched shop name:', shopName);
+    }
+  } catch (shopErr) {
+    console.warn('[CALLBACK] Could not fetch shop info:', shopErr);
+  }
+
+  // Encrypt and store the token with shop name
   const encryptedToken = encryptToken(tokenResponse.access_token, config.encryptionKey);
 
   const supabase = getSupabase();
@@ -246,6 +266,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
       shop_domain: shopDomain,
       access_token: encryptedToken,
       scope: tokenResponse.scope,
+      shop_name: shopName,
       updated_at: getISTTimestamp(),
     },
     { onConflict: 'shop_domain' }
@@ -255,6 +276,13 @@ async function handleCallback(req: VercelRequest, res: VercelResponse) {
     console.error('Failed to store session:', upsertError);
     return res.status(500).json({ error: 'Failed to store session' });
   }
+
+  // Mark as reinstalled if there was a pending uninstall
+  await supabase
+    .from('shopify_uninstall_log')
+    .update({ reinstalled: true })
+    .eq('shop_domain', shopDomain)
+    .is('cleaned_up_at', null);
 
   // Redirect to the app dashboard
   const appUrl = `${config.appUrl}/api/shopify?action=app&shop=${encodeURIComponent(shopDomain)}`;
@@ -948,6 +976,139 @@ Return this exact JSON structure:
 }
 
 // ============================================================================
+// Delete Data Handler - GDPR-compliant data deletion
+// ============================================================================
+async function handleDeleteData(req: VercelRequest, res: VercelResponse) {
+  console.log('[DELETE-DATA] Handler started, method:', req.method);
+
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // GET: Return summary of what will be deleted
+  // POST/DELETE: Actually delete the data (requires confirm=true)
+  const shop = (req.query.shop || req.body?.shop) as string;
+  const confirmDelete = req.body?.confirm === true;
+
+  if (!shop || typeof shop !== 'string') {
+    return res.status(400).json({
+      error: 'Missing shop parameter',
+      message: 'Request must include "shop" field',
+    });
+  }
+
+  const shopDomain = sanitizeShopDomain(shop);
+  if (!isValidShopDomain(shopDomain)) {
+    return res.status(400).json({
+      error: 'Invalid shop domain',
+      message: 'Shop domain must be in format: store-name.myshopify.com',
+    });
+  }
+
+  const supabase = getSupabase();
+
+  // Get counts of data that would be deleted
+  const { count: productCount } = await supabase
+    .from('enriched_products')
+    .select('*', { count: 'exact', head: true })
+    .eq('shop_domain', shopDomain);
+
+  const { count: syncLogCount } = await supabase
+    .from('shopify_sync_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('shop_domain', shopDomain);
+
+  const { data: sessionData } = await supabase
+    .from('shopify_sessions')
+    .select('shop_domain, shop_name, created_at')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  const summary = {
+    shop_domain: shopDomain,
+    shop_name: sessionData?.shop_name || null,
+    data_to_delete: {
+      products: productCount || 0,
+      sync_logs: syncLogCount || 0,
+      session: sessionData ? 1 : 0,
+    },
+    total_records: (productCount || 0) + (syncLogCount || 0) + (sessionData ? 1 : 0),
+  };
+
+  // If GET request or no confirm flag, just return the summary
+  if (req.method === 'GET' || !confirmDelete) {
+    return res.status(200).json({
+      ...summary,
+      confirm_required: true,
+      message: 'To delete all data, send a POST request with { "shop": "...", "confirm": true }',
+    });
+  }
+
+  // Actually delete the data
+  console.log('[DELETE-DATA] Confirmed deletion for:', shopDomain);
+  const deletionResults: Record<string, any> = {};
+
+  // Delete in order (handle any foreign key constraints)
+  // 1. Delete enriched products
+  const { error: productsError, count: deletedProducts } = await supabase
+    .from('enriched_products')
+    .delete({ count: 'exact' })
+    .eq('shop_domain', shopDomain);
+
+  deletionResults.products = {
+    deleted: deletedProducts || 0,
+    error: productsError?.message || null,
+  };
+
+  // 2. Delete sync logs
+  const { error: logsError, count: deletedLogs } = await supabase
+    .from('shopify_sync_logs')
+    .delete({ count: 'exact' })
+    .eq('shop_domain', shopDomain);
+
+  deletionResults.sync_logs = {
+    deleted: deletedLogs || 0,
+    error: logsError?.message || null,
+  };
+
+  // 3. Delete session
+  const { error: sessionError } = await supabase
+    .from('shopify_sessions')
+    .delete()
+    .eq('shop_domain', shopDomain);
+
+  deletionResults.session = {
+    deleted: sessionData ? 1 : 0,
+    error: sessionError?.message || null,
+  };
+
+  // 4. Mark any uninstall log entries as cleaned up
+  await supabase
+    .from('shopify_uninstall_log')
+    .update({ cleaned_up_at: getISTTimestamp() })
+    .eq('shop_domain', shopDomain)
+    .is('cleaned_up_at', null);
+
+  const hasErrors = productsError || logsError || sessionError;
+
+  console.log('[DELETE-DATA] Deletion complete for:', shopDomain, deletionResults);
+
+  return res.status(hasErrors ? 207 : 200).json({
+    success: !hasErrors,
+    shop_domain: shopDomain,
+    deleted: deletionResults,
+    message: hasErrors
+      ? 'Some deletions failed, see details'
+      : `Successfully deleted all data for ${shopDomain}`,
+  });
+}
+
+// ============================================================================
 // Webhooks Handler
 // ============================================================================
 async function handleWebhooks(req: VercelRequest, res: VercelResponse) {
@@ -998,7 +1159,15 @@ async function handleWebhooks(req: VercelRequest, res: VercelResponse) {
         // For now, we log it - full sync will catch inventory changes
         break;
       case 'app/uninstalled':
-        await getSupabase().from('shopify_sessions').delete().eq('shop_domain', shopDomain);
+        // Log uninstall with timestamp - don't delete immediately (7-day grace period)
+        // Data will be cleaned up by a scheduled job after 7 days if not reinstalled
+        console.log(`[WEBHOOK] App uninstalled for ${shopDomain} - logging for delayed cleanup`);
+        await getSupabase().from('shopify_uninstall_log').insert({
+          shop_domain: shopDomain,
+          uninstalled_at: getISTTimestamp(),
+        });
+        // Note: Session and data are NOT deleted here - scheduled cleanup will handle it
+        // This prevents data loss if merchant reinstalls within 7 days
         break;
     }
   } catch (error) {
@@ -1058,13 +1227,32 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
         const tokenData = JSON.parse(tokenResponseText);
         console.log('[APP] Token exchange successful, scope:', tokenData.scope, 'token_type:', tokenData.token_type);
 
-        // Store the new access token
+        // Fetch shop info to get display name
+        let shopName: string | null = null;
+        try {
+          const shopInfoResponse = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
+            headers: {
+              'X-Shopify-Access-Token': tokenData.access_token,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (shopInfoResponse.ok) {
+            const shopInfo = await shopInfoResponse.json() as { shop?: { name?: string } };
+            shopName = shopInfo.shop?.name || null;
+            console.log('[APP] Fetched shop name:', shopName);
+          }
+        } catch (shopErr) {
+          console.warn('[APP] Could not fetch shop info:', shopErr);
+        }
+
+        // Store the new access token and shop name
         const encryptedToken = encryptToken(tokenData.access_token, config.encryptionKey);
         const { error: upsertError } = await supabase.from('shopify_sessions').upsert(
           {
             shop_domain: shopDomain,
             access_token: encryptedToken,
             scope: tokenData.scope,
+            shop_name: shopName,
             updated_at: getISTTimestamp(),
           },
           { onConflict: 'shop_domain' }
@@ -1075,6 +1263,13 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
         } else {
           console.log('[APP] Exchanged token stored successfully');
         }
+
+        // Mark as reinstalled if there was a pending uninstall
+        await supabase
+          .from('shopify_uninstall_log')
+          .update({ reinstalled: true })
+          .eq('shop_domain', shopDomain)
+          .is('cleaned_up_at', null);
       } else {
         // tokenResponseText already contains the error response body
         console.error('[APP] Token exchange failed:', tokenExchangeResponse.status, tokenResponseText);

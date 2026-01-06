@@ -418,11 +418,48 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') return;
     setIsDeleting(true);
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Check if there's a connected Shopify store (saved during OAuth flow)
+      const connectedShop = localStorage.getItem('connected_shop_domain');
+
+      if (connectedShop) {
+        console.log('[Settings] Deleting Shopify data for:', connectedShop);
+
+        // Call the delete-data API with confirmation
+        const response = await fetch(`${API_BASE_URL}/api/shopify?action=delete-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shop: connectedShop,
+            confirm: true,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to delete account data');
+        }
+
+        const result = await response.json();
+        console.log('[Settings] Deletion result:', result);
+
+        // Clear local storage
+        localStorage.removeItem('connected_shop_domain');
+      }
+
+      // Clear any local data
+      clearHistory();
+      setUserName('');
+      setIsLoggedIn(false);
+
+      // Redirect to home
       window.location.href = '/';
     } catch (error) {
       console.error('Delete failed:', error);
+      setFormError(error instanceof Error ? error.message : 'Failed to delete account. Please try again.');
       setIsDeleting(false);
     }
   };
@@ -941,6 +978,15 @@ export default function SettingsPage() {
               <span style={{ color: 'var(--error)' }}>•</span> All associated data
             </li>
           </ul>
+
+          {formError && activeModal === 'delete' && (
+            <div
+              className="p-3 rounded-lg text-sm mb-4"
+              style={{ backgroundColor: 'rgba(168, 64, 50, 0.2)', color: 'var(--error)' }}
+            >
+              {formError}
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
