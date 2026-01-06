@@ -17,6 +17,8 @@ export interface Product {
   texture?: string;
   tone?: string;
   canonical_tags?: string[];
+  vibe_layer?: string;    // 'evening-sophistication', 'power-dressing', 'cozy-morning', etc.
+  pairs_with?: string[];  // ['statement-jewelry', 'elegant-footwear', 'neutral-knits']
   // Fields for user-uploaded products
   size?: string;
   source?: 'upload' | 'scrape' | 'api';

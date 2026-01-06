@@ -47,18 +47,29 @@ export function WeatherWidget() {
 
     const getCityFromCoords = async (lat: number, lng: number): Promise<string> => {
       try {
-        // Use Open-Meteo's geocoding API for reverse lookup
+        // Use BigDataCloud for accurate reverse geocoding (free, no API key)
         const res = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m&timezone=auto`
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
         );
         if (res.ok) {
           const data = await res.json();
-          // Open-Meteo returns timezone which often contains city info
-          // Fall back to coordinates if no city name available
-          return data.timezone?.split('/').pop()?.replace(/_/g, ' ') || 'Your Location';
+          // Return city name, or locality, or principal subdivision
+          return data.city || data.locality || data.principalSubdivision || 'Your Location';
         }
       } catch {
-        // Ignore reverse geocoding errors
+        // Fallback: try Nominatim (OpenStreetMap)
+        try {
+          const osmRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'User-Agent': 'TheMoodLayer/1.0' } }
+          );
+          if (osmRes.ok) {
+            const osmData = await osmRes.json();
+            return osmData.address?.city || osmData.address?.town || osmData.address?.village || 'Your Location';
+          }
+        } catch {
+          // Ignore fallback errors
+        }
       }
       return 'Your Location';
     };

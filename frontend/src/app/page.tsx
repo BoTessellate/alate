@@ -7,6 +7,7 @@ import { useLooksStore, generateMoodboardPath } from '@/stores/useLooksStore';
 import { useSettingsStore, type LocalCurrency } from '@/stores/useSettingsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { Card, SectionHeader, WeatherWidget, StatCard, StatDivider } from '@/components/ui';
+import { MiniMoodboard } from '@/components/MiniMoodboard';
 
 // Currency symbols map
 const CURRENCY_SYMBOLS: Record<LocalCurrency, string> = {
@@ -182,6 +183,16 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Time-Based Mini Moodboard */}
+      {isHydrated && currentTime && (
+        <div className="px-8 pb-6 max-w-6xl mx-auto">
+          <MiniMoodboard
+            timePeriod={timeContext?.period}
+            collections={collections}
+          />
+        </div>
+      )}
 
       {/* Content */}
       <div className="px-8 pb-24 max-w-6xl mx-auto">
