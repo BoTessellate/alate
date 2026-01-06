@@ -1962,6 +1962,21 @@ interface ParsedProductDetails {
   additional_tags: string[];
 }
 
+interface ParsedMultiProductDetails {
+  multiple: true;
+  products: Array<{
+    product_type?: string;
+    brand?: string | null;
+    size?: string | null;
+    material?: string | null;
+    estimated_price?: number | null;
+    currency?: string | null;
+    additional_tags?: string[];
+  }>;
+}
+
+type ParsedDetails = ParsedProductDetails | ParsedMultiProductDetails;
+
 /**
  * Parse natural language product description into structured fields
  * Uses Gemini (same as chat agent) for consistency
@@ -2054,7 +2069,7 @@ Return ONLY valid JSON, no explanation.`;
       });
     }
 
-    const parsed = parseJSONFromResponse(aiResponse.text) as ParsedProductDetails | null;
+    const parsed = parseJSONFromResponse(aiResponse.text) as ParsedDetails | null;
 
     if (!parsed) {
       log.warn('Failed to parse JSON from AI response');
@@ -2073,15 +2088,55 @@ Return ONLY valid JSON, no explanation.`;
       });
     }
 
-    // Validate and clean the parsed data
+    // Check if this is a multi-product response
+    if ('multiple' in parsed && parsed.multiple === true && Array.isArray(parsed.products)) {
+      // Multi-product response - clean each product
+      const cleanedProducts = parsed.products.map((p) => ({
+        product_type: p.product_type && typeof p.product_type === 'string' ? p.product_type.trim() : null,
+        brand: p.brand && typeof p.brand === 'string' ? p.brand.trim() : null,
+        size: p.size && typeof p.size === 'string' ? p.size.trim() : null,
+        material: p.material && typeof p.material === 'string' ? p.material.trim() : null,
+        estimated_price: typeof p.estimated_price === 'number' ? p.estimated_price : null,
+        currency: p.currency && typeof p.currency === 'string' ? p.currency.toUpperCase() : null,
+        additional_tags: Array.isArray(p.additional_tags)
+          ? p.additional_tags.filter((t): t is string => typeof t === 'string').map(t => t.trim())
+          : [],
+      }));
+
+      // Calculate confidence based on how many products have at least one field
+      const productsWithData = cleanedProducts.filter((p) =>
+        p.brand || p.size || p.material || p.estimated_price || p.product_type
+      ).length;
+      const confidence = cleanedProducts.length > 0 ? productsWithData / cleanedProducts.length : 0;
+
+      log.info({
+        productCount: cleanedProducts.length,
+        productsWithData,
+        modelUsed,
+        confidence,
+      }, 'Multi-product natural language parsing complete');
+
+      return res.status(200).json({
+        success: true,
+        parsed: {
+          multiple: true,
+          products: cleanedProducts,
+        },
+        confidence,
+        model_used: modelUsed,
+      });
+    }
+
+    // Single product response - validate and clean the parsed data
+    const singleParsed = parsed as ParsedProductDetails;
     const cleanedParsed: ParsedProductDetails = {
-      brand: parsed.brand && typeof parsed.brand === 'string' ? parsed.brand.trim() : null,
-      size: parsed.size && typeof parsed.size === 'string' ? parsed.size.trim() : null,
-      material: parsed.material && typeof parsed.material === 'string' ? parsed.material.trim() : null,
-      estimated_price: typeof parsed.estimated_price === 'number' ? parsed.estimated_price : null,
-      currency: parsed.currency && typeof parsed.currency === 'string' ? parsed.currency.toUpperCase() : null,
-      additional_tags: Array.isArray(parsed.additional_tags)
-        ? parsed.additional_tags.filter((t): t is string => typeof t === 'string').map(t => t.trim())
+      brand: singleParsed.brand && typeof singleParsed.brand === 'string' ? singleParsed.brand.trim() : null,
+      size: singleParsed.size && typeof singleParsed.size === 'string' ? singleParsed.size.trim() : null,
+      material: singleParsed.material && typeof singleParsed.material === 'string' ? singleParsed.material.trim() : null,
+      estimated_price: typeof singleParsed.estimated_price === 'number' ? singleParsed.estimated_price : null,
+      currency: singleParsed.currency && typeof singleParsed.currency === 'string' ? singleParsed.currency.toUpperCase() : null,
+      additional_tags: Array.isArray(singleParsed.additional_tags)
+        ? singleParsed.additional_tags.filter((t): t is string => typeof t === 'string').map(t => t.trim())
         : [],
     };
 
