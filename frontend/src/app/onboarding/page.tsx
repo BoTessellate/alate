@@ -191,8 +191,8 @@ export default function OnboardingPage() {
             variant="centered"
             size="md"
             maxWidth="none"
-            title="Hi I'm Moody, tell me a little about your style"
-            subtitle="Select at least 2 styles that vibe with you."
+            title="Hi, I'm Moody—let's get to know each other"
+            subtitle="Show me what catches your eye. Pick at least 2 styles that feel like you."
             className="px-0 pt-0 pb-0 mb-8"
           />
 
@@ -233,8 +233,8 @@ export default function OnboardingPage() {
             variant="centered"
             size="md"
             maxWidth="none"
-            title="Pick your favorites"
-            subtitle="Select at least 3 tags that catch your eye. These are popular in our catalog."
+            title="Love it. Now tell me a little more"
+            subtitle="Here are some of our most-loved tags—pick at least 3 that resonate with you."
             className="px-0 pt-0 pb-0 mb-8"
           />
 

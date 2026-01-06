@@ -274,7 +274,7 @@ describe('UnifiedChatInput', () => {
         />
       );
 
-      expect(screen.getByPlaceholderText('Add a description...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Tell me about this piece...')).toBeInTheDocument();
     });
 
     it('enables send button when image is attached even without text', () => {

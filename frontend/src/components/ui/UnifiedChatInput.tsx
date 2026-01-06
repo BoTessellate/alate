@@ -236,7 +236,7 @@ export function UnifiedChatInput({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={attachedImage ? 'Add a description...' : placeholder}
+            placeholder={attachedImage ? 'Tell me about this piece...' : placeholder}
             disabled={disabled || isLoading}
             rows={1}
             className="w-full bg-transparent resize-none text-sm outline-none focus:outline-none leading-normal py-1.5"
