@@ -418,7 +418,7 @@ Query: "${query}"
 // ============================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const handled = applyMiddleware(req, res);
+  const handled = await applyMiddleware(req, res);
   if (handled) return;
 
   const supabaseUrl = process.env.SUPABASE_URL;

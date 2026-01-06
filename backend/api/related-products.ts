@@ -232,7 +232,7 @@ async function findRelatedProducts(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Apply middleware
-  const handled = applyMiddleware(req, res);
+  const handled = await applyMiddleware(req, res);
   if (handled) return;
 
   if (req.method !== 'GET' && req.method !== 'POST') {

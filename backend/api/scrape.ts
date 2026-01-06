@@ -371,7 +371,7 @@ export default async function handler(
   res: VercelResponse
 ) {
   // Apply CORS, rate limiting, and security headers
-  const handled = applyMiddleware(req, res);
+  const handled = await applyMiddleware(req, res);
   if (handled) return;
 
   if (req.method !== 'POST') {

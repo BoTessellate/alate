@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/stores/useToastStore';
 import type { Collection, Product, CollectionMetadata } from '@/types';
 
 // Generate or retrieve a device ID for anonymous users
@@ -15,8 +16,12 @@ function getDeviceId(): string {
   return deviceId;
 }
 
+// Track sync failures to avoid spamming user with toasts
+let syncFailureCount = 0;
+const MAX_SILENT_FAILURES = 3;
+
 // Supabase sync helpers
-async function syncCollectionToSupabase(collection: Collection, deviceId: string): Promise<void> {
+async function syncCollectionToSupabase(collection: Collection, deviceId: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('user_collections')
@@ -33,13 +38,28 @@ async function syncCollectionToSupabase(collection: Collection, deviceId: string
 
     if (error) {
       console.warn('Failed to sync collection to Supabase:', error.message);
+      syncFailureCount++;
+      // Only show toast after multiple failures to avoid spam
+      if (syncFailureCount === MAX_SILENT_FAILURES) {
+        toast.warning('Cloud sync unavailable. Your data is saved locally.');
+      }
+      return false;
     }
+    // Reset failure count on success
+    syncFailureCount = 0;
+    return true;
   } catch (err) {
     console.warn('Supabase sync error:', err);
+    syncFailureCount++;
+    // Only show toast after multiple failures
+    if (syncFailureCount === MAX_SILENT_FAILURES) {
+      toast.warning('Cloud sync unavailable. Your data is saved locally.');
+    }
+    return false;
   }
 }
 
-async function deleteCollectionFromSupabase(collectionId: string): Promise<void> {
+async function deleteCollectionFromSupabase(collectionId: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('user_collections')
@@ -48,13 +68,18 @@ async function deleteCollectionFromSupabase(collectionId: string): Promise<void>
 
     if (error) {
       console.warn('Failed to delete collection from Supabase:', error.message);
+      // Silent failure - local deletion already succeeded
+      return false;
     }
+    return true;
   } catch (err) {
     console.warn('Supabase delete error:', err);
+    // Silent failure - local deletion already succeeded
+    return false;
   }
 }
 
-async function fetchCollectionsFromSupabase(deviceId: string): Promise<Collection[]> {
+async function fetchCollectionsFromSupabase(deviceId: string): Promise<{ collections: Collection[]; error: boolean }> {
   try {
     const { data, error } = await supabase
       .from('user_collections')
@@ -64,10 +89,10 @@ async function fetchCollectionsFromSupabase(deviceId: string): Promise<Collectio
 
     if (error) {
       console.warn('Failed to fetch collections from Supabase:', error.message);
-      return [];
+      return { collections: [], error: true };
     }
 
-    return (data || []).map((row) => ({
+    const collections = (data || []).map((row) => ({
       id: row.id,
       name: row.name,
       description: row.description || undefined,
@@ -76,9 +101,10 @@ async function fetchCollectionsFromSupabase(deviceId: string): Promise<Collectio
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
+    return { collections, error: false };
   } catch (err) {
     console.warn('Supabase fetch error:', err);
-    return [];
+    return { collections: [], error: true };
   }
 }
 
@@ -126,8 +152,13 @@ export const useCollectionsStore = create<CollectionsState>()(
 
         try {
           // Fetch from Supabase
-          const remoteCollections = await fetchCollectionsFromSupabase(deviceId);
+          const { collections: remoteCollections, error: fetchError } = await fetchCollectionsFromSupabase(deviceId);
           const localCollections = get().collections;
+
+          // Silent failure - just use local data
+          if (fetchError) {
+            console.warn('Cloud sync unavailable, using local data');
+          }
 
           // Merge strategy: use the most recently updated version of each collection
           const mergedMap = new Map<string, Collection>();
@@ -152,15 +183,18 @@ export const useCollectionsStore = create<CollectionsState>()(
             isSyncing: false,
           });
 
-          // Push any local-only or newer local collections to Supabase
-          for (const collection of merged) {
-            const remote = remoteCollections.find((r) => r.id === collection.id);
-            if (!remote || new Date(collection.updatedAt) > new Date(remote.updatedAt)) {
-              await syncCollectionToSupabase(collection, deviceId);
+          // Push any local-only or newer local collections to Supabase (if fetch succeeded)
+          if (!fetchError) {
+            for (const collection of merged) {
+              const remote = remoteCollections.find((r) => r.id === collection.id);
+              if (!remote || new Date(collection.updatedAt) > new Date(remote.updatedAt)) {
+                await syncCollectionToSupabase(collection, deviceId);
+              }
             }
           }
         } catch (err) {
           console.warn('Sync with Supabase failed:', err);
+          // Silent failure - local data is safe
           set({ isSyncing: false });
         }
       },

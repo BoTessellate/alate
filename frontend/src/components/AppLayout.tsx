@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import ThemeProvider from './ThemeProvider';
 import FloatingActionButton from './FloatingActionButton';
 import { ErrorBoundary, SidePanelProvider, SidePanelLayout } from '@/components/ui';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 import { useUserStore } from '@/stores/useUserStore';
 import { Loader2 } from 'lucide-react';
 
@@ -65,6 +66,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {children}
           </ErrorBoundary>
         </div>
+        <ToastContainer />
       </ThemeProvider>
     );
   }
@@ -114,6 +116,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {/* Floating Action Button - Opens side panel */}
           <FloatingActionButton />
         </div>
+        <ToastContainer />
       </SidePanelProvider>
     </ThemeProvider>
   );

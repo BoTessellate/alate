@@ -3,10 +3,15 @@
  * Centralized CORS, rate limiting, and security middleware
  *
  * Use these helpers in Vercel serverless functions and Express routes
+ *
+ * Rate Limiting:
+ * - Uses Upstash Redis when UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set
+ * - Falls back to in-memory rate limiting (best-effort in serverless)
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { Request, Response, NextFunction } from 'express';
+import { Redis } from '@upstash/redis';
 
 // ============================================================================
 // Configuration
@@ -163,8 +168,38 @@ export function setSecurityHeaders(res: VercelResponse): void {
 // ============================================================================
 
 /**
- * Simple in-memory rate limiter
- * Note: In production with multiple instances, use Redis instead
+ * Initialize Upstash Redis client if environment variables are set
+ * Falls back to in-memory store for development or when not configured
+ */
+let redisClient: Redis | null = null;
+let redisInitialized = false;
+
+function getRedisClient(): Redis | null {
+  if (redisInitialized) return redisClient;
+
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (url && token) {
+    try {
+      redisClient = new Redis({ url, token });
+      console.log('[RateLimiter] Using Upstash Redis for rate limiting');
+    } catch (error) {
+      console.warn('[RateLimiter] Failed to initialize Redis, using in-memory fallback:', error);
+      redisClient = null;
+    }
+  } else {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[RateLimiter] UPSTASH_REDIS_REST_URL/TOKEN not set. Using in-memory rate limiting (best-effort in serverless).');
+    }
+  }
+
+  redisInitialized = true;
+  return redisClient;
+}
+
+/**
+ * In-memory rate limit store (fallback for development or when Redis unavailable)
  */
 const rateLimitStore = new Map<
   string,
@@ -187,12 +222,62 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
 };
 
 /**
- * Check rate limit for an IP
- * Returns { allowed: boolean, remaining: number, resetAt: number }
+ * Check rate limit using Redis (distributed, works across serverless instances)
  */
-export function checkRateLimit(
+async function checkRateLimitRedis(
   ip: string,
-  config: RateLimitConfig = DEFAULT_RATE_LIMIT
+  config: RateLimitConfig,
+  redis: Redis
+): Promise<{ allowed: boolean; remaining: number; resetAt: number; retryAfter?: number }> {
+  const now = Date.now();
+  const key = `ratelimit:${ip}`;
+  const windowSeconds = Math.ceil(config.windowMs / 1000);
+
+  try {
+    // Use Redis INCR with TTL for atomic rate limiting
+    const count = await redis.incr(key);
+
+    // Set TTL on first request in window
+    if (count === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+
+    // Get TTL to calculate resetAt
+    const ttl = await redis.ttl(key);
+    const resetAt = now + (ttl > 0 ? ttl * 1000 : config.windowMs);
+
+    if (count > config.max) {
+      const retryAfter = Math.ceil((resetAt - now) / 1000);
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt,
+        retryAfter,
+      };
+    }
+
+    return {
+      allowed: true,
+      remaining: config.max - count,
+      resetAt,
+    };
+  } catch (error) {
+    // If Redis fails, allow the request (fail open) and log
+    console.warn('[RateLimiter] Redis error, allowing request:', error);
+    return {
+      allowed: true,
+      remaining: config.max - 1,
+      resetAt: now + config.windowMs,
+    };
+  }
+}
+
+/**
+ * Check rate limit using in-memory store (for development or fallback)
+ */
+function checkRateLimitMemory(
+  ip: string,
+  config: RateLimitConfig
 ): { allowed: boolean; remaining: number; resetAt: number; retryAfter?: number } {
   const now = Date.now();
   const key = `rate:${ip}`;
@@ -231,6 +316,35 @@ export function checkRateLimit(
 }
 
 /**
+ * Check rate limit for an IP
+ * Uses Redis if available, otherwise falls back to in-memory
+ * Returns { allowed: boolean, remaining: number, resetAt: number }
+ */
+export async function checkRateLimit(
+  ip: string,
+  config: RateLimitConfig = DEFAULT_RATE_LIMIT
+): Promise<{ allowed: boolean; remaining: number; resetAt: number; retryAfter?: number }> {
+  const redis = getRedisClient();
+
+  if (redis) {
+    return checkRateLimitRedis(ip, config, redis);
+  }
+
+  return checkRateLimitMemory(ip, config);
+}
+
+/**
+ * Synchronous rate limit check (in-memory only, for backwards compatibility)
+ * @deprecated Use checkRateLimit (async) for proper Redis support
+ */
+export function checkRateLimitSync(
+  ip: string,
+  config: RateLimitConfig = DEFAULT_RATE_LIMIT
+): { allowed: boolean; remaining: number; resetAt: number; retryAfter?: number } {
+  return checkRateLimitMemory(ip, config);
+}
+
+/**
  * Clean up expired rate limit entries
  */
 function cleanupRateLimitStore(): void {
@@ -261,16 +375,16 @@ export function getClientIp(req: VercelRequest): string {
 }
 
 /**
- * Apply rate limiting to a Vercel handler
+ * Apply rate limiting to a Vercel handler (async for Redis support)
  * Returns true if rate limited (caller should return early)
  */
-export function applyRateLimit(
+export async function applyRateLimit(
   req: VercelRequest,
   res: VercelResponse,
   config?: RateLimitConfig
-): boolean {
+): Promise<boolean> {
   const ip = getClientIp(req);
-  const result = checkRateLimit(ip, config);
+  const result = await checkRateLimit(ip, config);
 
   res.setHeader('X-RateLimit-Limit', String(config?.max || DEFAULT_RATE_LIMIT.max));
   res.setHeader('X-RateLimit-Remaining', String(result.remaining));
@@ -381,7 +495,7 @@ function isPrivateIp(hostname: string): boolean {
  * Apply all standard middleware to a Vercel handler
  * Returns true if the request was handled (preflight or rate limited)
  */
-export function applyMiddleware(
+export async function applyMiddleware(
   req: VercelRequest,
   res: VercelResponse,
   options: {
@@ -389,7 +503,7 @@ export function applyMiddleware(
     rateLimit?: RateLimitConfig | false;
     security?: boolean;
   } = {}
-): boolean {
+): Promise<boolean> {
   const { cors, rateLimit, security = true } = options;
 
   // Security headers
@@ -403,7 +517,7 @@ export function applyMiddleware(
 
   // Rate limiting
   if (rateLimit !== false) {
-    const isRateLimited = applyRateLimit(
+    const isRateLimited = await applyRateLimit(
       req,
       res,
       rateLimit || undefined
@@ -459,16 +573,16 @@ export function expressCorsMiddleware(config?: CorsConfig) {
 }
 
 /**
- * Express rate limiting middleware
+ * Express rate limiting middleware (async for Redis support)
  */
 export function expressRateLimitMiddleware(config?: RateLimitConfig) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const ip =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress ||
       'unknown';
 
-    const result = checkRateLimit(ip, config);
+    const result = await checkRateLimit(ip, config);
 
     res.setHeader('X-RateLimit-Limit', String(config?.max || DEFAULT_RATE_LIMIT.max));
     res.setHeader('X-RateLimit-Remaining', String(result.remaining));

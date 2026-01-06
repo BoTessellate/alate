@@ -317,7 +317,7 @@ async function handleStats(
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   // Apply CORS, rate limiting, and security headers
-  const handled = applyMiddleware(req, res);
+  const handled = await applyMiddleware(req, res);
   if (handled) return;
 
   // Only POST for mutations, GET for stats

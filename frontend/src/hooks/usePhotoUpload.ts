@@ -368,11 +368,12 @@ export function usePhotoUpload() {
   }, [productData, selectedCollections, addProductToCollection, setStatus, setError]);
 
   /**
-   * Reset the upload state
+   * Reset the upload state and cancel any in-flight requests
    */
   const resetUpload = useCallback(() => {
+    cancelRequests();
     reset();
-  }, [reset]);
+  }, [reset, cancelRequests]);
 
   /**
    * Detect multiple products in the selected image
@@ -467,6 +468,9 @@ export function usePhotoUpload() {
       return null;
     }
 
+    // Create abort signal for this request
+    const signal = createAbortController();
+
     try {
       setStatus('detecting');
       setProgress(10);
@@ -483,7 +487,7 @@ export function usePhotoUpload() {
 
       setProgress(50);
 
-      // Call the smart-detect API
+      // Call the smart-detect API with abort signal
       const response = await fetch(`${API_BASE_URL}/api/image-processing?action=smart-detect`, {
         method: 'POST',
         headers: {
@@ -496,6 +500,7 @@ export function usePhotoUpload() {
           },
           context: productType,
         }),
+        signal,
       });
 
       setProgress(80);
@@ -539,6 +544,11 @@ export function usePhotoUpload() {
         products: data.detectedProducts,
       };
     } catch (error) {
+      // Ignore abort errors - user cancelled the request
+      if (isAbortError(error)) {
+        return null;
+      }
+
       let message = 'Detection failed';
       if (error instanceof Error) {
         message = error.message || 'Failed to detect products. Please try again.';
@@ -546,7 +556,7 @@ export function usePhotoUpload() {
       setError(message);
       return null;
     }
-  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setDetectedProducts, setDetectionMode]);
+  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setDetectedProducts, setDetectionMode, createAbortController]);
 
   /**
    * Process selected products from detection
@@ -556,6 +566,9 @@ export function usePhotoUpload() {
       setError('No products selected');
       return null;
     }
+
+    // Create abort signal for this request
+    const signal = createAbortController();
 
     try {
       setStatus('processing-multi');
@@ -578,7 +591,7 @@ export function usePhotoUpload() {
 
       setProgress(30);
 
-      // Call the process-multi API
+      // Call the process-multi API with abort signal
       const response = await fetch(`${API_BASE_URL}/api/image-processing?action=process-multi`, {
         method: 'POST',
         headers: {
@@ -590,6 +603,7 @@ export function usePhotoUpload() {
           selectedProducts,
           productType,
         }),
+        signal,
       });
 
       setProgress(80);
@@ -631,6 +645,11 @@ export function usePhotoUpload() {
 
       return products;
     } catch (error) {
+      // Ignore abort errors - user cancelled the request
+      if (isAbortError(error)) {
+        return null;
+      }
+
       let message = 'Processing failed';
       if (error instanceof Error) {
         message = error.message || 'Failed to process products. Please try again.';
@@ -638,7 +657,7 @@ export function usePhotoUpload() {
       setError(message);
       return null;
     }
-  }, [selectedFile, selectedProductIds, detectedProducts, productType, fileToBase64, setStatus, setProgress, setError, setProcessedProducts]);
+  }, [selectedFile, selectedProductIds, detectedProducts, productType, fileToBase64, setStatus, setProgress, setError, setProcessedProducts, createAbortController]);
 
   /**
    * Save all processed products to collections
@@ -804,6 +823,7 @@ export function usePhotoUpload() {
     uploadAndProcess,
     saveToCollections,
     resetUpload,
+    cancelRequests,
     // Multi-product functions
     detectProducts,
     smartDetectAndProcess,

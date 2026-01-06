@@ -95,7 +95,7 @@ export default function UnifiedChatContent() {
     });
   }, []);
 
-  // Process image upload
+  // Process image upload with multi-product detection
   const processImageUpload = useCallback(async (file: File, description: string) => {
     try {
       // Add user message
@@ -114,63 +114,101 @@ export default function UnifiedChatContent() {
 
       const mimeType = file.type as 'image/jpeg' | 'image/png' | 'image/webp';
 
-      const response = await fetch(`${API_BASE_URL}/api/image-processing?action=upload`, {
+      // Step 1: Smart detect to find all products in the image
+      updateStage('detecting', 'Detecting products...');
+      const detectResponse = await fetch(`${API_BASE_URL}/api/image-processing?action=smart-detect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: { base64, mimeType, fileName: file.name },
+          image: { base64, mimeType },
+          context: 'fashion',
+        }),
+      });
+
+      updateProgress(40);
+
+      if (!detectResponse.ok) {
+        const errorData = await detectResponse.json();
+        throw new Error(errorData.error || 'Detection failed');
+      }
+
+      const detectData = await detectResponse.json();
+
+      if (!detectData.success || detectData.detectedProducts.length === 0) {
+        throw new Error('No products detected in image');
+      }
+
+      // Step 2: Process all detected products (crop and enrich each one)
+      updateStage('enriching', `Processing ${detectData.detectedProducts.length} item${detectData.detectedProducts.length > 1 ? 's' : ''}...`);
+      updateProgress(50);
+
+      const selectedProducts = detectData.detectedProducts.map((p: any) => ({
+        tempId: p.tempId,
+        boundingBox: p.boundingBox,
+        detected: p,
+      }));
+
+      const processResponse = await fetch(`${API_BASE_URL}/api/image-processing?action=process-multi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalBase64: base64,
+          mimeType,
+          selectedProducts,
           productType: 'fashion',
         }),
       });
 
-      updateProgress(70);
+      updateProgress(80);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json();
+        throw new Error(errorData.error || 'Processing failed');
       }
 
-      updateStage('enriching', 'Analyzing product...');
-      updateProgress(85);
+      const processData = await processResponse.json();
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error('Processing failed');
+      if (!processData.success || processData.products.length === 0) {
+        throw new Error('Failed to process products');
       }
 
-      const product: ChatProduct = {
-        id: data.product.id,
-        product_name: data.product.product_name,
-        brand: data.product.brand || 'My Upload',
-        price: data.product.price || 0,
-        currency: data.product.currency || 'USD',
-        image_url: data.product.image_url,
-        tags: data.product.tags || [],
-        color_palette: data.product.color_palette || [],
-        category: data.product.category || 'general',
-        material: data.product.material,
-        texture: data.product.texture,
-        tone: data.product.tone,
-        source: 'upload',
-        original_image_url: data.product.original_image_url,
-        uploaded_at: data.product.uploaded_at,
-        isAddedToCloset: true,
-      };
-
-      // Add to default collection
+      // Step 3: Add all products to collection
       const collectionId = getDefaultCollection();
       const collection = getCollectionById(collectionId);
       const collectionName = collection?.name || 'My Closet';
-      addProductToCollection(collectionId, product as Product);
+
+      const chatProducts: ChatProduct[] = processData.products.map((p: any) => ({
+        id: p.id,
+        product_name: p.product_name,
+        brand: p.brand || 'My Upload',
+        price: p.price || 0,
+        currency: p.currency || 'USD',
+        image_url: p.image_url,
+        tags: p.tags || [],
+        color_palette: p.color_palette || [],
+        category: p.category || 'general',
+        material: p.material,
+        texture: p.texture,
+        tone: p.tone,
+        source: 'upload',
+        original_image_url: p.original_image_url,
+        uploaded_at: p.uploaded_at,
+        isAddedToCloset: true,
+      }));
+
+      // Add each product to the collection
+      for (const product of chatProducts) {
+        addProductToCollection(collectionId, product as Product);
+      }
 
       updateProgress(100);
 
-      // Add assistant response with product and navigation hint (Issues 3 & 4)
+      // Add assistant response with all products
+      const productCount = chatProducts.length;
       addMessage({
         type: 'assistant-products',
-        content: `Added to "${collectionName}"`,
-        products: [product],
+        content: `Added ${productCount} item${productCount > 1 ? 's' : ''} to "${collectionName}"`,
+        products: chatProducts,
         navigationHint: {
           text: 'View in Closet',
           route: `/closet`,
@@ -178,15 +216,15 @@ export default function UnifiedChatContent() {
         },
       });
 
-      // Issue 2: Add follow-up prompt for additional details
+      // Add follow-up prompt for additional details
       addMessage({
         type: 'assistant-text',
         content: `Want to add more details? Just type naturally, like "It's a Zara, size M, paid $80"`,
         awaitingInput: 'product-details',
-        productId: product.id,
+        productId: chatProducts[0]?.id,
       });
 
-      finishProcessing('Product added to library!');
+      finishProcessing(`${productCount} item${productCount > 1 ? 's' : ''} added to library!`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process image';
       setProcessingError(message);
@@ -199,7 +237,7 @@ export default function UnifiedChatContent() {
   }, [
     addMessage, pendingImagePreview, clearPendingImage, startProcessing,
     updateProgress, updateStage, fileToBase64, getDefaultCollection,
-    addProductToCollection, finishProcessing, setProcessingError,
+    addProductToCollection, finishProcessing, setProcessingError, getCollectionById,
   ]);
 
   // Process URL scrape
