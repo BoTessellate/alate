@@ -137,6 +137,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleSyncRedirect(req, res);
       case 'enrich':
         return handleEnrich(req, res);
+      case 'enrich-all':
+        return handleEnrichAll(req, res);
       case 'webhooks':
         return handleWebhooks(req, res);
       case 'delete-data':
@@ -976,6 +978,167 @@ Return this exact JSON structure:
 }
 
 // ============================================================================
+// Enrich All Handler - Enriches products across all shops (for cron jobs)
+// ============================================================================
+async function handleEnrichAll(req: VercelRequest, res: VercelResponse) {
+  console.log('[ENRICH-ALL] Handler started, method:', req.method);
+
+  // Add CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const limit = parseInt((req.query.limit || req.body?.limit || '10') as string, 10);
+  const supabase = getSupabase();
+
+  // Find all shops with unenriched products
+  const { data: shopsWithPending, error: shopsError } = await supabase
+    .from('enriched_products')
+    .select('shop_domain')
+    .eq('platform', 'shopify')
+    .is('enriched_at', null)
+    .not('shop_domain', 'is', null);
+
+  if (shopsError) {
+    console.error('[ENRICH-ALL] Failed to query shops:', shopsError);
+    return res.status(500).json({ error: 'Failed to query shops', details: shopsError.message });
+  }
+
+  // Get unique shop domains
+  const uniqueShops = [...new Set(shopsWithPending?.map(p => p.shop_domain) || [])];
+
+  if (uniqueShops.length === 0) {
+    console.log('[ENRICH-ALL] No shops have products needing enrichment');
+    return res.status(200).json({
+      success: true,
+      message: 'No products need enrichment across any shop',
+      shops_processed: 0,
+      total_enriched: 0,
+    });
+  }
+
+  console.log('[ENRICH-ALL] Found', uniqueShops.length, 'shops with pending products:', uniqueShops);
+
+  // Import AI functions
+  const { callGemini, callOpenAI, callClaude, parseJSONFromResponse } = await import('../sdk/shared/secureAI');
+
+  const results: { shop: string; enriched: number; failed: number }[] = [];
+  let totalEnriched = 0;
+  let totalFailed = 0;
+
+  // Process each shop (limit products per shop to stay within timeout)
+  for (const shopDomain of uniqueShops) {
+    console.log('[ENRICH-ALL] Processing shop:', shopDomain);
+
+    // Get products needing enrichment for this shop
+    const { data: products, error: fetchError } = await supabase
+      .from('enriched_products')
+      .select('id, product_name, brand, category, price, image_url, external_id, shop_domain')
+      .eq('shop_domain', shopDomain)
+      .is('enriched_at', null)
+      .limit(limit);
+
+    if (fetchError || !products || products.length === 0) {
+      console.log('[ENRICH-ALL] No products found for', shopDomain);
+      continue;
+    }
+
+    let shopEnriched = 0;
+    let shopFailed = 0;
+
+    for (const product of products) {
+      try {
+        const prompt = `Analyze this product and extract style attributes. Return JSON only.
+
+Product: ${product.product_name}
+Brand: ${product.brand || 'Unknown'}
+Category: ${product.category || 'General'}
+Price: ${product.price || 'N/A'}
+
+Return this exact JSON structure:
+{
+  "color_palette": ["color1", "color2", "color3"],
+  "tags": ["style1", "style2", "style3"],
+  "texture": "texture_type",
+  "material": "material_type",
+  "tone": "aesthetic_mood",
+  "flags": ["special_attribute"],
+  "fit_tags": ["layout_hint"]
+}`;
+
+        // Use Gemini -> GPT-4o-mini -> Claude fallback chain
+        let response = await callGemini(prompt, { maxTokens: 512 });
+
+        if (!response.success) {
+          response = await callOpenAI(prompt, { maxTokens: 512 });
+        }
+
+        if (!response.success) {
+          response = await callClaude(prompt, { maxTokens: 512 });
+        }
+
+        if (!response.success || !response.text) {
+          throw new Error(response.error || 'All AI models failed');
+        }
+
+        const enrichment = parseJSONFromResponse(response.text);
+        if (!enrichment) {
+          throw new Error('Failed to parse enrichment response');
+        }
+
+        // Update the product
+        const { error: updateError } = await supabase
+          .from('enriched_products')
+          .update({
+            color_palette: enrichment.color_palette,
+            tags: enrichment.tags,
+            texture: enrichment.texture,
+            material: enrichment.material,
+            tone: enrichment.tone,
+            flags: enrichment.flags,
+            fit_tags: enrichment.fit_tags,
+            canonical_tags: enrichment.tags,
+            enriched_at: getISTTimestamp(),
+          })
+          .eq('id', product.id);
+
+        if (updateError) {
+          throw new Error(`Database update failed: ${updateError.message}`);
+        }
+
+        shopEnriched++;
+        console.log('[ENRICH-ALL] Enriched:', product.product_name);
+      } catch (error) {
+        shopFailed++;
+        console.error('[ENRICH-ALL] Failed:', product.product_name, error);
+      }
+    }
+
+    results.push({ shop: shopDomain, enriched: shopEnriched, failed: shopFailed });
+    totalEnriched += shopEnriched;
+    totalFailed += shopFailed;
+  }
+
+  console.log('[ENRICH-ALL] Complete. Total enriched:', totalEnriched, 'Failed:', totalFailed);
+
+  return res.status(200).json({
+    success: true,
+    shops_processed: uniqueShops.length,
+    total_enriched: totalEnriched,
+    total_failed: totalFailed,
+    details: results,
+  });
+}
+
+// ============================================================================
 // Delete Data Handler - GDPR-compliant data deletion
 // ============================================================================
 async function handleDeleteData(req: VercelRequest, res: VercelResponse) {
@@ -1746,12 +1909,18 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
           if (count === 0) {
             msg.textContent = 'Your catalog is up to date — no changes detected';
           } else {
-            msg.textContent = 'Synced ' + count + ' product' + (count !== 1 ? 's' : '') + (syncDuration ? ' in ' + (parseInt(syncDuration) / 1000).toFixed(1) + 's' : '') + ' — enriching with AI...';
+            // Show success message - AI enrichment runs server-side via GitHub Actions
+            msg.textContent = 'Synced ' + count + ' product' + (count !== 1 ? 's' : '') + (syncDuration ? ' in ' + (parseInt(syncDuration) / 1000).toFixed(1) + 's' : '') + ' — AI enrichment in progress';
 
-            // Auto-trigger enrichment after successful sync with products
+            // Auto-hide after 5 seconds
             setTimeout(function() {
-              autoEnrichAfterSync(msg, count);
-            }, 1000);
+              msg.style.opacity = '0';
+              msg.style.transition = 'opacity 0.3s ease';
+              setTimeout(function() {
+                msg.style.display = 'none';
+                msg.style.opacity = '1';
+              }, 300);
+            }, 5000);
           }
         } else {
           msg.className = 'message error';
@@ -1765,52 +1934,6 @@ async function handleApp(req: VercelRequest, res: VercelResponse) {
       window.history.replaceState({}, '', cleanUrl);
     }
 
-    // Auto-enrich products after sync completes
-    async function autoEnrichAfterSync(msgElement, syncedCount) {
-      try {
-        const response = await fetch(apiBase + '/api/shopify?action=enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop: shop })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          if (result.enriched_count > 0) {
-            msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' — enriched ' + result.enriched_count + ' with AI ✓';
-          } else {
-            msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' ✓';
-          }
-        } else {
-          // Enrichment failed but sync succeeded - show partial success
-          msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' (enrichment pending)';
-        }
-
-        // Auto-hide after showing final status
-        setTimeout(function() {
-          msgElement.style.opacity = '0';
-          msgElement.style.transition = 'opacity 0.3s ease';
-          setTimeout(function() {
-            msgElement.style.display = 'none';
-            msgElement.style.opacity = '1';
-          }, 300);
-        }, 5000);
-      } catch (error) {
-        console.error('Auto-enrich failed:', error);
-        msgElement.textContent = 'Synced ' + syncedCount + ' product' + (syncedCount !== 1 ? 's' : '') + ' (enrichment pending)';
-
-        // Auto-hide
-        setTimeout(function() {
-          msgElement.style.opacity = '0';
-          msgElement.style.transition = 'opacity 0.3s ease';
-          setTimeout(function() {
-            msgElement.style.display = 'none';
-            msgElement.style.opacity = '1';
-          }, 300);
-        }, 5000);
-      }
-    }
   </script>
 </body>
 </html>`.trim();

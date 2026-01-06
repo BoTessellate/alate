@@ -118,3 +118,31 @@ backgroundColor: isLooksListPage
 // BAD: Only considers one condition
 backgroundColor: isLooksListPage ? '#F4EFED' : '#222222'
 ```
+
+## Future Enhancements (TODO)
+
+### Shopify Product Enrichment - Immediate Trigger
+**Status**: Planned
+**Context**: Currently, product enrichment runs via GitHub Actions cron every 15 minutes. For better UX, we should trigger enrichment immediately after a Shopify sync completes.
+
+**Implementation**:
+1. Create a GitHub Personal Access Token (PAT) with `repo` scope
+2. Add `GITHUB_TOKEN` to Vercel environment variables
+3. In `handleSyncRedirect` (shopify.ts), after successful sync:
+   ```typescript
+   // Fire GitHub Action (non-blocking)
+   fetch('https://api.github.com/repos/ramsaptami/TML/dispatches', {
+     method: 'POST',
+     headers: {
+       'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+       'Accept': 'application/vnd.github.v3+json',
+     },
+     body: JSON.stringify({
+       event_type: 'enrich-products',
+       client_payload: { shop: shopDomain }
+     })
+   }).catch(e => console.error('GitHub dispatch failed:', e));
+   ```
+4. The workflow `.github/workflows/enrich-products.yml` already has `repository_dispatch` trigger configured
+
+**Why deferred**: Requires PAT setup which has security considerations for token storage.
