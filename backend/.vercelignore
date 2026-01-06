@@ -1,6 +1,9 @@
 # Exclude local development server
 api/index.ts
 
+# Exclude diagnostic-only endpoints (not needed in production)
+api/ai-status.ts
+
 # Exclude scheduler functions (not serverless - run via cron elsewhere)
 functions/
 
