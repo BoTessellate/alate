@@ -1950,6 +1950,162 @@ async function handleLayoutFeedback(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// PARSE PRODUCT DETAILS (Natural Language)
+// ============================================================================
+
+interface ParsedProductDetails {
+  brand: string | null;
+  size: string | null;
+  material: string | null;
+  estimated_price: number | null;
+  currency: string | null;
+  additional_tags: string[];
+}
+
+/**
+ * Parse natural language product description into structured fields
+ * Uses Gemini (same as chat agent) for consistency
+ *
+ * Example input: "It's a Zara blazer, size M, wool blend, paid $80"
+ * Example output: { brand: "Zara", size: "M", material: "wool blend", estimated_price: 80, currency: "USD" }
+ */
+async function handleParseProductDetails(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { description, context = 'fashion' } = req.body as {
+    description: string;
+    context?: 'fashion' | 'home';
+  };
+
+  if (!description || typeof description !== 'string') {
+    return res.status(400).json({ error: 'description is required' });
+  }
+
+  if (description.length > 500) {
+    return res.status(400).json({ error: 'description too long (max 500 characters)' });
+  }
+
+  const prompt = `Extract structured product details from this natural language description.
+
+User said: "${description}"
+Context: ${context} (${context === 'fashion' ? 'clothing/accessories' : 'home decor/furniture'})
+
+Extract the following fields if mentioned (return null if not mentioned):
+- brand: The brand name (e.g., "Zara", "Nike", "IKEA")
+- size: Size information (e.g., "M", "Large", "42", "10", "One Size")
+- material: Material or fabric (e.g., "wool blend", "cotton", "leather", "oak wood")
+- estimated_price: Numeric price value (just the number, no currency symbol)
+- currency: Currency if mentioned (e.g., "USD", "EUR", "GBP", "INR") - default to "USD" if price mentioned without currency
+- additional_tags: Array of additional descriptive tags extracted (e.g., ["navy", "formal", "vintage"])
+
+Return ONLY valid JSON in this exact format:
+{
+  "brand": "extracted brand or null",
+  "size": "extracted size or null",
+  "material": "extracted material or null",
+  "estimated_price": number or null,
+  "currency": "currency code or null",
+  "additional_tags": ["tag1", "tag2"]
+}`;
+
+  try {
+    log.info({ description, context }, 'Parsing natural language product details with Gemini...');
+
+    // Use Gemini (same as chat agent) for consistency
+    let aiResponse = await callGemini(prompt, { maxTokens: 300 });
+    let modelUsed = 'gemini';
+
+    // Fallback to Claude if Gemini fails
+    if (!aiResponse.success) {
+      log.warn({ error: aiResponse.error }, 'Gemini failed, trying Claude...');
+      aiResponse = await callClaude(prompt, { maxTokens: 300 });
+      modelUsed = 'claude';
+    }
+
+    if (!aiResponse.success || !aiResponse.text) {
+      log.warn('All AI providers failed for parse-details');
+      return res.status(200).json({
+        success: false,
+        error: 'Failed to parse description',
+        parsed: {
+          brand: null,
+          size: null,
+          material: null,
+          estimated_price: null,
+          currency: null,
+          additional_tags: [],
+        },
+        confidence: 0,
+      });
+    }
+
+    const parsed = parseJSONFromResponse(aiResponse.text) as ParsedProductDetails | null;
+
+    if (!parsed) {
+      log.warn('Failed to parse JSON from AI response');
+      return res.status(200).json({
+        success: false,
+        error: 'Failed to parse AI response',
+        parsed: {
+          brand: null,
+          size: null,
+          material: null,
+          estimated_price: null,
+          currency: null,
+          additional_tags: [],
+        },
+        confidence: 0,
+      });
+    }
+
+    // Validate and clean the parsed data
+    const cleanedParsed: ParsedProductDetails = {
+      brand: parsed.brand && typeof parsed.brand === 'string' ? parsed.brand.trim() : null,
+      size: parsed.size && typeof parsed.size === 'string' ? parsed.size.trim() : null,
+      material: parsed.material && typeof parsed.material === 'string' ? parsed.material.trim() : null,
+      estimated_price: typeof parsed.estimated_price === 'number' ? parsed.estimated_price : null,
+      currency: parsed.currency && typeof parsed.currency === 'string' ? parsed.currency.toUpperCase() : null,
+      additional_tags: Array.isArray(parsed.additional_tags)
+        ? parsed.additional_tags.filter((t): t is string => typeof t === 'string').map(t => t.trim())
+        : [],
+    };
+
+    // Calculate confidence based on how many fields were extracted
+    const fieldsExtracted = [
+      cleanedParsed.brand,
+      cleanedParsed.size,
+      cleanedParsed.material,
+      cleanedParsed.estimated_price,
+      cleanedParsed.additional_tags.length > 0,
+    ].filter(Boolean).length;
+    const confidence = Math.min(1, fieldsExtracted / 3); // At least 3 fields = full confidence
+
+    log.info({
+      parsed: cleanedParsed,
+      modelUsed,
+      confidence,
+      fieldsExtracted
+    }, 'Natural language parsing complete');
+
+    return res.status(200).json({
+      success: true,
+      parsed: cleanedParsed,
+      confidence,
+      model_used: modelUsed,
+    });
+
+  } catch (error) {
+    log.error({ error }, 'Parse product details failed');
+    return res.status(500).json({
+      error: 'Parse failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+// ============================================================================
 // MAIN HANDLER
 // ============================================================================
 
@@ -1995,10 +2151,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'layout-feedback':
         return handleLayoutFeedback(req, res);
 
+      case 'parse-details':
+        return handleParseProductDetails(req, res);
+
       default:
         return res.status(400).json({
           error: 'Invalid action',
-          hint: 'Use ?action=enrich|enrich-all|compose|tryon|layouts|layout|labels|feedback|layout-feedback',
+          hint: 'Use ?action=enrich|enrich-all|compose|tryon|layouts|layout|labels|feedback|layout-feedback|parse-details',
           examples: {
             enrich: 'POST /api/ai?action=enrich',
             'enrich-all': 'POST /api/ai?action=enrich-all (batch enrich pending products)',
@@ -2009,6 +2168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             labels: 'POST /api/ai?action=labels',
             feedback: 'POST /api/ai?action=feedback (tag feedback)',
             'layout-feedback': 'POST /api/ai?action=layout-feedback (layout adjustments)',
+            'parse-details': 'POST /api/ai?action=parse-details (natural language product details)',
           },
         });
     }

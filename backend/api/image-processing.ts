@@ -82,6 +82,32 @@ interface DetectMultiRequestBody {
   context: 'fashion' | 'home';
 }
 
+interface SmartDetectRequestBody {
+  image: {
+    base64: string;
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  };
+  context: 'fashion' | 'home';
+}
+
+type RecommendedMode = 'single' | 'multi' | 'uncertain';
+
+interface SmartDetectResponse {
+  success: boolean;
+  recommendedMode: RecommendedMode;
+  detectedProducts: Array<{
+    tempId: string;
+    boundingBox: { x: number; y: number; width: number; height: number };
+    suggestedName: string;
+    category: string;
+    colors: string[];
+    confidence: number;
+  }>;
+  originalImageUrl: string;
+  processingTimeMs: number;
+  _demo?: boolean;
+}
+
 interface ProcessMultiRequestBody {
   originalBase64: string;
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -388,6 +414,116 @@ async function handleMultiProductDetection(req: VercelRequest, res: VercelRespon
 }
 
 // ============================================================================
+// SMART DETECTION HANDLER (Auto-detect mode)
+// ============================================================================
+
+// Confidence thresholds for mode decision
+const CONFIDENT_SINGLE_THRESHOLD = 0.9;
+
+function determineRecommendedMode(
+  products: Array<{ confidence: number }>
+): RecommendedMode {
+  const count = products.length;
+
+  if (count === 0) {
+    // No products detected - fall back to single product mode (treat whole image as product)
+    return 'single';
+  }
+
+  if (count === 1) {
+    // Single product - check confidence
+    const confidence = products[0].confidence;
+    if (confidence >= CONFIDENT_SINGLE_THRESHOLD) {
+      return 'single';
+    }
+    // Low confidence single - ask user if they want to look for more
+    return 'uncertain';
+  }
+
+  // Multiple products detected - use multi mode
+  return 'multi';
+}
+
+async function handleSmartDetect(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const body = req.body as SmartDetectRequestBody;
+
+    // Validate request
+    if (!body.image?.base64 || !body.image?.mimeType) {
+      return res.status(400).json({
+        success: false,
+        error: 'Image data and mimeType are required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.context || !['fashion', 'home'].includes(body.context)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Context must be "fashion" or "home"',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    // Check payload size
+    if (body.image.base64.length > MAX_PAYLOAD_SIZE) {
+      return res.status(413).json({
+        success: false,
+        error: 'Image file too large. Maximum size: 10MB',
+        code: 'FILE_TOO_LARGE',
+      });
+    }
+
+    logger.info({
+      mimeType: body.image.mimeType,
+      context: body.context,
+      base64Length: body.image.base64.length,
+    }, 'Starting smart detection');
+
+    // Always run multi-product detection first
+    const detectionResult = await detectMultipleProducts({
+      base64: body.image.base64,
+      mimeType: body.image.mimeType,
+      context: body.context,
+    });
+
+    // Determine recommended mode based on results
+    const recommendedMode = determineRecommendedMode(detectionResult.detectedProducts);
+
+    logger.info({
+      detectedCount: detectionResult.detectedProducts.length,
+      recommendedMode,
+      processingMs: detectionResult.processingTimeMs,
+      demo: detectionResult._demo,
+    }, 'Smart detection complete');
+
+    const response: SmartDetectResponse = {
+      success: true,
+      recommendedMode,
+      detectedProducts: detectionResult.detectedProducts,
+      originalImageUrl: detectionResult.originalImageUrl,
+      processingTimeMs: detectionResult.processingTimeMs,
+      _demo: detectionResult._demo,
+    };
+
+    return res.status(200).json(response);
+
+  } catch (error) {
+    logger.error({ error }, 'Smart detection failed');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+      code: 'DETECTION_FAILED',
+    });
+  }
+}
+
+// ============================================================================
 // MULTI-PRODUCT PROCESSING HANDLER
 // ============================================================================
 
@@ -479,17 +615,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 'detect-multi':
       return handleMultiProductDetection(req, res);
 
+    case 'smart-detect':
+      return handleSmartDetect(req, res);
+
     case 'process-multi':
       return handleProcessMultipleProducts(req, res);
 
     default:
       return res.status(400).json({
         error: 'Invalid action',
-        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, or ?action=process-multi',
+        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, ?action=smart-detect, or ?action=process-multi',
         examples: {
           'remove-bg': 'POST /api/image-processing?action=remove-bg',
           'upload': 'POST /api/image-processing?action=upload',
           'detect-multi': 'POST /api/image-processing?action=detect-multi',
+          'smart-detect': 'POST /api/image-processing?action=smart-detect',
           'process-multi': 'POST /api/image-processing?action=process-multi',
         },
       });

@@ -31,6 +31,12 @@ export interface ChatProduct extends Product {
   isWishlisted?: boolean;
 }
 
+export interface NavigationHint {
+  text: string;
+  route: string;
+  collectionName: string;
+}
+
 export interface ChatMessage {
   id: string;
   type: MessageType;
@@ -44,6 +50,11 @@ export interface ChatMessage {
   statusType?: StatusType;
   // Search query for "see more" link
   searchQuery?: string;
+  // Navigation hint for closet/collection link (Issue 4)
+  navigationHint?: NavigationHint;
+  // For awaiting user input (Issue 2 - Natural Language)
+  awaitingInput?: 'product-details';
+  productId?: string;
 }
 
 export interface ProcessingState {
@@ -326,12 +337,16 @@ export const useChatStore = create<ChatState>()(
         messages: state.messages,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Clear messages older than 24 hours
+        if (state && state.messages.length > 0) {
+          // Clear messages older than 24 hours using proper setter
           const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-          state.messages = state.messages.filter(
+          const filteredMessages = state.messages.filter(
             (m) => new Date(m.timestamp).getTime() > cutoff
           );
+          // Only update if we actually filtered something
+          if (filteredMessages.length !== state.messages.length) {
+            useChatStore.setState({ messages: filteredMessages });
+          }
         }
       },
     }

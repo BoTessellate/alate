@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Upload, Loader2, Check, AlertCircle, Plus, Layers, Image as ImageIcon, X } from 'lucide-react';
-import { useUploadStore, ProductType } from '@/stores/useUploadStore';
+import { Upload, Loader2, Check, AlertCircle, Plus, X } from 'lucide-react';
+import { useUploadStore, ProductType, SimilarProduct } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { usePhotoUpload } from '@/hooks/usePhotoUpload';
-import { Button, IconButton, Input, CurrencySelect, Checkbox, SegmentedControl, TagList, useSidePanel } from '@/components/ui';
+import { Button, IconButton, Input, CurrencySelect, Checkbox, TagList, useSidePanel } from '@/components/ui';
 import MultiProductSelectionGrid from './MultiProductSelectionGrid';
+import { SimilarProductMatch } from './SimilarProductMatch';
 
 /**
  * Photo upload form content - used inside SidePanel
@@ -29,8 +30,7 @@ export default function PhotoUploadContent() {
     updateProductField,
     toggleCollection,
     // Multi-product state
-    isMultiMode,
-    setMultiMode,
+    detectionMode,
     detectedProducts,
     selectedProductIds,
     originalImageUrl,
@@ -42,16 +42,27 @@ export default function PhotoUploadContent() {
     updateProcessedProduct,
     clearError,
     reset,
+    // Similarity state
+    similarProducts,
+    showSimilarityUI,
+    setProductData,
   } = useUploadStore();
 
   const { collections, createCollection } = useCollectionsStore();
   const {
     uploadAndProcess,
     saveToCollections,
-    detectProducts,
+    smartDetectAndProcess,
     processSelectedProductsFromDetection,
     saveMultipleToCollections,
+    // Similarity functions
+    findSimilarProducts,
+    generateEmbedding,
+    dismissSimilarity,
   } = usePhotoUpload();
+
+  // Track if similarity check is in progress
+  const [checkingSimilarity, setCheckingSimilarity] = useState(false);
 
   // Track which product is expanded in multi-edit mode
   const [expandedProductIndex, setExpandedProductIndex] = useState(0);
@@ -83,12 +94,25 @@ export default function PhotoUploadContent() {
   const handleSave = useCallback(async () => {
     const success = await saveToCollections();
     if (success) {
+      // Generate embedding in background (non-blocking)
+      if (productData?.image_url && productData?.id) {
+        generateEmbedding(productData.image_url, productData.id, {
+          productName: productData.product_name,
+          brand: productData.brand,
+          category: productData.category,
+          tags: productData.tags,
+          colors: productData.color_palette,
+          material: productData.material,
+          size: productData.size,
+          price: productData.price,
+        });
+      }
       setTimeout(() => {
         reset();
         close();
       }, 1000);
     }
-  }, [saveToCollections, reset, close]);
+  }, [saveToCollections, reset, close, productData, generateEmbedding]);
 
   const handleCreateCollection = useCallback(() => {
     const input = newCollectionInputRef.current;
@@ -107,10 +131,23 @@ export default function PhotoUploadContent() {
     [productData?.tags, updateProductField]
   );
 
-  // Multi-product handlers
-  const handleDetectProducts = useCallback(async () => {
-    if (selectedFile) await detectProducts();
-  }, [selectedFile, detectProducts]);
+  // Smart detection handler - always runs smart detection first, then checks for similar products
+  const handleSmartDetect = useCallback(async () => {
+    if (!selectedFile) return;
+
+    const result = await smartDetectAndProcess();
+
+    // If we got a single product with an image, check for similar products in closet
+    if (result && result.mode === 'single' && result.products.length === 1) {
+      // Get the original image URL from the detection result
+      const imageUrl = originalImageUrl;
+      if (imageUrl) {
+        setCheckingSimilarity(true);
+        await findSimilarProducts(imageUrl);
+        setCheckingSimilarity(false);
+      }
+    }
+  }, [selectedFile, smartDetectAndProcess, originalImageUrl, findSimilarProducts]);
 
   const handleProcessSelected = useCallback(async () => {
     await processSelectedProductsFromDetection();
@@ -119,17 +156,52 @@ export default function PhotoUploadContent() {
   const handleSaveMultiple = useCallback(async () => {
     const success = await saveMultipleToCollections();
     if (success) {
+      // Generate embeddings for all products in background (non-blocking)
+      for (const product of processedProducts) {
+        if (product?.image_url && product?.id) {
+          generateEmbedding(product.image_url, product.id, {
+            productName: product.product_name,
+            brand: product.brand,
+            category: product.category,
+            tags: product.tags,
+            colors: product.color_palette,
+            material: product.material,
+            size: product.size,
+            price: product.price,
+          });
+        }
+      }
       setTimeout(() => {
         reset();
         close();
       }, 1000);
     }
-  }, [saveMultipleToCollections, reset, close]);
+  }, [saveMultipleToCollections, reset, close, processedProducts, generateEmbedding]);
 
   const handleCancel = useCallback(() => {
     reset();
     close();
   }, [reset, close]);
+
+  // Similarity handlers
+  const handleUseExistingProduct = useCallback((similarProduct: SimilarProduct) => {
+    // Copy metadata from the similar product to the current product
+    if (productData) {
+      setProductData({
+        ...productData,
+        brand: similarProduct.brand || productData.brand,
+        category: similarProduct.category || productData.category,
+        tags: similarProduct.tags || productData.tags,
+        color_palette: similarProduct.colors || productData.color_palette,
+      });
+    }
+    dismissSimilarity();
+  }, [productData, setProductData, dismissSimilarity]);
+
+  const handleAddAsNew = useCallback(() => {
+    // Just dismiss the similarity UI and continue with the current product data
+    dismissSimilarity();
+  }, [dismissSimilarity]);
 
   const isProcessing = status === 'uploading' || status === 'processing';
   const canEdit = status === 'editing' || status === 'error';
@@ -252,35 +324,36 @@ export default function PhotoUploadContent() {
         </div>
       )}
 
-      {/* Mode Toggle */}
-      {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
-        <SegmentedControl
-          label="Detection Mode"
-          value={isMultiMode ? 'multiple' : 'single'}
-          onChange={(value) => setMultiMode(value === 'multiple')}
-          options={[
-            { value: 'single', label: 'Single', icon: <ImageIcon size={16} /> },
-            { value: 'multiple', label: 'Multiple', icon: <Layers size={16} /> },
-          ]}
-          helperText={isMultiMode
-            ? 'Detect multiple products in one image (e.g., an outfit)'
-            : 'Process as a single product'}
-        />
-      )}
-
-      {/* Upload / Detect Button */}
+      {/* Smart Detect Button - Always runs smart detection */}
       {!canEdit && !isProcessing && !isSuccess && !isAnyMultiState && selectedFile && (
         <Button
           className="w-full"
-          onClick={isMultiMode ? handleDetectProducts : handleUpload}
+          onClick={handleSmartDetect}
         >
-          {isMultiMode ? 'Detect Products' : 'Process Image'}
+          Detect & Process
         </Button>
       )}
 
-      {/* Multi-Product Selection Grid */}
+      {/* Detection Results - shows different UI based on detectionMode */}
       {isSelecting && originalImageUrl && (
         <div className="space-y-3">
+          {/* Mode indicator */}
+          {detectionMode === 'single' && detectedProducts.length === 1 && (
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--success-alpha)', color: 'var(--success)' }}>
+              Found 1 item with high confidence
+            </div>
+          )}
+          {detectionMode === 'uncertain' && (
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--warning-alpha)', color: 'var(--warning)' }}>
+              Found 1 item. There might be more items in this image.
+            </div>
+          )}
+          {detectionMode === 'multi' && (
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--primary-alpha)', color: 'var(--primary)' }}>
+              Found {detectedProducts.length} items - select which ones to add
+            </div>
+          )}
+
           <MultiProductSelectionGrid
             products={detectedProducts}
             selectedIds={selectedProductIds}
@@ -295,8 +368,29 @@ export default function PhotoUploadContent() {
             onClick={handleProcessSelected}
             disabled={selectedProductIds.size === 0}
           >
-            Process Selected ({selectedProductIds.size})
+            {detectionMode === 'single'
+              ? 'Continue with this item'
+              : `Process Selected (${selectedProductIds.size})`}
           </Button>
+        </div>
+      )}
+
+      {/* Similar Product Match UI */}
+      {showSimilarityUI && originalImageUrl && (
+        <SimilarProductMatch
+          uploadedImageUrl={originalImageUrl}
+          onUseExisting={handleUseExistingProduct}
+          onAddAsNew={handleAddAsNew}
+        />
+      )}
+
+      {/* Similarity check loading indicator */}
+      {checkingSimilarity && (
+        <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--surface-light)' }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: 'var(--primary)' }} />
+          <span className="text-sm" style={{ color: 'var(--foreground-muted)' }}>
+            Checking for similar items in your closet...
+          </span>
         </div>
       )}
 

@@ -1,9 +1,57 @@
-import { useCallback } from 'react';
-import { useUploadStore, DetectedProduct } from '@/stores/useUploadStore';
+import { useCallback, useRef, useEffect } from 'react';
+import { useUploadStore, DetectedProduct, DetectionMode, SimilarProduct } from '@/stores/useUploadStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import type { Product } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
+
+/**
+ * Check if an error is an abort error (request was cancelled)
+ */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+/**
+ * Get or generate a device ID for per-user namespacing.
+ * Used for isolating user embeddings in Pinecone.
+ */
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'server';
+
+  let deviceId = localStorage.getItem('tml-device-id');
+  if (!deviceId) {
+    deviceId = `device-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('tml-device-id', deviceId);
+  }
+  return deviceId;
+}
+
+// Similarity search response type
+interface FindSimilarResponse {
+  success: boolean;
+  similar_products: SimilarProduct[];
+  vision_description?: string;
+  error?: string;
+}
+
+// Embed response type
+interface EmbedResponse {
+  success: boolean;
+  embedding_id?: string;
+  vision_description?: string;
+  error?: string;
+}
+
+// Smart detection response type
+interface SmartDetectResponse {
+  success: boolean;
+  recommendedMode: 'single' | 'multi' | 'uncertain';
+  detectedProducts: DetectedProduct[];
+  originalImageUrl: string;
+  processingTimeMs: number;
+  _demo?: boolean;
+}
 
 // Multi-product detection response types
 interface MultiDetectionResponse {
@@ -91,9 +139,47 @@ export function usePhotoUpload() {
     processedProducts,
     setDetectedProducts,
     setProcessedProducts,
+    setDetectionMode,
+    // Similarity state
+    setSimilarProducts,
+    setShowSimilarityUI,
+    clearSimilarProducts,
   } = useUploadStore();
 
   const { addProductToCollection } = useCollectionsStore();
+
+  // AbortController for cancelling in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount - cancel any pending requests
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  /**
+   * Cancel any in-flight requests
+   */
+  const cancelRequests = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Create a new AbortController for a request
+   */
+  const createAbortController = useCallback(() => {
+    // Cancel any existing request
+    cancelRequests();
+    // Create new controller
+    abortControllerRef.current = new AbortController();
+    return abortControllerRef.current.signal;
+  }, [cancelRequests]);
 
   /**
    * Convert File to base64
@@ -121,6 +207,9 @@ export function usePhotoUpload() {
       return null;
     }
 
+    // Create abort signal for this request
+    const signal = createAbortController();
+
     try {
       setStatus('uploading');
       setProgress(10);
@@ -138,7 +227,7 @@ export function usePhotoUpload() {
       setStatus('processing');
       setProgress(30);
 
-      // Call the API
+      // Call the API with abort signal
       const response = await fetch(`${API_BASE_URL}/api/image-processing?action=upload`, {
         method: 'POST',
         headers: {
@@ -152,6 +241,7 @@ export function usePhotoUpload() {
           },
           productType,
         }),
+        signal,
       });
 
       setProgress(70);
@@ -193,6 +283,11 @@ export function usePhotoUpload() {
 
       return product;
     } catch (error) {
+      // Ignore abort errors - user cancelled the request
+      if (isAbortError(error)) {
+        return null;
+      }
+
       // Provide action-based error messages
       let message = 'Upload failed';
 
@@ -201,7 +296,7 @@ export function usePhotoUpload() {
 
         if (errorMsg.includes('failed to fetch') || errorMsg.includes('networkerror') || errorMsg.includes('network')) {
           message = 'Unable to connect to server. Check your internet connection and try again.';
-        } else if (errorMsg.includes('timeout') || errorMsg.includes('aborted')) {
+        } else if (errorMsg.includes('timeout')) {
           message = 'Request timed out. Please try again with a smaller image.';
         } else if (errorMsg.includes('invalid file') || errorMsg.includes('format')) {
           message = error.message; // Keep validation errors as-is
@@ -219,7 +314,7 @@ export function usePhotoUpload() {
       setError(message);
       return null;
     }
-  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setProductData]);
+  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setProductData, createAbortController]);
 
   /**
    * Save the product to selected collections
@@ -288,6 +383,9 @@ export function usePhotoUpload() {
       return null;
     }
 
+    // Create abort signal for this request
+    const signal = createAbortController();
+
     try {
       setStatus('detecting');
       setProgress(10);
@@ -304,7 +402,7 @@ export function usePhotoUpload() {
 
       setProgress(50);
 
-      // Call the multi-detection API
+      // Call the multi-detection API with abort signal
       const response = await fetch(`${API_BASE_URL}/api/image-processing?action=detect-multi`, {
         method: 'POST',
         headers: {
@@ -317,6 +415,7 @@ export function usePhotoUpload() {
           },
           context: productType,
         }),
+        signal,
       });
 
       setProgress(80);
@@ -341,6 +440,11 @@ export function usePhotoUpload() {
 
       return data.detectedProducts;
     } catch (error) {
+      // Ignore abort errors - user cancelled the request
+      if (isAbortError(error)) {
+        return null;
+      }
+
       let message = 'Detection failed';
       if (error instanceof Error) {
         message = error.message || 'Failed to detect products. Please try again.';
@@ -348,7 +452,101 @@ export function usePhotoUpload() {
       setError(message);
       return null;
     }
-  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setDetectedProducts]);
+  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setDetectedProducts, createAbortController]);
+
+  /**
+   * Smart detect: Always runs multi-product detection and determines the best mode
+   * Returns the recommended mode and detected products
+   */
+  const smartDetectAndProcess = useCallback(async (): Promise<{
+    mode: DetectionMode;
+    products: DetectedProduct[];
+  } | null> => {
+    if (!selectedFile) {
+      setError('No file selected');
+      return null;
+    }
+
+    try {
+      setStatus('detecting');
+      setProgress(10);
+
+      // Convert file to base64
+      const base64 = await fileToBase64(selectedFile);
+      setProgress(30);
+
+      // Determine MIME type
+      const mimeType = selectedFile.type as 'image/jpeg' | 'image/png' | 'image/webp';
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
+        throw new Error('Invalid file format. Please upload JPG, PNG, or WebP.');
+      }
+
+      setProgress(50);
+
+      // Call the smart-detect API
+      const response = await fetch(`${API_BASE_URL}/api/image-processing?action=smart-detect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: {
+            base64,
+            mimeType,
+          },
+          context: productType,
+        }),
+      });
+
+      setProgress(80);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Detection failed');
+      }
+
+      const data: SmartDetectResponse = await response.json();
+      setProgress(100);
+
+      // Store detected products with the recommended mode
+      const mode = data.recommendedMode as DetectionMode;
+      setDetectionMode(mode);
+
+      if (data.detectedProducts.length > 0) {
+        setDetectedProducts(data.detectedProducts, data.originalImageUrl, mode);
+      }
+
+      // Set appropriate status based on mode
+      if (mode === 'single') {
+        // For single confident product, could auto-process or go to selecting
+        // For now, let's show the single product for confirmation
+        if (data.detectedProducts.length === 1) {
+          setStatus('selecting');
+        } else {
+          // No products detected, fallback to single upload mode
+          setStatus('idle');
+        }
+      } else if (mode === 'multi') {
+        // Multiple products detected - show selection UI
+        setStatus('selecting');
+      } else if (mode === 'uncertain') {
+        // Single product with low confidence - show with option to look for more
+        setStatus('selecting');
+      }
+
+      return {
+        mode,
+        products: data.detectedProducts,
+      };
+    } catch (error) {
+      let message = 'Detection failed';
+      if (error instanceof Error) {
+        message = error.message || 'Failed to detect products. Please try again.';
+      }
+      setError(message);
+      return null;
+    }
+  }, [selectedFile, productType, fileToBase64, setStatus, setProgress, setError, setDetectedProducts, setDetectionMode]);
 
   /**
    * Process selected products from detection
@@ -494,13 +692,126 @@ export function usePhotoUpload() {
     }
   }, [processedProducts, selectedCollections, addProductToCollection, setStatus, setError]);
 
+  /**
+   * Find similar products in user's closet based on image URL
+   * Returns true if similar products were found and UI should be shown
+   */
+  const findSimilarProducts = useCallback(async (imageUrl: string, threshold = 0.75): Promise<boolean> => {
+    const deviceId = getDeviceId();
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/image-embedding?action=find-similar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          device_id: deviceId,
+          threshold,
+          limit: 5,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn('[usePhotoUpload] Similarity search failed:', response.status);
+        return false;
+      }
+
+      const data: FindSimilarResponse = await response.json();
+
+      if (data.success && data.similar_products.length > 0) {
+        setSimilarProducts(data.similar_products);
+        setShowSimilarityUI(true);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.warn('[usePhotoUpload] Similarity search error:', error);
+      return false;
+    }
+  }, [setSimilarProducts, setShowSimilarityUI]);
+
+  /**
+   * Generate and store embedding for a product (call after saving to closet)
+   * This runs in background and doesn't block the UI
+   */
+  const generateEmbedding = useCallback(async (
+    imageUrl: string,
+    productId: string,
+    metadata?: {
+      productName?: string;
+      brand?: string;
+      category?: string;
+      tags?: string[];
+      colors?: string[];
+      material?: string;
+      size?: string;
+      price?: number;
+    }
+  ): Promise<void> => {
+    const deviceId = getDeviceId();
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/image-embedding?action=embed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          product_id: productId,
+          device_id: deviceId,
+          metadata: metadata ? {
+            product_name: metadata.productName,
+            brand: metadata.brand,
+            category: metadata.category,
+            tags: metadata.tags,
+            colors: metadata.colors,
+            material: metadata.material,
+            size: metadata.size,
+            price: metadata.price,
+          } : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn('[usePhotoUpload] Embedding generation failed:', response.status);
+        return;
+      }
+
+      const data: EmbedResponse = await response.json();
+
+      if (data.success) {
+        console.log('[usePhotoUpload] Embedding stored:', data.embedding_id);
+      } else {
+        console.warn('[usePhotoUpload] Embedding generation error:', data.error);
+      }
+    } catch (error) {
+      console.warn('[usePhotoUpload] Embedding generation error:', error);
+    }
+  }, []);
+
+  /**
+   * Clear similarity UI and state
+   */
+  const dismissSimilarity = useCallback(() => {
+    clearSimilarProducts();
+  }, [clearSimilarProducts]);
+
   return {
     uploadAndProcess,
     saveToCollections,
     resetUpload,
     // Multi-product functions
     detectProducts,
+    smartDetectAndProcess,
     processSelectedProductsFromDetection,
     saveMultipleToCollections,
+    // Similarity functions
+    findSimilarProducts,
+    generateEmbedding,
+    dismissSimilarity,
   };
 }

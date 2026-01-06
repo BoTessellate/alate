@@ -84,23 +84,6 @@ export function createModuleLogger(moduleName: string): Logger {
 export const logger = baseLogger;
 
 /**
- * SDK Module loggers - pre-configured for each module
- */
-export const loggers = {
-  productEnrichment: createModuleLogger('productEnrichment'),
-  searchEngine: createModuleLogger('searchEngine'),
-  layoutGenerator: createModuleLogger('layoutGenerator'),
-  layoutAI: createModuleLogger('layoutAI'),
-  exportEngine: createModuleLogger('exportEngine'),
-  themeTokens: createModuleLogger('themeTokens'),
-  moodboardComposer: createModuleLogger('moodboardComposer'),
-  socialExport: createModuleLogger('socialExport'),
-  pluginBridge: createModuleLogger('pluginBridge'),
-  pluginSync: createModuleLogger('pluginSync'),
-  brandDashboard: createModuleLogger('brandDashboard'),
-};
-
-/**
  * Request ID generator
  */
 function generateRequestId(): string {

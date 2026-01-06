@@ -17,6 +17,9 @@ export type UploadStatus =
 
 export type ProductType = 'fashion' | 'home';
 
+// Detection mode determined by smart-detect
+export type DetectionMode = 'pending' | 'single' | 'multi' | 'uncertain';
+
 // Types for multi-product detection
 export interface BoundingBox {
   x: number;
@@ -32,6 +35,18 @@ export interface DetectedProduct {
   category: string;
   colors: string[];
   confidence: number;
+}
+
+// Similar product from image embedding search
+export interface SimilarProduct {
+  productId: string;
+  score: number;
+  productName: string;
+  imageUrl?: string;
+  brand?: string;
+  category?: string;
+  tags?: string[];
+  colors?: string[];
 }
 
 interface UploadState {
@@ -55,11 +70,17 @@ interface UploadState {
   selectedCollections: string[];
 
   // Multi-product detection state
+  detectionMode: DetectionMode;
   isMultiMode: boolean;
   detectedProducts: DetectedProduct[];
   selectedProductIds: Set<string>;
   originalImageUrl: string | null;
   processedProducts: Partial<Product>[];
+
+  // Similarity matching state
+  similarProducts: SimilarProduct[];
+  showSimilarityUI: boolean;
+  selectedSimilarProduct: SimilarProduct | null;
 
   // Actions
   setFile: (file: File | null) => void;
@@ -75,14 +96,21 @@ interface UploadState {
   clearError: () => void;
 
   // Multi-product actions
+  setDetectionMode: (mode: DetectionMode) => void;
   setMultiMode: (isMulti: boolean) => void;
-  setDetectedProducts: (products: DetectedProduct[], originalUrl: string) => void;
+  setDetectedProducts: (products: DetectedProduct[], originalUrl: string, mode?: DetectionMode) => void;
   toggleProductSelection: (tempId: string) => void;
   selectAllProducts: () => void;
   deselectAllProducts: () => void;
   updateDetectedProductName: (tempId: string, name: string) => void;
   setProcessedProducts: (products: Partial<Product>[]) => void;
   updateProcessedProduct: (index: number, data: Partial<Product>) => void;
+
+  // Similarity actions
+  setSimilarProducts: (products: SimilarProduct[]) => void;
+  setShowSimilarityUI: (show: boolean) => void;
+  selectSimilarProduct: (product: SimilarProduct | null) => void;
+  clearSimilarProducts: () => void;
 }
 
 const initialState = {
@@ -96,11 +124,16 @@ const initialState = {
   productData: null,
   selectedCollections: [] as string[],
   // Multi-product state
+  detectionMode: 'pending' as DetectionMode,
   isMultiMode: false,
   detectedProducts: [] as DetectedProduct[],
   selectedProductIds: new Set<string>(),
   originalImageUrl: null as string | null,
   processedProducts: [] as Partial<Product>[],
+  // Similarity state
+  similarProducts: [] as SimilarProduct[],
+  showSimilarityUI: false,
+  selectedSimilarProduct: null as SimilarProduct | null,
 };
 
 export const useUploadStore = create<UploadState>()((set, get) => ({
@@ -170,21 +203,36 @@ export const useUploadStore = create<UploadState>()((set, get) => ({
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
-    set({ ...initialState, selectedProductIds: new Set<string>() });
+    set({
+      ...initialState,
+      selectedProductIds: new Set<string>(),
+      detectionMode: 'pending' as DetectionMode,
+      isMultiMode: false,
+      // Reset similarity state
+      similarProducts: [],
+      showSimilarityUI: false,
+      selectedSimilarProduct: null,
+    });
   },
 
   clearError: () => set({ error: null, status: 'idle', progress: 0 }),
 
   // Multi-product actions
-  setMultiMode: (isMulti) => set({ isMultiMode: isMulti }),
+  setDetectionMode: (mode) => set({ detectionMode: mode }),
 
-  setDetectedProducts: (products, originalUrl) => {
+  setMultiMode: (isMulti) => set({
+    isMultiMode: isMulti,
+    detectionMode: isMulti ? 'multi' : 'single',
+  }),
+
+  setDetectedProducts: (products, originalUrl, mode) => {
     // Auto-select all detected products
     const selectedIds = new Set(products.map(p => p.tempId));
     set({
       detectedProducts: products,
       selectedProductIds: selectedIds,
       originalImageUrl: originalUrl,
+      ...(mode ? { detectionMode: mode } : {}),
     });
   },
 
@@ -226,4 +274,17 @@ export const useUploadStore = create<UploadState>()((set, get) => ({
     updated[index] = { ...updated[index], ...data };
     set({ processedProducts: updated });
   },
+
+  // Similarity actions
+  setSimilarProducts: (products) => set({ similarProducts: products }),
+
+  setShowSimilarityUI: (show) => set({ showSimilarityUI: show }),
+
+  selectSimilarProduct: (product) => set({ selectedSimilarProduct: product }),
+
+  clearSimilarProducts: () => set({
+    similarProducts: [],
+    showSimilarityUI: false,
+    selectedSimilarProduct: null,
+  }),
 }));

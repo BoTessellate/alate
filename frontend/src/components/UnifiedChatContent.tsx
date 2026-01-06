@@ -114,9 +114,6 @@ export default function UnifiedChatContent() {
 
       const mimeType = file.type as 'image/jpeg' | 'image/png' | 'image/webp';
 
-      updateStage('removing-bg', 'Removing background...');
-      updateProgress(30);
-
       const response = await fetch(`${API_BASE_URL}/api/image-processing?action=upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,15 +160,30 @@ export default function UnifiedChatContent() {
 
       // Add to default collection
       const collectionId = getDefaultCollection();
+      const collection = getCollectionById(collectionId);
+      const collectionName = collection?.name || 'My Closet';
       addProductToCollection(collectionId, product as Product);
 
       updateProgress(100);
 
-      // Add assistant response with product
+      // Add assistant response with product and navigation hint (Issues 3 & 4)
       addMessage({
         type: 'assistant-products',
-        content: 'Added to your closet',
+        content: `Added to "${collectionName}"`,
         products: [product],
+        navigationHint: {
+          text: 'View in Closet',
+          route: `/closet`,
+          collectionName,
+        },
+      });
+
+      // Issue 2: Add follow-up prompt for additional details
+      addMessage({
+        type: 'assistant-text',
+        content: `Want to add more details? Just type naturally, like "It's a Zara, size M, paid $80"`,
+        awaitingInput: 'product-details',
+        productId: product.id,
       });
 
       finishProcessing('Product added to library!');
@@ -286,6 +298,76 @@ export default function UnifiedChatContent() {
     }
   }, [addMessage, startProcessing, updateProgress, updateStage, finishProcessing, setProcessingError, ensureWishlistCollection, addProductToCollection]);
 
+  // Process natural language product details (Issue 2)
+  const processProductDetails = useCallback(async (description: string, productId: string) => {
+    try {
+      addMessage({
+        type: 'user-text',
+        content: description,
+      });
+
+      startProcessing('enriching', 'Parsing details...');
+      updateProgress(30);
+
+      const response = await fetch(`${API_BASE_URL}/api/ai?action=parse-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          context: 'fashion',
+        }),
+      });
+
+      updateProgress(80);
+
+      if (!response.ok) {
+        throw new Error('Failed to parse details');
+      }
+
+      const data = await response.json();
+      updateProgress(100);
+
+      if (data.success && data.parsed) {
+        const parsed = data.parsed;
+        const updates: string[] = [];
+
+        if (parsed.brand) updates.push(`Brand: ${parsed.brand}`);
+        if (parsed.size) updates.push(`Size: ${parsed.size}`);
+        if (parsed.material) updates.push(`Material: ${parsed.material}`);
+        if (parsed.estimated_price) updates.push(`Price: ${parsed.currency || '$'}${parsed.estimated_price}`);
+        if (parsed.additional_tags?.length > 0) updates.push(`Tags: ${parsed.additional_tags.join(', ')}`);
+
+        if (updates.length > 0) {
+          addMessage({
+            type: 'assistant-text',
+            content: `Got it! Updated: ${updates.join(' • ')}`,
+          });
+        } else {
+          addMessage({
+            type: 'assistant-text',
+            content: "I couldn't extract any details from that. Try being more specific, like \"Zara blazer, size M, wool\"",
+          });
+        }
+
+        finishProcessing('Details updated!');
+      } else {
+        addMessage({
+          type: 'assistant-text',
+          content: "I couldn't understand that. Try something like \"Nike, size 10, leather, $120\"",
+        });
+        finishProcessing('');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to parse details';
+      setProcessingError(message);
+      addMessage({
+        type: 'assistant-status',
+        content: message,
+        statusType: 'error',
+      });
+    }
+  }, [addMessage, startProcessing, updateProgress, finishProcessing, setProcessingError]);
+
   // Process text search
   const processTextSearch = useCallback(async (query: string) => {
     try {
@@ -347,6 +429,9 @@ export default function UnifiedChatContent() {
   const handleSubmit = useCallback(async (payload: ChatInputPayload) => {
     if (processing.isProcessing) return;
 
+    // Check if we're awaiting product details input (Issue 2)
+    const lastAwaitingMessage = [...messages].reverse().find(m => m.awaitingInput === 'product-details');
+
     switch (payload.type) {
       case 'image':
         if (payload.file) {
@@ -357,10 +442,15 @@ export default function UnifiedChatContent() {
         await processUrlScrape(payload.content);
         break;
       case 'text':
-        await processTextSearch(payload.content);
+        // If there's an awaiting product details message and user sends text, parse it as product details
+        if (lastAwaitingMessage?.awaitingInput === 'product-details' && lastAwaitingMessage.productId) {
+          await processProductDetails(payload.content, lastAwaitingMessage.productId);
+        } else {
+          await processTextSearch(payload.content);
+        }
         break;
     }
-  }, [processing.isProcessing, processImageUpload, processUrlScrape, processTextSearch]);
+  }, [processing.isProcessing, messages, processImageUpload, processUrlScrape, processTextSearch, processProductDetails]);
 
   // Handle image attachment
   const handleImageAttach = useCallback((file: File, previewUrl: string) => {
@@ -455,6 +545,26 @@ export default function UnifiedChatContent() {
                 compact
               />
             ))}
+            {/* Navigation hint to view in closet (Issue 4) */}
+            {message.navigationHint && (
+              <button
+                onClick={() => {
+                  close();
+                  router.push(message.navigationHint!.route);
+                }}
+                className="flex items-center gap-1 text-sm mt-2 transition-colors"
+                style={{ color: 'var(--primary)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--primary-dark)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--primary)';
+                }}
+              >
+                {message.navigationHint.text}
+                <ArrowRight size={14} />
+              </button>
+            )}
             {message.searchQuery && (
               <button
                 onClick={() => handleExpandToDiscover(message.searchQuery!)}
