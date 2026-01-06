@@ -1,5 +1,30 @@
 # Claude Code Guidelines for Stel/Moodlayer
 
+## Git Workflow
+
+**Always use feature branches + PRs** for all changes (not direct commits to master).
+
+### Branch Naming
+- `feature/description` - New features
+- `fix/description` - Bug fixes
+- `refactor/description` - Code refactoring
+- `chore/description` - Maintenance tasks
+
+### Workflow
+1. Create branch: `git checkout -b feature/xyz`
+2. Make changes and commit
+3. Push branch: `git push -u origin feature/xyz`
+4. Create PR with summary and test plan
+5. User reviews and merges
+
+### Benefits
+- Clear history of all features in PR list
+- Easy to revert entire features
+- Code review opportunity before merge
+- Better traceability for debugging
+
+---
+
 ## Pre-Commit Verification Checklist
 
 Before presenting any code changes as complete, verify:
@@ -369,3 +394,15 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs
   - Accept user API key in request headers
   - Use user key if provided, fall back to system keys
 **Priority:** Medium - enables power users and reduces backend costs.
+
+---
+
+### 8. DB-Based Auto-Tagging for Basics
+**Status:** Not started
+**Context:** Current image embedding similarity (Issue 1) compares uploaded products to user's existing closet items. This is great for finding duplicates during upload.
+
+However, there's a different use case: auto-tagging "basics" is a harder problem best left for the user to define metadata.
+
+**Key Insight:** Unique items should be user-defined.
+
+**Priority:** Medium.
