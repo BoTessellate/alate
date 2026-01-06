@@ -121,6 +121,7 @@ interface CollectionsState {
   updateCollectionDescription: (id: string, description: string) => void;
   addProductToCollection: (collectionId: string, product: Product) => void;
   removeProductFromCollection: (collectionId: string, productId: string) => void;
+  updateProductInCollection: (collectionId: string, productId: string, updates: Partial<Product>) => void;
 
   // Query helpers
   getCollectionById: (id: string) => Collection | undefined;
@@ -314,6 +315,39 @@ export const useCollectionsStore = create<CollectionsState>()(
             if (c.id !== collectionId) return c;
 
             const updatedProducts = c.products.filter((p) => p.id !== productId);
+            const coverImages = updatedProducts
+              .slice(0, 4)
+              .map((p) => p.image_url)
+              .filter(Boolean);
+
+            updatedCollection = {
+              ...c,
+              products: updatedProducts,
+              coverImages,
+              updatedAt: new Date().toISOString(),
+            };
+            return updatedCollection;
+          }),
+        }));
+
+        // Sync to Supabase
+        if (updatedCollection && typeof window !== 'undefined') {
+          syncCollectionToSupabase(updatedCollection, getDeviceId());
+        }
+      },
+
+      updateProductInCollection: (collectionId, productId, updates) => {
+        let updatedCollection: Collection | undefined;
+
+        set((state) => ({
+          collections: state.collections.map((c) => {
+            if (c.id !== collectionId) return c;
+
+            const updatedProducts = c.products.map((p) => {
+              if (p.id !== productId) return p;
+              return { ...p, ...updates };
+            });
+
             const coverImages = updatedProducts
               .slice(0, 4)
               .map((p) => p.image_url)

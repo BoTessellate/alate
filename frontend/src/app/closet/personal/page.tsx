@@ -14,6 +14,7 @@ export default function PersonalCollectionPage() {
     deleteCollection,
     renameCollection,
     removeProductFromCollection,
+    updateProductInCollection,
   } = useCollectionsStore();
   const { openModal } = useUploadStore();
 
@@ -27,6 +28,16 @@ export default function PersonalCollectionPage() {
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [sidebarCollectionMenu, setSidebarCollectionMenu] = useState<string | null>(null);
+
+  // Edit product state
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editProductForm, setEditProductForm] = useState({
+    product_name: '',
+    brand: '',
+    price: '',
+    category: '',
+    tags: '',
+  });
 
   useEffect(() => {
     setIsHydrated(true);
@@ -96,6 +107,52 @@ export default function PersonalCollectionPage() {
       removeProductFromCollection(selectedCollectionId, productId);
     }
     setActiveItemMenu(null);
+  };
+
+  const handleStartEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setEditProductForm({
+      product_name: product.product_name || '',
+      brand: product.brand || '',
+      price: product.price?.toString() || '',
+      category: product.category || '',
+      tags: product.tags?.join(', ') || '',
+    });
+    setActiveItemMenu(null);
+  };
+
+  const handleSaveProductEdit = () => {
+    if (!editingProduct) return;
+
+    const updates: Partial<Product> = {
+      product_name: editProductForm.product_name || editingProduct.product_name,
+      brand: editProductForm.brand || undefined,
+      price: editProductForm.price ? parseFloat(editProductForm.price) : undefined,
+      category: editProductForm.category || undefined,
+      tags: editProductForm.tags
+        ? editProductForm.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : editingProduct.tags,
+    };
+
+    // Find all collections containing this product and update in each
+    collections.forEach(collection => {
+      if (collection.products.some(p => p.id === editingProduct.id)) {
+        updateProductInCollection(collection.id, editingProduct.id, updates);
+      }
+    });
+
+    setEditingProduct(null);
+  };
+
+  const handleCancelProductEdit = () => {
+    setEditingProduct(null);
+    setEditProductForm({
+      product_name: '',
+      brand: '',
+      price: '',
+      category: '',
+      tags: '',
+    });
   };
 
   // Loading state
@@ -411,20 +468,29 @@ export default function PersonalCollectionPage() {
                       </button>
 
                       {/* Item Dropdown Menu */}
-                      {activeItemMenu === item.id && selectedCollectionId && (
+                      {activeItemMenu === item.id && (
                         <div
                           className="absolute top-12 right-2 w-36 rounded-lg overflow-hidden shadow-lg z-20 py-1"
                           style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownItem
-                            icon={<Trash2 size={12} />}
-                            variant="destructive"
-                            onClick={() => handleRemoveItem(item.id)}
+                            icon={<Edit2 size={12} />}
+                            onClick={() => handleStartEditProduct(item)}
                             closeOnClick={false}
                           >
-                            Remove from collection
+                            Edit details
                           </DropdownItem>
+                          {selectedCollectionId && (
+                            <DropdownItem
+                              icon={<Trash2 size={12} />}
+                              variant="destructive"
+                              onClick={() => handleRemoveItem(item.id)}
+                              closeOnClick={false}
+                            >
+                              Remove
+                            </DropdownItem>
+                          )}
                         </div>
                       )}
                     </div>
@@ -473,6 +539,70 @@ export default function PersonalCollectionPage() {
             disabled={!newCollectionName.trim()}
           >
             Create
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Product Modal */}
+      <Modal
+        isOpen={!!editingProduct}
+        onClose={handleCancelProductEdit}
+        title="Edit Product"
+        size="sm"
+      >
+        <ModalContent className="space-y-4">
+          {editingProduct?.image_url && (
+            <div className="flex justify-center mb-2">
+              <img
+                src={editingProduct.image_url}
+                alt={editingProduct.product_name || 'Product'}
+                className="w-24 h-24 object-cover rounded-lg"
+              />
+            </div>
+          )}
+          <Input
+            label="Product Name"
+            value={editProductForm.product_name}
+            onChange={(e) => setEditProductForm(prev => ({ ...prev, product_name: e.target.value }))}
+            placeholder="e.g., Oversized Blazer"
+          />
+          <Input
+            label="Brand"
+            value={editProductForm.brand}
+            onChange={(e) => setEditProductForm(prev => ({ ...prev, brand: e.target.value }))}
+            placeholder="e.g., Zara"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Price"
+              type="number"
+              value={editProductForm.price}
+              onChange={(e) => setEditProductForm(prev => ({ ...prev, price: e.target.value }))}
+              placeholder="0.00"
+            />
+            <Input
+              label="Category"
+              value={editProductForm.category}
+              onChange={(e) => setEditProductForm(prev => ({ ...prev, category: e.target.value }))}
+              placeholder="e.g., Tops"
+            />
+          </div>
+          <Input
+            label="Tags (comma-separated)"
+            value={editProductForm.tags}
+            onChange={(e) => setEditProductForm(prev => ({ ...prev, tags: e.target.value }))}
+            placeholder="e.g., casual, cotton, summer"
+          />
+        </ModalContent>
+        <ModalFooter>
+          <Button variant="ghost" onClick={handleCancelProductEdit}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSaveProductEdit}
+          >
+            Save Changes
           </Button>
         </ModalFooter>
       </Modal>

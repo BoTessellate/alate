@@ -6,7 +6,8 @@
 3. [Deployment](#deployment)
 4. [Database](#database)
 5. [AI Systems](#ai-systems)
-6. [Notes for Later](#notes-for-later)
+6. [Testing](#testing)
+7. [Notes for Later](#notes-for-later)
 
 ---
 
@@ -393,6 +394,53 @@ The `/api/ai?action=labels` endpoint now:
 
 ---
 
+# Testing
+
+## Philosophy
+
+**Do not make band-aid fixes.** When tests fail:
+
+1. **Dig deep** - Don't just fix the symptom to make the error go away
+2. **Find the root cause** - Trace back to where the actual problem originates
+3. **Fix at the point of inflection** - The fix should address the underlying issue, not patch around it
+
+The goal is a codebase where tests genuinely validate behavior, not tests that are constantly adjusted to match bugs.
+
+## Shared Selectors (Single Source of Truth)
+
+When component selectors change, update in **ONE** place:
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/constants/testSelectors.ts` | Complete selector definitions |
+| `frontend/cypress/support/commands.ts` | SELECTORS export for E2E tests |
+
+```typescript
+import { SELECTORS } from '../support/commands';
+
+cy.get(SELECTORS.search.trigger).click();
+cy.get(SELECTORS.search.input).should('be.visible');
+```
+
+## Test Files
+
+| Type | Location | Tool |
+|------|----------|------|
+| Unit tests | `frontend/src/**/*.test.ts` | Jest |
+| E2E tests | `frontend/cypress/e2e/*.cy.ts` | Cypress |
+| Layout tests | `frontend/tests/**/*.spec.ts` | Playwright |
+
+## Extracted Logic for Unit Testing
+
+Complex logic is extracted into testable utilities:
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/utils/breadcrumbs.ts` | Pure functions for breadcrumb logic |
+| `frontend/src/constants/theme.ts` | `getTopbarColors()`, `getAgentModeColors()` |
+
+---
+
 # Notes for Later
 
 ## 1. Background Removal - DISABLED FOR NOW
@@ -476,3 +524,59 @@ However, there's a different use case: auto-tagging "basics" is a harder problem
 **Key Insight:** Unique items should be user-defined.
 
 **Priority:** Medium.
+
+---
+
+## 9. Upstash Redis for Rate Limiting (Optional)
+**Status:** Not required now
+**Context:** The rate limiter in `backend/sdk/shared/middleware.ts` currently uses in-memory storage with automatic fallback. This works perfectly fine for early-stage apps with low-to-moderate traffic. In serverless (Vercel), each function instance has its own memory, so rate limits are "best effort" rather than exact—but this is acceptable for most use cases.
+
+**When to Set Up:** Only needed if:
+- App has high traffic requiring strict rate limiting
+- You need accurate rate limiting across all serverless instances
+- You're experiencing abuse that in-memory limits can't catch
+
+**Action Required:**
+1. Go to [upstash.com](https://upstash.com) and create a free account
+2. Create a new Redis database (free tier: 10K commands/day)
+3. Copy the REST URL and REST Token from the database details
+4. Add to backend `.env` and Vercel environment variables:
+   ```
+   UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+   UPSTASH_REDIS_REST_TOKEN=AXxxxxxxxxxxxx
+   ```
+5. The middleware will automatically use Redis when these variables are present
+
+**Priority:** Low - only needed at scale.
+
+---
+
+## 10. Shopify Product Enrichment - Immediate Trigger
+
+**Status:** Planned
+
+**Context:** Currently, product enrichment runs via GitHub Actions cron every 15 minutes. For better UX, we should trigger enrichment immediately after a Shopify sync completes.
+
+**Implementation:**
+1. Create a GitHub Personal Access Token (PAT) with `repo` scope
+2. Add `GITHUB_TOKEN` to Vercel environment variables
+3. In `handleSyncRedirect` (shopify.ts), after successful sync:
+   ```typescript
+   // Fire GitHub Action (non-blocking)
+   fetch('https://api.github.com/repos/ramsaptami/TML/dispatches', {
+     method: 'POST',
+     headers: {
+       'Authorization': `token ${process.env.GITHUB_TOKEN}`,
+       'Accept': 'application/vnd.github.v3+json',
+     },
+     body: JSON.stringify({
+       event_type: 'enrich-products',
+       client_payload: { shop: shopDomain }
+     })
+   }).catch(e => console.error('GitHub dispatch failed:', e));
+   ```
+4. The workflow `.github/workflows/enrich-products.yml` already has `repository_dispatch` trigger configured
+
+**Why deferred:** Requires PAT setup which has security considerations for token storage.
+
+**Priority:** Low
