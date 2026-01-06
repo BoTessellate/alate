@@ -219,7 +219,7 @@ export default function UnifiedChatContent() {
       // Add follow-up prompt for additional details
       addMessage({
         type: 'assistant-text',
-        content: `Want to add more details? Just type naturally, like "It's a Zara, size M, paid $80"`,
+        content: `Add more details? Tell me brand, size, or price — e.g. "Zara, size M, $80"`,
         awaitingInput: 'product-details',
         productId: chatProducts[0]?.id,
       });
@@ -367,31 +367,50 @@ export default function UnifiedChatContent() {
 
       if (data.success && data.parsed) {
         const parsed = data.parsed;
-        const updates: string[] = [];
 
-        if (parsed.brand) updates.push(`Brand: ${parsed.brand}`);
-        if (parsed.size) updates.push(`Size: ${parsed.size}`);
-        if (parsed.material) updates.push(`Material: ${parsed.material}`);
-        if (parsed.estimated_price) updates.push(`Price: ${parsed.currency || '$'}${parsed.estimated_price}`);
-        if (parsed.additional_tags?.length > 0) updates.push(`Tags: ${parsed.additional_tags.join(', ')}`);
+        // Handle multi-product response
+        if (parsed.multiple && parsed.products?.length > 0) {
+          const productSummaries = parsed.products.map((p: { product_type?: string; brand?: string; size?: string }) => {
+            const parts = [];
+            if (p.product_type) parts.push(p.product_type);
+            if (p.brand) parts.push(p.brand);
+            if (p.size) parts.push(`size ${p.size}`);
+            return parts.join(' • ');
+          });
 
-        if (updates.length > 0) {
           addMessage({
             type: 'assistant-text',
-            content: `Got it! Updated: ${updates.join(' • ')}`,
+            content: `Got it! Updated ${parsed.products.length} items:\n${productSummaries.map((s: string) => `• ${s}`).join('\n')}`,
           });
+          finishProcessing('Details updated!');
         } else {
-          addMessage({
-            type: 'assistant-text',
-            content: "I couldn't extract any details from that. Try being more specific, like \"Zara blazer, size M, wool\"",
-          });
-        }
+          // Single product response
+          const updates: string[] = [];
 
-        finishProcessing('Details updated!');
+          if (parsed.brand) updates.push(`Brand: ${parsed.brand}`);
+          if (parsed.size) updates.push(`Size: ${parsed.size}`);
+          if (parsed.material) updates.push(`Material: ${parsed.material}`);
+          if (parsed.estimated_price) updates.push(`Price: ${parsed.currency || '$'}${parsed.estimated_price}`);
+          if (parsed.additional_tags?.length > 0) updates.push(`Tags: ${parsed.additional_tags.join(', ')}`);
+
+          if (updates.length > 0) {
+            addMessage({
+              type: 'assistant-text',
+              content: `Got it! Updated: ${updates.join(' • ')}`,
+            });
+            finishProcessing('Details updated!');
+          } else {
+            addMessage({
+              type: 'assistant-text',
+              content: "Hmm, I couldn't catch that. Try: \"Mango top, size S\" or \"M&S pants, size M\"",
+            });
+            finishProcessing('');
+          }
+        }
       } else {
         addMessage({
           type: 'assistant-text',
-          content: "I couldn't understand that. Try something like \"Nike, size 10, leather, $120\"",
+          content: "Couldn't parse that. Try: \"brand name, size\" — like \"Zara, size M\"",
         });
         finishProcessing('');
       }

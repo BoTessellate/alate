@@ -1,30 +1,10 @@
 # Claude Code Guidelines - Frontend
 
-Frontend-specific guidelines for the TML Next.js application. For project-wide guidelines, testing infrastructure, and TODOs, see the root [CLAUDE.md](../CLAUDE.md).
+Frontend-specific guidelines for the TML Next.js application. For project-wide guidelines (code style, testing, TODOs), see the root [CLAUDE.md](../CLAUDE.md).
 
 ## Table of Contents
-1. [Code Style](#code-style)
-2. [UI Components](#ui-components)
-3. [Key Patterns](#key-patterns)
-
----
-
-# Code Style
-
-## General Rules
-- Use TypeScript with strict types
-- Use CSS custom properties for theming (`var(--primary)`, `var(--foreground)`, etc.)
-- Components should be in `src/components/`
-- Stores use Zustand and are in `src/stores/`
-- API calls should have action-based error messages
-
-## Error Messages
-Error messages should be action-oriented:
-
-| Bad | Good |
-|-----|------|
-| "Failed to fetch" | "Unable to connect to server. Check your internet connection and try again." |
-| "Error" | "Could not save changes. Please try again." |
+1. [UI Components](#ui-components)
+2. [Key Patterns](#key-patterns)
 
 ---
 
@@ -46,7 +26,6 @@ Error messages should be action-oriented:
 ### If a Pattern Doesn't Fit
 1. First check if an existing component can be extended with a new prop/variant
 2. If not, create a new reusable component rather than adding inline styles
-3. Example: Centered wizard headers → create `WizardHeader` component
 
 ### Benefits
 - Style changes propagate automatically to all pages
@@ -54,15 +33,17 @@ Error messages should be action-oriented:
 - Less code duplication and easier maintenance
 
 ## UI Guidelines Reference
-See `UI_GUIDELINES.md` for full design system details:
-- Color palette and CSS variables
-- Typography scale
-- Component patterns
-- Spacing conventions
+See `UI_GUIDELINES.md` for full design system details.
 
 ---
 
 # Key Patterns
+
+## File Organization
+- Components: `src/components/`
+- Stores: `src/stores/` (Zustand)
+- Hooks: `src/hooks/`
+- Types: `src/types/`
 
 ## Breadcrumb Navigation
 
@@ -73,7 +54,7 @@ See `UI_GUIDELINES.md` for full design system details:
 | Specific item names (moodboard name) | Show contextual options for switching items |
 
 ## TopBar Consistency
-- All icon buttons should be consistent size (`w-8 h-8`)
+- All icon buttons: `w-8 h-8`
 - Use expandable patterns for space-constrained UI (e.g., search icon → expanded search bar)
 
 ## Condition-Based Theming

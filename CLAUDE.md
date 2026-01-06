@@ -32,6 +32,21 @@ TML/
 │       └── shared/
 ```
 
+## Code Style
+
+### General Rules
+- Use TypeScript with strict types
+- Use CSS custom properties for theming (`var(--primary)`, `var(--foreground)`, etc.)
+- API calls should have action-based error messages
+
+### Error Messages
+Error messages should be action-oriented:
+
+| Bad | Good |
+|-----|------|
+| "Failed to fetch" | "Unable to connect to server. Check your internet connection and try again." |
+| "Error" | "Could not save changes. Please try again." |
+
 ## Key Patterns
 
 ### API Calls
@@ -39,7 +54,7 @@ TML/
 - All API routes under `/api/`
 - Use proper error handling with try/catch
 
-### State Management
+### State Management (Frontend)
 - Zustand for global state
 - Local React state for component-specific UI state
 - Side panel context for panel state management

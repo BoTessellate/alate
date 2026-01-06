@@ -1988,27 +1988,40 @@ async function handleParseProductDetails(req: VercelRequest, res: VercelResponse
   }
 
   const prompt = `Extract structured product details from this natural language description.
+The user may describe one or multiple products in a single message.
 
 User said: "${description}"
 Context: ${context} (${context === 'fashion' ? 'clothing/accessories' : 'home decor/furniture'})
 
-Extract the following fields if mentioned (return null if not mentioned):
-- brand: The brand name (e.g., "Zara", "Nike", "IKEA")
-- size: Size information (e.g., "M", "Large", "42", "10", "One Size")
-- material: Material or fabric (e.g., "wool blend", "cotton", "leather", "oak wood")
-- estimated_price: Numeric price value (just the number, no currency symbol)
-- currency: Currency if mentioned (e.g., "USD", "EUR", "GBP", "INR") - default to "USD" if price mentioned without currency
-- additional_tags: Array of additional descriptive tags extracted (e.g., ["navy", "formal", "vintage"])
+For each product mentioned, extract:
+- product_type: What the item is (e.g., "top", "pants", "shoes", "dress")
+- brand: The brand name (e.g., "Zara", "Nike", "M&S", "Mango")
+- size: Size information (e.g., "S", "M", "Large", "UK 8", "42")
+- material: Material or fabric if mentioned
+- estimated_price: Numeric price value (just the number)
+- currency: Currency code (default "USD" if not specified)
+- additional_tags: Additional descriptive tags
 
-Return ONLY valid JSON in this exact format:
+If ONE product is described, return:
 {
-  "brand": "extracted brand or null",
-  "size": "extracted size or null",
-  "material": "extracted material or null",
+  "brand": "brand or null",
+  "size": "size or null",
+  "material": "material or null",
   "estimated_price": number or null,
   "currency": "currency code or null",
-  "additional_tags": ["tag1", "tag2"]
-}`;
+  "additional_tags": ["tag1"]
+}
+
+If MULTIPLE products are described, return:
+{
+  "multiple": true,
+  "products": [
+    { "product_type": "top", "brand": "Mango", "size": "S", ... },
+    { "product_type": "pants", "brand": "M&S", "size": "M", ... }
+  ]
+}
+
+Return ONLY valid JSON, no explanation.`;
 
   try {
     log.info({ description, context }, 'Parsing natural language product details with Gemini...');
