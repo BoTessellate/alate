@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { Check, ArrowRight, Loader2 } from 'lucide-react';
 import { useUserStore } from '@/stores/useUserStore';
 import { STYLE_CATEGORIES } from '@/types';
 import { Button, PageHeader } from '@/components/ui';
@@ -121,12 +121,8 @@ export default function OnboardingPage() {
     } else if (step === 2) {
       setStyleTags(selectedTags);
       completeOnboarding();
-      setStep(3);
+      router.push('/');
     }
-  };
-
-  const handleFinish = () => {
-    router.push('/');
   };
 
   const handleSkip = () => {
@@ -137,9 +133,7 @@ export default function OnboardingPage() {
   const canProceed =
     step === 1
       ? selectedCategories.length >= 2
-      : step === 2
-        ? selectedTags.length >= 3
-        : true;
+      : selectedTags.length >= 3;
 
   // Show loading while checking hydration
   if (!isHydrated) {
@@ -179,7 +173,7 @@ export default function OnboardingPage() {
 
       {/* Progress indicator */}
       <div className="flex gap-2 mb-8">
-        {[1, 2, 3].map((s) => (
+        {[1, 2].map((s) => (
           <div
             key={s}
             className="w-2 h-2 rounded-full transition-colors"
@@ -280,48 +274,26 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* Step 3: Complete */}
-      {step === 3 && (
-        <div className="max-w-md w-full text-center">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}
-          >
-            <Sparkles size={40} style={{ color: 'var(--primary)' }} />
-          </div>
-          <PageHeader
-            variant="centered"
-            size="md"
-            maxWidth="none"
-            title="You're all set!"
-            subtitle="Your personalized mood layer is ready. Start discovering products that match your style."
-            className="px-0 pt-0 pb-0"
-          />
-        </div>
-      )}
-
       {/* Navigation Button */}
       <Button
-        onClick={step === 3 ? handleFinish : handleNext}
+        onClick={handleNext}
         disabled={!canProceed}
         variant="primary"
         size="lg"
         iconRight={ArrowRight}
       >
-        {step === 3 ? 'Start Exploring' : 'Continue'}
+        {step === 2 ? 'Start Exploring' : 'Continue'}
       </Button>
 
-      {/* Skip option for steps 1 and 2 - always visible with pb-32 on container */}
-      {step < 3 && (
-        <Button
-          onClick={handleSkip}
-          variant="ghost"
-          size="sm"
-          className="mt-8"
-        >
-          Skip for now
-        </Button>
-      )}
+      {/* Skip option */}
+      <Button
+        onClick={handleSkip}
+        variant="ghost"
+        size="sm"
+        className="mt-8"
+      >
+        Skip for now
+      </Button>
       </div>
     </div>
   );
