@@ -204,7 +204,8 @@ async function cropImageRegion(
   boundingBox: BoundingBox
 ): Promise<string> {
   // Dynamic import sharp to avoid Vercel serverless issues with native bindings
-  const sharp = (await import('sharp')).default;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sharp = (await import('sharp')).default as any;
 
   const buffer = Buffer.from(base64, 'base64');
 
