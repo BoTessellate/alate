@@ -63,13 +63,15 @@ CREATE INDEX IF NOT EXISTS idx_detection_feedback_was_saved ON detection_feedbac
 -- Enable RLS
 ALTER TABLE detection_feedback ENABLE ROW LEVEL SECURITY;
 
--- Policies
+-- Policies (drop if exists, then create)
+DROP POLICY IF EXISTS "Allow service role full access on detection_feedback" ON detection_feedback;
 CREATE POLICY "Allow service role full access on detection_feedback"
     ON detection_feedback
     TO service_role
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow anon insert on detection_feedback" ON detection_feedback;
 CREATE POLICY "Allow anon insert on detection_feedback"
     ON detection_feedback FOR INSERT
     TO anon
