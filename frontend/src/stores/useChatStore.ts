@@ -17,6 +17,7 @@ export type MessageType =
 export type ProcessingStage =
   | 'idle'
   | 'uploading'
+  | 'detecting'
   | 'removing-bg'
   | 'enriching'
   | 'scraping'
@@ -117,6 +118,7 @@ const DEFAULT_BUBBLE_STATUS = 'How can I help?';
 const STAGE_STATUS_MAP: Record<ProcessingStage, string> = {
   idle: DEFAULT_BUBBLE_STATUS,
   uploading: 'Uploading image...',
+  detecting: 'Detecting products...',
   'removing-bg': 'Removing background...',
   enriching: 'Analyzing product...',
   scraping: 'Fetching product info...',
