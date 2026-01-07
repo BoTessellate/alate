@@ -285,8 +285,8 @@ test.describe('Page Layouts', () => {
       const progress = page.locator('.w-2.h-2.rounded-full');
       const count = await progress.count();
 
-      // Should have 3 progress dots
-      expect(count).toBeGreaterThanOrEqual(3);
+      // Should have 2 progress dots (2-step onboarding)
+      expect(count).toBeGreaterThanOrEqual(2);
     });
 
     test('continue button is visible', async ({ page }) => {
