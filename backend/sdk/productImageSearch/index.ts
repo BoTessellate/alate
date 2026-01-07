@@ -28,7 +28,7 @@
  * ```
  */
 
-import { createLogger } from '../shared/logger';
+import { createModuleLogger } from '../shared/logger';
 import { findBestDatabaseMatch, searchDatabaseForProduct } from './databaseSearch';
 import { findBestWebImage, searchWebForProductImage } from './webSearch';
 import type {
@@ -38,7 +38,7 @@ import type {
   DEFAULT_CONFIG,
 } from './types';
 
-const logger = createLogger('product-image-search');
+const logger = createModuleLogger('product-image-search');
 
 // Re-export types and utilities
 export * from './types';

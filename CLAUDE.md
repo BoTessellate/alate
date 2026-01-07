@@ -1158,3 +1158,25 @@ However, there's a different use case: auto-tagging "basics" is a harder problem
 **Why deferred:** Requires PAT setup which has security considerations for token storage.
 
 **Priority:** Low
+
+---
+
+## 11. Secure Google Custom Search API Key Before Production
+
+**Status:** TODO before launch
+
+**Context:** The Google Custom Search API key (`GOOGLE_CUSTOM_SEARCH_API_KEY`) is currently unrestricted for development. Before going live, it needs to be secured.
+
+**Action Required:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
+2. Edit the "Google custom search key for TML" API key
+3. Under **Application restrictions**:
+   - For production: Consider "HTTP referrers" if calling from frontend, or keep "None" for backend-only
+4. Under **API restrictions**:
+   - Select "Restrict key"
+   - Choose only "Custom Search API"
+5. Save changes
+
+**Why important:** An unrestricted API key could be abused if leaked, incurring unexpected costs or hitting rate limits.
+
+**Priority:** High (before production launch)

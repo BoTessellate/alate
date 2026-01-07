@@ -5,14 +5,14 @@
  * This is a fallback when the product isn't found in our database.
  */
 
-import { createLogger } from '../shared/logger';
+import { createModuleLogger } from '../shared/logger';
 import type {
   DetectedProductInfo,
   WebSearchOptions,
   WebSearchResultItem,
 } from './types';
 
-const logger = createLogger('product-image-search:web');
+const logger = createModuleLogger('product-image-search:web');
 
 // Google Custom Search API endpoint
 const GOOGLE_SEARCH_API = 'https://www.googleapis.com/customsearch/v1';

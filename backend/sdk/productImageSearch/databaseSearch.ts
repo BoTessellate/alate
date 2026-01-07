@@ -6,15 +6,15 @@
  * reference image for a detected product.
  */
 
-import { getSupabase } from '../shared/supabase';
-import { createLogger } from '../shared/logger';
+import { getSupabaseClient } from '../shared/supabaseClient';
+import { createModuleLogger } from '../shared/logger';
 import type {
   DetectedProductInfo,
   DatabaseSearchOptions,
   DatabaseProductMatch,
 } from './types';
 
-const logger = createLogger('product-image-search:database');
+const logger = createModuleLogger('product-image-search:database');
 
 /**
  * Calculate text similarity using Levenshtein-based approach
@@ -118,7 +118,7 @@ export async function searchDatabaseForProduct(
   const startTime = Date.now();
 
   try {
-    const supabase = getSupabase();
+    const supabase = getSupabaseClient();
 
     // Build query - get products with images
     let query = supabase
