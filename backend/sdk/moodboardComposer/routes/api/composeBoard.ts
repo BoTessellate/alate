@@ -1,6 +1,20 @@
 /**
  * Moodboard Composition API Routes
  * Endpoints for composing and exporting moodboards
+ *
+ * ============================================================================
+ * INTEGRATION STATUS: NOT WIRED TO FRONTEND
+ * ============================================================================
+ * Database Tables Used:
+ * - `moodboard_compositions` table: Stores rendered moodboard layouts
+ *
+ * To Wire Up:
+ * 1. Frontend needs to call POST /api/compose/board after layout is finalized
+ * 2. Store composition to `moodboard_compositions` table
+ * 3. Link to export flow for downloading/sharing
+ *
+ * Related: See `exportBoardDraft.ts` and `../socialExport/`
+ * ============================================================================
  */
 
 import { Router, Request, Response } from 'express';

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Grid3X3, MoreHorizontal, FolderPlus, ChevronDown, Trash2, Edit2 } from 'lucide-react';
-import { Button, EmptyState, PageHeader, Input, Modal, ModalContent, ModalFooter, Textarea, DropdownItem } from '@/components/ui';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, Search, Grid3X3, MoreHorizontal, FolderPlus, ChevronDown, Trash2, Edit2, X } from 'lucide-react';
+import { Button, EmptyState, PageHeader, Input, Modal, ModalContent, ModalFooter, Textarea, DropdownItem, TagList } from '@/components/ui';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useUploadStore } from '@/stores/useUploadStore';
 import type { Product } from '@/types';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
 
 export default function PersonalCollectionPage() {
   const {
@@ -36,8 +38,11 @@ export default function PersonalCollectionPage() {
     brand: '',
     price: '',
     category: '',
-    tags: '',
+    tags: [] as string[],
   });
+  const [newTagInput, setNewTagInput] = useState('');
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [originalTags, setOriginalTags] = useState<string[]>([]);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -111,27 +116,76 @@ export default function PersonalCollectionPage() {
 
   const handleStartEditProduct = (product: Product) => {
     setEditingProduct(product);
+    const productTags = product.tags || [];
     setEditProductForm({
       product_name: product.product_name || '',
       brand: product.brand || '',
       price: product.price?.toString() || '',
       category: product.category || '',
-      tags: product.tags?.join(', ') || '',
+      tags: productTags,
     });
+    setOriginalTags(productTags); // Store original tags for feedback comparison
+    setNewTagInput('');
+    setIsAddingTag(false);
     setActiveItemMenu(null);
   };
 
+  // Submit tag feedback to help AI learn from user corrections
+  const submitTagFeedback = useCallback(async (
+    productId: string,
+    originalTags: string[],
+    newTags: string[],
+    brand?: string,
+    category?: string
+  ) => {
+    // Check if tags were actually changed
+    const tagsChanged =
+      newTags.length !== originalTags.length ||
+      !newTags.every((t) => originalTags.includes(t));
+
+    if (!tagsChanged || originalTags.length === 0) return;
+
+    try {
+      await fetch(`${API_BASE_URL}/api/ai?action=feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feedback: {
+            product_id: productId,
+            brand: brand,
+            category: category,
+            ai_generated_tags: originalTags,
+            user_final_tags: newTags,
+            source: 'closet_edit', // Track this came from closet edit modal
+          },
+        }),
+      });
+      // Silent - don't show errors to user for feedback
+    } catch {
+      // Ignore feedback errors - non-critical
+    }
+  }, []);
+
   const handleSaveProductEdit = () => {
     if (!editingProduct) return;
+
+    const finalTags = editProductForm.tags.length > 0 ? editProductForm.tags : editingProduct.tags || [];
+
+    // Submit tag feedback for AI learning (async, non-blocking)
+    submitTagFeedback(
+      editingProduct.id,
+      originalTags,
+      finalTags,
+      editProductForm.brand || editingProduct.brand,
+      editProductForm.category || editingProduct.category
+    );
 
     const updates: Partial<Product> = {
       product_name: editProductForm.product_name || editingProduct.product_name,
       brand: editProductForm.brand || undefined,
       price: editProductForm.price ? parseFloat(editProductForm.price) : undefined,
       category: editProductForm.category || undefined,
-      tags: editProductForm.tags
-        ? editProductForm.tags.split(',').map(t => t.trim()).filter(Boolean)
-        : editingProduct.tags,
+      tags: finalTags,
     };
 
     // Find all collections containing this product and update in each
@@ -144,6 +198,25 @@ export default function PersonalCollectionPage() {
     setEditingProduct(null);
   };
 
+  const handleAddTag = () => {
+    const tag = newTagInput.trim().toLowerCase();
+    if (tag && !editProductForm.tags.includes(tag)) {
+      setEditProductForm(prev => ({
+        ...prev,
+        tags: [...prev.tags, tag],
+      }));
+    }
+    setNewTagInput('');
+    setIsAddingTag(false);
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditProductForm(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tagToRemove),
+    }));
+  };
+
   const handleCancelProductEdit = () => {
     setEditingProduct(null);
     setEditProductForm({
@@ -151,8 +224,10 @@ export default function PersonalCollectionPage() {
       brand: '',
       price: '',
       category: '',
-      tags: '',
+      tags: [],
     });
+    setNewTagInput('');
+    setIsAddingTag(false);
   };
 
   // Loading state
@@ -587,12 +662,90 @@ export default function PersonalCollectionPage() {
               placeholder="e.g., Tops"
             />
           </div>
-          <Input
-            label="Tags (comma-separated)"
-            value={editProductForm.tags}
-            onChange={(e) => setEditProductForm(prev => ({ ...prev, tags: e.target.value }))}
-            placeholder="e.g., casual, cotton, summer"
-          />
+          {/* Tags Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                Tags ({editProductForm.tags.length})
+              </span>
+              {!isAddingTag && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddingTag(true)}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors"
+                  style={{ color: 'var(--primary)' }}
+                >
+                  <Plus size={12} />
+                  Add
+                </button>
+              )}
+            </div>
+
+            {/* Add Tag Input */}
+            {isAddingTag && (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag();
+                    } else if (e.key === 'Escape') {
+                      setNewTagInput('');
+                      setIsAddingTag(false);
+                    }
+                  }}
+                  placeholder="Enter tag..."
+                  autoFocus
+                  className="flex-1 px-3 py-1.5 text-xs rounded-full outline-none"
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                    border: '1px solid var(--primary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  disabled={!newTagInput.trim()}
+                  className="px-3 py-1.5 text-xs rounded-full transition-colors"
+                  style={{
+                    backgroundColor: newTagInput.trim() ? 'var(--primary)' : 'var(--surface)',
+                    color: newTagInput.trim() ? 'white' : 'var(--foreground-muted)',
+                    cursor: newTagInput.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTagInput('');
+                    setIsAddingTag(false);
+                  }}
+                  className="px-2 py-1.5 text-xs rounded-full"
+                  style={{ color: 'var(--foreground-muted)' }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Tags Display */}
+            {editProductForm.tags.length > 0 ? (
+              <TagList
+                tags={editProductForm.tags}
+                onRemove={handleRemoveTag}
+                size="md"
+              />
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                No tags added yet
+              </p>
+            )}
+          </div>
         </ModalContent>
         <ModalFooter>
           <Button variant="ghost" onClick={handleCancelProductEdit}>

@@ -14,10 +14,17 @@ export interface PhotoUploadInput {
   productType: 'fashion' | 'home';
 }
 
+export interface BoundingBox {
+  x: number;      // Top-left x (0-1)
+  y: number;      // Top-left y (0-1)
+  width: number;  // Width (0-1)
+  height: number; // Height (0-1)
+}
+
 export interface ProcessedProduct {
   /** Generated UUID for the product */
   id: string;
-  /** URL of the original uploaded image */
+  /** URL of the original uploaded image (full, uncropped) */
   original_image_url: string;
   /** URL of the processed cutout image */
   image_url: string;
@@ -45,6 +52,8 @@ export interface ProcessedProduct {
   source: 'upload';
   /** Upload timestamp */
   uploaded_at: string;
+  /** Bounding box used for crop (for re-crop adjustment) */
+  boundingBox?: BoundingBox;
 }
 
 export interface PhotoUploadResponse {

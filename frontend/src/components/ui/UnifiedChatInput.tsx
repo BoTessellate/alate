@@ -11,6 +11,12 @@ export interface ChatInputPayload {
   analysis: InputAnalysis;
 }
 
+export interface QuickAction {
+  label: string;
+  action: string;
+  primary?: boolean;
+}
+
 export interface UnifiedChatInputProps {
   /** Callback when message is submitted */
   onSubmit: (payload: ChatInputPayload) => void;
@@ -30,6 +36,8 @@ export interface UnifiedChatInputProps {
   onImageAttach?: (file: File, previewUrl: string) => void;
   /** Callback to clear attached image */
   onClearAttachment?: () => void;
+  /** Callback when a quick action is clicked */
+  onQuickAction?: (action: string) => void;
   /** Test ID for testing */
   'data-testid'?: string;
 }
@@ -44,6 +52,19 @@ export interface UnifiedChatInputProps {
  * - Image preview with remove button
  * - Submit on Enter (Shift+Enter for new line)
  */
+// Quick actions for different input types
+const IMAGE_QUICK_ACTIONS: QuickAction[] = [
+  { label: 'Extract', action: 'extract', primary: true },
+  { label: 'Search similar', action: 'search-similar' },
+  { label: 'Tell me more...', action: 'custom' },
+];
+
+const URL_QUICK_ACTIONS: QuickAction[] = [
+  { label: 'Add to wishlist', action: 'add-wishlist', primary: true },
+  { label: 'Search similar', action: 'search-similar' },
+  { label: 'Tell me more...', action: 'custom' },
+];
+
 export function UnifiedChatInput({
   onSubmit,
   placeholder = 'Ask anything...',
@@ -54,12 +75,37 @@ export function UnifiedChatInput({
   attachedImagePreview,
   onImageAttach,
   onClearAttachment,
+  onQuickAction,
   'data-testid': testId,
 }: UnifiedChatInputProps) {
   const [value, setValue] = useState('');
   const [isUrlDetected, setIsUrlDetected] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Determine which quick actions to show
+  const quickActions = attachedImage ? IMAGE_QUICK_ACTIONS : isUrlDetected ? URL_QUICK_ACTIONS : null;
+  const showQuickActions = quickActions && !showCustomInput && !isLoading && !value.trim();
+
+  // Handle quick action click
+  const handleQuickActionClick = useCallback((action: string, index: number) => {
+    if (action === 'custom') {
+      setShowCustomInput(true);
+      setTimeout(() => textareaRef.current?.focus(), 0);
+      return;
+    }
+
+    setSelectedActionIndex(index);
+    onQuickAction?.(action);
+  }, [onQuickAction]);
+
+  // Reset custom input mode when attachment changes
+  useEffect(() => {
+    setShowCustomInput(false);
+    setSelectedActionIndex(0);
+  }, [attachedImage, isUrlDetected]);
 
   // Auto-focus on mount
   useEffect(() => {
@@ -106,9 +152,29 @@ export function UnifiedChatInput({
   }, [value, attachedImage, disabled, isLoading, onSubmit]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // If quick actions are showing and no text entered, Enter triggers primary action
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+
+      if (showQuickActions && quickActions) {
+        // Trigger the selected/primary action
+        const action = quickActions[selectedActionIndex];
+        handleQuickActionClick(action.action, selectedActionIndex);
+        return;
+      }
+
       handleSubmit();
+    }
+
+    // Arrow keys to navigate quick actions
+    if (showQuickActions && quickActions) {
+      if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        e.preventDefault();
+        setSelectedActionIndex((prev) => (prev + 1) % quickActions.length);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setSelectedActionIndex((prev) => (prev - 1 + quickActions.length) % quickActions.length);
+      }
     }
   };
 
@@ -169,6 +235,60 @@ export function UnifiedChatInput({
           >
             {attachedImage.name}
           </span>
+        </div>
+      )}
+
+      {/* Quick action buttons - shown when image attached or URL detected */}
+      {showQuickActions && quickActions && (
+        <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
+          {quickActions.map((action, index) => {
+            const isSelected = index === selectedActionIndex;
+            const isPrimary = action.primary;
+
+            return (
+              <button
+                key={action.action}
+                onClick={() => handleQuickActionClick(action.action, index)}
+                className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200"
+                style={{
+                  backgroundColor: isSelected
+                    ? 'var(--primary-dark)'
+                    : isPrimary
+                    ? 'var(--primary-light)'
+                    : 'var(--surface-light)',
+                  color: isSelected
+                    ? 'white'
+                    : isPrimary
+                    ? 'white'
+                    : 'var(--foreground-secondary)',
+                  border: isSelected
+                    ? '2px solid var(--primary)'
+                    : '1px solid transparent',
+                  transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = isPrimary
+                      ? 'var(--primary-dark)'
+                      : 'var(--surface-elevated)';
+                    e.currentTarget.style.color = isPrimary ? 'white' : 'var(--foreground)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = isPrimary
+                      ? 'var(--primary-light)'
+                      : 'var(--surface-light)';
+                    e.currentTarget.style.color = isPrimary ? 'white' : 'var(--foreground-secondary)';
+                  }
+                }}
+                aria-label={action.label}
+                data-testid={testId ? `${testId}-action-${action.action}` : undefined}
+              >
+                {action.label}
+              </button>
+            );
+          })}
         </div>
       )}
 

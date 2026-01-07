@@ -133,7 +133,7 @@ export function SidePanelProvider({ children }: SidePanelProviderProps) {
  * DO NOT use --topbar-height directly for panel positioning!
  * ALWAYS use --topbar-total-height to account for the curve.
  */
-const SIDE_PANEL_WIDTH = '480px';
+const SIDE_PANEL_WIDTH = '356px';
 
 // =============================================================================
 // LAYOUT COMPONENT

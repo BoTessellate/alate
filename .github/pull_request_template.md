@@ -1,75 +1,26 @@
-## Summary
-<!-- Brief description of changes -->
+﻿## Summary
+<!-- Brief description of what this PR does -->
 
-## Type of Change
-- [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New feature (non-breaking change that adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
-- [ ] Refactoring (no functional changes)
-- [ ] Documentation update
-- [ ] CI/CD changes
-- [ ] Dependency updates
+## Related Issue
+<!-- Link to the issue this PR addresses -->
+Closes #
 
-## Changes Made
-<!-- List the specific changes made in this PR -->
--
+## Changes
+- [ ] Change 1
+- [ ] Change 2
+- [ ] Change 3
 
-## Testing
-<!-- Describe how you tested these changes -->
-- [ ] Unit tests pass (`npm test`)
-- [ ] E2E tests pass (if applicable)
-- [ ] Manually tested locally
-- [ ] Tested on mobile (if mobile changes)
+## Screenshots/Demo
+<!-- Add screenshots or GIFs if this includes UI changes -->
 
-## Screenshots/Recordings
-<!-- If applicable, add screenshots or recordings to help explain your changes -->
+## Test Plan
+- [ ] Test case 1
+- [ ] Test case 2
 
 ## Checklist
+- [ ] TypeScript compiles without errors (npm run build)
+- [ ] Tests pass
+- [ ] No console errors in browser
+- [ ] Responsive design verified (if UI changes)
+- [ ] Self-reviewed the code
 
-### General
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation (if needed)
-- [ ] My changes generate no new warnings
-- [ ] TypeScript compiles without errors
-- [ ] No secrets/API keys committed
-
-### Critical Checks (Read before merging!)
-
-#### Backend Changes
-- [ ] **API Function Count**: Still at 11 or fewer? (Vercel Hobby = 12 max)
-- [ ] **secureAI.ts**: Did NOT remove AbortController timeout?
-- [ ] **secureAI.ts**: Did NOT remove Anthropic direct API fallback?
-- [ ] **shopify.ts**: Did NOT add X-Frame-Options header?
-- [ ] **shopify.ts**: Did NOT call .text()/.json() twice on same Response?
-
-#### Frontend Changes
-- [ ] Uses CSS variables for theming (not hardcoded colors)
-- [ ] Components use proper TypeScript types
-- [ ] New components have proper error boundaries (if needed)
-
-#### If Unsure
-Read the `CRITICAL ARCHITECTURE NOTES` comments at the top of:
-- `backend/sdk/shared/secureAI.ts`
-- `backend/api/shopify.ts`
-
-## CI Status
-<!-- The following checks must pass before merging -->
-- [ ] `frontend-lint` - ESLint check passed
-- [ ] `frontend-test` - Unit tests passed
-- [ ] `frontend-build` - Next.js build succeeded
-- [ ] `backend-test` - Backend tests passed
-- [ ] `backend-typecheck` - TypeScript compilation passed
-
-## Related Issues
-<!-- Link issues using keywords to auto-close them when PR merges:
-     - Fixes #123 (for bug fixes - auto-closes issue)
-     - Closes #456 (for features - auto-closes issue)
-     - Resolves #789 (general - auto-closes issue)
-     - Related to #101 (just links, doesn't close)
--->
-Fixes #
-
-## Additional Notes
-<!-- Any additional information that reviewers should know -->

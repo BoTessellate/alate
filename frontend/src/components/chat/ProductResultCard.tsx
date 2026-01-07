@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import Image from 'next/image';
-import { Check, ExternalLink } from 'lucide-react';
+import { Check, ExternalLink, Pencil } from 'lucide-react';
 import type { ChatProduct } from '@/stores/useChatStore';
 
 export interface ProductResultCardProps {
@@ -10,6 +10,7 @@ export interface ProductResultCardProps {
   source: 'upload' | 'scrape' | 'search';
   onWishlistToggle?: (productId: string) => void;
   onClosetToggle?: (productId: string) => void;
+  onEdit?: (product: ChatProduct) => void;
   onClick?: (productId: string) => void;
   compact?: boolean;
 }
@@ -28,6 +29,7 @@ export const ProductResultCard = memo(function ProductResultCard({
   source,
   onWishlistToggle,
   onClosetToggle,
+  onEdit,
   onClick,
   compact = false,
 }: ProductResultCardProps) {
@@ -41,6 +43,11 @@ export const ProductResultCard = memo(function ProductResultCard({
   const handleClosetChange = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClosetToggle?.(product.id);
+  };
+
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(product);
   };
 
   const handleCardClick = () => {
@@ -59,14 +66,17 @@ export const ProductResultCard = memo(function ProductResultCard({
   // Get display tags (limit to 3)
   const displayTags = product.tags?.slice(0, 3) || [];
 
+  // Only show pointer cursor if there's a click action
+  const hasClickAction = !!onClick;
+
   return (
     <div
-      className="flex items-start gap-3 p-2 rounded-lg border transition-colors cursor-pointer"
+      className={`flex items-start gap-3 p-2 rounded-lg border transition-colors ${hasClickAction ? 'cursor-pointer' : ''}`}
       style={{
         backgroundColor: 'var(--surface)',
         borderColor: 'var(--border)',
       }}
-      onClick={handleCardClick}
+      onClick={hasClickAction ? handleCardClick : undefined}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = 'var(--surface-light)';
       }}
@@ -241,15 +251,35 @@ export const ProductResultCard = memo(function ProductResultCard({
             </button>
           )}
 
-          {/* Added indicator - for uploads only (scrapes use radio buttons) */}
+          {/* Added indicator and edit button - for uploads only */}
           {source === 'upload' && (
-            <span
-              className="text-xs flex items-center gap-1"
-              style={{ color: 'var(--success)' }}
-            >
-              <Check size={12} />
-              In Closet
-            </span>
+            <>
+              <span
+                className="text-xs flex items-center gap-1"
+                style={{ color: 'var(--success)' }}
+              >
+                <Check size={12} />
+                In Closet
+              </span>
+              {onEdit && (
+                <button
+                  onClick={handleEditClick}
+                  className="text-xs flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                  style={{ color: 'var(--foreground-muted)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--primary)';
+                    e.currentTarget.style.backgroundColor = 'var(--surface-light)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--foreground-muted)';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Pencil size={10} />
+                  Edit
+                </button>
+              )}
+            </>
           )}
 
           {/* Added indicator - for search results added to closet */}

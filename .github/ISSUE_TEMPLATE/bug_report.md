@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve
+about: Report something that isn't working correctly
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -20,36 +20,22 @@ assignees: ''
 ## Actual Behavior
 <!-- What actually happens -->
 
-## Screenshots/Recordings
-<!-- If applicable, add screenshots or recordings -->
+## Root Cause Analysis
+<!-- Fill in after investigation -->
+- Where in the code does this originate?
+- What conditions trigger it?
 
-## Environment
-- Browser:
-- Device:
-- OS:
-
----
-
-## For Developer Use
-
-### Root Cause Analysis
-<!-- Where in the code does this originate? What conditions trigger it? -->
-- File(s):
-- Condition:
-
-### Files Affected
+## Files Affected
+<!-- List files that need to be modified -->
 - `path/to/file.ts`
 
-### Fix Applied
-<!-- Description of the fix after implementation -->
+## Proposed Fix
+<!-- Describe the fix approach -->
 
-### Testing Checklist
-- [ ] Verified fix locally
-- [ ] Added/updated tests
-- [ ] No regression in related features
+## Testing Checklist
+- [ ] Test case 1
+- [ ] Test case 2
+- [ ] No regression in related functionality
 
-### Recurrence History
-<!-- If this is a repeat issue, document previous occurrences -->
-| Date | PR | Notes |
-|------|-----|-------|
-|      |     |       |
+## Additional Context
+<!-- Screenshots, logs, error messages, etc. -->

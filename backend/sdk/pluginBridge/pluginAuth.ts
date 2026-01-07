@@ -1,6 +1,27 @@
 /**
  * Plugin Authentication Module
  * Validates API tokens and credentials for external platforms
+ *
+ * ============================================================================
+ * INTEGRATION STATUS: NOT WIRED TO FRONTEND
+ * ============================================================================
+ * Database Tables Used:
+ * - `plugin_credentials` table: Encrypted API keys for platforms
+ * - `plugin_syncs` table: Sync job records
+ * - `plugin_sync_logs` table: Detailed sync logs
+ * - `sync_errors` table: Error tracking
+ *
+ * Supported Platforms:
+ * - Canva (see `canva/canvaSearch.ts`, `canva/canvaInsert.ts`)
+ * - WooCommerce (see `commerce/wooSync.ts`)
+ * - Shopify (see `commerce/shopifySync.ts`)
+ *
+ * To Wire Up:
+ * 1. Create plugin settings page in frontend
+ * 2. Implement credential input forms
+ * 3. Add sync status dashboard
+ * 4. Connect to plugin-specific flows
+ * ============================================================================
  */
 
 import { Request, Response, NextFunction } from 'express';

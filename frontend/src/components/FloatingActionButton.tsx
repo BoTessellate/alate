@@ -31,7 +31,12 @@ export default function FloatingActionButton() {
     }
   };
 
-  const isActive = isOpen && activeContent?.id === 'assistant';
+  const isAssistantOpen = isOpen && activeContent?.id === 'assistant';
+
+  // Hide the button when the chat panel is open
+  if (isAssistantOpen) {
+    return null;
+  }
 
   return (
     <div
@@ -43,18 +48,12 @@ export default function FloatingActionButton() {
     >
       <button
         onClick={handleClick}
-        className={`
-          flex items-center justify-center rounded-full cursor-pointer
-          transition-transform duration-200
-          ${!isActive ? 'fab-pulse' : ''}
-        `}
+        className="flex items-center justify-center rounded-full cursor-pointer transition-transform duration-200 fab-pulse"
         style={{
           width: '48px',
           height: '48px',
           backgroundColor: 'var(--charcoal)',
-          boxShadow: isActive
-            ? '0 4px 20px rgba(0, 0, 0, 0.25)'
-            : '0 2px 12px rgba(0, 0, 0, 0.15)',
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.15)',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.08)';
@@ -71,8 +70,7 @@ export default function FloatingActionButton() {
           style={{
             width: '20px',
             height: '6px',
-            backgroundColor: isActive ? 'white' : 'var(--primary)',
-            transition: 'background-color 0.2s ease',
+            backgroundColor: 'var(--primary)',
           }}
         />
       </button>

@@ -42,6 +42,8 @@ export interface ProcessMultipleInput {
   selectedProducts: SelectedProduct[];
   /** Product type context */
   productType: 'fashion' | 'home';
+  /** URL of the original full image (for re-crop feature) */
+  originalImageUrl?: string;
 }
 
 export interface ProcessingResult {
@@ -143,9 +145,10 @@ export async function processSelectedProducts(
       timing.totalMs = Date.now() - productStart;
 
       // Assemble product
+      // Use the full original image URL (not cropped) for re-crop feature
       const product: ProcessedProduct = {
         id: productId,
-        original_image_url: croppedUrl,
+        original_image_url: input.originalImageUrl || croppedUrl,
         image_url: processedUrl,
         product_name: selected.customName || enrichment.product_name,
         brand: 'My Upload',
@@ -159,6 +162,8 @@ export async function processSelectedProducts(
         tone: enrichment.tone,
         source: 'upload',
         uploaded_at: new Date().toISOString(),
+        // Store bounding box for re-crop adjustment
+        boundingBox: selected.boundingBox,
       };
 
       results.push({

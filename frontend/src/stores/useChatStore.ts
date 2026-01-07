@@ -27,15 +27,30 @@ export type ProcessingStage =
 
 export type StatusType = 'success' | 'error' | 'info' | 'processing';
 
+export interface BoundingBox {
+  x: number;      // Top-left x (0-1)
+  y: number;      // Top-left y (0-1)
+  width: number;  // Width (0-1)
+  height: number; // Height (0-1)
+}
+
 export interface ChatProduct extends Product {
   isAddedToCloset?: boolean;
   isWishlisted?: boolean;
+  /** Bounding box used for crop (for re-crop adjustment) */
+  boundingBox?: BoundingBox;
 }
 
 export interface NavigationHint {
   text: string;
   route: string;
   collectionName: string;
+}
+
+export interface FollowUpAction {
+  label: string;
+  action: string;
+  primary?: boolean;
 }
 
 export interface ChatMessage {
@@ -56,6 +71,8 @@ export interface ChatMessage {
   // For awaiting user input (Issue 2 - Natural Language)
   awaitingInput?: 'product-details';
   productId?: string;
+  // Follow-up actions (quick response buttons)
+  followUpActions?: FollowUpAction[];
 }
 
 export interface ProcessingState {
@@ -100,11 +117,12 @@ interface ChatState {
 
   // Attachment actions
   setPendingImage: (file: File | null, previewUrl?: string | null) => void;
-  clearPendingImage: () => void;
+  clearPendingImage: (revokeUrl?: boolean) => void;
 
   // Product actions (mutually exclusive - selecting one clears the other)
   toggleProductWishlist: (messageId: string, productId: string) => void;
   toggleProductCloset: (messageId: string, productId: string) => void;
+  updateProductInMessage: (messageId: string, productId: string, updates: Partial<ChatProduct>) => void;
 }
 
 // =============================================================================
@@ -231,14 +249,7 @@ export const useChatStore = create<ChatState>()(
           },
           bubbleStatusText: text,
         });
-
-        // Reset status after 3 seconds
-        setTimeout(() => {
-          const current = get().bubbleStatusText;
-          if (current === text) {
-            set({ bubbleStatusText: DEFAULT_BUBBLE_STATUS });
-          }
-        }, 3000);
+        // Status persists until user takes next action (no auto-reset)
       },
 
       setProcessingError: (error) => {
@@ -286,9 +297,11 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      clearPendingImage: () => {
+      clearPendingImage: (revokeUrl = false) => {
         const oldPreview = get().pendingImagePreview;
-        if (oldPreview && oldPreview.startsWith('blob:')) {
+        // Only revoke if explicitly requested (e.g., user cancelled)
+        // Don't revoke when image is sent - it's now used in a message
+        if (revokeUrl && oldPreview && oldPreview.startsWith('blob:')) {
           URL.revokeObjectURL(oldPreview);
         }
 
@@ -325,6 +338,20 @@ export const useChatStore = create<ChatState>()(
                 p.id === productId
                   ? { ...p, isAddedToCloset: !p.isAddedToCloset, isWishlisted: false }
                   : p
+              ),
+            };
+          }),
+        }));
+      },
+
+      updateProductInMessage: (messageId, productId, updates) => {
+        set((state) => ({
+          messages: state.messages.map((msg) => {
+            if (msg.id !== messageId || !msg.products) return msg;
+            return {
+              ...msg,
+              products: msg.products.map((p) =>
+                p.id === productId ? { ...p, ...updates } : p
               ),
             };
           }),

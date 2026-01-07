@@ -1,6 +1,24 @@
 /**
  * Social Share Data Generation
  * Prepares moodboard metadata for Pinterest, Instagram, and other platforms
+ *
+ * ============================================================================
+ * INTEGRATION STATUS: NOT WIRED TO FRONTEND
+ * ============================================================================
+ * Database Tables Used:
+ * - `social_shares` table: Tracks share metadata
+ * - `share_events` table: Analytics for share interactions
+ * - `export_links` table: Generated shareable links
+ * - `link_access_events` table: Tracks link clicks/views
+ *
+ * To Wire Up:
+ * 1. Add share button to moodboard export UI
+ * 2. Call this SDK to generate platform-specific share data
+ * 3. Store share records to respective tables
+ * 4. Track analytics when links are accessed
+ *
+ * Related: See `exportToLink.ts` for link generation
+ * ============================================================================
  */
 
 import { MoodboardComposition } from '../moodboardComposer/composeBoard';

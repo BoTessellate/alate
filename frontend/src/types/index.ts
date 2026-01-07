@@ -2,6 +2,14 @@
  * Shared types for The Mood Layer application
  */
 
+// Bounding box for crop regions (normalized 0-1 coordinates)
+export interface BoundingBox {
+  x: number;      // Top-left x (0-1)
+  y: number;      // Top-left y (0-1)
+  width: number;  // Width (0-1)
+  height: number; // Height (0-1)
+}
+
 // Product interface (standardized across the app)
 export interface Product {
   id: string;
@@ -24,6 +32,8 @@ export interface Product {
   source?: 'upload' | 'scrape' | 'api';
   original_image_url?: string;
   uploaded_at?: string;
+  // Bounding box for re-crop adjustment (uploaded products only)
+  boundingBox?: BoundingBox;
 }
 
 // Collection with saved products

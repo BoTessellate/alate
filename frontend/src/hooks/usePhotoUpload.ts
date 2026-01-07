@@ -137,6 +137,7 @@ export function usePhotoUpload() {
     detectedProducts,
     selectedProductIds,
     processedProducts,
+    originalImageUrl,
     setDetectedProducts,
     setProcessedProducts,
     setDetectionMode,
@@ -602,6 +603,8 @@ export function usePhotoUpload() {
           mimeType,
           selectedProducts,
           productType,
+          // Pass original image URL for re-crop feature
+          originalImageUrl,
         }),
         signal,
       });
@@ -622,7 +625,8 @@ export function usePhotoUpload() {
       }
 
       // Convert to Partial<Product>[] for editing
-      const products: Partial<Product>[] = data.products.map(p => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const products: Partial<Product>[] = data.products.map((p: any) => ({
         id: p.id,
         product_name: p.product_name,
         brand: p.brand,
@@ -638,6 +642,8 @@ export function usePhotoUpload() {
         tone: p.tone,
         source: 'upload',
         uploaded_at: p.uploaded_at,
+        // Include bounding box for re-crop adjustment
+        boundingBox: p.boundingBox,
       }));
 
       setProcessedProducts(products);

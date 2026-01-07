@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { useSidePanel } from '@/components/ui';
+import { useSidePanel, Modal, ModalContent, ModalFooter } from '@/components/ui';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { UnifiedChatInput, type ChatInputPayload } from '@/components/ui/UnifiedChatInput';
-import { ProductResultCard, ProcessingIndicator } from '@/components/chat';
+import { ProductResultCard, ProcessingIndicator, ImageCropAdjuster, type BoundingBox } from '@/components/chat';
 import { useChatStore, type ChatMessage, type ChatProduct } from '@/stores/useChatStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import type { Product } from '@/types';
@@ -31,6 +33,20 @@ export default function UnifiedChatContent() {
   const { isPanelMode, close } = useSidePanel();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Edit modal state
+  const [editingProduct, setEditingProduct] = useState<ChatProduct | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    product_name: '',
+    brand: '',
+    size: '',
+    price: '',
+  });
+  // Crop adjustment state
+  const [showCropAdjust, setShowCropAdjust] = useState(false);
+  const [adjustedBoundingBox, setAdjustedBoundingBox] = useState<BoundingBox | null>(null);
+  const [isReCropping, setIsReCropping] = useState(false);
+
   const {
     messages,
     processing,
@@ -47,6 +63,7 @@ export default function UnifiedChatContent() {
     clearPendingImage,
     toggleProductWishlist,
     toggleProductCloset,
+    updateProductInMessage,
   } = useChatStore();
 
   const {
@@ -54,6 +71,7 @@ export default function UnifiedChatContent() {
     addProductToCollection,
     createCollection,
     getCollectionById,
+    updateProductInCollection,
   } = useCollectionsStore();
 
   // Auto-scroll to bottom in panel mode
@@ -216,15 +234,19 @@ export default function UnifiedChatContent() {
         },
       });
 
-      // Add follow-up prompt for additional details
+      // Add follow-up prompt with action buttons
       addMessage({
         type: 'assistant-text',
-        content: `Add more details? Tell me brand, size, or price — e.g. "Zara, size M, $80"`,
-        awaitingInput: 'product-details',
+        content: `What would you like to do next?`,
+        followUpActions: [
+          { label: 'Add details', action: 'add-details', primary: true },
+          { label: 'Upload another', action: 'upload-another' },
+          { label: 'View in closet', action: 'view-closet' },
+        ],
         productId: chatProducts[0]?.id,
       });
 
-      finishProcessing(`${productCount} item${productCount > 1 ? 's' : ''} added to library!`);
+      finishProcessing(`${productCount} item${productCount > 1 ? 's' : ''} added!`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to process image';
       setProcessingError(message);
@@ -462,11 +484,26 @@ export default function UnifiedChatContent() {
           searchQuery: query,
         });
 
+        // Add follow-up actions
+        addMessage({
+          type: 'assistant-text',
+          content: 'Want to explore more?',
+          followUpActions: [
+            { label: 'Refine search', action: 'refine-search', primary: true },
+            { label: 'Upload an image', action: 'upload-another' },
+            { label: 'See all results', action: 'see-all-results' },
+          ],
+        });
+
         finishProcessing(`${products.length} products found`);
       } else {
         addMessage({
           type: 'assistant-text',
-          content: 'No products found. Try a different search term.',
+          content: 'No products found.',
+          followUpActions: [
+            { label: 'Try different search', action: 'refine-search', primary: true },
+            { label: 'Upload an image', action: 'upload-another' },
+          ],
         });
 
         finishProcessing('No results');
@@ -514,6 +551,102 @@ export default function UnifiedChatContent() {
     setPendingImage(file, previewUrl);
   }, [setPendingImage]);
 
+  // Handle quick action buttons (for images and URLs)
+  const handleQuickAction = useCallback(async (action: string) => {
+    if (processing.isProcessing) return;
+
+    switch (action) {
+      case 'extract':
+        // Extract products from image (default image action)
+        if (pendingImage) {
+          await processImageUpload(pendingImage, 'Uploaded an image');
+        }
+        break;
+
+      case 'search-similar':
+        // Search for similar products based on the attached image
+        if (pendingImage) {
+          // Add user message with the image
+          addMessage({
+            type: 'user-image',
+            content: 'Find similar products',
+            imagePreviewUrl: pendingImagePreview || undefined,
+          });
+
+          const file = pendingImage;
+          clearPendingImage();
+          startProcessing('searching', 'Finding similar products...');
+          updateProgress(20);
+
+          try {
+            const base64 = await fileToBase64(file);
+            updateProgress(40);
+
+            // Call visual search API
+            const response = await fetch(`${API_BASE_URL}/api/search?action=visual`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image: { base64, mimeType: file.type },
+                limit: 6,
+              }),
+            });
+
+            updateProgress(80);
+
+            if (!response.ok) {
+              throw new Error('Visual search failed');
+            }
+
+            const data = await response.json();
+            updateProgress(100);
+
+            const products: ChatProduct[] = (data.products || []).map((p: Product) => ({
+              ...p,
+              isAddedToCloset: false,
+            }));
+
+            if (products.length > 0) {
+              addMessage({
+                type: 'assistant-products',
+                content: `Found ${products.length} similar products`,
+                products,
+                searchQuery: 'visual search',
+              });
+              finishProcessing(`${products.length} similar products found`);
+            } else {
+              addMessage({
+                type: 'assistant-text',
+                content: 'No similar products found. Try uploading a different image.',
+              });
+              finishProcessing('No results');
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Search failed';
+            setProcessingError(message);
+            addMessage({
+              type: 'assistant-status',
+              content: message,
+              statusType: 'error',
+            });
+          }
+        }
+        break;
+
+      case 'add-wishlist':
+        // For URL - same as processUrlScrape but explicitly wishlisted
+        // This is handled by processUrlScrape which already adds to wishlist
+        break;
+
+      default:
+        break;
+    }
+  }, [
+    processing.isProcessing, pendingImage, pendingImagePreview,
+    processImageUpload, addMessage, clearPendingImage, startProcessing,
+    updateProgress, fileToBase64, finishProcessing, setProcessingError,
+  ]);
+
   // Handle wishlist toggle
   const handleWishlistToggle = useCallback((messageId: string, productId: string) => {
     toggleProductWishlist(messageId, productId);
@@ -546,6 +679,139 @@ export default function UnifiedChatContent() {
     close();
     router.push(`/discover?q=${encodeURIComponent(query)}`);
   }, [close, router]);
+
+  // Handle product edit
+  const handleProductEdit = useCallback((messageId: string, product: ChatProduct) => {
+    setEditingProduct(product);
+    setEditingMessageId(messageId);
+    setEditForm({
+      product_name: product.product_name || '',
+      brand: product.brand || '',
+      size: product.size || '',
+      price: product.price ? String(product.price) : '',
+    });
+    // Reset crop adjustment state
+    setShowCropAdjust(false);
+    setAdjustedBoundingBox(null);
+  }, []);
+
+  // Handle save edit
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingProduct || !editingMessageId) return;
+
+    const updates: Partial<ChatProduct> = {
+      product_name: editForm.product_name.trim() || editingProduct.product_name,
+      brand: editForm.brand.trim() || editingProduct.brand,
+      size: editForm.size.trim() || undefined,
+      price: editForm.price ? parseFloat(editForm.price) : editingProduct.price,
+    };
+
+    // If bounding box was adjusted, call re-crop API
+    if (adjustedBoundingBox && editingProduct.original_image_url) {
+      setIsReCropping(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/image-processing?action=re-crop`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalImageUrl: editingProduct.original_image_url,
+            productId: editingProduct.id,
+            originalBoundingBox: editingProduct.boundingBox,
+            newBoundingBox: adjustedBoundingBox,
+            productType: 'fashion',
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          // Update with new cropped image URL
+          updates.image_url = result.newCroppedUrl;
+          updates.boundingBox = adjustedBoundingBox;
+        }
+      } catch (error) {
+        console.error('Re-crop failed:', error);
+      } finally {
+        setIsReCropping(false);
+      }
+    }
+
+    // Update product in chat message
+    updateProductInMessage(editingMessageId, editingProduct.id, updates);
+
+    // Also update in collection if it's an uploaded product
+    if (editingProduct.source === 'upload' && collections.length > 0) {
+      // Find which collection has this product
+      for (const collection of collections) {
+        if (collection.products.some((p) => p.id === editingProduct.id)) {
+          updateProductInCollection(collection.id, editingProduct.id, updates);
+          break;
+        }
+      }
+    }
+
+    // Close modal
+    setEditingProduct(null);
+    setEditingMessageId(null);
+    setShowCropAdjust(false);
+    setAdjustedBoundingBox(null);
+  }, [editingProduct, editingMessageId, editForm, adjustedBoundingBox, updateProductInMessage, collections, updateProductInCollection]);
+
+  // Handle cancel edit
+  const handleCancelEdit = useCallback(() => {
+    setEditingProduct(null);
+    setEditingMessageId(null);
+    setShowCropAdjust(false);
+    setAdjustedBoundingBox(null);
+  }, []);
+
+  // Handle follow-up action clicks from chat messages
+  const handleFollowUpAction = useCallback((action: string, messageId: string) => {
+    // Find the message to get context (e.g., productId)
+    const message = messages.find(m => m.id === messageId);
+
+    switch (action) {
+      case 'add-details':
+        // Focus the input and set a hint
+        addMessage({
+          type: 'assistant-text',
+          content: 'Tell me the brand, size, or price — e.g. "Zara, size M, $80"',
+          awaitingInput: 'product-details',
+          productId: message?.productId,
+        });
+        break;
+
+      case 'upload-another':
+        // Trigger the file input
+        const fileInput = document.querySelector('input[type="file"][accept*="image"]') as HTMLInputElement;
+        fileInput?.click();
+        break;
+
+      case 'view-closet':
+        close();
+        router.push('/closet');
+        break;
+
+      case 'refine-search':
+        // Just focus the input - user can type new search
+        addMessage({
+          type: 'assistant-text',
+          content: 'What would you like to search for?',
+        });
+        break;
+
+      case 'see-all-results':
+        // Find the last search query
+        const lastSearchMessage = [...messages].reverse().find(m => m.searchQuery);
+        if (lastSearchMessage?.searchQuery) {
+          close();
+          router.push(`/discover?q=${encodeURIComponent(lastSearchMessage.searchQuery)}`);
+        }
+        break;
+
+      default:
+        break;
+    }
+  }, [messages, addMessage, close, router]);
 
   // Render message content
   const renderMessage = (message: ChatMessage) => {
@@ -599,6 +865,7 @@ export default function UnifiedChatContent() {
                 source={product.source as 'upload' | 'scrape' | 'search'}
                 onWishlistToggle={(productId) => handleWishlistToggle(message.id, productId)}
                 onClosetToggle={(productId) => handleClosetToggle(message.id, productId)}
+                onEdit={product.source === 'upload' ? (p) => handleProductEdit(message.id, p) : undefined}
                 compact
               />
             ))}
@@ -609,7 +876,7 @@ export default function UnifiedChatContent() {
                   close();
                   router.push(message.navigationHint!.route);
                 }}
-                className="flex items-center gap-1 text-sm mt-2 transition-colors"
+                className="flex items-center gap-1 text-sm mt-2 transition-colors cursor-pointer"
                 style={{ color: 'var(--primary)' }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = 'var(--primary-dark)';
@@ -625,7 +892,7 @@ export default function UnifiedChatContent() {
             {message.searchQuery && (
               <button
                 onClick={() => handleExpandToDiscover(message.searchQuery!)}
-                className="flex items-center gap-1 text-sm mt-2 transition-colors"
+                className="flex items-center gap-1 text-sm mt-2 transition-colors cursor-pointer"
                 style={{ color: 'var(--primary)' }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = 'var(--primary-dark)';
@@ -643,13 +910,46 @@ export default function UnifiedChatContent() {
 
       case 'assistant-text':
         return (
-          <div
-            className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-sm"
-            style={{ backgroundColor: 'var(--surface-light)' }}
-          >
-            <p className="text-sm" style={{ color: 'var(--foreground)' }}>
-              {message.content}
-            </p>
+          <div className="space-y-2">
+            <div
+              className="max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-sm"
+              style={{ backgroundColor: 'var(--surface-light)' }}
+            >
+              <p className="text-sm" style={{ color: 'var(--foreground)' }}>
+                {message.content}
+              </p>
+            </div>
+            {/* Follow-up action buttons */}
+            {message.followUpActions && message.followUpActions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {message.followUpActions.map((action) => (
+                  <button
+                    key={action.action}
+                    onClick={() => handleFollowUpAction(action.action, message.id)}
+                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200"
+                    style={{
+                      backgroundColor: action.primary ? 'var(--primary-light)' : 'var(--surface-light)',
+                      color: action.primary ? 'white' : 'var(--foreground-secondary)',
+                      border: '1px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = action.primary
+                        ? 'var(--primary-dark)'
+                        : 'var(--surface-elevated)';
+                      e.currentTarget.style.color = action.primary ? 'white' : 'var(--foreground)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = action.primary
+                        ? 'var(--primary-light)'
+                        : 'var(--surface-light)';
+                      e.currentTarget.style.color = action.primary ? 'white' : 'var(--foreground-secondary)';
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         );
 
@@ -684,7 +984,8 @@ export default function UnifiedChatContent() {
         attachedImage={pendingImage}
         attachedImagePreview={pendingImagePreview}
         onImageAttach={handleImageAttach}
-        onClearAttachment={clearPendingImage}
+        onClearAttachment={() => clearPendingImage(true)}
+        onQuickAction={handleQuickAction}
         autoFocus
       />
     );
@@ -729,9 +1030,119 @@ export default function UnifiedChatContent() {
         attachedImage={pendingImage}
         attachedImagePreview={pendingImagePreview}
         onImageAttach={handleImageAttach}
-        onClearAttachment={clearPendingImage}
+        onClearAttachment={() => clearPendingImage(true)}
+        onQuickAction={handleQuickAction}
         autoFocus
       />
+
+      {/* Edit Product Modal */}
+      <Modal
+        isOpen={!!editingProduct}
+        onClose={handleCancelEdit}
+        title="Edit Product"
+        size={showCropAdjust ? 'full' : 'sm'}
+      >
+        <ModalContent>
+          <div className="space-y-4">
+            {/* Crop adjustment mode */}
+            {showCropAdjust && editingProduct?.original_image_url ? (
+              <ImageCropAdjuster
+                originalImageUrl={editingProduct.original_image_url}
+                boundingBox={adjustedBoundingBox || editingProduct.boundingBox || { x: 0, y: 0, width: 1, height: 1 }}
+                onChange={setAdjustedBoundingBox}
+                maxWidth={800}
+                maxHeight={600}
+              />
+            ) : (
+              <>
+                {/* Product image preview with adjust button */}
+                {editingProduct?.image_url && (
+                  <div className="flex flex-col items-center gap-2">
+                    <img
+                      src={editingProduct.image_url}
+                      alt={editingProduct.product_name}
+                      className="w-24 h-24 object-cover rounded-lg"
+                    />
+                    {/* Show adjust crop button only if original image exists */}
+                    {editingProduct?.original_image_url && (
+                      <button
+                        onClick={() => setShowCropAdjust(true)}
+                        className="text-xs px-2 py-1 rounded-full transition-colors cursor-pointer"
+                        style={{
+                          backgroundColor: 'var(--surface-light)',
+                          color: 'var(--foreground-secondary)',
+                        }}
+                      >
+                        Adjust crop area
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <Input
+                  label="Product Name"
+                  value={editForm.product_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, product_name: e.target.value }))}
+                  placeholder="e.g., Navy Blazer"
+                />
+
+                <Input
+                  label="Brand"
+                  value={editForm.brand}
+                  onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))}
+                  placeholder="e.g., Zara"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Size"
+                    value={editForm.size}
+                    onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))}
+                    placeholder="e.g., M, 38, US 8"
+                  />
+
+                  <Input
+                    label="Price"
+                    type="number"
+                    value={editForm.price}
+                    onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
+                    placeholder="e.g., 80"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </ModalContent>
+        <ModalFooter>
+          {showCropAdjust ? (
+            <>
+              <Button variant="ghost" onClick={() => setShowCropAdjust(false)}>
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => setShowCropAdjust(false)}
+                disabled={!adjustedBoundingBox}
+              >
+                Apply Crop
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveEdit}
+                disabled={isReCropping}
+              >
+                {isReCropping ? 'Saving...' : adjustedBoundingBox ? 'Save & Re-crop' : 'Save'}
+              </Button>
+            </>
+          )}
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

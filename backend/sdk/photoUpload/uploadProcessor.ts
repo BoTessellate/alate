@@ -1,6 +1,22 @@
 /**
  * Photo Upload Processor
  * Orchestrates the upload -> background removal -> enrichment pipeline
+ *
+ * ============================================================================
+ * INTEGRATION STATUS: NOT WIRED TO FRONTEND
+ * ============================================================================
+ * Database Tables Used:
+ * - `uploads` table: Stores upload metadata and processing status
+ * - `cutouts` storage bucket: Stores processed images with transparent backgrounds
+ *
+ * To Wire Up:
+ * 1. Create frontend upload component that calls /api/image-processing?action=upload
+ * 2. Handle multi-product detection flow
+ * 3. Store upload records to `uploads` table
+ * 4. Save processed cutouts to `cutouts` bucket
+ *
+ * Related: See `multiProductProcessor.ts` and `multiProductDetector.ts`
+ * ============================================================================
  */
 
 import { randomUUID } from 'crypto';

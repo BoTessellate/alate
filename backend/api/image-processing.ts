@@ -125,6 +125,25 @@ interface ProcessMultiRequestBody {
     };
   }>;
   productType: 'fashion' | 'home';
+  /** URL of the original full image (for re-crop feature) */
+  originalImageUrl?: string;
+}
+
+interface ReCropRequestBody {
+  /** URL of the original (uncropped) image */
+  originalImageUrl: string;
+  /** Product ID to update */
+  productId: string;
+  /** Original bounding box (AI-generated) */
+  originalBoundingBox: { x: number; y: number; width: number; height: number };
+  /** New bounding box (user-adjusted) */
+  newBoundingBox: { x: number; y: number; width: number; height: number };
+  /** Product type for context */
+  productType: 'fashion' | 'home';
+  /** Optional: re-run enrichment on new crop */
+  reEnrich?: boolean;
+  /** Device ID for feedback tracking */
+  deviceId?: string;
 }
 
 // ============================================================================
@@ -571,6 +590,7 @@ async function handleProcessMultipleProducts(req: VercelRequest, res: VercelResp
       mimeType: body.mimeType,
       selectedProducts: body.selectedProducts as SelectedProduct[],
       productType: body.productType,
+      originalImageUrl: body.originalImageUrl,
     };
 
     const result = await processSelectedProducts(input);
@@ -590,6 +610,224 @@ async function handleProcessMultipleProducts(req: VercelRequest, res: VercelResp
       success: false,
       error: message,
       code: 'PROCESSING_FAILED',
+    });
+  }
+}
+
+// ============================================================================
+// RE-CROP HANDLER (for bounding box corrections)
+// ============================================================================
+
+async function handleReCrop(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const body = req.body as ReCropRequestBody;
+
+    // Validate request
+    if (!body.originalImageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'originalImageUrl is required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'productId is required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    if (!body.newBoundingBox) {
+      return res.status(400).json({
+        success: false,
+        error: 'newBoundingBox is required',
+        code: 'INVALID_FORMAT',
+      });
+    }
+
+    // SECURITY: Validate URL is from trusted domains (SSRF prevention)
+    const trustedDomains = [
+      'supabase.co',
+      'supabase.in',
+      'tml-uploads',
+      'backend-tml.vercel.app',
+    ];
+
+    try {
+      const urlObj = new URL(body.originalImageUrl);
+      const isTrusted = trustedDomains.some(domain =>
+        urlObj.hostname.endsWith(domain) || urlObj.hostname.includes(domain)
+      );
+      if (!isTrusted) {
+        logger.warn({ url: body.originalImageUrl, hostname: urlObj.hostname }, 'Rejected untrusted image URL');
+        return res.status(400).json({
+          success: false,
+          error: 'Image URL must be from a trusted source',
+          code: 'UNTRUSTED_URL',
+        });
+      }
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid image URL format',
+        code: 'INVALID_URL',
+      });
+    }
+
+    logger.info({
+      productId: body.productId,
+      originalBox: body.originalBoundingBox,
+      newBox: body.newBoundingBox,
+      reEnrich: body.reEnrich,
+    }, 'Starting re-crop');
+
+    const supabase = getSupabase();
+    const startTime = Date.now();
+
+    // Step 1: Fetch the original image (URL already validated above)
+    const imageResponse = await fetch(body.originalImageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch original image: ${imageResponse.status}`);
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64 = Buffer.from(imageBuffer).toString('base64');
+    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+    // Step 2: Crop with new bounding box using Sharp
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sharp = (await import('sharp')).default as any;
+    const imgBuffer = Buffer.from(base64, 'base64');
+    const metadata = await sharp(imgBuffer).metadata();
+    const imgWidth = metadata.width || 1000;
+    const imgHeight = metadata.height || 1000;
+
+    // Calculate pixel coordinates from normalized values
+    const left = Math.max(0, Math.floor(body.newBoundingBox.x * imgWidth));
+    const top = Math.max(0, Math.floor(body.newBoundingBox.y * imgHeight));
+    const width = Math.min(
+      Math.floor(body.newBoundingBox.width * imgWidth),
+      imgWidth - left
+    );
+    const height = Math.min(
+      Math.floor(body.newBoundingBox.height * imgHeight),
+      imgHeight - top
+    );
+
+    // Ensure minimum dimensions
+    const cropWidth = Math.max(width, 50);
+    const cropHeight = Math.max(height, 50);
+
+    logger.debug({
+      original: { width: imgWidth, height: imgHeight },
+      crop: { left, top, width: cropWidth, height: cropHeight },
+    }, 'Cropping with adjusted bounding box');
+
+    // Crop the region
+    const croppedBuffer = await sharp(imgBuffer)
+      .extract({ left, top, width: cropWidth, height: cropHeight })
+      .toBuffer();
+
+    // Step 3: Upload the new cropped image
+    const ext = mimeType.split('/')[1] || 'png';
+    const fileName = `cropped/${body.productId}-adjusted-${Date.now()}.${ext}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(fileName, croppedBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw new Error(`Failed to upload cropped image: ${uploadError.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('uploads')
+      .getPublicUrl(uploadData.path);
+
+    const newCroppedUrl = urlData.publicUrl;
+
+    // Step 4: Calculate feedback deltas
+    const positionDelta = body.originalBoundingBox ? {
+      x: body.newBoundingBox.x - body.originalBoundingBox.x,
+      y: body.newBoundingBox.y - body.originalBoundingBox.y,
+    } : null;
+
+    const sizeDelta = body.originalBoundingBox ? {
+      width: body.newBoundingBox.width - body.originalBoundingBox.width,
+      height: body.newBoundingBox.height - body.originalBoundingBox.height,
+    } : null;
+
+    const boxMoved = positionDelta
+      ? Math.abs(positionDelta.x) > 0.02 || Math.abs(positionDelta.y) > 0.02
+      : false;
+    const boxResized = sizeDelta
+      ? Math.abs(sizeDelta.width) > 0.02 || Math.abs(sizeDelta.height) > 0.02
+      : false;
+
+    // Step 5: Store detection feedback
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase.from('detection_feedback') as any).insert({
+        product_id: body.productId,
+        original_image_url: body.originalImageUrl,
+        original_image_width: imgWidth,
+        original_image_height: imgHeight,
+        context: body.productType,
+        ai_bounding_box: body.originalBoundingBox || body.newBoundingBox,
+        user_bounding_box: body.newBoundingBox,
+        position_delta: positionDelta,
+        size_delta: sizeDelta,
+        box_moved: boxMoved,
+        box_resized: boxResized,
+        was_product_saved: true,
+        user_cropped_url: newCroppedUrl,
+        device_id: body.deviceId,
+      });
+      logger.info({ productId: body.productId }, 'Detection feedback stored');
+    } catch (feedbackError) {
+      // Non-fatal - log but continue
+      logger.warn({ error: feedbackError }, 'Failed to store detection feedback');
+    }
+
+    const processingTime = Date.now() - startTime;
+
+    logger.info({
+      productId: body.productId,
+      newCroppedUrl,
+      processingMs: processingTime,
+      boxMoved,
+      boxResized,
+    }, 'Re-crop complete');
+
+    return res.status(200).json({
+      success: true,
+      productId: body.productId,
+      newCroppedUrl,
+      boundingBox: body.newBoundingBox,
+      processingTimeMs: processingTime,
+      feedback: {
+        boxMoved,
+        boxResized,
+        positionDelta,
+        sizeDelta,
+      },
+    });
+
+  } catch (error) {
+    logger.error({ error }, 'Re-crop failed');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+      code: 'RECROP_FAILED',
     });
   }
 }
@@ -621,16 +859,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 'process-multi':
       return handleProcessMultipleProducts(req, res);
 
+    case 're-crop':
+      return handleReCrop(req, res);
+
     default:
       return res.status(400).json({
         error: 'Invalid action',
-        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, ?action=smart-detect, or ?action=process-multi',
+        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, ?action=smart-detect, ?action=process-multi, or ?action=re-crop',
         examples: {
           'remove-bg': 'POST /api/image-processing?action=remove-bg',
           'upload': 'POST /api/image-processing?action=upload',
           'detect-multi': 'POST /api/image-processing?action=detect-multi',
           'smart-detect': 'POST /api/image-processing?action=smart-detect',
           'process-multi': 'POST /api/image-processing?action=process-multi',
+          're-crop': 'POST /api/image-processing?action=re-crop',
         },
       });
   }

@@ -1,6 +1,26 @@
 /**
  * Brand Authentication
  * Handles brand login and session management
+ *
+ * ============================================================================
+ * INTEGRATION STATUS: NOT WIRED TO FRONTEND (B2B Feature)
+ * ============================================================================
+ * Database Tables Used:
+ * - `brands` table: Brand account records
+ * - `brand_sessions` table: Auth sessions
+ * - `brand_integrations` table: Platform connections (Shopify, etc.)
+ * - `upload_logs` table: CSV upload history
+ * - `enriched_products` table: Brand's product catalog
+ * - `plugin_syncs` table: Sync job status
+ *
+ * To Wire Up:
+ * 1. Create /brand portal frontend route
+ * 2. Implement login/register forms calling this SDK
+ * 3. Add brand dashboard with product management
+ * 4. Integrate CSV upload flow
+ *
+ * Related: See `uploadCSV.ts`, `getSyncStatus.ts`, `healthCheck.ts`
+ * ============================================================================
  */
 
 import { createClient } from '@supabase/supabase-js';

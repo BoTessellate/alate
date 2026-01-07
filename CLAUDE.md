@@ -7,7 +7,8 @@
 4. [Database](#database)
 5. [AI Systems](#ai-systems)
 6. [Testing](#testing)
-7. [Notes for Later](#notes-for-later)
+7. [Work Tracking](#work-tracking)
+8. [Notes for Later](#notes-for-later)
 
 ---
 
@@ -114,8 +115,25 @@ These tools are used for development, deployment, and database management. All a
   npx supabase functions logs
   ```
 
+### Shopify CLI
+- **Access:** Via `npx shopify` (from project root or backend directory)
+- **Version:** Latest via npx
+- **Common Commands:**
+  ```bash
+  npx shopify app info                    # Show app info and config
+  npx shopify app dev                     # Start dev server with ngrok tunnel
+  npx shopify app deploy                  # Deploy app to Shopify
+  npx shopify app function logs           # View function logs
+  npx shopify app env show                # Show environment config
+  npx shopify webhook list                # List registered webhooks
+  npx shopify webhook trigger <topic>     # Trigger test webhook
+  ```
+- **Configuration File:** `backend/shopify.app.toml`
+- **Webhook Topics:** products/create, products/update, products/delete, inventory_levels/update, app/uninstalled
+- **Webhook URL:** `https://backend-tml.vercel.app/api/shopify-webhooks`
+
 ### Notes on CLI Usage
-- **npx tools** (Vercel, Supabase): Use project-local or cached versions, no global install needed
+- **npx tools** (Vercel, Supabase, Shopify): Use project-local or cached versions, no global install needed
 - **GitHub CLI**: Installed globally, may need full path in some shells
 - **Authentication**: All tools are already authenticated in this environment
 
@@ -243,13 +261,113 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs  # Get build logs
 
 ## Tables
 
-| Table | Purpose |
-|-------|---------|
-| `enriched_products` | Stored enriched product data |
-| `color_mapping` | Hex to fashion color name mapping (100+ colors) |
-| `tag_feedback` | User corrections for tag AI learning |
-| `layout_feedback` | User adjustments for layout AI learning |
-| `label_feedback` | Label placement corrections |
+### Core Product Tables
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `enriched_products` | Main product data with AI-enriched metadata | ✅ Wired |
+| `products` | Raw product data (before enrichment) | ⚠️ LEGACY - Remove |
+| `color_mapping` | Hex to fashion color name mapping (100+ colors) | ✅ Wired |
+| `user_collections` | User's saved collections | ✅ Wired |
+
+**Note:** `products` table is obsolete. Code goes directly to `enriched_products`. Only remnant use is for `cutout_url` in image-processing.ts which should be migrated.
+
+### Shopify Integration
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `shopify_sessions` | OAuth tokens and shop connections | ✅ Wired |
+| `shopify_sync_logs` | Product sync history and status | ✅ Wired |
+| `shopify_uninstall_log` | App uninstall events for debugging | ✅ Wired |
+
+### AI Feedback & Learning
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `tag_feedback` | User corrections for tag AI learning | ⚠️ Partial (see note) |
+| `layout_feedback` | User adjustments for layout AI learning | ✅ Wired (on export) |
+| `label_feedback` | Label placement corrections | ⚡ SDK Ready |
+| `detection_feedback` | Product detection bounding box corrections | ✅ Wired (image-processing) |
+
+**Note on `tag_feedback`:**
+- ✅ Tag editing UI exists in `ScrapeUrlContent.tsx` (scrape flow) with +Add and X buttons
+- ❌ Closet Edit modal only has plain text input "Tags (comma-separated)" - no proper UI
+- ❌ Editing tags in closet does NOT call `submitTagFeedback()` - no data to `tag_feedback` table
+- **Fix needed:** Add TagList component to closet Edit modal + wire up feedback submission
+
+### Photo Upload & Processing
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `uploads` | Uploaded image metadata and processing status | ⚡ SDK Ready |
+| `cutouts` | Storage bucket for background-removed images | ⚡ SDK Ready |
+
+**Note:** `cutouts` is a Supabase **storage bucket**, not a table. Used for background removal (OpenAI images.edit API). SDK: `photoUpload/uploadProcessor.ts`
+
+### Moodboards & Compositions
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `moodboards` | User-created moodboard metadata | ✅ Wired |
+| `moodboard_compositions` | Rendered moodboard layouts | ⚡ SDK Ready |
+| `boards` | Collaboration boards | ❌ Not Implemented |
+| `board_drafts` | Draft board states | ⚡ SDK Ready |
+| `layouts` | Saved layout templates | ⚡ SDK Ready |
+| `exports` | Export history | ⚡ SDK Ready |
+
+### Social & Sharing
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `social_shares` | Social media share tracking | ⚡ SDK Ready |
+| `share_events` | Share event analytics | ⚡ SDK Ready |
+| `export_links` | Shareable link generation | ⚡ SDK Ready |
+| `link_access_events` | Link access analytics | ⚡ SDK Ready |
+
+**Note:** SDK exists in `socialExport/`. Needs frontend share button integration.
+
+### Brand Dashboard (B2B)
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `brands` | Brand accounts | ⚡ SDK Ready |
+| `brand_sessions` | Brand auth sessions | ⚡ SDK Ready |
+| `brand_integrations` | Brand platform connections | ⚡ SDK Ready |
+| `upload_logs` | Brand CSV upload history | ⚡ SDK Ready |
+
+**Note:** Full B2B portal SDK in `brandDashboard/`. Needs dedicated /brand frontend route.
+
+### Plugin Sync (Canva, WooCommerce, etc.)
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `plugin_syncs` | Plugin sync jobs | ⚡ SDK Ready |
+| `plugin_sync_logs` | Sync operation logs | ⚡ SDK Ready |
+| `plugin_credentials` | Plugin API credentials (encrypted) | ⚡ SDK Ready |
+| `sync_logs` | General sync logs | ⚡ SDK Ready |
+| `sync_errors` | Sync error tracking | ⚡ SDK Ready |
+
+**Note:** SDK exists in `pluginBridge/`. Supports Canva, WooCommerce, Shopify plugins.
+
+### Security & Audit
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `api_audit_log` | API request audit trail | ⚡ SDK Ready |
+
+**Note:** Implemented in Supabase Edge Function `secure-api/index.ts`. Logs operation, table, user_id, ip_address, request_data, response_status, duration_ms.
+
+### Database Views (Analytics - Not Tables)
+These are PostgreSQL **views** that aggregate data from tables above. They show as "tables" in Supabase UI but are read-only.
+
+| View | Source Table | Purpose |
+|------|--------------|---------|
+| `tag_correction_patterns` | `tag_feedback` | AI learning patterns |
+| `tag_addition_patterns` | `tag_feedback` | AI learning patterns |
+| `layout_position_patterns` | `layout_feedback` | AI learning patterns |
+| `successful_layouts` | `layout_feedback` | High-quality examples |
+| `category_layout_preferences` | `layout_feedback` | Category preferences |
+| `label_placement_patterns` | `label_feedback` | Label position patterns |
+| `detection_error_patterns` | `detection_feedback` | Detection accuracy |
+| `detection_position_patterns` | `detection_feedback` | Position correction patterns |
+| `detection_size_patterns` | `detection_feedback` | Size correction patterns |
+
+### Status Legend
+- ✅ **Wired** - Frontend calls backend, data flows to table
+- ⚡ **SDK Ready** - Backend SDK exists, needs frontend integration
+- ⚠️ **LEGACY** - Should be removed/migrated
+- ❌ **Not Implemented** - No SDK or frontend code
 
 ## SQL Migrations
 
@@ -259,15 +377,33 @@ Run these migrations in Supabase SQL Editor:
 
 ## Security (Row Level Security)
 
-All tables have RLS enabled with these policies:
+### Standard RLS Pattern
+All tables should have RLS enabled. Use this pattern:
 
-| Table | Read | Write |
-|-------|------|-------|
-| `enriched_products` | Public | service_role |
-| `color_mapping` | Public | service_role |
-| `tag_feedback` | service_role | service_role |
-| `layout_feedback` | service_role | service_role |
-| `label_feedback` | service_role | service_role |
+```sql
+-- Enable RLS
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+
+-- Public read, service_role write (for public data like products)
+CREATE POLICY "Public read" ON table_name FOR SELECT USING (true);
+CREATE POLICY "Service write" ON table_name FOR ALL USING (auth.role() = 'service_role');
+
+-- Service-only (for sensitive data like sessions, credentials)
+CREATE POLICY "Service only" ON table_name FOR ALL USING (auth.role() = 'service_role');
+```
+
+### Current RLS Policies
+
+| Table | Read | Write | Notes |
+|-------|------|-------|-------|
+| `enriched_products` | Public | service_role | Products visible to all |
+| `color_mapping` | Public | service_role | Reference data |
+| `tag_feedback` | service_role | service_role | Internal AI data |
+| `layout_feedback` | service_role | service_role | Internal AI data |
+| `label_feedback` | service_role | service_role | Internal AI data |
+| `detection_feedback` | service_role | service_role | Internal AI data |
+| `shopify_sessions` | service_role | service_role | Contains tokens |
+| `plugin_credentials` | service_role | service_role | Contains secrets |
 
 The backend API uses `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS for writes.
 
@@ -453,6 +589,433 @@ Complex logic is extracted into testable utilities:
 |------|---------|
 | `frontend/src/utils/breadcrumbs.ts` | Pure functions for breadcrumb logic |
 | `frontend/src/constants/theme.ts` | `getTopbarColors()`, `getAgentModeColors()` |
+
+---
+
+# Work Tracking
+
+**MANDATORY RULE:** Every feature, fix, enhancement, or change MUST have:
+1. A GitHub Issue to track the work
+2. A Pull Request to implement the work
+3. PR merged only after review
+
+This ensures all work is traceable, reviewable, and can be reverted if needed.
+
+**Note:** All `gh` commands use the full path (`"C:\Program Files\GitHub CLI\gh.exe"`) for Windows compatibility since it may not be in the shell PATH.
+
+---
+
+## The Golden Rule
+
+**No direct commits to main.** Every change—no matter how small—goes through:
+1. **Issue** → Document what needs to be done
+2. **Branch** → Isolate the work
+3. **PR** → Review and merge
+
+This creates a complete audit trail of all work done on the project.
+
+---
+
+## Feature Workflow
+
+When starting a new feature:
+
+### Step 1: Create Feature Issue
+Create an issue to define scope and track progress.
+
+```bash
+"C:\Program Files\GitHub CLI\gh.exe" issue create --repo ramsaptami/TML \
+  --title "[FEATURE] Brief description" \
+  --body "$(cat <<'EOF'
+## Overview
+What is this feature and why do we need it?
+
+## User Story
+As a [user type], I want [goal] so that [benefit].
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Technical Approach
+High-level implementation plan:
+1. Step one
+2. Step two
+3. Step three
+
+## Files to Create/Modify
+- `path/to/file1.ts` - Description
+- `path/to/file2.ts` - Description
+
+## Dependencies
+- Any blockers or prerequisites
+
+## Out of Scope
+What this feature will NOT include (to prevent scope creep).
+
+## Labels
+feature, [priority], [area]
+EOF
+)"
+```
+
+### Step 2: Create Feature Branch and PR
+Create the branch and immediately open a draft PR to track progress.
+
+```bash
+git checkout -b feature/issue-XX-description
+git push -u origin feature/issue-XX-description
+
+"C:\Program Files\GitHub CLI\gh.exe" pr create --repo ramsaptami/TML \
+  --title "feat: Brief description" \
+  --body "$(cat <<'EOF'
+## Summary
+Brief description of what this PR implements.
+
+Closes #ISSUE_NUMBER
+
+## Changes
+- [ ] Change 1
+- [ ] Change 2
+- [ ] Change 3
+
+## Screenshots/Demo
+(Add screenshots or GIFs if UI changes)
+
+## Test Plan
+- [ ] Test case 1
+- [ ] Test case 2
+
+## Checklist
+- [ ] TypeScript compiles without errors
+- [ ] Tests pass
+- [ ] No console errors in browser
+- [ ] Responsive design verified
+EOF
+)" --draft
+```
+
+### Step 3: Implement and Update
+1. Make commits referencing the issue: `feat(area): description (#XX)`
+2. Update PR description as work progresses
+3. Mark PR ready for review when complete
+
+### Step 4: Review and Merge
+1. User reviews PR
+2. Address any feedback
+3. Squash and merge when approved
+4. Issue auto-closes via "Closes #XX" keyword
+
+---
+
+## Bug Workflow
+
+When a bug is reported:
+
+### Step 1: Create Bug Issue
+```bash
+"C:\Program Files\GitHub CLI\gh.exe" issue create --repo ramsaptami/TML \
+  --title "[BUG] Brief description" \
+  --body "$(cat <<'EOF'
+## Description
+Clear description of the bug and its impact.
+
+## Steps to Reproduce
+1. Step one
+2. Step two
+3. Observe the issue
+
+## Expected Behavior
+What should happen.
+
+## Actual Behavior
+What actually happens.
+
+## Root Cause Analysis
+- Where in the code does this originate?
+- What conditions trigger it?
+
+## Files Affected
+- `path/to/file1.ts`
+- `path/to/file2.ts`
+
+## Proposed Fix
+Description of the fix approach.
+
+## Testing Checklist
+- [ ] Test case 1
+- [ ] Test case 2
+
+## Labels
+bug, [priority], [area]
+EOF
+)"
+```
+
+### Step 2: Fix and Create PR
+```bash
+git checkout -b fix/issue-XX-description
+# ... make fixes ...
+git push -u origin fix/issue-XX-description
+
+"C:\Program Files\GitHub CLI\gh.exe" pr create --repo ramsaptami/TML \
+  --title "fix: Brief description" \
+  --body "$(cat <<'EOF'
+## Summary
+Brief description of the fix.
+
+Fixes #ISSUE_NUMBER
+
+## Root Cause
+What was causing the bug.
+
+## Solution
+How this PR fixes it.
+
+## Changes
+- Change 1
+- Change 2
+
+## Test Plan
+- [ ] Verified fix resolves the issue
+- [ ] No regression in related functionality
+EOF
+)"
+```
+
+### Step 3: Review and Merge
+1. User reviews PR
+2. Merge when approved
+3. Issue auto-closes via "Fixes #XX" keyword
+
+### Step 4: Reopen if Issue Recurs
+If the same bug reappears:
+1. Reopen the original issue (not a new one)
+2. Add comment documenting the recurrence
+3. Label as `repeat-issue` for pattern tracking
+
+```bash
+"C:\Program Files\GitHub CLI\gh.exe" issue reopen ISSUE_NUMBER --repo ramsaptami/TML
+"C:\Program Files\GitHub CLI\gh.exe" issue comment ISSUE_NUMBER --repo ramsaptami/TML \
+  --body "## Recurrence Report
+
+**Date:** $(date +%Y-%m-%d)
+**Context:** How the bug reappeared
+
+**Why Previous Fix Didn't Hold:**
+- Root cause analysis
+
+**Additional Fix Applied:**
+- What was done this time"
+```
+
+---
+
+## Enhancement/Refactor Workflow
+
+For improvements to existing functionality:
+
+### Create Enhancement Issue and PR
+```bash
+"C:\Program Files\GitHub CLI\gh.exe" issue create --repo ramsaptami/TML \
+  --title "[ENHANCEMENT] Brief description" \
+  --body "$(cat <<'EOF'
+## Current Behavior
+How it works now.
+
+## Proposed Improvement
+What should change and why.
+
+## Benefits
+- Benefit 1
+- Benefit 2
+
+## Implementation Plan
+1. Step one
+2. Step two
+
+## Labels
+enhancement, [priority], [area]
+EOF
+)"
+
+git checkout -b refactor/issue-XX-description
+# or
+git checkout -b enhance/issue-XX-description
+```
+
+---
+
+## Chore/Maintenance Workflow
+
+For dependency updates, config changes, CI/CD work:
+
+```bash
+"C:\Program Files\GitHub CLI\gh.exe" issue create --repo ramsaptami/TML \
+  --title "[CHORE] Brief description" \
+  --body "$(cat <<'EOF'
+## Task
+What maintenance work needs to be done.
+
+## Reason
+Why this is needed now.
+
+## Changes
+- Change 1
+- Change 2
+
+## Labels
+chore, [priority]
+EOF
+)"
+
+git checkout -b chore/issue-XX-description
+```
+
+---
+
+## Issue Labels
+
+| Label | Use Case |
+|-------|----------|
+| **Type** | |
+| `feature` | New functionality |
+| `bug` | Something broken |
+| `enhancement` | Improvement to existing feature |
+| `refactor` | Code restructuring |
+| `chore` | Maintenance/dependencies |
+| `docs` | Documentation updates |
+| **Priority** | |
+| `critical` | Production-breaking, fix immediately |
+| `high` | Important, fix soon |
+| `medium` | Normal priority |
+| `low` | Nice to have |
+| **Area** | |
+| `frontend` | Frontend/UI work |
+| `backend` | Backend/API work |
+| `ai` | AI/ML related |
+| `ui` | Visual/design |
+| `data-quality` | Data integrity |
+| `infra` | Infrastructure/CI/CD |
+| **Status** | |
+| `in-progress` | Actively being worked on |
+| `blocked` | Waiting on something |
+| `needs-review` | PR ready for review |
+| `repeat-issue` | Bug that recurred |
+
+---
+
+## Quick Reference Commands
+
+```bash
+# List all open issues
+"C:\Program Files\GitHub CLI\gh.exe" issue list --repo ramsaptami/TML
+
+# List by type
+"C:\Program Files\GitHub CLI\gh.exe" issue list --repo ramsaptami/TML --label feature
+"C:\Program Files\GitHub CLI\gh.exe" issue list --repo ramsaptami/TML --label bug
+"C:\Program Files\GitHub CLI\gh.exe" issue list --repo ramsaptami/TML --label enhancement
+
+# List open PRs
+"C:\Program Files\GitHub CLI\gh.exe" pr list --repo ramsaptami/TML
+
+# View specific issue/PR
+"C:\Program Files\GitHub CLI\gh.exe" issue view ISSUE_NUMBER --repo ramsaptami/TML
+"C:\Program Files\GitHub CLI\gh.exe" pr view PR_NUMBER --repo ramsaptami/TML
+
+# Check PR status (CI checks)
+"C:\Program Files\GitHub CLI\gh.exe" pr checks PR_NUMBER --repo ramsaptami/TML
+```
+
+---
+
+## Common Bug Patterns
+
+Track recurring issues here to identify systemic problems:
+
+| Pattern | Description | Prevention |
+|---------|-------------|------------|
+| AI-invented data | AI generates fake data instead of null | Use validation utilities (e.g., `brandValidation.ts`) |
+| Type mismatches | TypeScript types don't match runtime | Add runtime validation at boundaries |
+| Missing null checks | Undefined access errors | Use optional chaining, add guards |
+| State sync issues | Frontend/backend state diverges | Add consistency checks |
+
+---
+
+## Label Setup
+
+Labels are defined in `.github/labels.yml`. To sync labels to GitHub:
+
+1. **Automatic:** Push changes to `.github/labels.yml` - the sync-labels workflow runs automatically
+2. **Manual:** Go to Actions tab → "Sync Labels" → "Run workflow"
+
+Or create labels manually via CLI:
+
+```bash
+# Type labels
+gh label create feature --color 0E8A16 --description "New functionality" --repo ramsaptami/TML
+gh label create bug --color D73A4A --description "Something isn't working" --repo ramsaptami/TML
+gh label create enhancement --color A2EEEF --description "Improvement to existing functionality" --repo ramsaptami/TML
+gh label create refactor --color 7057FF --description "Code restructuring" --repo ramsaptami/TML
+gh label create chore --color FEF2C0 --description "Maintenance, dependencies" --repo ramsaptami/TML
+gh label create docs --color 0075CA --description "Documentation updates" --repo ramsaptami/TML
+
+# Priority labels
+gh label create critical --color B60205 --description "Production-breaking" --repo ramsaptami/TML
+gh label create high --color D93F0B --description "Important, fix soon" --repo ramsaptami/TML
+gh label create medium --color FBCA04 --description "Normal priority" --repo ramsaptami/TML
+gh label create low --color C2E0C6 --description "Nice to have" --repo ramsaptami/TML
+
+# Area labels
+gh label create frontend --color 1D76DB --description "Frontend/UI work" --repo ramsaptami/TML
+gh label create backend --color 5319E7 --description "Backend/API work" --repo ramsaptami/TML
+gh label create ai --color BFDADC --description "AI/ML related" --repo ramsaptami/TML
+gh label create infra --color E4E669 --description "Infrastructure/CI/CD" --repo ramsaptami/TML
+
+# Status labels
+gh label create in-progress --color EDEDED --description "Work in progress" --repo ramsaptami/TML
+gh label create blocked --color B60205 --description "Waiting on external dependency" --repo ramsaptami/TML
+gh label create needs-review --color 0E8A16 --description "Ready for code review" --repo ramsaptami/TML
+gh label create repeat-issue --color D73A4A --description "Issue that has recurred" --repo ramsaptami/TML
+```
+
+---
+
+## Documentation Requirements
+
+**MANDATORY:** When making significant changes to the codebase, Claude MUST:
+
+1. **Update claude.md** if the change affects:
+   - Project structure or architecture
+   - Database schema or new tables
+   - API endpoints or SDK functions
+   - Development workflows or tooling
+   - Bug patterns or known issues
+
+2. **Add code comments** that explain:
+   - WHY the code exists, not just WHAT it does
+   - Complex business logic or algorithms
+   - Non-obvious decisions or workarounds
+   - Integration points with external services
+
+3. **Link issues and PRs** to maintain traceability:
+   - Every PR must reference an issue
+   - Commits should include issue numbers
+   - Close issues when work is complete
+
+4. **Prevent loops** by documenting:
+   - Root causes of bugs (in the issue AND code comments)
+   - Known edge cases and how they're handled
+   - Previous approaches that didn't work (so we don't retry them)
+
+### Why This Matters
+
+Without proper documentation:
+- We fix the same bug multiple times
+- We forget why certain code exists
+- Onboarding to areas of the codebase is painful
+- We make the same architectural mistakes repeatedly
 
 ---
 
