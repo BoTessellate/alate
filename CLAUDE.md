@@ -281,16 +281,16 @@ npx vercel inspect dpl_CncGhe1r5pWkZgUNYawUSnUDzciN --logs  # Get build logs
 ### AI Feedback & Learning
 | Table | Purpose | Status |
 |-------|---------|--------|
-| `tag_feedback` | User corrections for tag AI learning | ⚠️ Partial (see note) |
+| `tag_feedback` | User corrections for tag AI learning | ✅ Wired |
 | `layout_feedback` | User adjustments for layout AI learning | ✅ Wired (on export) |
 | `label_feedback` | Label placement corrections | ⚡ SDK Ready |
 | `detection_feedback` | Product detection bounding box corrections | ✅ Wired (image-processing) |
 
 **Note on `tag_feedback`:**
-- ✅ Tag editing UI exists in `ScrapeUrlContent.tsx` (scrape flow) with +Add and X buttons
-- ❌ Closet Edit modal only has plain text input "Tags (comma-separated)" - no proper UI
-- ❌ Editing tags in closet does NOT call `submitTagFeedback()` - no data to `tag_feedback` table
-- **Fix needed:** Add TagList component to closet Edit modal + wire up feedback submission
+- ✅ Tag editing UI in `ScrapeUrlContent.tsx` (scrape flow) with +Add and X buttons
+- ✅ Tag editing UI in closet Edit modal (`page.tsx`) with TagList + add/remove buttons
+- ✅ Both locations call `submitTagFeedback()` to populate the `tag_feedback` table
+- Implemented in PR #34
 
 ### Photo Upload & Processing
 | Table | Purpose | Status |
