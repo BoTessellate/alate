@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
-import { useSidePanel, Modal, ModalContent, ModalFooter } from '@/components/ui';
+import { ArrowRight, Plus, X } from 'lucide-react';
+import { useSidePanel, Modal, ModalContent, ModalFooter, TagList } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { UnifiedChatInput, type ChatInputPayload } from '@/components/ui/UnifiedChatInput';
@@ -41,7 +41,12 @@ export default function UnifiedChatContent() {
     brand: '',
     size: '',
     price: '',
+    tags: [] as string[],
   });
+  // Tag editing state
+  const [newTagInput, setNewTagInput] = useState('');
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [originalTags, setOriginalTags] = useState<string[]>([]);
   // Crop adjustment state
   const [showCropAdjust, setShowCropAdjust] = useState(false);
   const [adjustedBoundingBox, setAdjustedBoundingBox] = useState<BoundingBox | null>(null);
@@ -684,12 +689,18 @@ export default function UnifiedChatContent() {
   const handleProductEdit = useCallback((messageId: string, product: ChatProduct) => {
     setEditingProduct(product);
     setEditingMessageId(messageId);
+    const productTags = product.tags || [];
     setEditForm({
       product_name: product.product_name || '',
       brand: product.brand || '',
       size: product.size || '',
       price: product.price ? String(product.price) : '',
+      tags: [...productTags],
     });
+    setOriginalTags([...productTags]);
+    // Reset tag editing state
+    setNewTagInput('');
+    setIsAddingTag(false);
     // Reset crop adjustment state
     setShowCropAdjust(false);
     setAdjustedBoundingBox(null);
@@ -699,12 +710,35 @@ export default function UnifiedChatContent() {
   const handleSaveEdit = useCallback(async () => {
     if (!editingProduct || !editingMessageId) return;
 
+    // Use edited tags or keep original
+    const finalTags = editForm.tags.length > 0 ? editForm.tags : editingProduct.tags || [];
+
     const updates: Partial<ChatProduct> = {
       product_name: editForm.product_name.trim() || editingProduct.product_name,
       brand: editForm.brand.trim() || editingProduct.brand,
       size: editForm.size.trim() || undefined,
       price: editForm.price ? parseFloat(editForm.price) : editingProduct.price,
+      tags: finalTags,
     };
+
+    // Submit tag feedback for AI learning if tags changed
+    const tagsAdded = finalTags.filter(t => !originalTags.includes(t));
+    const tagsRemoved = originalTags.filter(t => !finalTags.includes(t));
+    if (tagsAdded.length > 0 || tagsRemoved.length > 0) {
+      // Fire-and-forget feedback submission
+      fetch(`${API_BASE_URL}/api/ai?action=feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ai_generated_tags: originalTags,
+          user_final_tags: finalTags,
+          tags_added: tagsAdded,
+          tags_removed: tagsRemoved,
+          brand: editingProduct.brand,
+          category: editingProduct.category,
+        }),
+      }).catch(err => console.error('Tag feedback submission failed:', err));
+    }
 
     // If bounding box was adjusted, call re-crop API
     if (adjustedBoundingBox && editingProduct.original_image_url) {
@@ -749,12 +783,14 @@ export default function UnifiedChatContent() {
       }
     }
 
-    // Close modal
+    // Close modal and reset tag state
     setEditingProduct(null);
     setEditingMessageId(null);
     setShowCropAdjust(false);
     setAdjustedBoundingBox(null);
-  }, [editingProduct, editingMessageId, editForm, adjustedBoundingBox, updateProductInMessage, collections, updateProductInCollection]);
+    setNewTagInput('');
+    setIsAddingTag(false);
+  }, [editingProduct, editingMessageId, editForm, adjustedBoundingBox, originalTags, updateProductInMessage, collections, updateProductInCollection]);
 
   // Handle cancel edit
   const handleCancelEdit = useCallback(() => {
@@ -762,6 +798,29 @@ export default function UnifiedChatContent() {
     setEditingMessageId(null);
     setShowCropAdjust(false);
     setAdjustedBoundingBox(null);
+    setNewTagInput('');
+    setIsAddingTag(false);
+  }, []);
+
+  // Handle add tag
+  const handleAddTag = useCallback(() => {
+    const tag = newTagInput.trim().toLowerCase();
+    if (tag && !editForm.tags.includes(tag)) {
+      setEditForm(prev => ({
+        ...prev,
+        tags: [...prev.tags, tag],
+      }));
+    }
+    setNewTagInput('');
+    setIsAddingTag(false);
+  }, [newTagInput, editForm.tags]);
+
+  // Handle remove tag
+  const handleRemoveTag = useCallback((tagToRemove: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t !== tagToRemove),
+    }));
   }, []);
 
   // Handle follow-up action clicks from chat messages
@@ -1108,6 +1167,94 @@ export default function UnifiedChatContent() {
                     onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))}
                     placeholder="e.g., 80"
                   />
+                </div>
+
+                {/* Tags Section */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--foreground)' }}
+                    >
+                      Tags
+                    </span>
+                    {!isAddingTag && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingTag(true)}
+                        className="flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-colors cursor-pointer"
+                        style={{ color: 'var(--primary)' }}
+                      >
+                        <Plus size={12} />
+                        Add
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Add Tag Input */}
+                  {isAddingTag && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddTag();
+                          } else if (e.key === 'Escape') {
+                            setNewTagInput('');
+                            setIsAddingTag(false);
+                          }
+                        }}
+                        placeholder="Enter tag..."
+                        autoFocus
+                        className="flex-1 px-3 py-1.5 text-xs rounded-full outline-none"
+                        style={{
+                          backgroundColor: 'var(--surface)',
+                          color: 'var(--foreground)',
+                          border: '1px solid var(--primary)',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTag}
+                        disabled={!newTagInput.trim()}
+                        className="px-3 py-1.5 text-xs rounded-full transition-colors"
+                        style={{
+                          backgroundColor: newTagInput.trim() ? 'var(--primary)' : 'var(--surface)',
+                          color: newTagInput.trim() ? 'white' : 'var(--foreground-muted)',
+                          cursor: newTagInput.trim() ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewTagInput('');
+                          setIsAddingTag(false);
+                        }}
+                        className="px-2 py-1.5 text-xs rounded-full cursor-pointer"
+                        style={{ color: 'var(--foreground-muted)' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Tags Display */}
+                  {editForm.tags.length > 0 ? (
+                    <TagList
+                      tags={editForm.tags}
+                      onRemove={handleRemoveTag}
+                      size="md"
+                    />
+                  ) : (
+                    <p className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                      No tags added yet
+                    </p>
+                  )}
                 </div>
               </>
             )}
