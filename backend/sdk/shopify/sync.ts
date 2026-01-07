@@ -9,6 +9,7 @@ import { transformShopifyProducts, generateFitTags, TransformedProduct } from '.
 import { decryptToken, getShopifyConfig } from './auth';
 import type { SyncResult, SyncError, SyncStatus, ShopifySession } from './types';
 import { callGemini, callOpenAI, callClaude, parseJSONFromResponse } from '../shared/secureAI';
+import { validateBrandName } from '../shared/brandValidation';
 
 /**
  * Get current time in IST as ISO string
@@ -319,7 +320,7 @@ async function upsertProducts(
     return {
       user_id: userId,
       product_name: product.product_name,
-      brand: product.brand,
+      brand: validateBrandName(product.brand),
       category: product.category,
       price: product.price,
       image_url: product.image_url,

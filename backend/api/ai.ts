@@ -33,6 +33,7 @@ import {
 } from '../sdk/imageGeneration';
 import { createClient } from '@supabase/supabase-js';
 import { extractAndNameColors } from '../sdk/productEnrichment/colorExtractor';
+import { validateBrandName } from '../sdk/shared/brandValidation';
 
 const log = createModuleLogger('ai');
 
@@ -43,62 +44,6 @@ const DEMO_MODE = process.env.DEMO_MODE === 'true';
 // Initialize Supabase for image storage (lazy)
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
-
-// ============================================================================
-// BRAND VALIDATION
-// ============================================================================
-
-/**
- * Patterns that indicate a fake/invented brand name rather than a real brand
- * These are descriptive phrases the AI might generate when it can't identify a real brand
- */
-const FAKE_BRAND_PATTERNS = [
-  // Category-like words
-  /\b(accessories|boutique|collection|collective|essentials|studio|atelier)\b/i,
-  /\b(classics|heritage|sportswear|activewear|outerwear|footwear)\b/i,
-  // Material-based
-  /\b(silk|cotton|leather|wool|linen|denim|cashmere)\s+(brand|co|company|house)?\b/i,
-  // Style-based
-  /\b(elegant|classic|modern|vintage|luxury|premium)\s+(style|fashion|wear)?\b/i,
-  // Generic descriptors
-  /\b(store|vendor|seller|shop)\s*\d*\b/i,
-  /\bunknown\b/i,
-  /\bn\/a\b/i,
-];
-
-/**
- * Validate if a brand name looks like a real brand vs AI-invented description
- * @param brand - The brand name to validate
- * @returns The brand if valid, null if it looks fake
- */
-function validateBrandName(brand: string | null | undefined): string | null {
-  if (!brand || typeof brand !== 'string') {
-    return null;
-  }
-
-  const trimmed = brand.trim();
-
-  // Empty or very short names are suspect
-  if (trimmed.length < 2 || trimmed.length > 50) {
-    return null;
-  }
-
-  // Check against fake brand patterns
-  for (const pattern of FAKE_BRAND_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      log.warn({ brand: trimmed, pattern: pattern.toString() }, 'Rejected fake brand name');
-      return null;
-    }
-  }
-
-  // If brand is just a single generic word, reject it
-  const singleWordGenerics = ['brand', 'product', 'item', 'goods', 'merchandise'];
-  if (singleWordGenerics.includes(trimmed.toLowerCase())) {
-    return null;
-  }
-
-  return trimmed;
-}
 
 // ============================================================================
 // TYPES

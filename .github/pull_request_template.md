@@ -63,7 +63,13 @@ Read the `CRITICAL ARCHITECTURE NOTES` comments at the top of:
 - [ ] `backend-typecheck` - TypeScript compilation passed
 
 ## Related Issues
-<!-- Link any related issues: Fixes #123, Closes #456 -->
+<!-- Link issues using keywords to auto-close them when PR merges:
+     - Fixes #123 (for bug fixes - auto-closes issue)
+     - Closes #456 (for features - auto-closes issue)
+     - Resolves #789 (general - auto-closes issue)
+     - Related to #101 (just links, doesn't close)
+-->
+Fixes #
 
 ## Additional Notes
 <!-- Any additional information that reviewers should know -->

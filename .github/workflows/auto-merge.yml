@@ -1,0 +1,35 @@
+# Auto-merge PRs when CI passes
+# Enables auto-merge for all PRs unless they have the "no-auto-merge" label
+# PRs will merge automatically once all required status checks pass
+
+name: Auto-Merge PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Enable Auto-Merge
+    runs-on: ubuntu-latest
+    # Skip if PR has "no-auto-merge" label
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-auto-merge') }}
+
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR
+        run: |
+          gh pr comment "$PR_URL" --body "Auto-merge enabled. This PR will be automatically merged once all required checks pass."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
