@@ -26,7 +26,7 @@ export interface ProcessedProduct {
   id: string;
   /** URL of the original uploaded image (full, uncropped) */
   original_image_url: string;
-  /** URL of the processed cutout image */
+  /** URL of the displayed product image (may be reference image or cropped user image) */
   image_url: string;
   /** AI-suggested product name */
   product_name: string;
@@ -54,6 +54,14 @@ export interface ProcessedProduct {
   uploaded_at: string;
   /** Bounding box used for crop (for re-crop adjustment) */
   boundingBox?: BoundingBox;
+  /** Where the display image came from */
+  image_source?: 'database' | 'web_search' | 'user_crop';
+  /** ID of matched product if image came from database */
+  matched_product_id?: string;
+  /** Name of matched product if image came from database/web */
+  matched_product_name?: string;
+  /** AI detection confidence (0-1) */
+  detection_confidence?: number;
 }
 
 export interface PhotoUploadResponse {

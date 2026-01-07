@@ -12,6 +12,11 @@ import { callClaude, parseJSONFromResponse } from '../shared/secureAI';
 import { createModuleLogger } from '../shared/logger';
 import { ProcessedProduct, DEMO_ENRICHMENTS } from './types';
 import { BoundingBox, DetectedProduct } from './multiProductDetector';
+import {
+  findBestProductImage,
+  shouldSearchForImage,
+  type DetectedProductInfo,
+} from '../productImageSearch';
 
 const logger = createModuleLogger('multiProductProcessor');
 
@@ -142,14 +147,65 @@ export async function processSelectedProducts(
       );
       timing.enrichmentMs = Date.now() - enrichStart;
 
+      // Step 5: Reference Image Search
+      // Instead of relying on potentially incorrect bounding box crops,
+      // try to find a clean reference image from our database or web search
+      let finalImageUrl = processedUrl;
+      let imageSource: 'database' | 'web_search' | 'user_crop' = 'user_crop';
+      let matchedProductId: string | undefined;
+      let matchedProductName: string | undefined;
+
+      const detectedInfo: DetectedProductInfo = {
+        name: selected.customName || enrichment.product_name || detected.suggestedName,
+        brand: detected.brand,
+        category: enrichment.category || detected.category,
+        tags: enrichment.tags || [],
+        colors: enrichment.color_palette || detected.colors,
+        confidence: detected.confidence,
+      };
+
+      // Only search for reference images for high-confidence detections
+      // or products in searchable categories (headphones, shoes, etc.)
+      if (shouldSearchForImage(detectedInfo)) {
+        try {
+          logger.info({ tempId: selected.tempId, detectedName: detectedInfo.name }, 'Searching for reference product image');
+
+          const imageSearchResult = await findBestProductImage(detectedInfo, {
+            enableDatabaseSearch: true,
+            enableWebSearch: true,
+            databaseMinSimilarity: 0.6,
+          });
+
+          if (imageSearchResult.found && imageSearchResult.imageUrl) {
+            finalImageUrl = imageSearchResult.imageUrl;
+            imageSource = imageSearchResult.source as 'database' | 'web_search';
+            matchedProductId = imageSearchResult.matchedProductId;
+            matchedProductName = imageSearchResult.matchedProductName;
+
+            logger.info({
+              tempId: selected.tempId,
+              source: imageSource,
+              matchScore: imageSearchResult.matchScore,
+              matchedProduct: matchedProductName,
+              searchTimeMs: imageSearchResult.searchTimeMs,
+            }, 'Found reference image - replacing user crop');
+          } else {
+            logger.info({ tempId: selected.tempId }, 'No reference image found, using processed crop');
+          }
+        } catch (error) {
+          logger.warn({ tempId: selected.tempId, error }, 'Reference image search failed, using processed crop');
+        }
+      }
+
       timing.totalMs = Date.now() - productStart;
 
       // Assemble product
       // Use the full original image URL (not cropped) for re-crop feature
+      // Display image may be reference image (from DB/web) or processed crop
       const product: ProcessedProduct = {
         id: productId,
         original_image_url: input.originalImageUrl || croppedUrl,
-        image_url: processedUrl,
+        image_url: finalImageUrl, // Use reference image if found, else processed crop
         product_name: selected.customName || enrichment.product_name,
         brand: 'My Upload',
         price: 0,
@@ -164,6 +220,11 @@ export async function processSelectedProducts(
         uploaded_at: new Date().toISOString(),
         // Store bounding box for re-crop adjustment
         boundingBox: selected.boundingBox,
+        // Reference image tracking
+        image_source: imageSource,
+        matched_product_id: matchedProductId,
+        matched_product_name: matchedProductName,
+        detection_confidence: detected.confidence,
       };
 
       results.push({
