@@ -157,7 +157,7 @@ export async function processSelectedProducts(
 
       const detectedInfo: DetectedProductInfo = {
         name: selected.customName || enrichment.product_name || selected.detected.suggestedName,
-        brand: selected.detected.brand,
+        brand: undefined, // Brand is determined during enrichment, not detection
         category: enrichment.category || selected.detected.category,
         tags: enrichment.tags || [],
         colors: enrichment.color_palette || selected.detected.colors,
