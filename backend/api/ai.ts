@@ -33,7 +33,6 @@ import {
 } from '../sdk/imageGeneration';
 import { createClient } from '@supabase/supabase-js';
 import { extractAndNameColors } from '../sdk/productEnrichment/colorExtractor';
-import { validateBrandName } from '../sdk/shared/brandValidation';
 
 const log = createModuleLogger('ai');
 
@@ -927,7 +926,7 @@ Return ONLY valid JSON, no explanation.`;
 
     const enrichedProduct: EnrichedProduct = {
       ...product,
-      brand: validateBrandName(enrichment.brand) || validateBrandName(inferredBrand) || validateBrandName(product.brand) || undefined,
+      brand: enrichment.brand || inferredBrand || product.brand || undefined,
       tags: enrichment.tags || [],
       // Pixel-accurate colors take priority over AI-suggested colors
       color_palette: finalColorPalette,

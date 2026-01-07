@@ -9,8 +9,6 @@ import { transformShopifyProducts, generateFitTags, TransformedProduct } from '.
 import { decryptToken, getShopifyConfig } from './auth';
 import type { SyncResult, SyncError, SyncStatus, ShopifySession } from './types';
 import { callGemini, callOpenAI, callClaude, parseJSONFromResponse } from '../shared/secureAI';
-// Note: Brand validation is intentionally NOT used for Shopify sync
-// The Shopify Vendor field contains real merchant data, not AI-generated content
 
 /**
  * Get current time in IST as ISO string
@@ -321,7 +319,6 @@ async function upsertProducts(
     return {
       user_id: userId,
       product_name: product.product_name,
-      // Don't validate brand for Shopify - vendor field is real merchant data
       brand: product.brand || null,
       category: product.category,
       price: product.price,

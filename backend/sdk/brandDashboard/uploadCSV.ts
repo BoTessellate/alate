@@ -6,7 +6,6 @@
 import { parse } from 'csv-parse/sync';
 import { ProductEnricher } from '../productEnrichment/enrichProduct';
 import { createClient } from '@supabase/supabase-js';
-import { validateBrandName } from '../shared/brandValidation';
 
 // CSV row type for parsed records
 interface CSVRow {
@@ -277,13 +276,9 @@ export class CSVUploadHandler {
    * Normalize CSV row to product format
    */
   private normalizeCSVRow(row: any, defaultBrand: string): any {
-    // Validate brand name to prevent fake/invented brands
-    const rawBrand = row.brand?.trim() || defaultBrand;
-    const validatedBrand = validateBrandName(rawBrand);
-
     return {
       product_name: row.product_name?.trim(),
-      brand: validatedBrand,
+      brand: row.brand?.trim() || defaultBrand,
       category: row.category?.trim()?.toLowerCase(),
       price: row.price ? parseFloat(row.price) : undefined,
       tags: row.tags ? row.tags.split(',').map((t: string) => t.trim().toLowerCase()) : [],

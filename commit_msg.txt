@@ -1,0 +1,31 @@
+feat(upload): reference product image substitution for photo uploads
+
+Instead of displaying incorrectly cropped user images, substitute with
+clean reference product images from database or web search.
+
+## New SDK: productImageSearch/
+
+- types.ts: Type definitions for search results and configuration
+- databaseSearch.ts: Fuzzy matching against enriched_products table
+- webSearch.ts: Google Custom Search API integration
+- index.ts: Orchestrator with fallback strategy (DB -> Web -> user crop)
+
+## Integration in multiProductProcessor.ts
+
+- Added Step 5: Reference Image Search after enrichment
+- Calls findBestProductImage() for high-confidence detections
+- Uses reference image URL if found, else falls back to processed crop
+- Tracks image source (database/web_search/user_crop) on product
+
+## ProcessedProduct type updates
+
+- image_source: tracks where display image came from
+- matched_product_id: ID if matched from database
+- matched_product_name: name from matched source
+- detection_confidence: AI detection confidence score
+
+Closes #35
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
