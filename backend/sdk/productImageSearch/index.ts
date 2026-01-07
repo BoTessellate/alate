@@ -208,9 +208,11 @@ export function shouldSearchForImage(detected: DetectedProductInfo): boolean {
   );
 
   // If brand is known, search is more likely to succeed
-  const hasKnownBrand = detected.brand &&
+  const hasKnownBrand = Boolean(
+    detected.brand &&
     detected.brand.toLowerCase() !== 'unknown' &&
-    detected.brand.toLowerCase() !== 'my upload';
+    detected.brand.toLowerCase() !== 'my upload'
+  );
 
   return isSearchableCategory || hasKnownBrand;
 }

@@ -156,12 +156,12 @@ export async function processSelectedProducts(
       let matchedProductName: string | undefined;
 
       const detectedInfo: DetectedProductInfo = {
-        name: selected.customName || enrichment.product_name || detected.suggestedName,
-        brand: detected.brand,
-        category: enrichment.category || detected.category,
+        name: selected.customName || enrichment.product_name || selected.detected.suggestedName,
+        brand: selected.detected.brand,
+        category: enrichment.category || selected.detected.category,
         tags: enrichment.tags || [],
-        colors: enrichment.color_palette || detected.colors,
-        confidence: detected.confidence,
+        colors: enrichment.color_palette || selected.detected.colors,
+        confidence: selected.detected.confidence,
       };
 
       // Only search for reference images for high-confidence detections
@@ -224,7 +224,7 @@ export async function processSelectedProducts(
         image_source: imageSource,
         matched_product_id: matchedProductId,
         matched_product_name: matchedProductName,
-        detection_confidence: detected.confidence,
+        detection_confidence: selected.detected.confidence,
       };
 
       results.push({

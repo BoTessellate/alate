@@ -101,7 +101,7 @@ export async function searchWebForProductImage(
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { items?: any[]; searchInformation?: { totalResults?: string } };
     const searchTime = Date.now() - startTime;
 
     // Parse results
@@ -208,7 +208,7 @@ export async function searchSerpApiForProductImage(
       return [];
     }
 
-    const data = await response.json();
+    const data = await response.json() as { images_results?: any[] };
     const searchTime = Date.now() - startTime;
 
     const items: WebSearchResultItem[] = (data.images_results || [])
