@@ -45,6 +45,62 @@ const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
 
 // ============================================================================
+// BRAND VALIDATION
+// ============================================================================
+
+/**
+ * Patterns that indicate a fake/invented brand name rather than a real brand
+ * These are descriptive phrases the AI might generate when it can't identify a real brand
+ */
+const FAKE_BRAND_PATTERNS = [
+  // Category-like words
+  /\b(accessories|boutique|collection|collective|essentials|studio|atelier)\b/i,
+  /\b(classics|heritage|sportswear|activewear|outerwear|footwear)\b/i,
+  // Material-based
+  /\b(silk|cotton|leather|wool|linen|denim|cashmere)\s+(brand|co|company|house)?\b/i,
+  // Style-based
+  /\b(elegant|classic|modern|vintage|luxury|premium)\s+(style|fashion|wear)?\b/i,
+  // Generic descriptors
+  /\b(store|vendor|seller|shop)\s*\d*\b/i,
+  /\bunknown\b/i,
+  /\bn\/a\b/i,
+];
+
+/**
+ * Validate if a brand name looks like a real brand vs AI-invented description
+ * @param brand - The brand name to validate
+ * @returns The brand if valid, null if it looks fake
+ */
+function validateBrandName(brand: string | null | undefined): string | null {
+  if (!brand || typeof brand !== 'string') {
+    return null;
+  }
+
+  const trimmed = brand.trim();
+
+  // Empty or very short names are suspect
+  if (trimmed.length < 2 || trimmed.length > 50) {
+    return null;
+  }
+
+  // Check against fake brand patterns
+  for (const pattern of FAKE_BRAND_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      log.warn({ brand: trimmed, pattern: pattern.toString() }, 'Rejected fake brand name');
+      return null;
+    }
+  }
+
+  // If brand is just a single generic word, reject it
+  const singleWordGenerics = ['brand', 'product', 'item', 'goods', 'merchandise'];
+  if (singleWordGenerics.includes(trimmed.toLowerCase())) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -824,10 +880,13 @@ IMPORTANT BRAND RULES:
 1. For multi-brand houses, use the SPECIFIC sub-brand (e.g., "Giorgio Armani" not just "Armani", "Emporio Armani" for younger line, "Armani/Fiori" for florals, "Armani/Casa" for home)
 2. Extract the sub-brand from the URL path or product title
 3. Each sub-brand has distinct positioning - capture that in the tone
+4. CRITICAL: If you cannot identify a REAL brand name, return null for brand. DO NOT invent brand names.
+5. Descriptive phrases like "Silk Accessories", "Jewelry Boutique", "Classic Sportswear" are NOT brands - return null instead.
+6. Only return a brand if it's a recognizable company/designer name (e.g., "Zara", "Nike", "West Elm", "Anthropologie")
 ${fewShotExamples}
 Return a JSON object with these fields:
 {
-  "brand": "The specific brand/sub-brand name (e.g., 'Giorgio Armani', 'Emporio Armani', 'Armani/Fiori', 'Armani/Casa')",
+  "brand": "The specific brand/sub-brand name, or null if unknown. NEVER invent fake brand names.",
   "tags": ["10-15 descriptive tags covering multiple dimensions:
     - Style: minimalist, bohemian, classic, modern, contemporary, avant-garde
     - Occasion: formal, casual, evening, day-to-night, special-occasion, everyday
@@ -923,7 +982,7 @@ Return ONLY valid JSON, no explanation.`;
 
     const enrichedProduct: EnrichedProduct = {
       ...product,
-      brand: enrichment.brand || inferredBrand || product.brand,
+      brand: validateBrandName(enrichment.brand) || validateBrandName(inferredBrand) || validateBrandName(product.brand) || undefined,
       tags: enrichment.tags || [],
       // Pixel-accurate colors take priority over AI-suggested colors
       color_palette: finalColorPalette,
@@ -1152,7 +1211,7 @@ async function saveEnrichedProduct(product: EnrichedProduct): Promise<{ id: stri
     // Map to database schema
     const dbProduct = {
       product_name: product.name,
-      brand: product.brand || 'Unknown',
+      brand: product.brand || null,
       category: product.category || 'general',
       price: product.price || null,
       color_palette: product.color_palette || [],
