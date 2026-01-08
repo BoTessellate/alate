@@ -179,6 +179,7 @@ export default function UnifiedChatContent() {
           mimeType,
           selectedProducts,
           productType: 'fashion',
+          originalImageUrl: detectData.originalImageUrl,
         }),
       });
 
