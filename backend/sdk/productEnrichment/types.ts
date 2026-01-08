@@ -43,6 +43,12 @@ export interface RawProductInput {
   region?: string;
   dimensions?: string;  // Legacy string format (deprecated)
 
+  // Product description and metadata for richer enrichment
+  description?: string;       // Product description text
+  meta_title?: string;        // SEO meta title
+  meta_description?: string;  // SEO meta description
+  product_type?: string;      // Shopify product type
+
   // New: Variant support
   variants?: ProductVariant[];
 
@@ -60,7 +66,8 @@ export interface RawProductInput {
 export interface EnrichedProductFields {
   color_palette: string[];
   tags: string[];
-  texture: string;
+  texture: string;       // Surface finish: smooth, matte, glossy, shiny, brushed, etc.
+  weave?: string;        // Fabric construction: oxford, twill, sateen, jersey, flannel, etc.
   material: string;
   tone: string;
   flags?: string[];  // e.g., ["fragile", "handmade", "limited-edition", "eco-friendly"]
@@ -102,7 +109,8 @@ export interface VisionAnalysisResult {
 export interface ClaudeEnrichmentResponse {
   color_palette: string[];
   tags: string[];
-  texture: string;
+  texture: string;       // Surface finish
+  weave?: string;        // Fabric construction (for textiles)
   material: string;
   tone: string;
   flags?: string[];

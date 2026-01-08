@@ -66,6 +66,18 @@ Error messages should be action-oriented:
 - Tailwind for utility classes
 - Design system colors: `var(--primary)`, `var(--surface)`, `var(--foreground)`, etc.
 
+### UI Design Rules (IMPORTANT)
+1. **No Decorative Gradients**: Do not use CSS gradients for backgrounds, buttons, or decorative elements unless explicitly requested by the user.
+   - **ALLOWED**: Functional gradients (image overlays for text readability, crop masks, fading dividers)
+   - **NOT ALLOWED**: Decorative gradients (card backgrounds, button fills, section backgrounds)
+   - Use solid `rgba()` colors instead. Example: `rgba(76, 112, 49, 0.1)` for a light green tint.
+2. **No Decorative Shadows**: Avoid box-shadows for purely decorative purposes. Only use subtle shadows for functional elevation (modals, dropdowns).
+3. **Flat Design**: Prefer flat, clean design over skeuomorphism or excessive depth.
+4. **Typography**:
+   - Headlines use Cormorant font with italic style
+   - Body text uses Jost font (default)
+   - Use CSS variable: `fontFamily: 'var(--font-cormorant)'`
+
 ---
 
 # Development Setup

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   User,
   Bell,
@@ -19,6 +19,12 @@ import {
   Edit2,
   DollarSign,
   MessageCircle,
+  Store,
+  RefreshCw,
+  Link,
+  Unlink,
+  Package,
+  Clock,
 } from 'lucide-react';
 import { useSettingsStore, Theme } from '@/stores/useSettingsStore';
 import { useChatStore } from '@/stores/useChatStore';
@@ -244,6 +250,124 @@ export default function SettingsPage() {
     createdAt: '2024-01-15',
     lastPasswordChange: null as string | null,
   });
+
+  // Shopify integration state
+  const [shopifyConnected, setShopifyConnected] = useState(false);
+  const [shopifyShop, setShopifyShop] = useState<string | null>(null);
+  const [shopifyProductCount, setShopifyProductCount] = useState<number | null>(null);
+  const [shopifyLastSync, setShopifyLastSync] = useState<string | null>(null);
+  const [isShopifyLoading, setIsShopifyLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-tml.vercel.app';
+
+  // Check Shopify connection status on mount
+  const checkShopifyStatus = useCallback(async () => {
+    const connectedShop = localStorage.getItem('connected_shop_domain');
+    if (!connectedShop) {
+      setIsShopifyLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/shopify?action=status&shop=${encodeURIComponent(connectedShop)}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setShopifyConnected(data.status === 'connected');
+        setShopifyShop(connectedShop);
+        setShopifyProductCount(data.productCount || 0);
+        setShopifyLastSync(data.lastSyncAt || null);
+      } else {
+        // Connection no longer valid
+        localStorage.removeItem('connected_shop_domain');
+        setShopifyConnected(false);
+      }
+    } catch (error) {
+      console.error('Failed to check Shopify status:', error);
+    } finally {
+      setIsShopifyLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    checkShopifyStatus();
+  }, [checkShopifyStatus]);
+
+  const handleShopifyConnect = () => {
+    // Open OAuth flow
+    const authUrl = `${API_BASE_URL}/api/shopify?action=auth`;
+    window.location.href = authUrl;
+  };
+
+  const handleShopifySync = async () => {
+    if (!shopifyShop) return;
+
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/shopify?action=sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: shopifyShop }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setShopifyProductCount(data.productCount || shopifyProductCount);
+        setShopifyLastSync(new Date().toISOString());
+        await showSaveStatus();
+      }
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleShopifyDisconnect = async () => {
+    if (!shopifyShop) return;
+
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/shopify?action=disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: shopifyShop }),
+      });
+
+      if (response.ok) {
+        localStorage.removeItem('connected_shop_domain');
+        setShopifyConnected(false);
+        setShopifyShop(null);
+        setShopifyProductCount(null);
+        setShopifyLastSync(null);
+        await showSaveStatus();
+      }
+    } catch (error) {
+      console.error('Disconnect failed:', error);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const formatShopifyDate = (dateString: string | null) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   // Save helpers
   const showSaveStatus = async () => {
@@ -706,6 +830,138 @@ export default function SettingsPage() {
                 <strong style={{ color: 'var(--primary)' }}>$$$</strong> = above {Math.round((priceRange.max * 2) / 3).toLocaleString()} {localCurrency}
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Store Integration Section */}
+        <Card>
+          <SectionHeader icon={Store} title="Store Integration" description="Connect your Shopify store to import products" />
+          <CardContent className="p-4 space-y-4">
+            {isShopifyLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={24} className="animate-spin" style={{ color: 'var(--primary)' }} />
+              </div>
+            ) : shopifyConnected && shopifyShop ? (
+              <>
+                {/* Connected Store Info */}
+                <div
+                  className="p-4 rounded-lg border"
+                  style={{
+                    backgroundColor: 'rgba(76, 112, 49, 0.1)',
+                    borderColor: 'var(--primary)',
+                  }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-full" style={{ backgroundColor: 'var(--primary)' }}>
+                      <Check size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium" style={{ color: 'var(--foreground)' }}>
+                        Connected to Shopify
+                      </p>
+                      <p className="text-sm" style={{ color: 'var(--foreground-secondary)' }}>
+                        {shopifyShop}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div
+                      className="p-3 rounded-lg"
+                      style={{ backgroundColor: 'var(--surface-light)' }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Package size={14} style={{ color: 'var(--foreground-muted)' }} />
+                        <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Products
+                        </span>
+                      </div>
+                      <p className="text-lg font-medium" style={{ color: 'var(--foreground)' }}>
+                        {shopifyProductCount?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                    <div
+                      className="p-3 rounded-lg"
+                      style={{ backgroundColor: 'var(--surface-light)' }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock size={14} style={{ color: 'var(--foreground-muted)' }} />
+                        <span className="text-xs" style={{ color: 'var(--foreground-muted)' }}>
+                          Last Sync
+                        </span>
+                      </div>
+                      <p className="text-lg font-medium" style={{ color: 'var(--foreground)' }}>
+                        {formatShopifyDate(shopifyLastSync)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sync Button */}
+                <ActionButton
+                  icon={RefreshCw}
+                  title="Sync products"
+                  description="Import the latest products from your store"
+                  onClick={handleShopifySync}
+                  isLoading={isSyncing}
+                  loadingText="Syncing..."
+                  testId="shopify-sync-btn"
+                />
+
+                <Divider />
+
+                {/* Disconnect Button */}
+                <ActionButton
+                  icon={Unlink}
+                  title="Disconnect store"
+                  description="Remove the connection to your Shopify store"
+                  onClick={handleShopifyDisconnect}
+                  isLoading={isDisconnecting}
+                  loadingText="Disconnecting..."
+                  variant="destructive"
+                  testId="shopify-disconnect-btn"
+                />
+              </>
+            ) : (
+              <>
+                {/* Not Connected State */}
+                <div
+                  className="p-6 rounded-lg text-center"
+                  style={{ backgroundColor: 'var(--surface-light)' }}
+                >
+                  <div
+                    className="w-12 h-12 rounded-full mx-auto mb-4 flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(76, 112, 49, 0.2)' }}
+                  >
+                    <Store size={24} style={{ color: 'var(--primary)' }} />
+                  </div>
+                  <h3
+                    className="text-lg italic mb-2"
+                    style={{
+                      fontFamily: 'var(--font-cormorant)',
+                      fontWeight: 500,
+                      color: 'var(--foreground)',
+                    }}
+                  >
+                    Connect Your Store
+                  </h3>
+                  <p className="text-sm mb-4" style={{ color: 'var(--foreground-secondary)' }}>
+                    Import products from your Shopify store to create beautiful moodboards and virtual try-ons.
+                  </p>
+                  <Button
+                    onClick={handleShopifyConnect}
+                    icon={Link}
+                    data-testid="shopify-connect-btn"
+                  >
+                    Connect Shopify
+                  </Button>
+                </div>
+
+                <p className="text-xs text-center" style={{ color: 'var(--foreground-muted)' }}>
+                  We only request read access to your products. Your store data is secure.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 

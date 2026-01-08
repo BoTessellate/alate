@@ -178,7 +178,7 @@ export class ProductEnrichmentEngine {
         // Parse JSON response
         const enriched = JSON.parse(responseText);
         console.log('Product enrichment completed using Claude');
-        return enriched as ClaudeEnrichmentResponse;
+        return this.normalizeEnrichmentResponse(enriched);
       } catch (claudeError) {
         console.warn('Claude enrichment failed, attempting Gemini fallback:', claudeError);
         // Fall through to Gemini fallback
@@ -215,10 +215,128 @@ export class ProductEnrichmentEngine {
     try {
       const enriched = JSON.parse(responseText);
       console.log('Product enrichment completed using Gemini (fallback)');
-      return enriched as ClaudeEnrichmentResponse;
+      return this.normalizeEnrichmentResponse(enriched);
     } catch (error) {
       throw new Error(`Failed to parse Gemini response: ${responseText}`);
     }
+  }
+
+  /**
+   * Normalizes enrichment response to ensure data consistency
+   * - Converts all string values to lowercase
+   * - Validates texture values against allowed list
+   * - Extracts weave from texture if AI confused them
+   * @param response - Raw AI response
+   * @returns Normalized response
+   */
+  private normalizeEnrichmentResponse(response: ClaudeEnrichmentResponse): ClaudeEnrichmentResponse {
+    // Valid texture values (surface finishes, not weave types)
+    const validTextures = [
+      'smooth', 'textured', 'woven', 'ribbed', 'rough', 'soft', 'fuzzy',
+      'grainy', 'pebbled', 'quilted', 'embossed', 'matte', 'glossy',
+      'shiny', 'brushed', 'polished', 'satin', 'distressed', 'knit',
+      'velvet', 'suede', 'patent', 'metallic', 'nubuck', 'coarse'
+    ];
+
+    // Valid weave types (fabric construction methods)
+    const validWeaves = [
+      'oxford', 'twill', 'sateen', 'percale', 'jersey', 'flannel',
+      'poplin', 'chambray', 'herringbone', 'jacquard', 'canvas',
+      'denim', 'corduroy', 'seersucker', 'dobby', 'broadcloth',
+      'gabardine', 'chino', 'fleece', 'terry', 'velour', 'chenille',
+      'boucle', 'cable-knit', 'rib-knit', 'interlock', 'pique'
+    ];
+
+    // Weave-to-texture mapping (what texture does this weave typically produce?)
+    const weaveToTexture: Record<string, string> = {
+      'oxford': 'textured',
+      'twill': 'smooth',
+      'percale': 'smooth',
+      'sateen': 'satin',
+      'jersey': 'soft',
+      'flannel': 'soft',
+      'poplin': 'smooth',
+      'chambray': 'soft',
+      'herringbone': 'textured',
+      'jacquard': 'textured',
+      'canvas': 'textured',
+      'denim': 'textured',
+      'corduroy': 'ribbed',
+      'seersucker': 'textured',
+      'dobby': 'textured',
+      'broadcloth': 'smooth',
+      'gabardine': 'smooth',
+      'chino': 'smooth',
+      'fleece': 'soft',
+      'terry': 'fuzzy',
+      'velour': 'velvet',
+      'chenille': 'soft',
+      'boucle': 'textured',
+      'cable-knit': 'knit',
+      'rib-knit': 'ribbed',
+      'interlock': 'smooth',
+      'pique': 'textured',
+    };
+
+    // Material-to-texture mapping (fallback for non-textiles)
+    const materialToTexture: Record<string, string> = {
+      'leather': 'smooth',
+      'silk': 'smooth',
+      'cotton': 'soft',
+      'wool': 'fuzzy',
+      'linen': 'textured',
+      'metal': 'shiny',
+      'glass': 'glossy',
+      'ceramic': 'smooth',
+      'wood': 'grainy',
+      'plastic': 'smooth',
+      'rubber': 'matte',
+      'suede': 'suede',
+      'velvet': 'velvet',
+      'cashmere': 'soft',
+    };
+
+    // Get raw values
+    let rawTexture = response.texture?.toLowerCase().trim() || '';
+    let rawWeave = response.weave?.toLowerCase().trim() || '';
+    const rawMaterial = response.material?.toLowerCase().trim() || 'unknown';
+
+    // If AI put a weave type in the texture field, extract it
+    if (validWeaves.includes(rawTexture)) {
+      // Move to weave field if not already set
+      if (!rawWeave) {
+        rawWeave = rawTexture;
+      }
+      // Map to correct texture
+      rawTexture = weaveToTexture[rawTexture] || 'smooth';
+    }
+
+    // Validate weave (only keep valid values)
+    const normalizedWeave = validWeaves.includes(rawWeave) ? rawWeave : undefined;
+
+    // Validate texture
+    let normalizedTexture = rawTexture;
+    if (!validTextures.includes(normalizedTexture)) {
+      // Try material-based fallback
+      if (materialToTexture[rawMaterial]) {
+        normalizedTexture = materialToTexture[rawMaterial];
+      } else {
+        console.warn(`Invalid texture "${rawTexture}", defaulting to "smooth"`);
+        normalizedTexture = 'smooth';
+      }
+    }
+
+    return {
+      color_palette: response.color_palette?.map(c => c.toLowerCase().trim()) || [],
+      tags: response.tags?.map(t => t.toLowerCase().trim()) || [],
+      texture: normalizedTexture,
+      weave: normalizedWeave,
+      material: rawMaterial,
+      tone: response.tone?.toLowerCase().trim() || 'neutral',
+      flags: response.flags?.map(f => f.toLowerCase().trim()) || [],
+      fit_tags: response.fit_tags || [],
+      inferred_dimensions: response.inferred_dimensions
+    };
   }
 
   /**
@@ -227,13 +345,21 @@ export class ProductEnrichmentEngine {
    * @returns Formatted prompt string
    */
   private buildEnrichmentPrompt(product: RawProductInput): string {
+    // Build description section from all available metadata
+    const descriptionParts: string[] = [];
+    if (product.description) descriptionParts.push(product.description);
+    if (product.meta_description) descriptionParts.push(product.meta_description);
+    if (product.product_type) descriptionParts.push(`Product Type: ${product.product_type}`);
+    const fullDescription = descriptionParts.join('\n');
+
     return `You are an expert product analyst specializing in home decor, fashion, and lifestyle products.
 
 Given the product below, analyze and enrich it with the following:
 - **color_palette**: An array of 2-5 primary and secondary colors (e.g., ["indigo", "cream", "brick red"])
 - **tags**: An array of 3-5 descriptive style keywords (e.g., ["handwoven", "traditional", "boho", "textured"])
-- **texture**: A single descriptive word for the surface quality (e.g., "woven", "matte", "glossy", "smooth")
-- **material**: The primary material class (e.g., "cotton", "ceramic", "wood", "linen")
+- **texture**: The SURFACE FINISH quality - how it feels/looks to touch. Must be one of: smooth, textured, woven, ribbed, rough, soft, fuzzy, grainy, pebbled, quilted, embossed, matte, glossy, shiny, brushed, polished, satin, distressed, velvet, suede, knit
+- **weave**: For TEXTILES ONLY - the fabric construction type (e.g., "oxford", "twill", "sateen", "percale", "jersey", "flannel", "poplin", "chambray", "herringbone", "jacquard", "canvas", "denim"). Use null for non-textile items.
+- **material**: The primary material class (e.g., "cotton", "ceramic", "wood", "linen", "leather", "silk", "wool", "polyester", "metal", "glass")
 - **tone**: The overall aesthetic or mood (e.g., "earthy", "playful", "minimalist", "luxury")
 - **flags**: Special product attributes (e.g., ["handmade", "fragile", "limited-edition", "eco-friendly", "vintage", "artisan"])
 - **fit_tags**: Physical characteristics for layout placement. Choose from: "bulky", "flat", "delicate", "lightweight", "oversized"
@@ -247,22 +373,29 @@ ${product.price ? `- Price: ${product.price}` : ''}
 ${product.region ? `- Region: ${product.region}` : ''}
 ${product.dimensions ? `- Dimensions: ${product.dimensions}` : ''}
 ${product.product_dimensions ? `- Structured Dimensions: ${JSON.stringify(product.product_dimensions)}` : ''}
+${fullDescription ? `\n**Product Description/Metadata:**\n${fullDescription}` : ''}
 
-**Important Instructions:**
-1. Base your analysis on the product name, brand, and category
-2. Use specific, descriptive terms (avoid vague words like "nice", "good", "normal")
-3. Ensure colors are realistic and relevant to the product type
-4. Tags should capture style, aesthetic, and use case
-5. Flags should highlight special characteristics (handmade, fragile, eco-friendly, etc.)
-6. fit_tags help with moodboard layout - think about how the item would be photographed/displayed
-7. For dimensions, infer typical sizes based on product category (e.g., a cushion is ~45x45cm)
-8. Return ONLY valid JSON without any markdown formatting or explanations
+**CRITICAL RULES - READ CAREFULLY:**
+1. ALL values must be LOWERCASE (e.g., "cotton" not "Cotton", "smooth" not "Smooth")
+2. **texture** vs **weave** - these are DIFFERENT things:
+   - **texture** = SURFACE FINISH (how it feels): smooth, soft, textured, matte, glossy, shiny, brushed, ribbed
+   - **weave** = FABRIC CONSTRUCTION (how it's made): oxford, twill, sateen, jersey, flannel, poplin
+3. For TEXTILES (shirts, pants, bedding): provide BOTH texture AND weave
+   - Example: Oxford shirt → texture: "smooth", weave: "oxford"
+   - Example: Flannel shirt → texture: "soft", weave: "flannel"
+4. For ACCESSORIES (jewelry, watches, bags): texture only, weave should be null
+   - Use textures like: shiny, matte, brushed, polished, satin, pebbled, smooth
+   - Base texture on material (e.g., metal=shiny/brushed, leather=smooth/pebbled)
+5. For NON-TEXTILES (ceramics, wood, glass): texture only, weave should be null
+6. Extract material, size, and other details from the description/metadata if available
+7. Return ONLY valid JSON without any markdown formatting or explanations
 
 **Output Format (JSON only):**
 {
   "color_palette": ["color1", "color2", "color3"],
   "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "texture": "texture_description",
+  "texture": "surface_finish",
+  "weave": "fabric_construction_or_null",
   "material": "material_type",
   "tone": "aesthetic_mood",
   "flags": ["flag1", "flag2"],

@@ -7,6 +7,13 @@
 // Shopify GraphQL Types
 // ============================================================================
 
+export interface ShopifyMetafield {
+  namespace: string;
+  key: string;
+  value: string;
+  type: string;
+}
+
 export interface ShopifyGraphQLProduct {
   id: string; // gid://shopify/Product/123
   title: string;
@@ -29,6 +36,11 @@ export interface ShopifyGraphQLProduct {
     }>;
   };
   options: ShopifyProductOption[];
+  metafields?: {
+    edges: Array<{
+      node: ShopifyMetafield;
+    }>;
+  };
 }
 
 export interface ShopifyImage {
@@ -54,6 +66,11 @@ export interface ShopifyVariant {
   weight: number | null;
   weightUnit: 'KILOGRAMS' | 'GRAMS' | 'POUNDS' | 'OUNCES';
   image: { src: string } | null;
+  metafields?: {
+    edges: Array<{
+      node: ShopifyMetafield;
+    }>;
+  };
 }
 
 export interface ShopifyProductOption {
@@ -241,6 +258,25 @@ export interface ProductDimensions {
   depth?: number;
   weight?: number;
   weight_unit?: 'kg' | 'g' | 'lbs' | 'oz';
+  // Sizing info extracted from metafields
+  size_chart?: SizeChartEntry[];
+  fit_info?: string;
+  material_info?: string;
+  care_instructions?: string;
+}
+
+export interface SizeChartEntry {
+  size: string;
+  measurements?: {
+    chest?: string;
+    waist?: string;
+    hips?: string;
+    length?: string;
+    inseam?: string;
+    shoulders?: string;
+    sleeve?: string;
+    [key: string]: string | undefined;
+  };
 }
 
 // ============================================================================

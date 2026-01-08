@@ -50,7 +50,12 @@ export default function PersonalCollectionPage() {
 
   // Close menus on click outside
   useEffect(() => {
-    const handleClickOutside = () => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Don't close if clicking on a menu button (data-menu-trigger attribute)
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-menu-trigger]')) {
+        return;
+      }
       setActiveItemMenu(null);
       setSidebarCollectionMenu(null);
       setMobileDropdownOpen(false);
@@ -529,6 +534,7 @@ export default function PersonalCollectionPage() {
 
                       {/* Item Menu Button */}
                       <button
+                        data-menu-trigger
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveItemMenu(activeItemMenu === item.id ? null : item.id);
