@@ -43,6 +43,12 @@ export interface RawProductInput {
   region?: string;
   dimensions?: string;  // Legacy string format (deprecated)
 
+  // Product description and metadata for richer enrichment
+  description?: string;       // Product description text
+  meta_title?: string;        // SEO meta title
+  meta_description?: string;  // SEO meta description
+  product_type?: string;      // Shopify product type
+
   // New: Variant support
   variants?: ProductVariant[];
 
