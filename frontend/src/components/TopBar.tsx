@@ -170,12 +170,15 @@ export default function TopBar() {
       onMouseEnter={() => setIsTopBarExpanded(true)}
       onMouseLeave={() => setIsTopBarExpanded(false)}
     >
-      {/* Main TopBar content */}
+      {/* Main TopBar content - Glass Effect */}
       <div
-        className="flex items-center justify-between px-4 backdrop-blur-md transition-all duration-300 ease-out relative z-10"
+        className="flex items-center justify-between px-4 transition-all duration-300 ease-out relative z-10"
         style={{
           height: isTopBarExpanded ? 'calc(var(--topbar-height) + 28px)' : 'var(--topbar-height)',
           backgroundColor: topbarVariant === 'warm' ? 'var(--topbar-bg-warm)' : topbarVariant === 'highlight' ? 'var(--topbar-bg-highlight)' : 'var(--topbar-bg)',
+          backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
+          borderBottom: '1px solid var(--glass-border-subtle)',
         }}
       >
       {/* Left side - Logo + Breadcrumb Navigation */}
@@ -298,13 +301,16 @@ export default function TopBar() {
             </span>
           </button>
 
-          {/* Currency Dropdown Menu */}
+          {/* Currency Dropdown Menu - Glass Effect */}
           {showCurrencyMenu && (
             <div
-              className="absolute top-full right-0 mt-2 py-1 rounded-lg border shadow-lg overflow-hidden z-50"
+              className="absolute top-full right-0 mt-2 py-1 rounded-lg overflow-hidden z-50"
               style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
+                backgroundColor: 'var(--glass-bg-heavy)',
+                backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+                WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+                border: '1px solid var(--glass-border)',
+                boxShadow: 'var(--shadow-lg)',
                 minWidth: '100px',
               }}
               role="listbox"
@@ -404,15 +410,18 @@ export default function TopBar() {
             variant="filled"
           />
 
-          {/* User Dropdown Menu */}
+          {/* User Dropdown Menu - Glass Effect */}
           {showUserMenu && (
             <div
               role="menu"
               aria-label="User options"
-              className="absolute top-full right-0 mt-2 w-48 rounded-lg border shadow-lg overflow-hidden z-50"
+              className="absolute top-full right-0 mt-2 w-48 rounded-lg overflow-hidden z-50"
               style={{
-                backgroundColor: 'var(--surface)',
-                borderColor: 'var(--border)',
+                backgroundColor: 'var(--glass-bg-heavy)',
+                backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+                WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+                border: '1px solid var(--glass-border)',
+                boxShadow: 'var(--shadow-lg)',
               }}
             >
               <div className="p-3 border-b" style={{ borderColor: 'var(--border)' }}>
@@ -466,12 +475,14 @@ export default function TopBar() {
       </div>
       </div>
 
-      {/* Curved bottom edge - gentle arc */}
+      {/* Curved bottom edge - gentle arc with glass */}
       <div
-        className="w-full backdrop-blur-md"
+        className="w-full"
         style={{
           height: '16px',
           backgroundColor: topbarVariant === 'warm' ? 'var(--topbar-bg-warm)' : topbarVariant === 'highlight' ? 'var(--topbar-bg-highlight)' : 'var(--topbar-bg)',
+          backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
           borderRadius: '0 0 100% 100% / 0 0 100% 100%',
         }}
       />

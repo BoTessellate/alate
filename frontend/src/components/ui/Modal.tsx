@@ -165,7 +165,11 @@ export function Modal({
   return (
     <div
       className={`fixed inset-0 z-50 flex ${positionClasses[position]}`}
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+      }}
       onClick={handleBackdropClick}
       role="presentation"
     >
@@ -176,10 +180,12 @@ export function Modal({
         aria-labelledby={title ? 'modal-title' : undefined}
         tabIndex={-1}
         data-testid={testId}
-        className={`w-full ${sizeClasses[size]} rounded-lg border overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${className}`}
+        className={`w-full ${sizeClasses[size]} rounded-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${className}`}
         style={{
-          backgroundColor: 'var(--surface)',
-          borderColor: 'var(--border)',
+          backgroundColor: 'var(--glass-bg-heavy)',
+          backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.5)',
+          border: '1px solid var(--glass-border)',
           boxShadow: 'var(--shadow-lg)',
           ...modalPositionStyles,
         }}

@@ -13,26 +13,46 @@ export const THEME_TOKENS = {
     surfaceElevated: '#FFFFFF',
     foreground: '#222222',
     foregroundSecondary: '#444444',
-    foregroundMuted: '#666666',
+    foregroundMuted: '#555555', // Improved readability
     border: '#D0D3C9',
     borderLight: '#C5C8BE',
-    topbarBg: 'rgba(76, 112, 49, 0.92)',
-    topbarBgHighlight: 'rgba(86, 98, 83, 0.95)', // Muted sage green for /discover page
+    // Glass topbar with blur
+    topbarBg: 'rgba(76, 112, 49, 0.88)',
+    topbarBgHighlight: 'rgba(86, 98, 83, 0.90)',
+  },
+  // Glass effect tokens
+  glass: {
+    light: {
+      background: 'rgba(255, 255, 255, 0.72)',
+      backgroundHeavy: 'rgba(255, 255, 255, 0.85)',
+      border: 'rgba(255, 255, 255, 0.25)',
+      borderSubtle: 'rgba(255, 255, 255, 0.12)',
+    },
+    dark: {
+      background: 'rgba(15, 15, 15, 0.85)',
+      backgroundHeavy: 'rgba(10, 10, 10, 0.92)',
+      border: 'rgba(76, 112, 49, 0.2)',
+      borderSubtle: 'rgba(76, 112, 49, 0.1)',
+    },
   },
   dark: {
-    background: '#0d0d0d',
-    backgroundSecondary: '#151515',
-    backgroundTertiary: '#0a0a0a',
-    surface: '#1a1a1a',
-    surfaceLight: '#252525',
-    surfaceElevated: '#303030',
+    // True black for striking modern aesthetic
+    background: '#000000',
+    backgroundSecondary: '#0a0a0a',
+    backgroundTertiary: '#050505',
+    surface: '#0f0f0f',
+    surfaceLight: '#1a1a1a',
+    surfaceElevated: '#1f1f1f',
+    // Warm foreground for readability
     foreground: '#f6e9cf',
     foregroundSecondary: '#d4c9b0',
     foregroundMuted: '#b0a090',
-    border: '#2a2a2a',
-    borderLight: '#3a3a3a',
-    topbarBg: 'rgba(61, 82, 45, 0.95)', // primary-dark with transparency
-    topbarBgHighlight: 'rgba(52, 65, 49, 0.95)', // #344131 for /discover page in dark mode
+    // Green-tinted borders for brand cohesion
+    border: 'rgba(76, 112, 49, 0.18)',
+    borderLight: 'rgba(76, 112, 49, 0.12)',
+    // Glass topbar with blur
+    topbarBg: 'rgba(10, 10, 10, 0.85)',
+    topbarBgHighlight: 'rgba(52, 65, 49, 0.95)',
   },
   // Brand colors (theme-independent)
   brand: {
