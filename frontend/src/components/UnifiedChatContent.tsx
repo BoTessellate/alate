@@ -51,6 +51,11 @@ export default function UnifiedChatContent() {
   const [showCropAdjust, setShowCropAdjust] = useState(false);
   const [adjustedBoundingBox, setAdjustedBoundingBox] = useState<BoundingBox | null>(null);
   const [isReCropping, setIsReCropping] = useState(false);
+  // Save/sync status for visual feedback
+  const [saveStatus, setSaveStatus] = useState<{
+    state: 'idle' | 'saving' | 'searching' | 'syncing' | 'success' | 'error';
+    message?: string;
+  }>({ state: 'idle' });
 
   const {
     messages,
@@ -713,8 +718,10 @@ export default function UnifiedChatContent() {
 
     // Use edited tags or keep original
     const finalTags = editForm.tags.length > 0 ? editForm.tags : editingProduct.tags || [];
+    const nameChanged = editForm.product_name.trim() !== editingProduct.product_name;
+    const brandChanged = editForm.brand.trim() !== editingProduct.brand;
 
-    const updates: Partial<ChatProduct> = {
+    let updates: Partial<ChatProduct> = {
       product_name: editForm.product_name.trim() || editingProduct.product_name,
       brand: editForm.brand.trim() || editingProduct.brand,
       size: editForm.size.trim() || undefined,
@@ -744,6 +751,7 @@ export default function UnifiedChatContent() {
     // If bounding box was adjusted, call re-crop API
     if (adjustedBoundingBox && editingProduct.original_image_url) {
       setIsReCropping(true);
+      setSaveStatus({ state: 'saving', message: 'Adjusting crop...' });
       try {
         const response = await fetch(`${API_BASE_URL}/api/image-processing?action=re-crop`, {
           method: 'POST',
@@ -770,6 +778,66 @@ export default function UnifiedChatContent() {
       }
     }
 
+    // If name or brand changed significantly, call update-product API to search for better image and sync to DB
+    if ((nameChanged || brandChanged) && editingProduct.source === 'upload') {
+      setSaveStatus({ state: 'searching', message: 'Finding better image...' });
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/image-processing?action=update-product`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: editingProduct.id,
+            updates: {
+              product_name: updates.product_name,
+              brand: updates.brand,
+              tags: updates.tags,
+              category: editingProduct.category,
+              price: updates.price,
+            },
+            previousName: editingProduct.product_name,
+            currentImageUrl: editingProduct.image_url,
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+
+          // Apply any enriched data from the API
+          if (result.updates) {
+            if (result.updates.image_url) {
+              updates.image_url = result.updates.image_url;
+            }
+            if (result.updates.tags && !tagsAdded.length && !tagsRemoved.length) {
+              updates.tags = result.updates.tags;
+            }
+            if (result.updates.material) {
+              updates.material = result.updates.material;
+            }
+            if (result.updates.texture) {
+              updates.texture = result.updates.texture;
+            }
+          }
+
+          // Show feedback about what happened
+          if (result.imageSearch?.found) {
+            setSaveStatus({
+              state: 'success',
+              message: result.imageSearch.source === 'database'
+                ? 'Found matching product image!'
+                : 'Found product image online!',
+            });
+          } else if (result.syncedToDatabase) {
+            setSaveStatus({ state: 'success', message: 'Saved to closet' });
+          }
+        }
+      } catch (error) {
+        console.error('Product update failed:', error);
+        setSaveStatus({ state: 'error', message: 'Failed to save changes' });
+      }
+    } else {
+      setSaveStatus({ state: 'syncing', message: 'Saving...' });
+    }
+
     // Update product in chat message
     updateProductInMessage(editingMessageId, editingProduct.id, updates);
 
@@ -784,14 +852,22 @@ export default function UnifiedChatContent() {
       }
     }
 
-    // Close modal and reset tag state
-    setEditingProduct(null);
-    setEditingMessageId(null);
-    setShowCropAdjust(false);
-    setAdjustedBoundingBox(null);
-    setNewTagInput('');
-    setIsAddingTag(false);
-  }, [editingProduct, editingMessageId, editForm, adjustedBoundingBox, originalTags, updateProductInMessage, collections, updateProductInCollection]);
+    // Show success briefly then close
+    if (saveStatus.state !== 'success' && saveStatus.state !== 'error') {
+      setSaveStatus({ state: 'success', message: 'Saved!' });
+    }
+
+    // Close modal after a brief delay to show feedback
+    setTimeout(() => {
+      setEditingProduct(null);
+      setEditingMessageId(null);
+      setShowCropAdjust(false);
+      setAdjustedBoundingBox(null);
+      setNewTagInput('');
+      setIsAddingTag(false);
+      setSaveStatus({ state: 'idle' });
+    }, saveStatus.state === 'success' || saveStatus.state === 'error' ? 1500 : 500);
+  }, [editingProduct, editingMessageId, editForm, adjustedBoundingBox, originalTags, updateProductInMessage, collections, updateProductInCollection, saveStatus.state]);
 
   // Handle cancel edit
   const handleCancelEdit = useCallback(() => {
@@ -1277,15 +1353,21 @@ export default function UnifiedChatContent() {
             </>
           ) : (
             <>
-              <Button variant="ghost" onClick={handleCancelEdit}>
+              <Button variant="ghost" onClick={handleCancelEdit} disabled={saveStatus.state !== 'idle' && saveStatus.state !== 'error'}>
                 Cancel
               </Button>
               <Button
                 variant="primary"
                 onClick={handleSaveEdit}
-                disabled={isReCropping}
+                disabled={isReCropping || (saveStatus.state !== 'idle' && saveStatus.state !== 'error')}
               >
-                {isReCropping ? 'Saving...' : adjustedBoundingBox ? 'Save & Re-crop' : 'Save'}
+                {saveStatus.state === 'saving' ? 'Adjusting crop...' :
+                 saveStatus.state === 'searching' ? 'Finding image...' :
+                 saveStatus.state === 'syncing' ? 'Saving...' :
+                 saveStatus.state === 'success' ? saveStatus.message :
+                 saveStatus.state === 'error' ? saveStatus.message :
+                 isReCropping ? 'Saving...' :
+                 adjustedBoundingBox ? 'Save & Re-crop' : 'Save'}
               </Button>
             </>
           )}

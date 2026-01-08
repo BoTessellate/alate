@@ -23,6 +23,11 @@ import {
   ProcessMultipleInput,
   SelectedProduct,
 } from '../sdk/photoUpload';
+import {
+  findBestProductImage,
+  shouldSearchForImage,
+  type DetectedProductInfo,
+} from '../sdk/productImageSearch';
 
 const logger = createModuleLogger('image-processing');
 
@@ -144,6 +149,26 @@ interface ReCropRequestBody {
   reEnrich?: boolean;
   /** Device ID for feedback tracking */
   deviceId?: string;
+}
+
+interface UpdateProductRequestBody {
+  /** Product ID to update */
+  productId: string;
+  /** Field updates */
+  updates: {
+    product_name?: string;
+    brand?: string;
+    tags?: string[];
+    category?: string;
+    price?: number;
+    currency?: string;
+  };
+  /** Previous product name (to detect significant change) */
+  previousName?: string;
+  /** Current image URL (to compare if new image is better) */
+  currentImageUrl?: string;
+  /** Force image search even if name didn't change much */
+  forceImageSearch?: boolean;
 }
 
 // ============================================================================
@@ -832,6 +857,205 @@ async function handleReCrop(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+/**
+ * Handle product update with optional image search
+ * When user edits product name/brand, search for a better image
+ */
+async function handleUpdateProduct(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const body = req.body as UpdateProductRequestBody;
+  const startTime = Date.now();
+
+  // Validate request
+  if (!body.productId) {
+    return res.status(400).json({
+      success: false,
+      error: 'productId is required',
+      code: 'INVALID_FORMAT',
+    });
+  }
+
+  if (!body.updates || Object.keys(body.updates).length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'updates object is required with at least one field',
+      code: 'INVALID_FORMAT',
+    });
+  }
+
+  const supabase = getSupabase();
+
+  try {
+    logger.info({
+      productId: body.productId,
+      updates: Object.keys(body.updates),
+      previousName: body.previousName,
+      forceImageSearch: body.forceImageSearch,
+    }, 'Processing product update');
+
+    // Determine if name changed significantly (for image search trigger)
+    const nameChanged = body.previousName &&
+      body.updates.product_name &&
+      body.previousName.toLowerCase().trim() !== body.updates.product_name.toLowerCase().trim();
+
+    const shouldSearch = body.forceImageSearch || (
+      nameChanged &&
+      // Only search if new name looks like a specific product (has brand or model)
+      body.updates.product_name &&
+      (body.updates.product_name.split(' ').length >= 2 || body.updates.brand)
+    );
+
+    let imageSearchResult: { found: boolean; imageUrl?: string; source?: string; matchedProductId?: string; enrichedData?: Record<string, unknown> } = { found: false };
+    let enrichedUpdates: Record<string, unknown> = { ...body.updates };
+
+    // Step 1: Search for better image if warranted
+    if (shouldSearch) {
+      logger.info({ newName: body.updates.product_name }, 'Searching for product image');
+
+      const searchInfo: DetectedProductInfo = {
+        name: body.updates.product_name || '',
+        brand: body.updates.brand,
+        category: body.updates.category || 'general',
+        tags: body.updates.tags || [],
+        colors: [],
+        confidence: 0.9, // User-edited names are high confidence
+      };
+
+      // Check if this product should be searched
+      if (shouldSearchForImage(searchInfo)) {
+        const result = await findBestProductImage(searchInfo, {
+          enableDatabaseSearch: true,
+          enableWebSearch: true,
+          databaseMinSimilarity: 0.7, // Higher threshold for name-based search
+        });
+
+        if (result.found && result.imageUrl) {
+          imageSearchResult = {
+            found: true,
+            imageUrl: result.imageUrl,
+            source: result.source,
+            matchedProductId: result.matchedProductId,
+          };
+
+          // If we matched a database product, use its enriched data too
+          if (result.source === 'database' && result.matchedProductId) {
+            try {
+              const { data: matchedProduct } = await supabase
+                .from('enriched_products')
+                .select('tags, category, material, texture, tone, color_palette')
+                .eq('id', result.matchedProductId)
+                .single();
+
+              if (matchedProduct) {
+                // Only use enriched data that the user hasn't explicitly set
+                imageSearchResult.enrichedData = matchedProduct;
+                if (!body.updates.tags && matchedProduct.tags) {
+                  enrichedUpdates.tags = matchedProduct.tags;
+                }
+                if (!body.updates.category && matchedProduct.category) {
+                  enrichedUpdates.category = matchedProduct.category;
+                }
+                // Add material, texture, tone if available
+                if (matchedProduct.material) enrichedUpdates.material = matchedProduct.material;
+                if (matchedProduct.texture) enrichedUpdates.texture = matchedProduct.texture;
+                if (matchedProduct.tone) enrichedUpdates.tone = matchedProduct.tone;
+              }
+            } catch (err) {
+              logger.warn({ error: err }, 'Failed to fetch matched product enrichment');
+            }
+          }
+
+          // Add new image URL to updates
+          enrichedUpdates.image_url = result.imageUrl;
+          enrichedUpdates.image_source = result.source;
+          if (result.matchedProductId) {
+            enrichedUpdates.matched_product_id = result.matchedProductId;
+          }
+        }
+      }
+    }
+
+    // Step 2: Sync to database (upsert enriched_products)
+    let syncedToDatabase = false;
+    try {
+      // Prepare the database record
+      const dbRecord: Record<string, unknown> = {
+        id: body.productId,
+        product_name: enrichedUpdates.product_name,
+        brand: enrichedUpdates.brand || 'My Upload',
+        updated_at: new Date().toISOString(),
+      };
+
+      // Add optional fields if present
+      if (enrichedUpdates.image_url) dbRecord.image_url = enrichedUpdates.image_url;
+      if (enrichedUpdates.tags) dbRecord.tags = enrichedUpdates.tags;
+      if (enrichedUpdates.category) dbRecord.category = enrichedUpdates.category;
+      if (enrichedUpdates.price !== undefined) dbRecord.price = enrichedUpdates.price;
+      if (enrichedUpdates.currency) dbRecord.currency = enrichedUpdates.currency;
+      if (enrichedUpdates.material) dbRecord.material = enrichedUpdates.material;
+      if (enrichedUpdates.texture) dbRecord.texture = enrichedUpdates.texture;
+      if (enrichedUpdates.tone) dbRecord.tone = enrichedUpdates.tone;
+      if (enrichedUpdates.image_source) dbRecord.image_source = enrichedUpdates.image_source;
+      if (enrichedUpdates.matched_product_id) dbRecord.matched_product_id = enrichedUpdates.matched_product_id;
+
+      // Upsert to database
+      const { error: upsertError } = await supabase
+        .from('enriched_products')
+        .upsert(dbRecord, {
+          onConflict: 'id',
+          ignoreDuplicates: false,
+        });
+
+      if (upsertError) {
+        logger.warn({ error: upsertError }, 'Failed to sync product to database');
+      } else {
+        syncedToDatabase = true;
+        logger.info({ productId: body.productId }, 'Product synced to database');
+      }
+    } catch (dbError) {
+      logger.warn({ error: dbError }, 'Database sync failed');
+    }
+
+    const processingTime = Date.now() - startTime;
+
+    logger.info({
+      productId: body.productId,
+      imageFound: imageSearchResult.found,
+      imageSource: imageSearchResult.source,
+      syncedToDatabase,
+      processingMs: processingTime,
+    }, 'Product update complete');
+
+    return res.status(200).json({
+      success: true,
+      productId: body.productId,
+      updates: enrichedUpdates,
+      imageSearch: {
+        performed: shouldSearch,
+        found: imageSearchResult.found,
+        source: imageSearchResult.source || 'unchanged',
+        newImageUrl: imageSearchResult.imageUrl,
+        matchedProductId: imageSearchResult.matchedProductId,
+        enrichedFromMatch: !!imageSearchResult.enrichedData,
+      },
+      syncedToDatabase,
+      processingTimeMs: processingTime,
+    });
+
+  } catch (error) {
+    logger.error({ error }, 'Product update failed');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      success: false,
+      error: message,
+      code: 'UPDATE_FAILED',
+    });
+  }
+}
+
 // ============================================================================
 // MAIN HANDLER
 // ============================================================================
@@ -862,10 +1086,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 're-crop':
       return handleReCrop(req, res);
 
+    case 'update-product':
+      return handleUpdateProduct(req, res);
+
     default:
       return res.status(400).json({
         error: 'Invalid action',
-        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, ?action=smart-detect, ?action=process-multi, or ?action=re-crop',
+        hint: 'Use ?action=remove-bg, ?action=upload, ?action=detect-multi, ?action=smart-detect, ?action=process-multi, ?action=re-crop, or ?action=update-product',
         examples: {
           'remove-bg': 'POST /api/image-processing?action=remove-bg',
           'upload': 'POST /api/image-processing?action=upload',
@@ -873,6 +1100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'smart-detect': 'POST /api/image-processing?action=smart-detect',
           'process-multi': 'POST /api/image-processing?action=process-multi',
           're-crop': 'POST /api/image-processing?action=re-crop',
+          'update-product': 'POST /api/image-processing?action=update-product',
         },
       });
   }
