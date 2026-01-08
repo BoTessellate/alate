@@ -339,9 +339,7 @@ export default function CollectionDetailPage() {
                   <div
                     className="w-full h-full"
                     style={{
-                      backgroundImage:
-                        'linear-gradient(135deg, var(--primary) 0%, var(--cream-dark) 100%)',
-                      opacity: 0.5,
+                      backgroundColor: 'var(--surface-light)',
                     }}
                   />
                 )}

@@ -38,6 +38,16 @@ const PRODUCTS_QUERY = `
             name
             values
           }
+          metafields(first: 20) {
+            edges {
+              node {
+                namespace
+                key
+                value
+                type
+              }
+            }
+          }
           images(first: 10) {
             edges {
               node {
@@ -56,9 +66,21 @@ const PRODUCTS_QUERY = `
                 compareAtPrice
                 sku
                 inventoryQuantity
+                weight
+                weightUnit
                 selectedOptions {
                   name
                   value
+                }
+                metafields(first: 10) {
+                  edges {
+                    node {
+                      namespace
+                      key
+                      value
+                      type
+                    }
+                  }
                 }
                 image {
                   src
@@ -90,6 +112,16 @@ const PRODUCT_BY_ID_QUERY = `
         name
         values
       }
+      metafields(first: 20) {
+        edges {
+          node {
+            namespace
+            key
+            value
+            type
+          }
+        }
+      }
       images(first: 10) {
         edges {
           node {
@@ -108,9 +140,21 @@ const PRODUCT_BY_ID_QUERY = `
             compareAtPrice
             sku
             inventoryQuantity
+            weight
+            weightUnit
             selectedOptions {
               name
               value
+            }
+            metafields(first: 10) {
+              edges {
+                node {
+                  namespace
+                  key
+                  value
+                  type
+                }
+              }
             }
             image {
               src
@@ -148,6 +192,16 @@ const BULK_OPERATION_QUERY = `
                 status
                 createdAt
                 updatedAt
+                metafields(first: 20) {
+                  edges {
+                    node {
+                      namespace
+                      key
+                      value
+                      type
+                    }
+                  }
+                }
                 images(first: 10) {
                   edges {
                     node {
@@ -172,6 +226,16 @@ const BULK_OPERATION_QUERY = `
                       }
                       weight
                       weightUnit
+                      metafields(first: 10) {
+                        edges {
+                          node {
+                            namespace
+                            key
+                            value
+                            type
+                          }
+                        }
+                      }
                       image {
                         src
                       }
