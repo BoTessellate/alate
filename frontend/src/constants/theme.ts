@@ -50,8 +50,8 @@ export const THEME_TOKENS = {
     // Green-tinted borders for brand cohesion
     border: 'rgba(76, 112, 49, 0.18)',
     borderLight: 'rgba(76, 112, 49, 0.12)',
-    // Glass topbar with blur
-    topbarBg: 'rgba(10, 10, 10, 0.85)',
+    // Green topbar (same as light mode for brand consistency)
+    topbarBg: 'rgba(61, 82, 45, 0.92)',
     topbarBgHighlight: 'rgba(52, 65, 49, 0.95)',
   },
   // Brand colors (theme-independent)

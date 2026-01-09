@@ -178,7 +178,6 @@ export default function TopBar() {
           backgroundColor: topbarVariant === 'warm' ? 'var(--topbar-bg-warm)' : topbarVariant === 'highlight' ? 'var(--topbar-bg-highlight)' : 'var(--topbar-bg)',
           backdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
           WebkitBackdropFilter: 'blur(var(--glass-blur, 20px)) saturate(1.8)',
-          borderBottom: '1px solid var(--glass-border-subtle)',
         }}
       >
       {/* Left side - Logo + Breadcrumb Navigation */}
