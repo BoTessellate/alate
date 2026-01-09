@@ -82,6 +82,7 @@ export function UnifiedChatInput({
   const [isUrlDetected, setIsUrlDetected] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -346,7 +347,8 @@ export function UnifiedChatInput({
         <div
           className="flex-1 flex items-center rounded-xl px-3 min-h-[36px]"
           style={{
-            backgroundColor: 'var(--surface-light)',
+            backgroundColor: isFocused ? 'var(--surface-elevated)' : 'var(--surface-light)',
+            boxShadow: isFocused ? '0 0 0 2px var(--primary-light)' : 'none',
             transition: 'all var(--transition-base) var(--ease-out)',
           }}
           data-testid={testId ? `${testId}-input-container` : undefined}
@@ -356,6 +358,8 @@ export function UnifiedChatInput({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             placeholder={attachedImage ? 'Tell me about this piece...' : placeholder}
             disabled={disabled || isLoading}
             rows={1}
