@@ -76,8 +76,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary-dark)';
+    if (isFocused) return 'var(--primary)';
     return 'var(--border)';
+  };
+
+  const getBoxShadow = () => {
+    if (error) return 'var(--glow-error)';
+    if (isFocused) return 'var(--glow-primary-focus)';
+    return 'none';
   };
 
   return (
@@ -96,17 +102,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           <Icon
             size={iconSizes[size]}
             className={`absolute ${iconPositions[size]} top-1/2 -translate-y-1/2 pointer-events-none`}
-            style={{ color: 'var(--foreground-muted)' }}
+            style={{ color: isFocused ? 'var(--primary)' : 'var(--foreground-muted)' }}
           />
         )}
         <input
           ref={ref}
           id={inputId}
-          className={`w-full rounded-lg border outline-none transition-colors ${sizeClasses[size]} ${paddingClasses[size]}`}
+          className={`w-full rounded-lg border outline-none ${sizeClasses[size]} ${paddingClasses[size]}`}
           style={{
             backgroundColor: 'var(--background)',
             borderColor: getBorderColor(),
             color: 'var(--foreground)',
+            boxShadow: getBoxShadow(),
+            transition: 'all var(--transition-base) var(--ease-out)',
           }}
           onFocus={(e) => {
             setIsFocused(true);
@@ -182,8 +190,14 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary-dark)';
+    if (isFocused) return 'var(--primary)';
     return 'var(--border)';
+  };
+
+  const getBoxShadow = () => {
+    if (error) return 'var(--glow-error)';
+    if (isFocused) return 'var(--glow-primary-focus)';
+    return 'none';
   };
 
   return (
@@ -200,11 +214,13 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
       <textarea
         ref={ref}
         id={textareaId}
-        className="w-full rounded-lg border outline-none transition-colors px-4 py-3 text-sm resize-y min-h-[100px]"
+        className="w-full rounded-lg border outline-none px-4 py-3 text-sm resize-y min-h-[100px]"
         style={{
           backgroundColor: 'var(--background)',
           borderColor: getBorderColor(),
           color: 'var(--foreground)',
+          boxShadow: getBoxShadow(),
+          transition: 'all var(--transition-base) var(--ease-out)',
         }}
         onFocus={(e) => {
           setIsFocused(true);
@@ -345,8 +361,14 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
 
   const getBorderColor = () => {
     if (error) return 'var(--error)';
-    if (isFocused) return 'var(--primary-dark)';
+    if (isFocused) return 'var(--primary)';
     return 'var(--border)';
+  };
+
+  const getBoxShadow = () => {
+    if (error) return 'var(--glow-error)';
+    if (isFocused) return 'var(--glow-primary-focus)';
+    return 'none';
   };
 
   return (
@@ -365,11 +387,13 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(fu
           ref={ref}
           id={inputId}
           type={showPassword ? 'text' : 'password'}
-          className={`w-full rounded-lg border outline-none transition-colors ${sizeClasses[size]} ${paddingClasses[size]}`}
+          className={`w-full rounded-lg border outline-none ${sizeClasses[size]} ${paddingClasses[size]}`}
           style={{
             backgroundColor: 'var(--background)',
             borderColor: getBorderColor(),
             color: 'var(--foreground)',
+            boxShadow: getBoxShadow(),
+            transition: 'all var(--transition-base) var(--ease-out)',
           }}
           onFocus={(e) => {
             setIsFocused(true);

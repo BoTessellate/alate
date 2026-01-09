@@ -31,6 +31,18 @@
   --accent: #4c7031;            /* Same as primary green */
   --highlight: #996b26;         /* Gold highlight (WCAG AA: 4.68:1 on white) */
 
+  /* Delight Accent - for memorable moments (badges, new tags, empty states) */
+  --delight: #9D8EC9;           /* Muted lavender */
+  --delight-light: #B8ABDA;     /* Lighter lavender */
+  --delight-dark: #7A6BA8;      /* Darker lavender */
+  --delight-alpha: rgba(157, 142, 201, 0.15);
+
+  /* Brand-Tinted Text Grays (green undertone for cohesion) */
+  --text-primary: #1a1f1a;      /* Near black with green tint */
+  --text-secondary: #3d453d;    /* Dark gray with green tint */
+  --text-tertiary: #5a665a;     /* Medium gray with green tint */
+  --text-muted: rgba(76, 112, 49, 0.5); /* Primary at 50% */
+
   --success: #4c7031;           /* Use primary green for success */
   --warning: #996b26;           /* WCAG AA compliant gold */
   --error: #a84032;
@@ -145,6 +157,13 @@
   /* Spring Easing for Micro-interactions */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Interactive Border Glow (focus/hover states) */
+  --glow-primary: 0 0 0 3px rgba(76, 112, 49, 0.12);
+  --glow-primary-focus: 0 0 0 3px rgba(76, 112, 49, 0.2), 0 0 0 1px var(--primary);
+  --glow-delight: 0 0 0 3px rgba(157, 142, 201, 0.15);
+  --glow-error: 0 0 0 3px rgba(168, 64, 50, 0.15);
 
   /* Hover Transforms */
   --lift-sm: translateY(-2px);
@@ -232,6 +251,24 @@
     0 0 32px rgba(76, 112, 49, 0.2);
   --shadow-primary-glow: 0 0 32px rgba(76, 112, 49, 0.3);
 
+  /* Delight color in dark mode - slightly brighter */
+  --delight: #A99BD4;
+  --delight-light: #C4B8E5;
+  --delight-dark: #8A7BB9;
+  --delight-alpha: rgba(169, 155, 212, 0.2);
+
+  /* Brand-tinted text grays for dark mode */
+  --text-primary: #f6e9cf;
+  --text-secondary: #c9bda5;
+  --text-tertiary: #9a9080;
+  --text-muted: rgba(180, 200, 160, 0.5);
+
+  /* Interactive glow for dark mode (more visible) */
+  --glow-primary: 0 0 0 3px rgba(76, 112, 49, 0.2);
+  --glow-primary-focus: 0 0 0 3px rgba(76, 112, 49, 0.3), 0 0 0 1px var(--primary);
+  --glow-delight: 0 0 0 3px rgba(169, 155, 212, 0.25);
+  --glow-error: 0 0 0 3px rgba(168, 64, 50, 0.25);
+
   --topbar-bg-highlight: rgba(52, 65, 49, 0.95);
 }
 
@@ -277,6 +314,22 @@ body::after {
   pointer-events: none;
   z-index: -1;
   background: var(--gradient-glow);
+}
+
+/* Noise texture overlay for analog warmth */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  mix-blend-mode: overlay;
+}
+
+[data-theme="dark"] .noise-overlay {
+  opacity: 0.035;
 }
 
 /* Scrollbar styling */
@@ -371,6 +424,131 @@ body::after {
 
 .shadow-primary-glow {
   box-shadow: var(--shadow-primary-glow);
+}
+
+/* ========================================
+   DELIGHT ACCENT UTILITIES
+   ======================================== */
+
+/* Delight badge/tag */
+.badge-delight {
+  background: var(--delight-alpha);
+  color: var(--delight-dark);
+  border: 1px solid var(--delight);
+}
+
+/* Delight text */
+.text-delight {
+  color: var(--delight);
+}
+
+/* Delight background */
+.bg-delight {
+  background: var(--delight);
+}
+
+.bg-delight-alpha {
+  background: var(--delight-alpha);
+}
+
+/* ========================================
+   INTERACTIVE GLOW UTILITIES
+   ======================================== */
+
+/* Focus glow ring */
+.focus-glow:focus,
+.focus-glow:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-primary-focus);
+}
+
+/* Hover glow ring */
+.hover-glow:hover {
+  box-shadow: var(--glow-primary);
+}
+
+/* Combined focus + hover glow */
+.interactive-glow {
+  transition: box-shadow var(--transition-base) var(--ease-out);
+}
+
+.interactive-glow:hover {
+  box-shadow: var(--glow-primary);
+}
+
+.interactive-glow:focus,
+.interactive-glow:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-primary-focus);
+}
+
+/* Error state glow */
+.glow-error {
+  box-shadow: var(--glow-error);
+}
+
+/* ========================================
+   SPRING ANIMATION UTILITIES
+   ======================================== */
+
+/* Spring hover lift */
+.spring-lift {
+  transition: transform var(--transition-base) var(--ease-spring),
+              box-shadow var(--transition-base) var(--ease-spring);
+}
+
+.spring-lift:hover {
+  transform: var(--lift-sm);
+}
+
+/* Spring scale on hover */
+.spring-scale {
+  transition: transform var(--transition-base) var(--ease-spring);
+}
+
+.spring-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Spring press effect */
+.spring-press:active {
+  transform: scale(0.98);
+  transition: transform var(--transition-fast) var(--ease-spring);
+}
+
+/* Bounce entrance animation */
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.4s var(--ease-spring);
+}
+
+/* Spring fade up */
+@keyframes spring-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-spring-fade-up {
+  animation: spring-fade-up 0.3s var(--ease-spring);
 }
 
 /* Agent Pill Blink Animation - human-like blink (~150ms blink, 4s interval) */

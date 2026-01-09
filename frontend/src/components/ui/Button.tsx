@@ -129,10 +129,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const styles = getVariantStyles();
 
-  // Enhanced lift transform for boldness
+  // Enhanced lift transform with spring easing and primary glow
   const shouldLift = !isDisabled && (variant === 'primary' || variant === 'secondary');
-  const liftTransform = shouldLift && isHovered ? 'var(--lift-md)' : 'translateY(0)';
-  const hoverShadow = shouldLift && isHovered ? 'var(--shadow-hover)' : 'none';
+  const liftTransform = shouldLift && isHovered ? 'var(--lift-sm)' : 'translateY(0)';
+  // Primary buttons get color-tinted shadow, others get regular shadow
+  const hoverShadow = shouldLift && isHovered
+    ? (variant === 'primary' ? 'var(--shadow-primary-hover)' : 'var(--shadow-hover)')
+    : (variant === 'primary' ? 'var(--shadow-primary)' : 'none');
 
   const baseClasses = [
     'inline-flex items-center justify-center font-medium rounded-lg border',
@@ -156,7 +159,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         borderColor: styles.borderColor,
         transform: liftTransform,
         boxShadow: hoverShadow,
-        transition: 'all var(--transition-base) var(--ease-out)',
+        transition: 'all var(--transition-base) var(--ease-spring)',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -235,10 +238,10 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 
   const baseStyles = getStyles();
   // Merge custom style with base styles, custom style takes precedence
-  // Add transition for smooth hover effects
+  // Add spring transition for playful hover effects
   const mergedStyles = {
     ...baseStyles,
-    transition: 'all var(--transition-base) var(--ease-out)',
+    transition: 'all var(--transition-base) var(--ease-spring)',
     ...(style || {}),
   };
 

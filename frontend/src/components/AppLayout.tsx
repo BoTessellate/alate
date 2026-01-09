@@ -117,6 +117,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <FloatingActionButton />
         </div>
         <ToastContainer />
+        {/* Noise texture overlay for analog warmth */}
+        <div className="noise-overlay" aria-hidden="true" />
       </SidePanelProvider>
     </ThemeProvider>
   );
