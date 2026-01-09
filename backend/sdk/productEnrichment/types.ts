@@ -66,8 +66,11 @@ export interface RawProductInput {
 export interface EnrichedProductFields {
   color_palette: string[];
   tags: string[];
-  texture: string;       // Surface finish: smooth, matte, glossy, shiny, brushed, etc.
-  weave?: string;        // Fabric construction: oxford, twill, sateen, jersey, flannel, etc.
+  // Texture split into tactile feel vs visual appearance
+  texture_feel: string;   // How it FEELS: soft, smooth, rough, silky, fuzzy, crisp, etc.
+  texture_look: string;   // How it LOOKS: matte, glossy, shiny, lustrous, iridescent, etc.
+  texture?: string;       // @deprecated - use texture_feel/texture_look. Kept for backward compatibility.
+  weave?: string;         // Fabric construction: oxford, twill, khadi, ikat, banarasi, etc.
   material: string;
   tone: string;
   flags?: string[];  // e.g., ["fragile", "handmade", "limited-edition", "eco-friendly"]
@@ -109,8 +112,10 @@ export interface VisionAnalysisResult {
 export interface ClaudeEnrichmentResponse {
   color_palette: string[];
   tags: string[];
-  texture: string;       // Surface finish
-  weave?: string;        // Fabric construction (for textiles)
+  texture_feel: string;   // How it FEELS (tactile)
+  texture_look: string;   // How it LOOKS (visual)
+  texture?: string;       // @deprecated - for backward compatibility
+  weave?: string;         // Fabric construction (for textiles)
   material: string;
   tone: string;
   flags?: string[];

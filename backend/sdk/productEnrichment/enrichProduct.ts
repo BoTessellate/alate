@@ -230,7 +230,23 @@ export class ProductEnrichmentEngine {
    * @returns Normalized response
    */
   private normalizeEnrichmentResponse(response: ClaudeEnrichmentResponse): ClaudeEnrichmentResponse {
-    // Valid texture values (surface finishes, not weave types)
+    // Valid texture_feel values (tactile - how it FEELS to touch)
+    const validTextureFeel = [
+      'smooth', 'soft', 'rough', 'fuzzy', 'silky', 'crisp', 'plush',
+      'textured', 'ribbed', 'grainy', 'pebbled', 'quilted', 'embossed',
+      'nubby', 'coarse', 'supple', 'stiff', 'spongy', 'velvety', 'slick',
+      'bumpy', 'nubbly', 'scratchy', 'cottony', 'feathery', 'papery'
+    ];
+
+    // Valid texture_look values (visual - how it LOOKS)
+    const validTextureLook = [
+      'matte', 'glossy', 'shiny', 'lustrous', 'satin', 'iridescent',
+      'metallic', 'patent', 'brushed', 'polished', 'distressed', 'woven',
+      'knit', 'embossed', 'velvet', 'suede', 'pearlescent', 'frosted',
+      'reflective', 'dull', 'shimmer', 'glitter', 'opalescent', 'lacquered'
+    ];
+
+    // Legacy combined texture (for backward compatibility)
     const validTextures = [
       'smooth', 'textured', 'woven', 'ribbed', 'rough', 'soft', 'fuzzy',
       'grainy', 'pebbled', 'quilted', 'embossed', 'matte', 'glossy',
@@ -238,98 +254,219 @@ export class ProductEnrichmentEngine {
       'velvet', 'suede', 'patent', 'metallic', 'nubuck', 'coarse'
     ];
 
-    // Valid weave types (fabric construction methods)
+    // Valid weave types (fabric construction methods) - Global textile traditions
+    // Organized by technique type, not geography - names are self-descriptive of origin
     const validWeaves = [
-      'oxford', 'twill', 'sateen', 'percale', 'jersey', 'flannel',
-      'poplin', 'chambray', 'herringbone', 'jacquard', 'canvas',
-      'denim', 'corduroy', 'seersucker', 'dobby', 'broadcloth',
-      'gabardine', 'chino', 'fleece', 'terry', 'velour', 'chenille',
-      'boucle', 'cable-knit', 'rib-knit', 'interlock', 'pique'
+      // Plain/tabby weaves
+      'oxford', 'poplin', 'broadcloth', 'percale', 'chambray', 'canvas',
+      'khadi', 'kota', 'tant', 'mangalgiri', 'chanderi', 'maheshwari',
+      'habutae', 'shweshwe',
+      // Twill weaves
+      'twill', 'gabardine', 'denim', 'chino', 'herringbone', 'serge',
+      // Satin weaves
+      'sateen', 'charmeuse',
+      // Jacquard/brocade weaves (complex patterns)
+      'jacquard', 'damask', 'brocade',
+      'banarasi', 'kanchipuram', 'paithani', 'patola', 'jamdani',
+      'nishijin', 'songket', 'kente', 'aso-oke',
+      // Knit constructions
+      'jersey', 'interlock', 'pique', 'cable-knit', 'rib-knit',
+      // Pile/napped fabrics
+      'velour', 'velvet', 'corduroy', 'terry', 'chenille', 'fleece', 'flannel',
+      // Resist-dye/tie-dye techniques (pattern + weave)
+      'ikat', 'pochampally', 'sambalpuri', 'kasuri', 'shibori', 'bandhani',
+      'adire', 'batik', 'ajrak',
+      // Embroidered/embellished textiles
+      'chikankari', 'lucknowi', 'phulkari', 'kantha', 'sashiko', 'kogin',
+      'suzani',
+      // Hand-painted/printed textiles
+      'kalamkari', 'yuzen', 'ankara', 'kitenge', 'kanga',
+      // Specialty silk weaves
+      'tussar', 'muga', 'tsumugi', 'chirimen', 'meisen',
+      // Textured/novelty weaves
+      'seersucker', 'dobby', 'boucle', 'waffle',
+      // Rug/flatweave techniques
+      'kilim', 'dhurrie',
+      // Patch/repair techniques (wabi-sabi aesthetic)
+      'boro',
+      // Traditional handloom (region-specific)
+      'tenun', 'lurik', 'ulos', 'tapis', 'mudcloth', 'bogolan'
     ];
 
-    // Weave-to-texture mapping (what texture does this weave typically produce?)
-    const weaveToTexture: Record<string, string> = {
-      'oxford': 'textured',
-      'twill': 'smooth',
-      'percale': 'smooth',
-      'sateen': 'satin',
-      'jersey': 'soft',
-      'flannel': 'soft',
-      'poplin': 'smooth',
-      'chambray': 'soft',
-      'herringbone': 'textured',
-      'jacquard': 'textured',
-      'canvas': 'textured',
-      'denim': 'textured',
-      'corduroy': 'ribbed',
-      'seersucker': 'textured',
-      'dobby': 'textured',
-      'broadcloth': 'smooth',
-      'gabardine': 'smooth',
-      'chino': 'smooth',
-      'fleece': 'soft',
-      'terry': 'fuzzy',
-      'velour': 'velvet',
-      'chenille': 'soft',
-      'boucle': 'textured',
-      'cable-knit': 'knit',
+    // Weave-to-texture mapping (what texture feel AND look does this weave produce?)
+    const weaveToTextureFeel: Record<string, string> = {
+      // Plain weaves
+      'oxford': 'textured', 'poplin': 'smooth', 'broadcloth': 'smooth', 'percale': 'crisp',
+      'chambray': 'soft', 'canvas': 'rough', 'khadi': 'textured', 'kota': 'crisp',
+      'tant': 'crisp', 'mangalgiri': 'crisp', 'chanderi': 'silky', 'maheshwari': 'soft',
+      'habutae': 'silky', 'shweshwe': 'crisp',
+      // Twill weaves
+      'twill': 'smooth', 'gabardine': 'smooth', 'denim': 'textured', 'chino': 'smooth',
+      'herringbone': 'textured', 'serge': 'smooth',
+      // Satin weaves
+      'sateen': 'silky', 'charmeuse': 'silky',
+      // Jacquard/brocade weaves
+      'jacquard': 'textured', 'damask': 'smooth', 'brocade': 'textured',
+      'banarasi': 'textured', 'kanchipuram': 'crisp', 'paithani': 'silky', 'patola': 'silky',
+      'jamdani': 'soft', 'nishijin': 'textured', 'songket': 'textured', 'kente': 'textured',
+      'aso-oke': 'textured',
+      // Knit constructions
+      'jersey': 'soft', 'interlock': 'smooth', 'pique': 'textured', 'cable-knit': 'textured',
       'rib-knit': 'ribbed',
-      'interlock': 'smooth',
-      'pique': 'textured',
+      // Pile/napped fabrics
+      'velour': 'plush', 'velvet': 'plush', 'corduroy': 'ribbed', 'terry': 'fuzzy',
+      'chenille': 'soft', 'fleece': 'soft', 'flannel': 'soft',
+      // Resist-dye techniques
+      'ikat': 'textured', 'pochampally': 'soft', 'sambalpuri': 'soft', 'kasuri': 'soft',
+      'shibori': 'textured', 'bandhani': 'textured', 'adire': 'soft', 'batik': 'soft',
+      'ajrak': 'soft',
+      // Embroidered textiles (base fabric + embroidery)
+      'chikankari': 'textured', 'lucknowi': 'textured', 'phulkari': 'textured',
+      'kantha': 'quilted', 'sashiko': 'quilted', 'kogin': 'textured', 'suzani': 'embossed',
+      // Hand-painted/printed
+      'kalamkari': 'soft', 'yuzen': 'silky', 'ankara': 'crisp', 'kitenge': 'crisp', 'kanga': 'soft',
+      // Specialty silks
+      'tussar': 'textured', 'muga': 'silky', 'tsumugi': 'textured', 'chirimen': 'textured',
+      'meisen': 'silky',
+      // Textured weaves
+      'seersucker': 'textured', 'dobby': 'textured', 'boucle': 'nubby', 'waffle': 'textured',
+      // Rug techniques
+      'kilim': 'rough', 'dhurrie': 'rough',
+      // Patch/repair
+      'boro': 'textured',
+      // Handloom
+      'tenun': 'textured', 'lurik': 'textured', 'ulos': 'textured', 'tapis': 'textured',
+      'mudcloth': 'rough', 'bogolan': 'rough',
+    };
+
+    const weaveToTextureLook: Record<string, string> = {
+      // Plain weaves
+      'oxford': 'woven', 'poplin': 'matte', 'broadcloth': 'matte', 'percale': 'matte',
+      'chambray': 'matte', 'canvas': 'matte', 'khadi': 'matte', 'kota': 'shiny',
+      'tant': 'matte', 'mangalgiri': 'matte', 'chanderi': 'shiny', 'maheshwari': 'lustrous',
+      'habutae': 'lustrous', 'shweshwe': 'matte',
+      // Twill weaves
+      'twill': 'matte', 'gabardine': 'matte', 'denim': 'matte', 'chino': 'matte',
+      'herringbone': 'woven', 'serge': 'matte',
+      // Satin weaves
+      'sateen': 'lustrous', 'charmeuse': 'lustrous',
+      // Jacquard/brocade weaves
+      'jacquard': 'woven', 'damask': 'lustrous', 'brocade': 'lustrous',
+      'banarasi': 'lustrous', 'kanchipuram': 'lustrous', 'paithani': 'lustrous',
+      'patola': 'lustrous', 'jamdani': 'lustrous', 'nishijin': 'lustrous',
+      'songket': 'lustrous', 'kente': 'woven', 'aso-oke': 'woven',
+      // Knit constructions
+      'jersey': 'matte', 'interlock': 'matte', 'pique': 'woven', 'cable-knit': 'knit',
+      'rib-knit': 'knit',
+      // Pile/napped fabrics
+      'velour': 'velvet', 'velvet': 'velvet', 'corduroy': 'woven', 'terry': 'matte',
+      'chenille': 'velvet', 'fleece': 'matte', 'flannel': 'matte',
+      // Resist-dye techniques
+      'ikat': 'matte', 'pochampally': 'lustrous', 'sambalpuri': 'lustrous', 'kasuri': 'matte',
+      'shibori': 'matte', 'bandhani': 'matte', 'adire': 'matte', 'batik': 'matte', 'ajrak': 'matte',
+      // Embroidered textiles
+      'chikankari': 'embossed', 'lucknowi': 'embossed', 'phulkari': 'embossed',
+      'kantha': 'embossed', 'sashiko': 'embossed', 'kogin': 'embossed', 'suzani': 'embossed',
+      // Hand-painted/printed
+      'kalamkari': 'matte', 'yuzen': 'lustrous', 'ankara': 'matte', 'kitenge': 'matte', 'kanga': 'matte',
+      // Specialty silks
+      'tussar': 'matte', 'muga': 'lustrous', 'tsumugi': 'matte', 'chirimen': 'matte', 'meisen': 'lustrous',
+      // Textured weaves
+      'seersucker': 'woven', 'dobby': 'woven', 'boucle': 'woven', 'waffle': 'woven',
+      // Rug techniques
+      'kilim': 'woven', 'dhurrie': 'woven',
+      // Patch/repair
+      'boro': 'distressed',
+      // Handloom
+      'tenun': 'woven', 'lurik': 'woven', 'ulos': 'woven', 'tapis': 'lustrous',
+      'mudcloth': 'matte', 'bogolan': 'matte',
     };
 
     // Material-to-texture mapping (fallback for non-textiles)
-    const materialToTexture: Record<string, string> = {
-      'leather': 'smooth',
-      'silk': 'smooth',
-      'cotton': 'soft',
-      'wool': 'fuzzy',
-      'linen': 'textured',
-      'metal': 'shiny',
-      'glass': 'glossy',
-      'ceramic': 'smooth',
-      'wood': 'grainy',
-      'plastic': 'smooth',
-      'rubber': 'matte',
-      'suede': 'suede',
-      'velvet': 'velvet',
-      'cashmere': 'soft',
+    const materialToTextureFeel: Record<string, string> = {
+      'leather': 'smooth', 'silk': 'silky', 'cotton': 'soft', 'wool': 'fuzzy',
+      'linen': 'textured', 'metal': 'smooth', 'glass': 'smooth', 'ceramic': 'smooth',
+      'wood': 'grainy', 'plastic': 'smooth', 'rubber': 'soft', 'suede': 'velvety',
+      'velvet': 'plush', 'cashmere': 'soft', 'denim': 'textured', 'polyester': 'smooth',
+      'nylon': 'slick', 'canvas': 'rough', 'tweed': 'textured', 'satin': 'silky',
+    };
+
+    const materialToTextureLook: Record<string, string> = {
+      'leather': 'matte', 'silk': 'lustrous', 'cotton': 'matte', 'wool': 'matte',
+      'linen': 'matte', 'metal': 'shiny', 'glass': 'glossy', 'ceramic': 'glossy',
+      'wood': 'matte', 'plastic': 'glossy', 'rubber': 'matte', 'suede': 'suede',
+      'velvet': 'velvet', 'cashmere': 'matte', 'denim': 'matte', 'polyester': 'shiny',
+      'nylon': 'shiny', 'canvas': 'matte', 'tweed': 'woven', 'satin': 'satin',
     };
 
     // Get raw values
-    let rawTexture = response.texture?.toLowerCase().trim() || '';
+    let rawTextureFeel = response.texture_feel?.toLowerCase().trim() || '';
+    let rawTextureLook = response.texture_look?.toLowerCase().trim() || '';
+    let rawTexture = response.texture?.toLowerCase().trim() || ''; // Legacy field
     let rawWeave = response.weave?.toLowerCase().trim() || '';
     const rawMaterial = response.material?.toLowerCase().trim() || 'unknown';
 
-    // If AI put a weave type in the texture field, extract it
-    if (validWeaves.includes(rawTexture)) {
-      // Move to weave field if not already set
-      if (!rawWeave) {
-        rawWeave = rawTexture;
+    // If AI put a weave type in any texture field, extract it
+    const allTextureFields = [rawTextureFeel, rawTextureLook, rawTexture];
+    for (const field of allTextureFields) {
+      if (field && validWeaves.includes(field)) {
+        if (!rawWeave) {
+          rawWeave = field;
+        }
+        // Clear from texture fields if it was mistakenly placed there
+        if (rawTextureFeel === field) rawTextureFeel = '';
+        if (rawTextureLook === field) rawTextureLook = '';
+        if (rawTexture === field) rawTexture = '';
       }
-      // Map to correct texture
-      rawTexture = weaveToTexture[rawTexture] || 'smooth';
     }
 
     // Validate weave (only keep valid values)
     const normalizedWeave = validWeaves.includes(rawWeave) ? rawWeave : undefined;
 
-    // Validate texture
+    // Normalize texture_feel
+    let normalizedTextureFeel = rawTextureFeel;
+    if (!validTextureFeel.includes(normalizedTextureFeel)) {
+      // Try weave-based fallback first
+      if (normalizedWeave && weaveToTextureFeel[normalizedWeave]) {
+        normalizedTextureFeel = weaveToTextureFeel[normalizedWeave];
+      } else if (materialToTextureFeel[rawMaterial]) {
+        normalizedTextureFeel = materialToTextureFeel[rawMaterial];
+      } else if (rawTexture && validTextureFeel.includes(rawTexture)) {
+        // Legacy: try old texture field
+        normalizedTextureFeel = rawTexture;
+      } else {
+        normalizedTextureFeel = 'smooth';
+      }
+    }
+
+    // Normalize texture_look
+    let normalizedTextureLook = rawTextureLook;
+    if (!validTextureLook.includes(normalizedTextureLook)) {
+      // Try weave-based fallback first
+      if (normalizedWeave && weaveToTextureLook[normalizedWeave]) {
+        normalizedTextureLook = weaveToTextureLook[normalizedWeave];
+      } else if (materialToTextureLook[rawMaterial]) {
+        normalizedTextureLook = materialToTextureLook[rawMaterial];
+      } else if (rawTexture && validTextureLook.includes(rawTexture)) {
+        // Legacy: try old texture field
+        normalizedTextureLook = rawTexture;
+      } else {
+        normalizedTextureLook = 'matte';
+      }
+    }
+
+    // Legacy texture (for backward compatibility - use feel as primary)
     let normalizedTexture = rawTexture;
     if (!validTextures.includes(normalizedTexture)) {
-      // Try material-based fallback
-      if (materialToTexture[rawMaterial]) {
-        normalizedTexture = materialToTexture[rawMaterial];
-      } else {
-        console.warn(`Invalid texture "${rawTexture}", defaulting to "smooth"`);
-        normalizedTexture = 'smooth';
-      }
+      normalizedTexture = normalizedTextureFeel;
     }
 
     return {
       color_palette: response.color_palette?.map(c => c.toLowerCase().trim()) || [],
       tags: response.tags?.map(t => t.toLowerCase().trim()) || [],
-      texture: normalizedTexture,
+      texture_feel: normalizedTextureFeel,
+      texture_look: normalizedTextureLook,
+      texture: normalizedTexture, // Legacy - kept for backward compatibility
       weave: normalizedWeave,
       material: rawMaterial,
       tone: response.tone?.toLowerCase().trim() || 'neutral',
@@ -355,14 +492,20 @@ export class ProductEnrichmentEngine {
     return `You are an expert product analyst specializing in home decor, fashion, and lifestyle products.
 
 Given the product below, analyze and enrich it with the following:
-- **color_palette**: An array of 2-5 primary and secondary colors (e.g., ["indigo", "cream", "brick red"])
-- **tags**: An array of 3-5 descriptive style keywords (e.g., ["handwoven", "traditional", "boho", "textured"])
-- **texture**: The SURFACE FINISH quality - how it feels/looks to touch. Must be one of: smooth, textured, woven, ribbed, rough, soft, fuzzy, grainy, pebbled, quilted, embossed, matte, glossy, shiny, brushed, polished, satin, distressed, velvet, suede, knit
-- **weave**: For TEXTILES ONLY - the fabric construction type (e.g., "oxford", "twill", "sateen", "percale", "jersey", "flannel", "poplin", "chambray", "herringbone", "jacquard", "canvas", "denim"). Use null for non-textile items.
-- **material**: The primary material class (e.g., "cotton", "ceramic", "wood", "linen", "leather", "silk", "wool", "polyester", "metal", "glass")
-- **tone**: The overall aesthetic or mood (e.g., "earthy", "playful", "minimalist", "luxury")
-- **flags**: Special product attributes (e.g., ["handmade", "fragile", "limited-edition", "eco-friendly", "vintage", "artisan"])
-- **fit_tags**: Physical characteristics for layout placement. Choose from: "bulky", "flat", "delicate", "lightweight", "oversized"
+- **color_palette**: Array of 2-5 primary/secondary colors (e.g., ["indigo", "cream", "brick red"])
+- **tags**: Array of 3-5 descriptive style keywords (e.g., ["handwoven", "traditional", "boho"])
+- **texture_feel**: How it FEELS to touch (tactile). Choose from: smooth, soft, rough, fuzzy, silky, crisp, plush, textured, ribbed, grainy, pebbled, quilted, embossed, nubby, coarse, supple, stiff, spongy, velvety, slick
+- **texture_look**: How it LOOKS visually. Choose from: matte, glossy, shiny, lustrous, satin, iridescent, metallic, patent, brushed, polished, distressed, woven, knit, embossed, velvet, suede, pearlescent, frosted, reflective
+- **weave**: For TEXTILES ONLY - the fabric construction/tradition. Examples:
+  - Western: oxford, twill, sateen, jersey, flannel, poplin, herringbone, jacquard, denim, corduroy
+  - South Asian: khadi, ikat, banarasi, chanderi, kanchipuram, patola, bandhani, chikankari, phulkari
+  - East Asian: shibori, kasuri, sashiko, nishijin, yuzen
+  - African: kente, adire, ankara, kitenge, mudcloth, aso-oke
+  - Use null for non-textile items.
+- **material**: Primary material class (e.g., "cotton", "silk", "wool", "leather", "metal", "ceramic")
+- **tone**: Overall aesthetic/mood (e.g., "earthy", "playful", "minimalist", "luxury", "bohemian")
+- **flags**: Special attributes (e.g., ["handmade", "artisan", "eco-friendly", "vintage", "limited-edition"])
+- **fit_tags**: Physical characteristics for layout. Choose from: "bulky", "flat", "delicate", "lightweight", "oversized"
 - **inferred_dimensions**: Estimate typical dimensions based on product type
 
 **Product Details:**
@@ -375,26 +518,25 @@ ${product.dimensions ? `- Dimensions: ${product.dimensions}` : ''}
 ${product.product_dimensions ? `- Structured Dimensions: ${JSON.stringify(product.product_dimensions)}` : ''}
 ${fullDescription ? `\n**Product Description/Metadata:**\n${fullDescription}` : ''}
 
-**CRITICAL RULES - READ CAREFULLY:**
-1. ALL values must be LOWERCASE (e.g., "cotton" not "Cotton", "smooth" not "Smooth")
-2. **texture** vs **weave** - these are DIFFERENT things:
-   - **texture** = SURFACE FINISH (how it feels): smooth, soft, textured, matte, glossy, shiny, brushed, ribbed
-   - **weave** = FABRIC CONSTRUCTION (how it's made): oxford, twill, sateen, jersey, flannel, poplin
-3. For TEXTILES (shirts, pants, bedding): provide BOTH texture AND weave
-   - Example: Oxford shirt → texture: "smooth", weave: "oxford"
-   - Example: Flannel shirt → texture: "soft", weave: "flannel"
-4. For ACCESSORIES (jewelry, watches, bags): texture only, weave should be null
-   - Use textures like: shiny, matte, brushed, polished, satin, pebbled, smooth
-   - Base texture on material (e.g., metal=shiny/brushed, leather=smooth/pebbled)
-5. For NON-TEXTILES (ceramics, wood, glass): texture only, weave should be null
-6. Extract material, size, and other details from the description/metadata if available
-7. Return ONLY valid JSON without any markdown formatting or explanations
+**CRITICAL RULES:**
+1. ALL values must be LOWERCASE
+2. **texture_feel** = TACTILE (how it feels when touched)
+3. **texture_look** = VISUAL (how it appears to the eye)
+4. **weave** = FABRIC CONSTRUCTION (how textile is woven/made) - null for non-textiles
 
-**Output Format (JSON only):**
+**Examples:**
+- Banarasi silk saree → texture_feel: "silky", texture_look: "lustrous", weave: "banarasi"
+- Khadi kurta → texture_feel: "textured", texture_look: "matte", weave: "khadi"
+- Oxford shirt → texture_feel: "crisp", texture_look: "woven", weave: "oxford"
+- Leather bag → texture_feel: "smooth", texture_look: "matte", weave: null
+- Gold bracelet → texture_feel: "smooth", texture_look: "shiny", weave: null
+
+Return ONLY valid JSON without markdown formatting:
 {
   "color_palette": ["color1", "color2", "color3"],
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "texture": "surface_finish",
+  "tags": ["tag1", "tag2", "tag3"],
+  "texture_feel": "tactile_quality",
+  "texture_look": "visual_quality",
   "weave": "fabric_construction_or_null",
   "material": "material_type",
   "tone": "aesthetic_mood",

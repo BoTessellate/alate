@@ -34,9 +34,9 @@ Instead of trying to fix bounding box issues, substitute with reference product 
 
 ## Test Plan
 
-- [ ] Upload product that exists in enriched_products database → should show database image
-- [ ] Upload recognizable branded product not in database → should show web search image
-- [ ] Upload obscure/custom product → should fallback to processed user crop
+- [ ] Upload product that exists in enriched_products database - should show database image
+- [ ] Upload recognizable branded product not in database - should show web search image
+- [ ] Upload obscure/custom product - should fallback to processed user crop
 - [ ] Verify ProcessedProduct includes correct `image_source` tracking
 
 ## Configuration
