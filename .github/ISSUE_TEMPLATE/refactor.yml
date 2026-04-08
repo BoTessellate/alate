@@ -1,0 +1,55 @@
+name: Refactor
+description: Code restructuring or improvement
+title: "refactor: "
+labels: ["refactor"]
+body:
+  - type: textarea
+    id: current-state
+    attributes:
+      label: Current State
+      description: What needs restructuring and why?
+      placeholder: Describe what exists now
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-change
+    attributes:
+      label: Proposed Change
+      description: What should it become?
+      placeholder: Describe the target state
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know when this is done?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - critical
+        - high
+        - normal
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - frontend
+        - backend
+        - ai
+    validations:
+      required: true

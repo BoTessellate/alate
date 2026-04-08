@@ -1,0 +1,11 @@
+appId: com.fitcheck.app
+---
+# Test: Share URL to Fit Check app
+- launchApp
+- tapOn: "Enter product URL"
+- inputText: "https://www.asos.com/product/123"
+- tapOn: "Check Fit"
+- assertVisible: "Checking fit"
+- assertVisible:
+    text: "Fit Result"
+    timeout: 10000

@@ -1,0 +1,14 @@
+{
+  "name": "alate",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "cd backend && npm test && cd ../mobile && npm test",
+    "test:backend": "cd backend && npm test",
+    "test:mobile": "cd mobile && npm test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

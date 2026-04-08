@@ -1,0 +1,231 @@
+{
+  "version": "1.0.0",
+  "description": "Editable glossary of all approved tags with definitions",
+  "tags": {
+    "material": {
+      "cotton": {
+        "definition": "Made from cotton fibers, natural and breathable",
+        "synonyms": ["100% cotton", "pure cotton", "cotton blend"]
+      },
+      "linen": {
+        "definition": "Made from flax plant fibers, lightweight and durable",
+        "synonyms": ["flax", "linen blend"]
+      },
+      "silk": {
+        "definition": "Made from silk fibers, luxurious and smooth",
+        "synonyms": ["pure silk", "silk blend", "mulberry silk"]
+      },
+      "bamboo": {
+        "definition": "Made from bamboo fibers, sustainable and soft",
+        "synonyms": ["bamboo fiber", "bamboo blend"]
+      },
+      "wool": {
+        "definition": "Made from animal wool fibers, warm and insulating",
+        "synonyms": ["merino", "cashmere", "alpaca"]
+      },
+      "leather": {
+        "definition": "Made from animal hide, durable and timeless",
+        "synonyms": ["genuine leather", "full grain", "top grain"]
+      },
+      "ceramic": {
+        "definition": "Made from fired clay, decorative and functional",
+        "synonyms": ["porcelain", "stoneware", "earthenware", "pottery"]
+      },
+      "wood": {
+        "definition": "Made from natural wood, warm and organic",
+        "synonyms": ["wooden", "timber", "hardwood", "softwood"]
+      },
+      "metal": {
+        "definition": "Made from metal materials, durable and modern",
+        "synonyms": ["brass", "copper", "steel", "iron", "aluminum"]
+      },
+      "glass": {
+        "definition": "Made from glass, transparent and elegant",
+        "synonyms": ["crystal", "blown glass", "recycled glass"]
+      }
+    },
+    "origin": {
+      "made-in-india": {
+        "definition": "Product manufactured in India",
+        "synonyms": ["indian", "from india", "india origin"]
+      },
+      "japan-origin": {
+        "definition": "Product manufactured in Japan",
+        "synonyms": ["japanese", "from japan", "made in japan"]
+      },
+      "local-brand": {
+        "definition": "Brand based locally or domestically",
+        "synonyms": ["local", "domestic", "homegrown"]
+      },
+      "imported": {
+        "definition": "Product imported from another country",
+        "synonyms": ["international", "foreign"]
+      },
+      "fair-trade": {
+        "definition": "Certified fair trade, ensuring ethical labor practices",
+        "synonyms": ["fairtrade", "fair-trade certified", "ethically sourced"]
+      },
+      "artisan": {
+        "definition": "Made by skilled craftspeople using traditional methods",
+        "synonyms": ["artisanal", "craftsman", "handcrafted"]
+      },
+      "small-batch": {
+        "definition": "Produced in limited quantities for quality control",
+        "synonyms": ["limited production", "micro-batch", "craft"]
+      }
+    },
+    "use-case": {
+      "gifting": {
+        "definition": "Suitable as a gift for others",
+        "synonyms": ["gift", "present", "giftable", "gift-worthy"]
+      },
+      "summer": {
+        "definition": "Suitable for summer/warm weather use",
+        "synonyms": ["warm weather", "beach", "poolside"]
+      },
+      "winter": {
+        "definition": "Suitable for winter/cold weather use",
+        "synonyms": ["cold weather", "cozy", "warm"]
+      },
+      "festive": {
+        "definition": "Suitable for festivals and celebrations",
+        "synonyms": ["celebration", "holiday", "party", "diwali", "christmas"]
+      },
+      "everyday": {
+        "definition": "Suitable for daily use",
+        "synonyms": ["daily", "regular", "casual", "day-to-day"]
+      },
+      "special-occasion": {
+        "definition": "Reserved for special events or occasions",
+        "synonyms": ["formal", "occasion", "event", "celebration"]
+      },
+      "travel": {
+        "definition": "Suitable for travel and portability",
+        "synonyms": ["portable", "travel-friendly", "on-the-go"]
+      },
+      "outdoor": {
+        "definition": "Designed for outdoor use",
+        "synonyms": ["outdoors", "garden", "patio", "exterior"]
+      }
+    },
+    "sustainability": {
+      "organic": {
+        "definition": "Made from organically grown materials without chemicals",
+        "synonyms": ["certified organic", "100% organic", "organically grown"]
+      },
+      "sustainable": {
+        "definition": "Produced using environmentally sustainable practices",
+        "synonyms": ["eco", "environmentally friendly", "green"]
+      },
+      "eco-friendly": {
+        "definition": "Designed to have minimal environmental impact",
+        "synonyms": ["environmentally friendly", "eco", "green", "earth-friendly"]
+      },
+      "handwoven": {
+        "definition": "Woven by hand using traditional techniques",
+        "synonyms": ["hand-woven", "hand woven", "loom-woven"]
+      },
+      "handmade": {
+        "definition": "Made by hand rather than machine",
+        "synonyms": ["hand-made", "hand made", "handcrafted", "hand-crafted"]
+      },
+      "upcycled": {
+        "definition": "Made from repurposed or upcycled materials",
+        "synonyms": ["up-cycled", "repurposed", "reclaimed"]
+      },
+      "recycled": {
+        "definition": "Made from recycled materials",
+        "synonyms": ["re-cycled", "post-consumer", "pre-consumer"]
+      },
+      "plastic-free": {
+        "definition": "Contains no plastic materials",
+        "synonyms": ["no plastic", "zero plastic", "plastic free"]
+      },
+      "vegan": {
+        "definition": "Contains no animal products or by-products",
+        "synonyms": ["plant-based", "animal-free"]
+      },
+      "cruelty-free": {
+        "definition": "Not tested on animals",
+        "synonyms": ["cruelty free", "not tested on animals", "bunny-approved"]
+      }
+    },
+    "style": {
+      "earthy": {
+        "definition": "Natural, grounded aesthetic with earth tones",
+        "synonyms": ["natural", "grounded", "organic look"]
+      },
+      "bold": {
+        "definition": "Strong, striking, and attention-grabbing design",
+        "synonyms": ["statement", "striking", "dramatic"]
+      },
+      "monochrome": {
+        "definition": "Single color or variations of one color",
+        "synonyms": ["monotone", "single-color", "tonal"]
+      },
+      "minimalist": {
+        "definition": "Simple, clean design with minimal elements",
+        "synonyms": ["minimal", "simple", "clean", "understated"]
+      },
+      "maximalist": {
+        "definition": "Bold, layered design with abundant elements",
+        "synonyms": ["maximal", "layered", "abundant", "ornate"]
+      },
+      "bohemian": {
+        "definition": "Free-spirited, eclectic, and artistic style",
+        "synonyms": ["boho", "boho-chic", "gypsy", "free-spirited"]
+      },
+      "modern": {
+        "definition": "Contemporary design with clean lines",
+        "synonyms": ["contemporary", "current", "present-day"]
+      },
+      "vintage": {
+        "definition": "Inspired by or from a previous era",
+        "synonyms": ["retro", "antique", "old-fashioned", "classic"]
+      },
+      "scandinavian": {
+        "definition": "Nordic-inspired minimalist design",
+        "synonyms": ["scandi", "nordic", "swedish", "danish"]
+      },
+      "industrial": {
+        "definition": "Raw, factory-inspired aesthetic",
+        "synonyms": ["factory", "warehouse", "urban", "loft"]
+      },
+      "rustic": {
+        "definition": "Rural, countryside-inspired rough aesthetic",
+        "synonyms": ["country", "farmhouse", "rural", "cottage"]
+      },
+      "coastal": {
+        "definition": "Beach and ocean-inspired aesthetic",
+        "synonyms": ["beach", "nautical", "seaside", "ocean"]
+      },
+      "mid-century": {
+        "definition": "1950s-60s modern design aesthetic",
+        "synonyms": ["midcentury", "mid century", "mcm", "retro modern"]
+      },
+      "luxurious": {
+        "definition": "High-end, premium, and opulent",
+        "synonyms": ["luxury", "premium", "high-end", "upscale", "opulent"]
+      }
+    }
+  },
+  "global_aliases": {
+    "boho": "bohemian",
+    "scandi": "scandinavian",
+    "midcentury": "mid-century",
+    "mid century": "mid-century",
+    "hand made": "handmade",
+    "hand-made": "handmade",
+    "eco friendly": "eco-friendly",
+    "eco": "eco-friendly",
+    "green": "sustainable",
+    "cruelty free": "cruelty-free",
+    "plastic free": "plastic-free",
+    "fair trade": "fair-trade",
+    "small batch": "small-batch",
+    "local": "local-brand",
+    "homegrown": "local-brand",
+    "minimal": "minimalist",
+    "simple": "minimalist"
+  }
+}

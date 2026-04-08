@@ -1,0 +1,177 @@
+/**
+ * FitLoader - Animated loading component for fit analysis
+ * Uses react-native-reanimated for smooth, brand-aligned animation
+ */
+
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withDelay,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
+import { colors, spacing, typography } from '../constants/theme';
+
+interface FitLoaderProps {
+  title?: string;
+  subtitle?: string;
+}
+
+const DOT_SIZE = 10;
+const DOT_GAP = 10;
+const DOT_COLORS = [colors.cta, colors.primaryLight, colors.accentDark];
+const ANIMATION_DURATION = 500;
+
+function BounceDot({ delay, color }: { delay: number; color: string }) {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(-12, { duration: ANIMATION_DURATION, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: ANIMATION_DURATION, easing: Easing.in(Easing.quad) }),
+        ),
+        -1,
+        false
+      )
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.dot,
+        { backgroundColor: color },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+function PulseRing() {
+  const scale = useSharedValue(0.8);
+  const opacity = useSharedValue(0.6);
+
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.4, { duration: 900, easing: Easing.out(Easing.ease) }),
+        withTiming(0.8, { duration: 900, easing: Easing.in(Easing.ease) }),
+      ),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 900, easing: Easing.out(Easing.ease) }),
+        withTiming(0.6, { duration: 900, easing: Easing.in(Easing.ease) }),
+      ),
+      -1,
+      false
+    );
+  }, []);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.pulseRing, ringStyle]} />;
+}
+
+export default function FitLoader({
+  title = 'Analysing fit…',
+  subtitle = 'Checking measurements and material',
+}: FitLoaderProps) {
+  return (
+    <View style={styles.container}>
+      {/* Icon with pulse ring */}
+      <View style={styles.iconWrapper}>
+        <PulseRing />
+        <View style={styles.iconContainer}>
+          <Feather name="shopping-bag" size={32} color={colors.cta} />
+        </View>
+      </View>
+
+      {/* Bounce dots */}
+      <View style={styles.dotsRow}>
+        {DOT_COLORS.map((color, i) => (
+          <BounceDot key={i} delay={i * 160} color={color} />
+        ))}
+      </View>
+
+      {/* Text */}
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background,
+  },
+  iconWrapper: {
+    width: 96,
+    height: 96,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderColor: colors.cta,
+    backgroundColor: 'transparent',
+  },
+  iconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.cta + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: DOT_GAP,
+    marginBottom: spacing.lg,
+    height: 28,
+  },
+  dot: {
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
+  },
+  title: {
+    ...typography.headingM,
+    color: colors.text,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+});

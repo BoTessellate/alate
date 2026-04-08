@@ -1,0 +1,425 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StatusBar,
+} from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
+import { Feather } from '@expo/vector-icons';
+import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
+import { useAvatarStore } from '../store/avatarStore';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+
+type NavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList, 'Home'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProp>();
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [failedBrand, setFailedBrand] = useState<{ brandName: string; brandDomain: string } | null>(null);
+  const [nudgeSent, setNudgeSent] = useState(false);
+  const [nudging, setNudging] = useState(false);
+  const { avatar } = useAvatarStore();
+
+  useFocusEffect(
+    useCallback(() => {
+      setUrl('');
+      setError(null);
+      setFailedBrand(null);
+      setNudgeSent(false);
+    }, [])
+  );
+
+  const handleCheckFit = async () => {
+    if (!url.trim()) {
+      setError('Please enter a product URL');
+      return;
+    }
+
+    // Check if avatar is set up
+    if (!avatar) {
+      navigation.navigate('AvatarSetup');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setFailedBrand(null);
+    setNudgeSent(false);
+
+    try {
+      const result = await scrapeProduct(url);
+      if (result.success && result.data) {
+        navigation.navigate('FitResult', { product: result.data, url });
+      } else {
+        const brand = extractBrandFromUrl(url);
+        setFailedBrand(brand);
+        setError('Unable to fetch product details.');
+      }
+    } catch (err) {
+      const brand = extractBrandFromUrl(url);
+      setFailedBrand(brand);
+      setError('Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.content}>
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            <View style={styles.iconContainer}>
+              <Feather name="shopping-bag" size={36} color={colors.primary} />
+            </View>
+            <Text style={styles.title}>Will it fit?</Text>
+            <Text style={styles.subtitle}>
+              Paste any product URL to instantly check{'\n'}if it'll fit your body perfectly
+            </Text>
+          </View>
+
+          {/* Input Card */}
+          <View style={styles.inputCard}>
+            <Text style={styles.inputLabel}>Product URL</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                testID="url-input"
+                style={styles.input}
+                placeholder="Paste ASOS, Zara, or any product URL..."
+                placeholderTextColor={colors.textMuted}
+                value={url}
+                onChangeText={(text) => {
+                  setUrl(text);
+                  if (error) {
+                    setError(null);
+                    setFailedBrand(null);
+                    setNudgeSent(false);
+                  }
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+            </View>
+
+            {error && !failedBrand && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.error}>{error}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              testID="check-fit-button"
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleCheckFit}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Check Fit</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Brand Nudge Card */}
+          {failedBrand && (
+            <View style={styles.nudgeCard}>
+              <View style={styles.nudgeHeader}>
+                <Feather name="send" size={18} color={colors.secondary} />
+                <Text style={styles.nudgeTitle}>
+                  {nudgeSent
+                    ? `We've reached out to ${failedBrand.brandName}!`
+                    : `${failedBrand.brandName} isn't on our platform yet`}
+                </Text>
+              </View>
+              {nudgeSent ? (
+                <Text style={styles.nudgeDescription}>
+                  Thanks for nudging {failedBrand.brandName}. We've sent them an email
+                  explaining how they can help their customers check fit before buying.
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.nudgeDescription}>
+                    Nudge your favourite brand to get on our platform so you can check fit
+                    before making the final purchase.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.nudgeButton}
+                    onPress={async () => {
+                      setNudging(true);
+                      await nudgeBrand(failedBrand.brandDomain, failedBrand.brandName);
+                      setNudging(false);
+                      setNudgeSent(true);
+                    }}
+                    disabled={nudging}
+                    activeOpacity={0.8}
+                  >
+                    {nudging ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <>
+                        <Feather name="mail" size={16} color={colors.white} />
+                        <Text style={styles.nudgeButtonText}>
+                          Nudge {failedBrand.brandName}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Profile Setup Prompt */}
+          {!avatar && (
+            <TouchableOpacity
+              style={styles.setupCard}
+              onPress={() => navigation.navigate('AvatarSetup')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.setupIconContainer}>
+                <Feather name="sliders" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.setupTextContainer}>
+                <Text style={styles.setupTitle}>Set up your body profile</Text>
+                <Text style={styles.setupSubtitle}>
+                  Tell us your height and body type for accurate fit predictions
+                </Text>
+              </View>
+              <Text style={styles.setupArrow}>→</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Feature Highlights */}
+          <View style={styles.featuresSection}>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureDot, { backgroundColor: colors.primary }]} />
+              <Text style={styles.featureText}>Works with 100+ fashion sites</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureDot, { backgroundColor: colors.secondary }]} />
+              <Text style={styles.featureText}>Instant AI-powered fit analysis</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <View style={[styles.featureDot, { backgroundColor: colors.success }]} />
+              <Text style={styles.featureText}>Save to your fit history</Text>
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    flex: 1,
+    padding: spacing.lg,
+    justifyContent: 'center',
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primaryLight + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  title: {
+    ...typography.displayMedium,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  inputCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    ...shadows.md,
+  },
+  inputLabel: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    marginBottom: spacing.md,
+  },
+  input: {
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    ...typography.body,
+    color: colors.text,
+    borderWidth: 2,
+    borderColor: colors.border,
+  },
+  errorContainer: {
+    backgroundColor: colors.errorLight + '20',
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  error: {
+    ...typography.bodySmall,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: colors.cta,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    ...typography.button,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  setupCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.primaryLight,
+    borderStyle: 'dashed',
+  },
+  setupIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primaryLight + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  setupTextContainer: {
+    flex: 1,
+  },
+  setupTitle: {
+    ...typography.labelLarge,
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  setupSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  setupArrow: {
+    fontSize: 20,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  nudgeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.secondary + '40',
+    ...shadows.sm,
+  },
+  nudgeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  nudgeTitle: {
+    ...typography.labelLarge,
+    color: colors.text,
+    flex: 1,
+  },
+  nudgeDescription: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  nudgeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cta,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    ...shadows.sm,
+  },
+  nudgeButtonText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  featuresSection: {
+    paddingTop: spacing.md,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  featureDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: spacing.sm,
+  },
+  featureText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+});

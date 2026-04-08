@@ -1,0 +1,20 @@
+# Shopify App Configuration
+# Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "The Mood Layer"
+client_id = "35efcb33843d514f14a8cad36e9827f7"
+application_url = "https://backend-tml.vercel.app/api/shopify"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,read_product_listings,read_inventory"
+
+[auth]
+redirect_urls = ["https://backend-tml.vercel.app/api/shopify-callback"]
+
+[webhooks]
+api_version = "2024-01"
+
+  [[webhooks.subscriptions]]
+  topics = ["products/create", "products/update", "products/delete", "inventory_levels/update", "app/uninstalled"]
+  uri = "https://backend-tml.vercel.app/api/shopify-webhooks"

@@ -1,0 +1,54 @@
+name: Enrich Shopify Products
+
+on:
+  # Triggered after sync via API (for future immediate trigger)
+  repository_dispatch:
+    types: [enrich-products]
+
+  # Run every 6 hours
+  schedule:
+    - cron: '0 */6 * * *'
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      shop:
+        description: 'Shop domain (optional - leave empty for all shops)'
+        required: false
+
+jobs:
+  enrich:
+    if: false  # Disabled - remove this line to re-enable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enrich products
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          # Get shop from dispatch payload or manual input
+          SHOP="${{ github.event.client_payload.shop || inputs.shop || '' }}"
+
+          echo "Starting product enrichment..."
+          echo "API URL: $API_URL"
+
+          if [ -z "$API_URL" ]; then
+            echo "ERROR: API_URL secret not configured"
+            exit 1
+          fi
+
+          if [ -n "$SHOP" ]; then
+            # Enrich specific shop
+            echo "Enriching products for shop: $SHOP"
+            curl -X POST "$API_URL/api/shopify?action=enrich" \
+              -H "Content-Type: application/json" \
+              -d "{\"shop\": \"$SHOP\", \"limit\": 10}" \
+              --fail --show-error
+          else
+            # Enrich all shops with pending products
+            echo "Enriching products for all shops..."
+            curl -X GET "$API_URL/api/shopify?action=enrich-all&limit=10" \
+              --fail --show-error
+          fi
+
+          echo ""
+          echo "Enrichment complete!"

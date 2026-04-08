@@ -1,0 +1,22 @@
+node_modules/
+backend.log
+
+# Exclude local development server
+api/index.ts
+
+# Exclude diagnostic-only endpoints (not needed in production)
+api/ai-status.ts
+
+# Exclude scheduler functions (not serverless - run via cron elsewhere)
+functions/
+
+# Exclude supabase edge functions (deployed separately)
+supabase/
+
+# Exclude test files
+**/*.test.ts
+**/__tests__/
+
+# Exclude development files
+.env.local
+.env.development

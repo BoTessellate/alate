@@ -1,0 +1,12 @@
+node_modules
+.vercel
+dist
+.env
+.env.local
+.env*.local
+
+# Test outputs
+sdk/exportEngine/test-output/
+
+# Logs
+backend.log

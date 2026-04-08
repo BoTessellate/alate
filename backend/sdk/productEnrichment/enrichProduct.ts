@@ -1,0 +1,633 @@
+/**
+ * Product Enrichment Module
+ * Enriches raw product data using Claude AI (primary) with Gemini fallback
+ */
+
+import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  RawProductInput,
+  EnrichedProduct,
+  ClaudeEnrichmentResponse,
+  EnrichmentConfig
+} from './types';
+import {
+  validateRawProduct,
+  validateEnrichedFields,
+  sanitizeProductName,
+  normalizeCategory
+} from './validateProduct';
+import {
+  normalizeTags,
+  validateCategory as validateTaxonomyCategory,
+  NormalizationResult
+} from '../taxonomy';
+import {
+  getRecentFeedback,
+  FeedbackEntry
+} from '../shared/morphicPrompts';
+
+const CLAUDE_MAX_TOKENS = 1024;
+
+export class ProductEnrichmentEngine {
+  private anthropic: Anthropic | null;
+  private gemini: GoogleGenerativeAI | null;
+  private supabase: SupabaseClient;
+  private model: string;
+  private geminiModel: string;
+  private useMorphicPrompts: boolean;
+
+  constructor(config: EnrichmentConfig) {
+    // Initialize Anthropic if API key available
+    if (config.anthropicApiKey) {
+      this.anthropic = new Anthropic({
+        apiKey: config.anthropicApiKey
+      });
+    } else {
+      this.anthropic = null;
+      console.warn('Anthropic API key not provided - Claude enrichment disabled');
+    }
+
+    // Initialize Gemini as fallback
+    const geminiApiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(geminiApiKey);
+    } else {
+      this.gemini = null;
+      console.warn('Gemini API key not provided - Gemini fallback disabled');
+    }
+
+    // Ensure at least one provider is available
+    if (!this.anthropic && !this.gemini) {
+      throw new Error('At least one AI provider (Anthropic or Gemini) must be configured');
+    }
+
+    this.supabase = createClient(
+      config.supabaseUrl,
+      config.supabaseKey
+    );
+
+    this.model = config.model || process.env.ENRICHMENT_MODEL || 'claude-opus-4-5-20251101';
+    this.geminiModel = config.geminiModel || process.env.GEMINI_ENRICHMENT_MODEL || 'gemini-2.5-flash';
+    this.useMorphicPrompts = config.useMorphicPrompts ?? true; // Enable by default
+  }
+
+  /**
+   * Enriches a raw product using Claude AI
+   * @param rawProduct - Raw product input
+   * @param options - Optional enrichment options
+   * @param options.morphInstructions - Inline prompt modifications (e.g., ["focus on luxury brands", "emphasize sustainable materials"])
+   * @returns Enriched product with AI-generated fields
+   */
+  async enrichProduct(
+    rawProduct: RawProductInput,
+    options?: { morphInstructions?: string[] }
+  ): Promise<EnrichedProduct> {
+    // Step 1: Validate raw input
+    const validation = validateRawProduct(rawProduct);
+    if (!validation.isValid) {
+      throw new Error(`Invalid product input: ${validation.errors.join(', ')}`);
+    }
+
+    // Step 2: Sanitize inputs
+    const sanitized: RawProductInput = {
+      ...rawProduct,
+      product_name: sanitizeProductName(rawProduct.product_name),
+      category: normalizeCategory(rawProduct.category)
+    };
+
+    // Step 3: Call Claude for enrichment (with morphic prompts if enabled)
+    const enrichedFields = await this.callClaudeForEnrichment(sanitized, options?.morphInstructions);
+
+    // Step 4: Validate enriched fields
+    const enrichmentValidation = validateEnrichedFields(enrichedFields);
+    if (!enrichmentValidation.isValid) {
+      throw new Error(`Invalid enrichment output: ${enrichmentValidation.errors.join(', ')}`);
+    }
+
+    // Step 5: Normalize tags using taxonomy
+    const tagNormalization = this.normalizeProductTags(
+      enrichedFields.tags || [],
+      sanitized.category
+    );
+
+    // Step 6: Map inferred dimensions to product_dimensions if not already set
+    const productDimensions = sanitized.product_dimensions || (enrichedFields.inferred_dimensions ? {
+      width: enrichedFields.inferred_dimensions.width_cm,
+      height: enrichedFields.inferred_dimensions.height_cm,
+      depth: enrichedFields.inferred_dimensions.depth_cm,
+    } : undefined);
+
+    // Step 7: Merge and return enriched product
+    const enrichedProduct: EnrichedProduct = {
+      ...sanitized,
+      ...enrichedFields,
+      tags: tagNormalization.canonical_tags,
+      canonical_tags: tagNormalization.canonical_tags,
+      product_dimensions: productDimensions,
+      enriched_at: new Date().toISOString()
+    };
+
+    // Remove the inferred_dimensions field (it's mapped to product_dimensions)
+    delete (enrichedProduct as { inferred_dimensions?: unknown }).inferred_dimensions;
+
+    return enrichedProduct;
+  }
+
+  /**
+   * Normalizes product tags against the taxonomy
+   * @param tags - Raw tags from enrichment
+   * @param category - Product category for scoped normalization
+   * @returns Normalization result with canonical tags
+   */
+  private normalizeProductTags(tags: string[], category?: string): NormalizationResult {
+    // Validate category against taxonomy
+    const validCategory = category ? validateTaxonomyCategory(category) : undefined;
+
+    // Normalize tags using taxonomy
+    const result = normalizeTags(tags, validCategory || undefined);
+
+    // Log unmatched tags for monitoring (could be sent to analytics)
+    if (result.unmatched_tags.length > 0) {
+      console.warn(
+        `Unmatched tags during enrichment: ${result.unmatched_tags.join(', ')}`
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Calls AI API to enrich product data (Claude primary, Gemini fallback)
+   * @param product - Sanitized raw product
+   * @param morphInstructions - Optional inline modifications for the prompt
+   * @returns Enriched fields from AI
+   */
+  private async callClaudeForEnrichment(
+    product: RawProductInput,
+    morphInstructions?: string[]
+  ): Promise<ClaudeEnrichmentResponse> {
+    // Fetch recent feedback for few-shot learning if morphic prompts enabled
+    let recentFeedback: FeedbackEntry[] | undefined;
+    if (this.useMorphicPrompts) {
+      try {
+        recentFeedback = await getRecentFeedback(product.brand, product.category);
+      } catch (error) {
+        // Non-critical - continue without feedback
+        console.warn('Could not fetch recent feedback for morphic prompts:', error);
+      }
+    }
+
+    const prompt = this.buildEnrichmentPrompt(product, recentFeedback, morphInstructions);
+
+    // Try Claude first if available
+    if (this.anthropic) {
+      try {
+        const message = await this.anthropic.messages.create({
+          model: this.model,
+          max_tokens: CLAUDE_MAX_TOKENS,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        });
+
+        const textBlocks = message.content.filter((block) => block.type === 'text');
+        if (textBlocks.length === 0) {
+          throw new Error('Claude returned no text content blocks');
+        }
+
+        // Strip markdown code fences if present (Claude may wrap JSON in ```json)
+        let responseText = textBlocks
+          .map((block) => ('text' in block ? block.text : ''))
+          .join('');
+        responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+        if (!responseText) {
+          throw new Error('Claude returned empty response text');
+        }
+
+        const enriched = JSON.parse(responseText);
+        console.log('Product enrichment completed using Claude');
+        return this.normalizeEnrichmentResponse(enriched);
+      } catch (claudeError) {
+        const isJsonParseError = claudeError instanceof SyntaxError;
+        console.warn(
+          isJsonParseError
+            ? 'Claude returned malformed JSON, falling back to Gemini:'
+            : 'Claude enrichment failed, falling back to Gemini:',
+          claudeError
+        );
+        // Fall through to Gemini fallback
+      }
+    }
+
+    // Gemini fallback
+    if (this.gemini) {
+      return await this.callGeminiForEnrichment(prompt);
+    }
+
+    throw new Error('All AI providers failed for product enrichment');
+  }
+
+  /**
+   * Calls Gemini API for enrichment (fallback)
+   * @param prompt - The enrichment prompt
+   * @returns Enriched fields from Gemini
+   */
+  private async callGeminiForEnrichment(prompt: string): Promise<ClaudeEnrichmentResponse> {
+    if (!this.gemini) {
+      throw new Error('Gemini not configured');
+    }
+
+    const model = this.gemini.getGenerativeModel({ model: this.geminiModel });
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let responseText = response.text();
+
+    // Clean up response - Gemini sometimes wraps in markdown code blocks
+    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    try {
+      const enriched = JSON.parse(responseText);
+      console.log('Product enrichment completed using Gemini (fallback)');
+      return this.normalizeEnrichmentResponse(enriched);
+    } catch (error) {
+      throw new Error(`Failed to parse Gemini response: ${responseText}`);
+    }
+  }
+
+  /**
+   * Normalizes enrichment response to ensure data consistency
+   * - Converts all string values to lowercase
+   * - Validates texture values against allowed list
+   * - Extracts weave from texture if AI confused them
+   * @param response - Raw AI response
+   * @returns Normalized response
+   */
+  private normalizeEnrichmentResponse(response: ClaudeEnrichmentResponse): ClaudeEnrichmentResponse {
+    // Valid texture values (surface finishes, not weave types)
+    const validTextures = [
+      'smooth', 'textured', 'woven', 'ribbed', 'rough', 'soft', 'fuzzy',
+      'grainy', 'pebbled', 'quilted', 'embossed', 'matte', 'glossy',
+      'shiny', 'brushed', 'polished', 'satin', 'distressed', 'knit',
+      'velvet', 'suede', 'patent', 'metallic', 'nubuck', 'coarse'
+    ];
+
+    // Valid weave types (fabric construction methods)
+    const validWeaves = [
+      'oxford', 'twill', 'sateen', 'percale', 'jersey', 'flannel',
+      'poplin', 'chambray', 'herringbone', 'jacquard', 'canvas',
+      'denim', 'corduroy', 'seersucker', 'dobby', 'broadcloth',
+      'gabardine', 'chino', 'fleece', 'terry', 'velour', 'chenille',
+      'boucle', 'cable-knit', 'rib-knit', 'interlock', 'pique'
+    ];
+
+    // Weave-to-texture mapping (what texture does this weave typically produce?)
+    const weaveToTexture: Record<string, string> = {
+      'oxford': 'textured',
+      'twill': 'smooth',
+      'percale': 'smooth',
+      'sateen': 'satin',
+      'jersey': 'soft',
+      'flannel': 'soft',
+      'poplin': 'smooth',
+      'chambray': 'soft',
+      'herringbone': 'textured',
+      'jacquard': 'textured',
+      'canvas': 'textured',
+      'denim': 'textured',
+      'corduroy': 'ribbed',
+      'seersucker': 'textured',
+      'dobby': 'textured',
+      'broadcloth': 'smooth',
+      'gabardine': 'smooth',
+      'chino': 'smooth',
+      'fleece': 'soft',
+      'terry': 'fuzzy',
+      'velour': 'velvet',
+      'chenille': 'soft',
+      'boucle': 'textured',
+      'cable-knit': 'knit',
+      'rib-knit': 'ribbed',
+      'interlock': 'smooth',
+      'pique': 'textured',
+    };
+
+    // Material-to-texture mapping (fallback for non-textiles)
+    const materialToTexture: Record<string, string> = {
+      'leather': 'smooth',
+      'silk': 'smooth',
+      'cotton': 'soft',
+      'wool': 'fuzzy',
+      'linen': 'textured',
+      'metal': 'shiny',
+      'glass': 'glossy',
+      'ceramic': 'smooth',
+      'wood': 'grainy',
+      'plastic': 'smooth',
+      'rubber': 'matte',
+      'suede': 'suede',
+      'velvet': 'velvet',
+      'cashmere': 'soft',
+    };
+
+    // Get raw values
+    let rawTexture = response.texture?.toLowerCase().trim() || '';
+    let rawWeave = response.weave?.toLowerCase().trim() || '';
+    const rawMaterial = response.material?.toLowerCase().trim() || 'unknown';
+
+    // If AI put a weave type in the texture field, extract it
+    if (validWeaves.includes(rawTexture)) {
+      // Move to weave field if not already set
+      if (!rawWeave) {
+        rawWeave = rawTexture;
+      }
+      // Map to correct texture
+      rawTexture = weaveToTexture[rawTexture] || 'smooth';
+    }
+
+    // Validate weave (only keep valid values)
+    const normalizedWeave = validWeaves.includes(rawWeave) ? rawWeave : undefined;
+
+    // Validate texture
+    let normalizedTexture = rawTexture;
+    if (!validTextures.includes(normalizedTexture)) {
+      // Try material-based fallback
+      if (materialToTexture[rawMaterial]) {
+        normalizedTexture = materialToTexture[rawMaterial];
+      } else {
+        console.warn(`Invalid texture "${rawTexture}", defaulting to "smooth"`);
+        normalizedTexture = 'smooth';
+      }
+    }
+
+    return {
+      color_palette: response.color_palette?.map(c => c.toLowerCase().trim()) || [],
+      tags: response.tags?.map(t => t.toLowerCase().trim()) || [],
+      texture: normalizedTexture,
+      weave: normalizedWeave,
+      material: rawMaterial,
+      tone: response.tone?.toLowerCase().trim() || 'neutral',
+      flags: response.flags?.map(f => f.toLowerCase().trim()) || [],
+      fit_tags: response.fit_tags || [],
+      inferred_dimensions: response.inferred_dimensions
+    };
+  }
+
+  /**
+   * Builds the enrichment prompt for Claude with optional morphic enhancements
+   * @param product - Raw product data
+   * @param recentFeedback - Recent user corrections for few-shot learning
+   * @param morphInstructions - Optional inline modifications (e.g., "focus on luxury brands")
+   * @returns Formatted prompt string
+   */
+  private buildEnrichmentPrompt(
+    product: RawProductInput,
+    recentFeedback?: FeedbackEntry[],
+    morphInstructions?: string[]
+  ): string {
+    // Build description section from all available metadata
+    const descriptionParts: string[] = [];
+    if (product.description) descriptionParts.push(product.description);
+    if (product.meta_description) descriptionParts.push(product.meta_description);
+    if (product.product_type) descriptionParts.push(`Product Type: ${product.product_type}`);
+    const fullDescription = descriptionParts.join('\n');
+
+    return `You are an expert product analyst specializing in home decor, fashion, and lifestyle products.
+
+Given the product below, analyze and enrich it with the following:
+- **color_palette**: An array of 2-5 primary and secondary colors (e.g., ["indigo", "cream", "brick red"])
+- **tags**: An array of 3-5 descriptive style keywords (e.g., ["handwoven", "traditional", "boho", "textured"])
+- **texture**: The SURFACE FINISH quality - how it feels/looks to touch. Must be one of: smooth, textured, woven, ribbed, rough, soft, fuzzy, grainy, pebbled, quilted, embossed, matte, glossy, shiny, brushed, polished, satin, distressed, velvet, suede, knit
+- **weave**: For TEXTILES ONLY - the fabric construction type (e.g., "oxford", "twill", "sateen", "percale", "jersey", "flannel", "poplin", "chambray", "herringbone", "jacquard", "canvas", "denim"). Use null for non-textile items.
+- **material**: The primary material class (e.g., "cotton", "ceramic", "wood", "linen", "leather", "silk", "wool", "polyester", "metal", "glass")
+- **tone**: The overall aesthetic or mood (e.g., "earthy", "playful", "minimalist", "luxury")
+- **flags**: Special product attributes (e.g., ["handmade", "fragile", "limited-edition", "eco-friendly", "vintage", "artisan"])
+- **fit_tags**: Physical characteristics for layout placement. Choose from: "bulky", "flat", "delicate", "lightweight", "oversized"
+- **inferred_dimensions**: Estimate typical dimensions based on product type
+
+**Product Details:**
+- Product Name: "${product.product_name}"
+- Brand: "${product.brand}"
+- Category: "${product.category}"
+${product.price ? `- Price: ${product.price}` : ''}
+${product.region ? `- Region: ${product.region}` : ''}
+${product.dimensions ? `- Dimensions: ${product.dimensions}` : ''}
+${product.product_dimensions ? `- Structured Dimensions: ${JSON.stringify(product.product_dimensions)}` : ''}
+${fullDescription ? `\n**Product Description/Metadata:**\n${fullDescription}` : ''}
+${this.buildFewShotSection(recentFeedback)}
+${this.buildMorphInstructionsSection(morphInstructions)}
+**CRITICAL RULES - READ CAREFULLY:**
+1. ALL values must be LOWERCASE (e.g., "cotton" not "Cotton", "smooth" not "Smooth")
+2. **texture** vs **weave** - these are DIFFERENT things:
+   - **texture** = SURFACE FINISH (how it feels): smooth, soft, textured, matte, glossy, shiny, brushed, ribbed
+   - **weave** = FABRIC CONSTRUCTION (how it's made): oxford, twill, sateen, jersey, flannel, poplin
+3. For TEXTILES (shirts, pants, bedding): provide BOTH texture AND weave
+   - Example: Oxford shirt → texture: "smooth", weave: "oxford"
+   - Example: Flannel shirt → texture: "soft", weave: "flannel"
+4. For ACCESSORIES (jewelry, watches, bags): texture only, weave should be null
+   - Use textures like: shiny, matte, brushed, polished, satin, pebbled, smooth
+   - Base texture on material (e.g., metal=shiny/brushed, leather=smooth/pebbled)
+5. For NON-TEXTILES (ceramics, wood, glass): texture only, weave should be null
+6. Extract material, size, and other details from the description/metadata if available
+7. Return ONLY valid JSON without any markdown formatting or explanations
+
+**Output Format (JSON only):**
+{
+  "color_palette": ["color1", "color2", "color3"],
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "texture": "surface_finish",
+  "weave": "fabric_construction_or_null",
+  "material": "material_type",
+  "tone": "aesthetic_mood",
+  "flags": ["flag1", "flag2"],
+  "fit_tags": ["flat", "lightweight"],
+  "inferred_dimensions": {
+    "width_cm": 45,
+    "height_cm": 45,
+    "depth_cm": 10,
+    "size_category": "medium"
+  }
+}`;
+  }
+
+  /**
+   * Builds few-shot learning section from recent feedback
+   * This teaches the AI from user corrections
+   */
+  private buildFewShotSection(feedback?: FeedbackEntry[]): string {
+    if (!feedback || feedback.length === 0) {
+      return '';
+    }
+
+    const examples = feedback
+      .filter(f => f.tagsRemoved.length > 0 || f.tagsAdded.length > 0)
+      .slice(0, 3)
+      .map((f, i) => {
+        const lines = [`Example ${i + 1}:`];
+        if (f.brand) lines.push(`  Brand: ${f.brand}`);
+        if (f.category) lines.push(`  Category: ${f.category}`);
+        if (f.tagsRemoved.length > 0) {
+          lines.push(`  Tags to AVOID: ${f.tagsRemoved.join(', ')}`);
+        }
+        if (f.tagsAdded.length > 0) {
+          lines.push(`  Tags users typically ADD: ${f.tagsAdded.join(', ')}`);
+        }
+        return lines.join('\n');
+      });
+
+    if (examples.length === 0) {
+      return '';
+    }
+
+    return `
+**LEARN FROM RECENT USER CORRECTIONS:**
+${examples.join('\n\n')}
+
+`;
+  }
+
+  /**
+   * Builds morph instructions section for inline prompt modifications
+   */
+  private buildMorphInstructionsSection(instructions?: string[]): string {
+    if (!instructions || instructions.length === 0) {
+      return '';
+    }
+
+    return `
+**ADDITIONAL INSTRUCTIONS FOR THIS REQUEST:**
+${instructions.map(i => `- ${i}`).join('\n')}
+
+`;
+  }
+
+  /**
+   * Saves enriched product to Supabase
+   * @param enrichedProduct - Enriched product data
+   * @returns Saved product with database ID
+   */
+  async saveToDatabase(enrichedProduct: EnrichedProduct, userId?: string): Promise<EnrichedProduct> {
+    // Add user_id to match database schema (use system ID if not provided)
+    const productToSave = {
+      ...enrichedProduct,
+      user_id: userId || '00000000-0000-0000-0000-000000000000' // System/backend user ID
+    };
+
+    const { data, error } = await this.supabase
+      .from('enriched_products')
+      .insert(productToSave)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to save to database: ${error.message}`);
+    }
+
+    return data as EnrichedProduct;
+  }
+
+  /**
+   * End-to-end pipeline: enrich and save product
+   * @param rawProduct - Raw product input
+   * @returns Saved enriched product with database ID
+   */
+  async enrichAndSave(rawProduct: RawProductInput): Promise<EnrichedProduct> {
+    const enriched = await this.enrichProduct(rawProduct);
+    return await this.saveToDatabase(enriched);
+  }
+
+  /**
+   * Batch enrich multiple products
+   * @param rawProducts - Array of raw products
+   * @returns Array of enriched products
+   */
+  async enrichBatch(rawProducts: RawProductInput[]): Promise<EnrichedProduct[]> {
+    const enrichedProducts: EnrichedProduct[] = [];
+
+    for (const product of rawProducts) {
+      try {
+        const enriched = await this.enrichProduct(product);
+        enrichedProducts.push(enriched);
+      } catch (error) {
+        console.error(`Failed to enrich product ${product.product_name}:`, error);
+        // Continue with next product
+      }
+    }
+
+    return enrichedProducts;
+  }
+
+  /**
+   * Batch enrich and save multiple products
+   * @param rawProducts - Array of raw products
+   * @returns Array of saved enriched products
+   */
+  async enrichAndSaveBatch(rawProducts: RawProductInput[], userId?: string): Promise<EnrichedProduct[]> {
+    const enriched = await this.enrichBatch(rawProducts);
+
+    // Add user_id to all products
+    const productsToSave = enriched.map(p => ({
+      ...p,
+      user_id: userId || '00000000-0000-0000-0000-000000000000'
+    }));
+
+    const { data, error } = await this.supabase
+      .from('enriched_products')
+      .insert(productsToSave)
+      .select();
+
+    if (error) {
+      throw new Error(`Failed to save batch to database: ${error.message}`);
+    }
+
+    return data as EnrichedProduct[];
+  }
+}
+
+/**
+ * Factory function to create ProductEnrichmentEngine
+ */
+export function createEnrichmentEngine(config: EnrichmentConfig): ProductEnrichmentEngine {
+  return new ProductEnrichmentEngine(config);
+}
+
+/**
+ * Simple ProductEnricher wrapper for backward compatibility
+ * Used by CSV upload and other simple use cases
+ */
+export class ProductEnricher {
+  private engine: ProductEnrichmentEngine;
+
+  constructor(anthropicApiKey: string) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials not configured');
+    }
+
+    this.engine = new ProductEnrichmentEngine({
+      anthropicApiKey,
+      supabaseUrl,
+      supabaseKey
+    });
+  }
+
+  async enrichAndSave(product: RawProductInput): Promise<{ success: boolean; product_id?: string; error?: string }> {
+    try {
+      const enriched = await this.engine.enrichAndSave(product);
+      return { success: true, product_id: enriched.id };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Enrichment failed'
+      };
+    }
+  }
+}
