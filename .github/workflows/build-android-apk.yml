@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/share-intent-integration
+      - master
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-android-apk.yml'
 
 jobs:
   build:
