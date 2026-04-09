@@ -20,9 +20,13 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import FitLoader from '../components/FitLoader';
 import { captureError } from '../utils/sentry';
+import { inferCategory } from '../utils/inferCategory';
+import { Feather } from '@expo/vector-icons';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
+
+const FILTERED_CATEGORIES = ['general', 'clothing', 'other', 'unknown'];
 
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
@@ -72,7 +76,6 @@ export default function FitResultScreen() {
     if (!avatar) return;
 
     try {
-      // Attempt enrichment but fall through to checkFit even if it fails
       let enrichedData: { id?: string; name?: string; category?: string; material?: string; tags?: string[] } | null = null;
       try {
         const enrichResult = await enrichProduct({
@@ -83,8 +86,15 @@ export default function FitResultScreen() {
           currency: product.price?.currency,
         });
         if (enrichResult.success && enrichResult.product) {
-          setEnrichedProduct(enrichResult.product);
-          enrichedData = enrichResult.product;
+          // If API returned a generic category, infer a better one from the product name
+          const resolvedCategory = inferCategory(
+            enrichResult.product.category,
+            product.name,
+            product.description,
+          );
+          const resolved = { ...enrichResult.product, category: resolvedCategory };
+          setEnrichedProduct(resolved);
+          enrichedData = resolved;
         } else {
           captureError(new Error('Enrichment returned success:false'), {
             feature: 'product-enrichment',
@@ -93,7 +103,6 @@ export default function FitResultScreen() {
           });
         }
       } catch (enrichError) {
-        // enrichment failed — continue with basic product data
         captureError(enrichError, {
           feature: 'product-enrichment',
           productName: product.name,
@@ -151,12 +160,12 @@ export default function FitResultScreen() {
   };
 
   const runReevaluation = async () => {
-    if (!avatar || !historyEntryId) return;
+    if (!avatar) return;
     setReevaluating(true);
     try {
       const fitResult = await checkFit(
         {
-          id: historyEntryId,
+          id: historyEntryId || 'recheck',
           product_name: product.name || 'Unknown',
           category: enrichedProduct?.category || precomputed?.enrichedProduct?.category || 'clothing',
           material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
@@ -172,13 +181,15 @@ export default function FitResultScreen() {
         setFitScore(newScore);
         setSizeRec(newSizeRec);
         setReevaluated(true);
-        updateEntry(historyEntryId, {
-          warnings: newWarnings,
-          fitScore: newScore,
-          sizeRecommendation: newSizeRec
-            ? { size: newSizeRec.size, confidence: newSizeRec.confidence, note: newSizeRec.note }
-            : undefined,
-        });
+        if (historyEntryId) {
+          updateEntry(historyEntryId, {
+            warnings: newWarnings,
+            fitScore: newScore,
+            sizeRecommendation: newSizeRec
+              ? { size: newSizeRec.size, confidence: newSizeRec.confidence, note: newSizeRec.note }
+              : undefined,
+          });
+        }
       }
     } catch {
       // silently fail — keep showing original result
@@ -197,25 +208,22 @@ export default function FitResultScreen() {
         return {
           color: colors.success,
           bgColor: colors.success + '15',
-          icon: '✓',
-          text: 'Great Fit!',
-          description: 'This item should fit you well',
+          icon: '✓' as const,
+          text: 'Great Fit',
         };
       case 'moderate':
         return {
           color: colors.warning,
           bgColor: colors.warning + '15',
-          icon: '⚠',
+          icon: '⚠' as const,
           text: 'Some Concerns',
-          description: 'Review the warnings below',
         };
       case 'poor':
         return {
           color: colors.error,
           bgColor: colors.error + '15',
-          icon: '✕',
-          text: 'May Not Fit Well',
-          description: 'Consider these issues carefully',
+          icon: '✕' as const,
+          text: 'May Not Fit',
         };
     }
   };
@@ -247,20 +255,48 @@ export default function FitResultScreen() {
 
   const scoreConfig = getScoreConfig();
 
+  // Only show product details section if there's non-generic content
+  const hasProductDetails = enrichedProduct && (
+    (enrichedProduct.category && !FILTERED_CATEGORIES.includes(enrichedProduct.category.toLowerCase())) ||
+    enrichedProduct.material ||
+    (enrichedProduct.tags && enrichedProduct.tags.length > 0)
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Product Image */}
-        {product.image && (
-          <View style={styles.imageContainer}>
+
+        {/* Product Hero Image */}
+        <View style={styles.imageContainer}>
+          {product.image ? (
             <Image source={{ uri: product.image }} style={styles.productImage} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Feather name="cloud-drizzle" size={48} color={colors.accentDark} />
+              <Text style={styles.imagePlaceholderText}>No image available</Text>
+            </View>
+          )}
+
+          {/* Score badge overlaid on image */}
+          <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.color }]}>
+            <Text style={styles.scoreBadgeIcon}>{scoreConfig.icon}</Text>
+            <Text style={styles.scoreBadgeText}>{scoreConfig.text}</Text>
+            {warnings.length > 0 && (
+              <Text style={styles.scoreBadgeCount}>
+                · {warnings.length} concern{warnings.length > 1 ? 's' : ''}
+              </Text>
+            )}
           </View>
-        )}
+        </View>
 
         {/* Product Info */}
         <View style={styles.productInfo}>
-          {product.brand && <Text style={styles.brandText}>{product.brand}</Text>}
+          {product.brand && (
+            <Text style={styles.brandText}>
+              {product.brand !== 'undefined' ? product.brand.toUpperCase() : ''}
+            </Text>
+          )}
           <Text style={styles.productName}>{product.name || 'Product'}</Text>
           {product.price && (
             <Text style={styles.price}>
@@ -271,104 +307,109 @@ export default function FitResultScreen() {
             <Text style={styles.checkedAt}>Checked {formatDate(precomputed.checkedAt)}</Text>
           )}
           {reevaluated && (
-            <Text style={styles.checkedAt}>Re-evaluated today</Text>
+            <View style={styles.reevalChip}>
+              <Feather name="refresh-cw" size={11} color={colors.success} />
+              <Text style={styles.reevalChipText}>Re-evaluated today</Text>
+            </View>
           )}
         </View>
 
-        {/* Re-evaluation banners (history mode only) */}
+        {/* Re-evaluating banner */}
         {reevaluating && (
           <View style={styles.reevalBanner}>
             <ActivityIndicator size="small" color={colors.accentDark} />
-            <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
-          </View>
-        )}
-        {reevaluated && !reevaluating && (
-          <View style={styles.reevalSuccessBanner}>
-            <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
+            <Text style={styles.reevalBannerText}>Re-evaluating with updated measurements…</Text>
           </View>
         )}
 
-        {/* Fit Score Card */}
-        <View style={[styles.scoreCard, { backgroundColor: scoreConfig.bgColor }]}>
-          <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
-            <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
-          </View>
-          <View style={styles.scoreTextContainer}>
-            <Text style={[styles.scoreTitle, { color: scoreConfig.color }]}>
-              {scoreConfig.text}
-            </Text>
-            <Text style={styles.scoreDescription}>
-              {warnings.length === 0
-                ? 'No fit concerns detected'
-                : `${warnings.length} potential issue${warnings.length > 1 ? 's' : ''} found`}
-            </Text>
-          </View>
-        </View>
-
-        {/* Size Recommendation Card */}
+        {/* Size & Concerns Card — combined */}
         {sizeRec && (
-          <View style={styles.sizeCard}>
-            <View style={styles.sizeCardLeft}>
-              <Text style={styles.sizeCardLabel}>Recommended Size</Text>
-              <Text style={styles.sizeCardValue}>{sizeRec.size}</Text>
-              {sizeRec.note && (
-                <Text style={styles.sizeCardNote}>{sizeRec.note}</Text>
-              )}
-            </View>
-            <View style={styles.sizeCardRight}>
-              <View style={[
-                styles.confidenceBadge,
-                {
-                  backgroundColor:
-                    sizeRec.confidence === 'high' ? colors.primary + '18'
-                    : sizeRec.confidence === 'medium' ? colors.primaryLight + '20'
-                    : colors.accentDark + '22',
-                },
-              ]}>
+          <View style={styles.glassCard}>
+            {/* Size row */}
+            <View style={styles.sizeRow}>
+              <View style={styles.sizeLeft}>
+                <Text style={styles.sizeLabel}>Recommended Size</Text>
+                <Text style={styles.sizeValue}>{sizeRec.size}</Text>
+                {sizeRec.note && (
+                  <Text style={styles.sizeNote}>{sizeRec.note}</Text>
+                )}
+              </View>
+              <View style={styles.sizeRight}>
                 <View style={[
-                  styles.confidenceDot,
+                  styles.confidenceBadge,
                   {
                     backgroundColor:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
-                  },
-                ]} />
-                <Text style={[
-                  styles.confidenceText,
-                  {
-                    color:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
+                      sizeRec.confidence === 'high' ? colors.primary + '18'
+                      : sizeRec.confidence === 'medium' ? colors.primaryLight + '20'
+                      : colors.accentDark + '22',
                   },
                 ]}>
-                  {sizeRec.confidence === 'high' ? 'High confidence'
-                    : sizeRec.confidence === 'medium' ? 'Medium confidence'
-                    : 'Low confidence'}
-                </Text>
-              </View>
-              {product.availableSizes && product.availableSizes.length > 0 && (
-                <View style={styles.availabilityRow}>
-                  {product.availableSizes.includes(sizeRec.size) ? (
-                    <Text style={styles.availableText}>✓ In stock on site</Text>
-                  ) : (
-                    <Text style={styles.unavailableText}>⚠ Size may be unavailable</Text>
-                  )}
+                  <View style={[
+                    styles.confidenceDot,
+                    {
+                      backgroundColor:
+                        sizeRec.confidence === 'high' ? colors.primary
+                        : sizeRec.confidence === 'medium' ? colors.primaryLight
+                        : colors.accentDark,
+                    },
+                  ]} />
+                  <Text style={[
+                    styles.confidenceText,
+                    {
+                      color:
+                        sizeRec.confidence === 'high' ? colors.primary
+                        : sizeRec.confidence === 'medium' ? colors.primaryLight
+                        : colors.accentDark,
+                    },
+                  ]}>
+                    {sizeRec.confidence === 'high' ? 'High confidence'
+                      : sizeRec.confidence === 'medium' ? 'Medium confidence'
+                      : 'Low confidence'}
+                  </Text>
                 </View>
-              )}
+                {product.availableSizes && product.availableSizes.length > 0 && (
+                  <View style={styles.availabilityRow}>
+                    {product.availableSizes.includes(sizeRec.size) ? (
+                      <Text style={styles.availableText}>✓ In stock</Text>
+                    ) : (
+                      <Text style={styles.unavailableText}>⚠ May be unavailable</Text>
+                    )}
+                  </View>
+                )}
+              </View>
             </View>
+
+            {/* Warnings within the same card */}
+            {warnings.length > 0 && (
+              <>
+                <View style={styles.cardDivider} />
+                <Text style={styles.cardSectionLabel}>Fit Concerns</Text>
+                {warnings.map((warning, index) => {
+                  const config = getSeverityConfig(warning.severity);
+                  return (
+                    <View key={index} style={styles.warningRow}>
+                      <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
+                        <Text style={[styles.severityText, { color: config.color }]}>
+                          {config.label}
+                        </Text>
+                      </View>
+                      <Text style={styles.warningText}>{warning.message}</Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
           </View>
         )}
 
-        {/* Warnings Section */}
-        {warnings.length > 0 && (
-          <View style={styles.warningsSection}>
-            <Text style={styles.sectionTitle}>Fit Warnings</Text>
+        {/* Warnings only (no size rec) */}
+        {warnings.length > 0 && !sizeRec && (
+          <View style={styles.glassCard}>
+            <Text style={styles.cardSectionLabel}>Fit Concerns</Text>
             {warnings.map((warning, index) => {
               const config = getSeverityConfig(warning.severity);
               return (
-                <View key={index} style={styles.warningCard}>
+                <View key={index} style={styles.warningRow}>
                   <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
                     <Text style={[styles.severityText, { color: config.color }]}>
                       {config.label}
@@ -382,80 +423,85 @@ export default function FitResultScreen() {
         )}
 
         {/* Product Details */}
-        {(enrichedProduct?.category || enrichedProduct?.material) && (
-          <View style={styles.detailsSection}>
-            <Text style={styles.sectionTitle}>Product Details</Text>
-            <View style={styles.detailsCard}>
-              {enrichedProduct?.category &&
-                !['general', 'clothing', 'other', 'unknown'].includes(
-                  enrichedProduct.category.toLowerCase()
-                ) && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Category</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct.category}</Text>
-                </View>
-              )}
-              {enrichedProduct?.material && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Material</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct.material}</Text>
-                </View>
-              )}
-              {enrichedProduct?.tags && enrichedProduct.tags.length > 0 && (
-                <View style={styles.tagsRow}>
-                  <Text style={styles.detailLabel}>Tags</Text>
-                  <View style={styles.tagsContainer}>
-                    {enrichedProduct.tags.slice(0, 5).map((tag: string, i: number) => (
-                      <View key={i} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </View>
-                    ))}
+        {hasProductDetails && (
+          <View style={styles.glassCard}>
+            <Text style={styles.cardSectionLabel}>Product Details</Text>
+            {enrichedProduct?.category &&
+              !FILTERED_CATEGORIES.includes(enrichedProduct.category.toLowerCase()) && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Category</Text>
+                <Text style={styles.detailValue}>{enrichedProduct.category}</Text>
+              </View>
+            )}
+            {enrichedProduct?.material && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Material</Text>
+                <Text style={styles.detailValue}>{enrichedProduct.material}</Text>
+              </View>
+            )}
+            {enrichedProduct?.tags && enrichedProduct.tags.length > 0 && (
+              <View style={styles.tagsContainer}>
+                {enrichedProduct.tags.slice(0, 5).map((tag: string, i: number) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
                   </View>
-                </View>
-              )}
-            </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons — always persistent */}
         <View style={styles.actionsSection}>
-          {isHistoryMode ? (
-            <>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => {
-                  wentToAvatarSetup.current = true;
-                  navigation.navigate('AvatarSetup');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>Adjust profile & re-evaluate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>View on Store</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>View on Store</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryButton}
-                onPress={() => navigation.goBack()}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>Check Another Product</Text>
-              </TouchableOpacity>
-            </>
+          {/* Primary: Re-evaluate */}
+          <TouchableOpacity
+            style={[styles.primaryButton, reevaluating && styles.buttonDisabled]}
+            onPress={runReevaluation}
+            disabled={reevaluating}
+            activeOpacity={0.8}
+          >
+            {reevaluating ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <>
+                <Feather name="refresh-cw" size={16} color={colors.white} />
+                <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Secondary: Change your measurements */}
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              wentToAvatarSetup.current = true;
+              navigation.navigate('AvatarSetup');
+            }}
+            activeOpacity={0.8}
+          >
+            <Feather name="sliders" size={15} color={colors.primary} />
+            <Text style={styles.secondaryButtonText}>Change your measurements</Text>
+          </TouchableOpacity>
+
+          {/* Tertiary: View on Store */}
+          <TouchableOpacity
+            style={styles.tertiaryButton}
+            onPress={openProductPage}
+            activeOpacity={0.8}
+          >
+            <Feather name="external-link" size={14} color={colors.textMuted} />
+            <Text style={styles.tertiaryButtonText}>View on Store</Text>
+          </TouchableOpacity>
+
+          {/* Check Another (only in fresh analysis mode) */}
+          {!isHistoryMode && (
+            <TouchableOpacity
+              style={styles.tertiaryButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.tertiaryButtonText}>Check Another Product</Text>
+            </TouchableOpacity>
           )}
         </View>
       </ScrollView>
@@ -477,28 +523,67 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
+
+  // Hero image
   imageContainer: {
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
-    ...shadows.md,
+    position: 'relative',
+    marginBottom: spacing.md,
   },
   productImage: {
     width: '100%',
-    height: 300,
-    backgroundColor: colors.surface,
+    height: 320,
+    backgroundColor: colors.backgroundSecondary,
   },
+  imagePlaceholder: {
+    width: '100%',
+    height: 240,
+    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  imagePlaceholderText: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+  },
+  scoreBadge: {
+    position: 'absolute',
+    bottom: spacing.md,
+    left: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: borderRadius.pill,
+  },
+  scoreBadgeIcon: {
+    fontSize: 13,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  scoreBadgeText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  scoreBadgeCount: {
+    ...typography.label,
+    color: 'rgba(255,255,255,0.85)',
+    fontWeight: '500',
+  },
+
+  // Product info
   productInfo: {
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   brandText: {
     ...typography.labelSmall,
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
     marginBottom: 2,
   },
   productName: {
@@ -516,13 +601,32 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
+  reevalChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.success + '15',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.pill,
+    marginTop: spacing.xs,
+  },
+  reevalChipText: {
+    ...typography.caption,
+    color: colors.success,
+    fontWeight: '600',
+  },
+
+  // Re-eval banner
   reevalBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.accentDark + '12',
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
   reevalBannerText: {
@@ -530,86 +634,56 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     flex: 1,
   },
-  reevalSuccessBanner: {
-    backgroundColor: colors.success + '12',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+
+  // Glass card — used for size+concerns, product details
+  glassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: borderRadius.xxl,
+    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.7)',
+    shadowColor: '#402d65',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    elevation: 4,
   },
-  reevalSuccessText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  scoreCard: {
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  scoreIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  scoreIcon: {
-    fontSize: 24,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  scoreTextContainer: {
-    flex: 1,
-  },
-  scoreTitle: {
-    ...typography.headingM,
-    marginBottom: 2,
-  },
-  scoreDescription: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  sizeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+
+  // Size section
+  sizeRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.accentDark + '40',
-    ...shadows.sm,
   },
-  sizeCardLeft: {
+  sizeLeft: {
     flex: 1,
   },
-  sizeCardLabel: {
+  sizeLabel: {
     ...typography.label,
     color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing.xs,
   },
-  sizeCardValue: {
-    fontSize: 42,
+  sizeValue: {
+    fontSize: 48,
     fontWeight: '700',
     color: colors.primary,
-    lineHeight: 48,
+    lineHeight: 54,
     marginBottom: 2,
   },
-  sizeCardNote: {
+  sizeNote: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xs,
     maxWidth: 160,
   },
-  sizeCardRight: {
+  sizeRight: {
     alignItems: 'flex-end',
     gap: spacing.sm,
+    paddingTop: spacing.xs,
   },
   confidenceBadge: {
     flexDirection: 'row',
@@ -620,8 +694,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   confidenceDot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
   },
   confidenceText: {
@@ -641,46 +715,45 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontWeight: '500',
   },
-  warningsSection: {
-    marginBottom: spacing.lg,
+
+  // Card internals
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.md,
   },
-  sectionTitle: {
-    ...typography.headingS,
-    color: colors.text,
+  cardSectionLabel: {
+    ...typography.label,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: spacing.md,
   },
-  warningCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+
+  // Warnings
+  warningRow: {
     marginBottom: spacing.sm,
-    ...shadows.sm,
   },
   severityBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
+    marginBottom: 5,
   },
   severityText: {
     ...typography.labelSmall,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   warningText: {
     ...typography.body,
     color: colors.text,
+    lineHeight: 22,
   },
-  detailsSection: {
-    marginBottom: spacing.lg,
-  },
-  detailsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    ...shadows.sm,
-  },
+
+  // Product details
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -693,15 +766,13 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textSecondary,
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   detailValue: {
     ...typography.body,
     color: colors.text,
     fontWeight: '500',
     textTransform: 'capitalize',
-  },
-  tagsRow: {
-    paddingVertical: spacing.sm,
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -710,7 +781,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   tag: {
-    backgroundColor: colors.primaryLight + '30',
+    backgroundColor: colors.primaryLight + '25',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
@@ -720,15 +791,29 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '500',
   },
+
+  // Action buttons
   actionsSection: {
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
   },
   primaryButton: {
-    backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cta,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    shadowColor: colors.cta,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   primaryButtonText: {
     ...typography.button,
@@ -736,16 +821,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary + '40',
   },
   secondaryButtonText: {
     ...typography.button,
-    color: colors.text,
+    color: colors.primary,
     fontWeight: '600',
+  },
+  tertiaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+  },
+  tertiaryButtonText: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
   },
 });
