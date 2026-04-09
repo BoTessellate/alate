@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +27,15 @@ type NavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+function isValidUrl(text: string): boolean {
+  try {
+    const url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const [url, setUrl] = useState('');
@@ -35,6 +45,7 @@ export default function HomeScreen() {
   const [nudgeSent, setNudgeSent] = useState(false);
   const [nudging, setNudging] = useState(false);
   const { avatar } = useAvatarStore();
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,13 +56,13 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const handleCheckFit = async () => {
-    if (!url.trim()) {
+  const handleCheckFit = useCallback(async (urlToCheck?: string) => {
+    const targetUrl = (urlToCheck ?? url).trim();
+    if (!targetUrl) {
       setError('Please enter a product URL');
       return;
     }
 
-    // Check if avatar is set up
     if (!avatar) {
       navigation.navigate('AvatarSetup');
       return;
@@ -63,26 +74,44 @@ export default function HomeScreen() {
     setNudgeSent(false);
 
     try {
-      const result = await scrapeProduct(url);
+      const result = await scrapeProduct(targetUrl);
       if (result.success && result.data) {
-        navigation.navigate('FitResult', { product: result.data, url });
+        navigation.navigate('FitResult', { product: result.data, url: targetUrl });
       } else {
-        const brand = extractBrandFromUrl(url);
+        const brand = extractBrandFromUrl(targetUrl);
         setFailedBrand(brand);
         setError('Unable to fetch product details.');
       }
-    } catch (err) {
-      const brand = extractBrandFromUrl(url);
+    } catch {
+      const brand = extractBrandFromUrl(targetUrl);
       setFailedBrand(brand);
-      setError('Something went wrong.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+    }
+  }, [url, avatar, navigation]);
+
+  const handleUrlChange = (text: string) => {
+    setUrl(text);
+    if (error) {
+      setError(null);
+      setFailedBrand(null);
+      setNudgeSent(false);
+    }
+
+    // Auto-trigger on valid URL paste (debounced)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    const trimmed = text.trim();
+    if (trimmed && isValidUrl(trimmed)) {
+      debounceTimer.current = setTimeout(() => {
+        handleCheckFit(trimmed);
+      }, 700);
     }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -90,8 +119,12 @@ export default function HomeScreen() {
         <View style={styles.content}>
           {/* Hero Section */}
           <View style={styles.heroSection}>
-            <View style={styles.iconContainer}>
-              <Feather name="shopping-bag" size={36} color={colors.primary} />
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.title}>Will it fit?</Text>
             <Text style={styles.subtitle}>
@@ -101,47 +134,28 @@ export default function HomeScreen() {
 
           {/* Input Card */}
           <View style={styles.inputCard}>
-            <Text style={styles.inputLabel}>Product URL</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                testID="url-input"
-                style={styles.input}
-                placeholder="Paste ASOS, Zara, or any product URL..."
-                placeholderTextColor={colors.textMuted}
-                value={url}
-                onChangeText={(text) => {
-                  setUrl(text);
-                  if (error) {
-                    setError(null);
-                    setFailedBrand(null);
-                    setNudgeSent(false);
-                  }
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
-            </View>
+            <TextInput
+              testID="url-input"
+              style={styles.input}
+              placeholder="Product URL"
+              placeholderTextColor={colors.textMuted}
+              value={url}
+              onChangeText={handleUrlChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
 
             {error && !failedBrand && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.error}>{error}</Text>
-              </View>
+              <Text style={styles.errorText}>{error}</Text>
             )}
 
-            <TouchableOpacity
-              testID="check-fit-button"
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleCheckFit}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>Check Fit</Text>
-              )}
-            </TouchableOpacity>
+            {loading && (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color={colors.cta} />
+                <Text style={styles.loadingText}>Checking fit…</Text>
+              </View>
+            )}
           </View>
 
           {/* Brand Nudge Card */}
@@ -237,11 +251,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
   content: {
     flex: 1,
@@ -252,14 +266,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  iconContainer: {
+  logoContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryLight + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 20,
+    overflow: 'hidden',
     marginBottom: spacing.md,
+    ...shadows.md,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
   },
   title: {
     ...typography.displayMedium,
@@ -274,73 +291,56 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   inputCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    ...shadows.md,
-  },
-  inputLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  inputWrapper: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
+    padding: spacing.md,
     marginBottom: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    ...shadows.sm,
   },
   input: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     ...typography.body,
     color: colors.text,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.border,
   },
-  errorContainer: {
-    backgroundColor: colors.errorLight + '20',
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  error: {
+  errorText: {
     ...typography.bodySmall,
     color: colors.error,
-    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginLeft: spacing.xs,
   },
-  button: {
-    backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+  loadingRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    ...typography.button,
-    color: colors.white,
-    fontWeight: '700',
+  loadingText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   setupCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.primaryLight,
-    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: colors.primaryLight + '40',
+    ...shadows.sm,
   },
   setupIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primaryLight + '30',
+    backgroundColor: colors.primaryLight + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -363,12 +363,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nudgeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xxl,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.secondary + '40',
+    borderWidth: 1,
+    borderColor: colors.border,
     ...shadows.sm,
   },
   nudgeHeader: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
     ...shadows.sm,

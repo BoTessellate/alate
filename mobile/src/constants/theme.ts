@@ -48,10 +48,10 @@ export const colors = {
   highlightLight: '#625380',
   highlightDark: '#2c1853',
 
-  // Background - Lilac (most-used brand color)
-  background: '#efedf5',
-  backgroundSecondary: '#E6DFF0',
-  backgroundTertiary: '#D8D0E8',
+  // Background - Clean white (glass-morphism friendly)
+  background: '#FFFFFF',
+  backgroundSecondary: '#F5F3FA',
+  backgroundTertiary: '#EDE8F5',
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
@@ -114,11 +114,20 @@ export const borderRadius = {
   none: 0,
   sm: 4,
   md: 6,
-  lg: 8,
-  xl: 12,
-  xxl: 16,
+  lg: 10,
+  xl: 16,
+  xxl: 20,
+  xxxl: 28,
   pill: 9999,
   full: 9999,
+};
+
+// Glass-morphism card style — semi-transparent white over any background
+export const glass = {
+  backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  borderColor: 'rgba(255, 255, 255, 0.7)',
+  borderWidth: 1,
+  // combine with shadows.glass below
 };
 
 // =============================================================================
@@ -260,6 +269,13 @@ export const shadows = {
     shadowRadius: 16,
     elevation: 12,
   },
+  glass: {
+    shadowColor: '#402d65',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 6,
+  },
   // Colored shadows — brand purple
   glow: {
     shadowColor: '#402d65',
@@ -286,6 +302,7 @@ export default {
   spacing,
   ms,
   borderRadius,
+  glass,
   typography,
   shadows,
 };

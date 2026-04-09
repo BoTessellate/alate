@@ -24,42 +24,11 @@ type NavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+const FILTERED_CATEGORIES = ['general', 'clothing', 'other', 'unknown'];
+
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { entries, removeEntry, clearHistory } = useFitHistoryStore();
-
-  const getScoreConfig = (score: 'great' | 'moderate' | 'poor') => {
-    switch (score) {
-      case 'great':
-        return {
-          color: colors.success,
-          bgColor: colors.success + '15',
-          label: 'Great Fit',
-          icon: '✓',
-        };
-      case 'moderate':
-        return {
-          color: colors.warning,
-          bgColor: colors.warning + '15',
-          label: 'Some Concerns',
-          icon: '⚠',
-        };
-      case 'poor':
-        return {
-          color: colors.error,
-          bgColor: colors.error + '15',
-          label: 'May Not Fit',
-          icon: '✕',
-        };
-      default:
-        return {
-          color: colors.textSecondary,
-          bgColor: colors.backgroundSecondary,
-          label: 'Unknown',
-          icon: '?',
-        };
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -68,19 +37,13 @@ export default function HistoryScreen() {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
       return 'Yesterday';
     } else if (diffDays < 7) {
       return `${diffDays} days ago`;
     } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
   };
 
@@ -91,23 +54,25 @@ export default function HistoryScreen() {
     return `${symbol}${price.amount}`;
   };
 
-  // Confidence uses the brand palette: high = deep brand purple,
-  // medium = mid purple, low = a lighter but still legible shade.
   const getConfidenceColor = (confidence: 'high' | 'medium' | 'low') => {
     switch (confidence) {
-      case 'high':
-        return colors.primary;
-      case 'medium':
-        return colors.primaryLight;
-      case 'low':
-        return colors.accentDark;
+      case 'high': return colors.primary;
+      case 'medium': return colors.primaryLight;
+      case 'low': return colors.accentDark;
     }
   };
 
   const renderItem = ({ item }: { item: FitHistoryEntry }) => {
-    const scoreConfig = getScoreConfig(item.fitScore);
     const priceText = formatPrice(item.price);
-    const hasBrandOrPrice = item.brand || priceText;
+    const hasBrandOrPrice = item.brand && item.brand !== 'undefined' && item.brand !== 'null';
+
+    // Filter out generic/useless categories
+    const displayCategory =
+      item.category && !FILTERED_CATEGORIES.includes(item.category.toLowerCase())
+        ? item.category
+        : null;
+
+    const concernCount = item.warnings?.length ?? 0;
 
     return (
       <TouchableOpacity
@@ -140,31 +105,30 @@ export default function HistoryScreen() {
             <Image source={{ uri: item.productImage }} style={styles.thumbnail} />
           ) : (
             <View style={styles.thumbnailPlaceholder}>
-              <Feather name="shopping-bag" size={28} color={colors.textMuted} />
+              <Feather name="cloud-drizzle" size={24} color={colors.textMuted} />
             </View>
           )}
         </View>
+
         <View style={styles.cardContent}>
-          {hasBrandOrPrice && (
+          {(hasBrandOrPrice || priceText) && (
             <View style={styles.brandRow}>
-              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-              {item.brand && priceText && <Text style={styles.dotSeparator}>•</Text>}
+              {hasBrandOrPrice && (
+                <Text style={styles.brandText}>{item.brand!.toUpperCase()}</Text>
+              )}
+              {hasBrandOrPrice && priceText && (
+                <Text style={styles.dotSeparator}>•</Text>
+              )}
               {priceText && <Text style={styles.priceText}>{priceText}</Text>}
             </View>
           )}
+
           <Text style={styles.productName} numberOfLines={2}>
             {item.productName}
           </Text>
 
+          {/* Tags: [Size] [Category] — in that order */}
           <View style={styles.pillRow}>
-            <View style={[styles.pill, { backgroundColor: scoreConfig.bgColor }]}>
-              <Text style={[styles.pillIcon, { color: scoreConfig.color }]}>
-                {scoreConfig.icon}
-              </Text>
-              <Text style={[styles.pillLabel, { color: scoreConfig.color }]}>
-                {scoreConfig.label}
-              </Text>
-            </View>
             {item.sizeRecommendation && (
               <View style={[styles.pill, styles.sizePill]}>
                 <Text style={styles.sizePillLabel}>Size {item.sizeRecommendation.size}</Text>
@@ -176,10 +140,10 @@ export default function HistoryScreen() {
                 />
               </View>
             )}
-            {item.category && (
+            {displayCategory && (
               <View style={[styles.pill, styles.categoryPill]}>
                 <Text style={styles.categoryPillLabel} numberOfLines={1}>
-                  {item.category}
+                  {displayCategory}
                 </Text>
               </View>
             )}
@@ -187,13 +151,14 @@ export default function HistoryScreen() {
 
           <View style={styles.bottomRow}>
             <Text style={styles.dateText}>{formatDate(item.checkedAt)}</Text>
-            {item.warnings.length > 0 && (
-              <Text style={styles.warningCount}>
-                {item.warnings.length} warning{item.warnings.length > 1 ? 's' : ''}
+            {concernCount > 0 && (
+              <Text style={styles.concernCount}>
+                {concernCount} concern{concernCount > 1 ? 's' : ''}
               </Text>
             )}
           </View>
         </View>
+
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => removeEntry(item.id)}
@@ -227,10 +192,8 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View testID="history-screen" style={styles.container}>
-        {/* Page Title */}
         <Text style={styles.pageTitle}>History</Text>
 
-        {/* Header Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{entries.length}</Text>
@@ -244,7 +207,6 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {/* List */}
         <FlatList
           data={entries}
           renderItem={renderItem}
@@ -253,7 +215,6 @@ export default function HistoryScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        {/* Clear Button */}
         {entries.length > 0 && (
           <View style={styles.clearContainer}>
             <TouchableOpacity
@@ -303,8 +264,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     alignItems: 'center',
     ...shadows.sm,
@@ -323,8 +284,8 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
@@ -337,13 +298,13 @@ const styles = StyleSheet.create({
   thumbnail: {
     width: ms(70),
     height: ms(70),
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.backgroundSecondary,
   },
   thumbnailPlaceholder: {
     width: ms(70),
     height: ms(70),
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -360,7 +321,6 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textSecondary,
     fontWeight: '600',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   dotSeparator: {
@@ -392,14 +352,6 @@ const styles = StyleSheet.create({
     paddingVertical: ms(4),
     borderRadius: borderRadius.pill,
     gap: ms(4),
-  },
-  pillIcon: {
-    fontSize: ms(11),
-    fontWeight: '700',
-  },
-  pillLabel: {
-    ...typography.labelSmall,
-    fontWeight: '600',
   },
   sizePill: {
     backgroundColor: colors.primary + '15',
@@ -433,7 +385,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
-  warningCount: {
+  concernCount: {
     ...typography.caption,
     color: colors.warning,
     fontWeight: '500',
@@ -481,13 +433,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
   },
   clearButton: {
     padding: spacing.md,
     alignItems: 'center',
     backgroundColor: colors.error + '10',
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
   },
   clearText: {
     ...typography.label,
