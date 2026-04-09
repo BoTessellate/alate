@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Mobile (Expo Metro)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "port": 8081,
+      "cwd": "mobile"
+    },
+    {
+      "name": "Backend (Express dev)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "cwd": "backend"
+    },
+    {
+      "name": "Backend (Vercel dev)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:vercel"],
+      "port": 3000,
+      "cwd": "backend"
+    }
+  ]
+}
