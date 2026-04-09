@@ -70,9 +70,6 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
         color={focused ? colors.primary : colors.textSecondary}
         style={focused ? styles.tabIconFocused : undefined}
       />
-      <Text style={[styles.tabLabel, focused && styles.tabLabelFocused]} numberOfLines={1}>
-        {name === 'Home' ? 'Check' : name}
-      </Text>
     </View>
   );
 }
@@ -248,18 +245,11 @@ const styles = StyleSheet.create({
   tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 44,
+    height: 44,
   },
   tabIconFocused: {
-    transform: [{ scale: 1.05 }],
-  },
-  tabLabel: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  tabLabelFocused: {
-    color: colors.primary,
-    fontWeight: '600',
+    transform: [{ scale: 1.1 }],
   },
   loadingOverlay: {
     flex: 1,

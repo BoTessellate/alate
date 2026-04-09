@@ -8,13 +8,15 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Linking,
-  SafeAreaView,
+  Dimensions,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
@@ -24,9 +26,25 @@ import { captureError } from '../utils/sentry';
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const HERO_HEIGHT = 360;
+
+/** Strip string "undefined"/"null" from the scraper */
+function sanitize(val?: string): string | undefined {
+  if (!val || val === 'undefined' || val === 'null') return undefined;
+  return val;
+}
+
+/** Glass card style constant */
+const GLASS = {
+  ...glass,
+  ...shadows.glass,
+};
+
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
   const navigation = useNavigation<NavProp>();
+  const insets = useSafeAreaInsets();
   const { product, url, historyEntryId, precomputed } = route.params;
   const { avatar } = useAvatarStore();
   const { addEntry, updateEntry } = useFitHistoryStore();
@@ -72,7 +90,6 @@ export default function FitResultScreen() {
     if (!avatar) return;
 
     try {
-      // Attempt enrichment but fall through to checkFit even if it fails
       let enrichedData: { id?: string; name?: string; category?: string; material?: string; tags?: string[] } | null = null;
       try {
         const enrichResult = await enrichProduct({
@@ -93,7 +110,6 @@ export default function FitResultScreen() {
           });
         }
       } catch (enrichError) {
-        // enrichment failed — continue with basic product data
         captureError(enrichError, {
           feature: 'product-enrichment',
           productName: product.name,
@@ -119,9 +135,12 @@ export default function FitResultScreen() {
         setSizeRec(fitResult.size_recommendation ?? null);
 
         const brandInfo = extractBrandFromUrl(url);
+        const safeBrand = sanitize(product.brand) || brandInfo?.brandName;
+        const safeName = sanitize(product.name) || 'Unknown';
+
         addEntry({
           url,
-          productName: product.name || 'Unknown',
+          productName: safeName,
           productImage: product.image,
           fitScore: fitResult.fit_score || 'great',
           warnings: fitResult.warnings || [],
@@ -139,7 +158,7 @@ export default function FitResultScreen() {
           price: product.price
             ? { amount: product.price.amount, currency: product.price.currency }
             : undefined,
-          brand: product.brand || brandInfo?.brandName,
+          brand: safeBrand,
         });
       }
     } catch (error) {
@@ -196,7 +215,8 @@ export default function FitResultScreen() {
       case 'great':
         return {
           color: colors.success,
-          bgColor: colors.success + '15',
+          bgColor: colors.success + '20',
+          border: colors.success + '50',
           icon: '✓',
           text: 'Great Fit!',
           description: 'This item should fit you well',
@@ -204,18 +224,20 @@ export default function FitResultScreen() {
       case 'moderate':
         return {
           color: colors.warning,
-          bgColor: colors.warning + '15',
+          bgColor: colors.warning + '20',
+          border: colors.warning + '50',
           icon: '⚠',
           text: 'Some Concerns',
-          description: 'Review the warnings below',
+          description: 'Review the notes below',
         };
       case 'poor':
         return {
           color: colors.error,
-          bgColor: colors.error + '15',
+          bgColor: colors.error + '20',
+          border: colors.error + '50',
           icon: '✕',
           text: 'May Not Fit Well',
-          description: 'Consider these issues carefully',
+          description: 'Consider these carefully',
         };
     }
   };
@@ -238,30 +260,56 @@ export default function FitResultScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingSafeArea}>
+      <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <FitLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
   const scoreConfig = getScoreConfig();
+  const safeBrand = sanitize(product.brand);
+  const safeName = sanitize(product.name);
+
+  const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Product Image */}
-        {product.image && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: product.image }} style={styles.productImage} />
-          </View>
-        )}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        {/* Product Info */}
-        <View style={styles.productInfo}>
-          {product.brand && <Text style={styles.brandText}>{product.brand}</Text>}
-          <Text style={styles.productName}>{product.name || 'Product'}</Text>
+      {/* Fixed hero image — stays behind scroll */}
+      <View style={styles.heroFixed}>
+        {product.image ? (
+          <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.heroImage, styles.heroPlaceholder]} />
+        )}
+        <LinearGradient
+          colors={['transparent', colors.background]}
+          style={styles.heroGradient}
+        />
+        {/* Score badge pinned to bottom of hero */}
+        <View style={[styles.scoreBadgeWrapper, { top: insets.top + 8 }]}>
+          <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.bgColor, borderColor: scoreConfig.border }]}>
+            <Text style={[styles.scoreBadgeIcon, { color: scoreConfig.color }]}>{scoreConfig.icon}</Text>
+            <Text style={[styles.scoreBadgeText, { color: scoreConfig.color }]}>{scoreConfig.text}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Scrollable content — slides up over hero */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Spacer so first card starts below hero */}
+        <View style={{ height: HERO_HEIGHT - 80 }} />
+
+        {/* Product info card */}
+        <View style={[styles.card, styles.productCard]}>
+          {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
+          <Text style={styles.productName}>{safeName || 'Product'}</Text>
           {product.price && (
             <Text style={styles.price}>
               {product.price.currency} {product.price.amount}
@@ -275,21 +323,8 @@ export default function FitResultScreen() {
           )}
         </View>
 
-        {/* Re-evaluation banners (history mode only) */}
-        {reevaluating && (
-          <View style={styles.reevalBanner}>
-            <ActivityIndicator size="small" color={colors.accentDark} />
-            <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
-          </View>
-        )}
-        {reevaluated && !reevaluating && (
-          <View style={styles.reevalSuccessBanner}>
-            <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
-          </View>
-        )}
-
-        {/* Fit Score Card */}
-        <View style={[styles.scoreCard, { backgroundColor: scoreConfig.bgColor }]}>
+        {/* Score card */}
+        <View style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
           <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
             <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
           </View>
@@ -300,14 +335,27 @@ export default function FitResultScreen() {
             <Text style={styles.scoreDescription}>
               {warnings.length === 0
                 ? 'No fit concerns detected'
-                : `${warnings.length} potential issue${warnings.length > 1 ? 's' : ''} found`}
+                : `${warnings.length} potential concern${warnings.length > 1 ? 's' : ''} found`}
             </Text>
           </View>
         </View>
 
-        {/* Size Recommendation Card */}
+        {/* Re-evaluation banners */}
+        {reevaluating && (
+          <View style={[styles.card, styles.reevalBanner]}>
+            <ActivityIndicator size="small" color={colors.accentDark} />
+            <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
+          </View>
+        )}
+        {reevaluated && !reevaluating && (
+          <View style={[styles.card, styles.reevalSuccessBanner]}>
+            <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
+          </View>
+        )}
+
+        {/* Size Recommendation */}
         {sizeRec && (
-          <View style={styles.sizeCard}>
+          <View style={[styles.card, styles.sizeCard]}>
             <View style={styles.sizeCardLeft}>
               <Text style={styles.sizeCardLabel}>Recommended Size</Text>
               <Text style={styles.sizeCardValue}>{sizeRec.size}</Text>
@@ -361,14 +409,14 @@ export default function FitResultScreen() {
           </View>
         )}
 
-        {/* Warnings Section */}
+        {/* Concerns */}
         {warnings.length > 0 && (
-          <View style={styles.warningsSection}>
-            <Text style={styles.sectionTitle}>Fit Warnings</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Fit Concerns</Text>
             {warnings.map((warning, index) => {
               const config = getSeverityConfig(warning.severity);
               return (
-                <View key={index} style={styles.warningCard}>
+                <View key={index} style={[styles.card, styles.warningCard]}>
                   <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
                     <Text style={[styles.severityText, { color: config.color }]}>
                       {config.label}
@@ -383,26 +431,24 @@ export default function FitResultScreen() {
 
         {/* Product Details */}
         {(enrichedProduct?.category || enrichedProduct?.material) && (
-          <View style={styles.detailsSection}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Product Details</Text>
-            <View style={styles.detailsCard}>
+            <View style={[styles.card, styles.detailsCard]}>
               {enrichedProduct?.category &&
-                !['general', 'clothing', 'other', 'unknown'].includes(
-                  enrichedProduct.category.toLowerCase()
-                ) && (
+                !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()) && (
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Category</Text>
                   <Text style={styles.detailValue}>{enrichedProduct.category}</Text>
                 </View>
               )}
               {enrichedProduct?.material && (
-                <View style={styles.detailRow}>
+                <View style={[styles.detailRow, styles.detailRowLast]}>
                   <Text style={styles.detailLabel}>Material</Text>
                   <Text style={styles.detailValue}>{enrichedProduct.material}</Text>
                 </View>
               )}
               {enrichedProduct?.tags && enrichedProduct.tags.length > 0 && (
-                <View style={styles.tagsRow}>
+                <View style={[styles.tagsRow]}>
                   <Text style={styles.detailLabel}>Tags</Text>
                   <View style={styles.tagsContainer}>
                     {enrichedProduct.tags.slice(0, 5).map((tag: string, i: number) => (
@@ -429,14 +475,24 @@ export default function FitResultScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.primaryButtonText}>Adjust profile & re-evaluate</Text>
+                <Text style={styles.primaryButtonText}>Re-evaluate</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.secondaryButton}
+                onPress={() => {
+                  wentToAvatarSetup.current = true;
+                  navigation.navigate('AvatarSetup');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>Change your measurements</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.ghostButton}
                 onPress={openProductPage}
                 activeOpacity={0.8}
               >
-                <Text style={styles.secondaryButtonText}>View on Store</Text>
+                <Text style={styles.ghostButtonText}>View on Store</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -459,40 +515,80 @@ export default function FitResultScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  loadingSafeArea: {
+  loadingContainer: {
     flex: 1,
     backgroundColor: colors.background,
   },
-  container: {
+  // --- Hero ---
+  heroFixed: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: HERO_HEIGHT,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+    backgroundColor: colors.backgroundSecondary,
+  },
+  heroPlaceholder: {
+    backgroundColor: colors.backgroundSecondary,
+  },
+  heroGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+  },
+  scoreBadgeWrapper: {
+    position: 'absolute',
+    left: spacing.lg,
+  },
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: borderRadius.pill,
+    borderWidth: 1.5,
+  },
+  scoreBadgeIcon: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  scoreBadgeText: {
+    ...typography.label,
+    fontWeight: '700',
+  },
+  // --- Scroll ---
+  scroll: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
   },
-  imageContainer: {
+  // --- Glass card base ---
+  card: {
+    ...GLASS,
     borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    marginBottom: spacing.lg,
-    ...shadows.md,
+    marginBottom: spacing.md,
   },
-  productImage: {
-    width: '100%',
-    height: 300,
-    backgroundColor: colors.surface,
-  },
-  productInfo: {
-    marginBottom: spacing.lg,
+  // --- Product card ---
+  productCard: {
+    padding: spacing.lg,
   },
   brandText: {
     ...typography.labelSmall,
@@ -516,37 +612,12 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
-  reevalBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.accentDark + '12',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  reevalBannerText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  reevalSuccessBanner: {
-    backgroundColor: colors.success + '12',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  reevalSuccessText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '600',
-  },
+  // --- Score card ---
   scoreCard: {
-    borderRadius: borderRadius.xl,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    borderWidth: 1.5,
   },
   scoreIconContainer: {
     width: 48,
@@ -572,17 +643,33 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
+  // --- Reeval banners ---
+  reevalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  reevalBannerText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  reevalSuccessBanner: {
+    padding: spacing.md,
+    backgroundColor: colors.success + '20',
+  },
+  reevalSuccessText: {
+    ...typography.bodySmall,
+    color: colors.success,
+    fontWeight: '600',
+  },
+  // --- Size card ---
   sizeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
     padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.accentDark + '40',
-    ...shadows.sm,
   },
   sizeCardLeft: {
     flex: 1,
@@ -641,20 +728,18 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontWeight: '500',
   },
-  warningsSection: {
-    marginBottom: spacing.lg,
+  // --- Sections ---
+  section: {
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
     ...typography.headingS,
     color: colors.text,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   warningCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    ...shadows.sm,
   },
   severityBadge: {
     alignSelf: 'flex-start',
@@ -672,14 +757,9 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
   },
-  detailsSection: {
-    marginBottom: spacing.lg,
-  },
   detailsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
     padding: spacing.md,
-    ...shadows.sm,
+    overflow: 'hidden',
   },
   detailRow: {
     flexDirection: 'row',
@@ -687,7 +767,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: 'rgba(64, 45, 101, 0.1)',
+  },
+  detailRowLast: {
+    borderBottomWidth: 0,
   },
   detailLabel: {
     ...typography.label,
@@ -720,8 +803,10 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '500',
   },
+  // --- Buttons ---
   actionsSection: {
     gap: spacing.md,
+    marginTop: spacing.sm,
   },
   primaryButton: {
     backgroundColor: colors.cta,
@@ -731,21 +816,30 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   primaryButtonText: {
-    ...typography.button,
+    ...typography.label,
+    fontSize: 16,
     color: colors.white,
     fontWeight: '700',
   },
   secondaryButton: {
-    backgroundColor: colors.surface,
+    ...GLASS,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
   },
   secondaryButtonText: {
-    ...typography.button,
-    color: colors.text,
+    ...typography.label,
+    fontSize: 15,
+    color: colors.primary,
     fontWeight: '600',
+  },
+  ghostButton: {
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  ghostButtonText: {
+    ...typography.label,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
 });

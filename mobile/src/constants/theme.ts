@@ -48,10 +48,10 @@ export const colors = {
   highlightLight: '#625380',
   highlightDark: '#2c1853',
 
-  // Background - Lilac (most-used brand color)
-  background: '#efedf5',
-  backgroundSecondary: '#E6DFF0',
-  backgroundTertiary: '#D8D0E8',
+  // Background - Warm lavender (glass cards pop against this)
+  background: '#F0EBF8',
+  backgroundSecondary: '#E8E0F4',
+  backgroundTertiary: '#DDD4EE',
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
@@ -113,10 +113,11 @@ export const ms = (value: number) => value;
 export const borderRadius = {
   none: 0,
   sm: 4,
-  md: 6,
-  lg: 8,
-  xl: 12,
-  xxl: 16,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  xxl: 20,
+  xxxl: 28,
   pill: 9999,
   full: 9999,
 };
@@ -260,6 +261,14 @@ export const shadows = {
     shadowRadius: 16,
     elevation: 12,
   },
+  // Glass shadow — purple-tinted for glass cards on lavender bg
+  glass: {
+    shadowColor: '#2c1853',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 28,
+    elevation: 8,
+  },
   // Colored shadows — brand purple
   glow: {
     shadowColor: '#402d65',
@@ -278,6 +287,15 @@ export const shadows = {
 };
 
 // =============================================================================
+// GLASS STYLE — semi-transparent cards on lavender background
+// =============================================================================
+export const glass = {
+  backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  borderColor: 'rgba(255, 255, 255, 0.95)',
+  borderWidth: 1.5,
+};
+
+// =============================================================================
 // DEFAULT EXPORT
 // =============================================================================
 export default {
@@ -288,4 +306,5 @@ export default {
   borderRadius,
   typography,
   shadows,
+  glass,
 };

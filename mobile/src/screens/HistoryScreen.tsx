@@ -15,7 +15,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, ms } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, ms, glass } from '../constants/theme';
+
+/** Strip string "undefined" / "null" values that the scraper sometimes returns */
+function sanitize(val?: string): string | undefined {
+  if (!val || val === 'undefined' || val === 'null') return undefined;
+  return val;
+}
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 
@@ -104,10 +110,16 @@ export default function HistoryScreen() {
     }
   };
 
+  const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
+
   const renderItem = ({ item }: { item: FitHistoryEntry }) => {
     const scoreConfig = getScoreConfig(item.fitScore);
     const priceText = formatPrice(item.price);
-    const hasBrandOrPrice = item.brand || priceText;
+    const safeBrand = sanitize(item.brand);
+    const safeName = sanitize(item.productName) ?? 'Unknown Product';
+    const safeCategory = sanitize(item.category);
+    const showCategory = safeCategory && !FILTERED_CATEGORIES.has(safeCategory.toLowerCase());
+    const hasBrandOrPrice = safeBrand || priceText;
 
     return (
       <TouchableOpacity
@@ -147,24 +159,16 @@ export default function HistoryScreen() {
         <View style={styles.cardContent}>
           {hasBrandOrPrice && (
             <View style={styles.brandRow}>
-              {item.brand && <Text style={styles.brandText}>{item.brand}</Text>}
-              {item.brand && priceText && <Text style={styles.dotSeparator}>•</Text>}
+              {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
+              {safeBrand && priceText && <Text style={styles.dotSeparator}>•</Text>}
               {priceText && <Text style={styles.priceText}>{priceText}</Text>}
             </View>
           )}
           <Text style={styles.productName} numberOfLines={2}>
-            {item.productName}
+            {safeName}
           </Text>
 
           <View style={styles.pillRow}>
-            <View style={[styles.pill, { backgroundColor: scoreConfig.bgColor }]}>
-              <Text style={[styles.pillIcon, { color: scoreConfig.color }]}>
-                {scoreConfig.icon}
-              </Text>
-              <Text style={[styles.pillLabel, { color: scoreConfig.color }]}>
-                {scoreConfig.label}
-              </Text>
-            </View>
             {item.sizeRecommendation && (
               <View style={[styles.pill, styles.sizePill]}>
                 <Text style={styles.sizePillLabel}>Size {item.sizeRecommendation.size}</Text>
@@ -176,20 +180,27 @@ export default function HistoryScreen() {
                 />
               </View>
             )}
-            {item.category && (
+            {showCategory && (
               <View style={[styles.pill, styles.categoryPill]}>
                 <Text style={styles.categoryPillLabel} numberOfLines={1}>
-                  {item.category}
+                  {safeCategory}
                 </Text>
               </View>
             )}
           </View>
 
           <View style={styles.bottomRow}>
-            <Text style={styles.dateText}>{formatDate(item.checkedAt)}</Text>
+            <View style={styles.scoreRow}>
+              <View style={[styles.scoreDot, { backgroundColor: scoreConfig.color }]} />
+              <Text style={[styles.scoreLabel, { color: scoreConfig.color }]}>
+                {scoreConfig.label}
+              </Text>
+              <Text style={styles.dateSep}>·</Text>
+              <Text style={styles.dateText}>{formatDate(item.checkedAt)}</Text>
+            </View>
             {item.warnings.length > 0 && (
               <Text style={styles.warningCount}>
-                {item.warnings.length} warning{item.warnings.length > 1 ? 's' : ''}
+                {item.warnings.length} concern{item.warnings.length > 1 ? 's' : ''}
               </Text>
             )}
           </View>
@@ -303,11 +314,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    ...glass,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     alignItems: 'center',
-    ...shadows.sm,
+    ...shadows.glass,
   },
   statNumber: {
     ...typography.headingL,
@@ -323,13 +334,13 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    ...glass,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    ...shadows.sm,
+    ...shadows.glass,
   },
   cardImageContainer: {
     marginRight: spacing.md,
@@ -428,6 +439,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(5),
+  },
+  scoreDot: {
+    width: ms(7),
+    height: ms(7),
+    borderRadius: ms(4),
+  },
+  scoreLabel: {
+    ...typography.caption,
+    fontWeight: '600',
+  },
+  dateSep: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
   dateText: {
     ...typography.caption,

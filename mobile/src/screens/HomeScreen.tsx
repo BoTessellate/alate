@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -35,24 +35,31 @@ export default function HomeScreen() {
   const [nudgeSent, setNudgeSent] = useState(false);
   const [nudging, setNudging] = useState(false);
   const { avatar } = useAvatarStore();
+  // Preserves URL across navigation to AvatarSetup so it auto-triggers on return
+  const pendingUrlRef = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
+      // If we just came back from AvatarSetup with a pending URL, auto-trigger
+      if (pendingUrlRef.current && avatar) {
+        const saved = pendingUrlRef.current;
+        pendingUrlRef.current = null;
+        setUrl(saved);
+        runCheck(saved);
+        return;
+      }
+      // Normal focus — reset state
       setUrl('');
       setError(null);
       setFailedBrand(null);
       setNudgeSent(false);
-    }, [])
+    }, [avatar])
   );
 
-  const handleCheckFit = async () => {
-    if (!url.trim()) {
-      setError('Please enter a product URL');
-      return;
-    }
-
-    // Check if avatar is set up
+  const runCheck = useCallback(async (targetUrl: string) => {
     if (!avatar) {
+      // Save URL before leaving so we can restore it on return
+      pendingUrlRef.current = targetUrl;
       navigation.navigate('AvatarSetup');
       return;
     }
@@ -63,21 +70,29 @@ export default function HomeScreen() {
     setNudgeSent(false);
 
     try {
-      const result = await scrapeProduct(url);
+      const result = await scrapeProduct(targetUrl);
       if (result.success && result.data) {
-        navigation.navigate('FitResult', { product: result.data, url });
+        navigation.navigate('FitResult', { product: result.data, url: targetUrl });
       } else {
-        const brand = extractBrandFromUrl(url);
+        const brand = extractBrandFromUrl(targetUrl);
         setFailedBrand(brand);
         setError('Unable to fetch product details.');
       }
     } catch (err) {
-      const brand = extractBrandFromUrl(url);
+      const brand = extractBrandFromUrl(targetUrl);
       setFailedBrand(brand);
       setError('Something went wrong.');
     } finally {
       setLoading(false);
     }
+  }, [avatar, navigation]);
+
+  const handleCheckFit = () => {
+    if (!url.trim()) {
+      setError('Please enter a product URL');
+      return;
+    }
+    runCheck(url.trim());
   };
 
   return (
@@ -274,11 +289,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   inputCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    ...glass,
+    borderRadius: borderRadius.xxl,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.md,
+    ...shadows.glass,
   },
   inputLabel: {
     ...typography.label,
@@ -326,15 +341,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   setupCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    ...glass,
+    borderRadius: borderRadius.xxl,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.primaryLight,
     borderStyle: 'dashed',
+    ...shadows.glass,
   },
   setupIconContainer: {
     width: 44,
@@ -363,13 +377,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nudgeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
+    ...glass,
+    borderRadius: borderRadius.xxl,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.secondary + '40',
-    ...shadows.sm,
+    ...shadows.glass,
   },
   nudgeHeader: {
     flexDirection: 'row',

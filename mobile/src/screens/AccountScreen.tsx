@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,25 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  Alert,
+  Image,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
+import { useAccountStore } from '../store/accountStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
+
+// Required: completes the auth session on app resume
+WebBrowser.maybeCompleteAuthSession();
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Account'>,
@@ -37,10 +46,73 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ');
 }
 
+const GLASS_CARD = {
+  ...glass,
+  ...shadows.glass,
+};
+
 export default function AccountScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { avatar, clearAvatar } = useAvatarStore();
   const { entries } = useFitHistoryStore();
+  const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
+
+  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+  const hasGoogleConfig = !!(googleClientId || googleAndroidClientId || googleIosClientId);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: googleClientId,
+    androidClientId: googleAndroidClientId,
+    iosClientId: googleIosClientId,
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { authentication } = response;
+      if (authentication?.accessToken) {
+        fetchGoogleUser(authentication.accessToken);
+      }
+    }
+  }, [response]);
+
+  const fetchGoogleUser = async (accessToken: string) => {
+    try {
+      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const user = await res.json();
+      setGoogleUser({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture,
+      });
+    } catch {
+      Alert.alert('Sign-in error', 'Could not fetch your Google profile. Please try again.');
+    }
+  };
+
+  const handleGoogleSignIn = () => {
+    if (!hasGoogleConfig) {
+      Alert.alert(
+        'Not configured',
+        'Google Sign-In is not set up yet. Add EXPO_PUBLIC_GOOGLE_CLIENT_ID to your .env file.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    promptAsync();
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: clearAccount },
+    ]);
+  };
 
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
@@ -53,13 +125,46 @@ export default function AccountScreen() {
           <Text style={styles.title}>Account</Text>
         </View>
 
+        {/* Google account card */}
+        <View style={[styles.accountCard, GLASS_CARD]}>
+          {googleUser ? (
+            <View style={styles.signedInRow}>
+              {googleUser.picture ? (
+                <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Feather name="user" size={22} color={colors.primary} />
+                </View>
+              )}
+              <View style={styles.signedInInfo}>
+                {googleUser.name && (
+                  <Text style={styles.userName}>{googleUser.name}</Text>
+                )}
+                <Text style={styles.userEmail}>{googleUser.email}</Text>
+              </View>
+              <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+                <Text style={styles.signOutText}>Sign out</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGoogleSignIn}
+              activeOpacity={0.8}
+            >
+              <Feather name="log-in" size={18} color={colors.white} />
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, GLASS_CARD]}>
             <Text style={styles.statNumber}>{entries.length}</Text>
             <Text style={styles.statLabel}>Checked</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, GLASS_CARD]}>
             <Text style={[styles.statNumber, { color: colors.success }]}>{greatFits}</Text>
             <Text style={styles.statLabel}>Great Fits</Text>
           </View>
@@ -79,7 +184,7 @@ export default function AccountScreen() {
         </View>
 
         {avatar ? (
-          <View style={styles.profileCard}>
+          <View style={[styles.profileCard, GLASS_CARD]}>
             {/* Height row */}
             <View style={styles.profileRow}>
               <Text style={styles.profileLabel}>Height</Text>
@@ -99,7 +204,7 @@ export default function AccountScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            style={styles.emptyProfileCard}
+            style={[styles.emptyProfileCard, GLASS_CARD]}
             onPress={() => navigation.navigate('AvatarSetup')}
             activeOpacity={0.8}
           >
@@ -114,9 +219,9 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Size Accuracy Tip */}
+        {/* Tip */}
         {avatar && (
-          <View style={styles.tipCard}>
+          <View style={[styles.tipCard, GLASS_CARD]}>
             <Feather name="info" size={16} color={colors.accentDark} style={styles.tipIcon} />
             <Text style={styles.tipText}>
               Size accuracy improves the more you check products. Your fit history helps calibrate predictions over time.
@@ -146,7 +251,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     padding: spacing.lg,
@@ -159,6 +263,73 @@ const styles = StyleSheet.create({
     ...typography.headingXL,
     color: colors.text,
   },
+  // Google account card
+  accountCard: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cta,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  googleButtonText: {
+    ...typography.label,
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  signedInRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.backgroundSecondary,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primaryLight + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  signedInInfo: {
+    flex: 1,
+  },
+  userName: {
+    ...typography.labelLarge,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  userEmail: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  signOutButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.error + '12',
+  },
+  signOutText: {
+    ...typography.label,
+    color: colors.error,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  // Stats
   statsRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -166,11 +337,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     alignItems: 'center',
-    ...shadows.sm,
   },
   statNumber: {
     ...typography.headingL,
@@ -181,6 +350,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
+  // Section header
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,12 +375,11 @@ const styles = StyleSheet.create({
     color: colors.accentDark,
     fontWeight: '600',
   },
+  // Profile card
   profileCard: {
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    ...shadows.sm,
   },
   profileRow: {
     flexDirection: 'row',
@@ -218,7 +387,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: 'rgba(64, 45, 101, 0.1)',
   },
   profileLabel: {
     ...typography.label,
@@ -231,14 +400,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyProfileCard: {
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
     alignItems: 'center',
     marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.accentDark + '40',
-    borderStyle: 'dashed',
   },
   emptyProfileIcon: {
     fontSize: 36,
@@ -271,7 +436,6 @@ const styles = StyleSheet.create({
   tipCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.accentDark + '12',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,

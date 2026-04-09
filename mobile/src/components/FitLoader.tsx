@@ -10,7 +10,6 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
-  withDelay,
   withSequence,
   Easing,
 } from 'react-native-reanimated';
@@ -20,43 +19,6 @@ import { colors, spacing, typography } from '../constants/theme';
 interface FitLoaderProps {
   title?: string;
   subtitle?: string;
-}
-
-const DOT_SIZE = 10;
-const DOT_GAP = 10;
-const DOT_COLORS = [colors.cta, colors.primaryLight, colors.accentDark];
-const ANIMATION_DURATION = 500;
-
-function BounceDot({ delay, color }: { delay: number; color: string }) {
-  const translateY = useSharedValue(0);
-
-  useEffect(() => {
-    translateY.value = withDelay(
-      delay,
-      withRepeat(
-        withSequence(
-          withTiming(-12, { duration: ANIMATION_DURATION, easing: Easing.out(Easing.quad) }),
-          withTiming(0, { duration: ANIMATION_DURATION, easing: Easing.in(Easing.quad) }),
-        ),
-        -1,
-        false
-      )
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.dot,
-        { backgroundColor: color },
-        animatedStyle,
-      ]}
-    />
-  );
 }
 
 function PulseRing() {
@@ -104,13 +66,6 @@ export default function FitLoader({
         </View>
       </View>
 
-      {/* Bounce dots */}
-      <View style={styles.dotsRow}>
-        {DOT_COLORS.map((color, i) => (
-          <BounceDot key={i} delay={i * 160} color={color} />
-        ))}
-      </View>
-
       {/* Text */}
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
@@ -149,18 +104,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cta + '18',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: DOT_GAP,
-    marginBottom: spacing.lg,
-    height: 28,
-  },
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
   },
   title: {
     ...typography.headingM,
