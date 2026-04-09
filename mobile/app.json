@@ -31,7 +31,15 @@
       "bundler": "metro"
     },
     "plugins": [
-      "@sentry/react-native",
+      "./plugins/withGradleMirrors",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "bot-h0",
+          "project": "android",
+          "url": "https://de.sentry.io/"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-share-intent",
@@ -45,7 +53,18 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://s01.oss.sonatype.org/content/repositories/releases/",
+              "https://repo1.maven.org/maven2/"
+            ]
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
