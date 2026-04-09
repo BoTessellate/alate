@@ -10,7 +10,15 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
+  Image,
 } from 'react-native';
+
+function isValidUrl(text: string): boolean {
+  try {
+    const url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch { return false; }
+}
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
@@ -37,6 +45,8 @@ export default function HomeScreen() {
   const { avatar } = useAvatarStore();
   // Preserves URL across navigation to AvatarSetup so it auto-triggers on return
   const pendingUrlRef = useRef<string | null>(null);
+  // Auto-trigger debounce on paste
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,6 +105,21 @@ export default function HomeScreen() {
     runCheck(url.trim());
   };
 
+  const handleUrlChange = (text: string) => {
+    setUrl(text);
+    if (error) {
+      setError(null);
+      setFailedBrand(null);
+      setNudgeSent(false);
+    }
+    // Auto-trigger on valid URL paste (debounced 700ms)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    const trimmed = text.trim();
+    if (trimmed && isValidUrl(trimmed)) {
+      debounceTimer.current = setTimeout(() => runCheck(trimmed), 700);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
@@ -105,8 +130,12 @@ export default function HomeScreen() {
         <View style={styles.content}>
           {/* Hero Section */}
           <View style={styles.heroSection}>
-            <View style={styles.iconContainer}>
-              <Feather name="shopping-bag" size={36} color={colors.primary} />
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.title}>Will it fit?</Text>
             <Text style={styles.subtitle}>
@@ -124,14 +153,7 @@ export default function HomeScreen() {
                 placeholder="Paste ASOS, Zara, or any product URL..."
                 placeholderTextColor={colors.textMuted}
                 value={url}
-                onChangeText={(text) => {
-                  setUrl(text);
-                  if (error) {
-                    setError(null);
-                    setFailedBrand(null);
-                    setNudgeSent(false);
-                  }
-                }}
+                onChangeText={handleUrlChange}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
@@ -267,14 +289,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  iconContainer: {
+  logoContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primaryLight + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 20,
+    overflow: 'hidden',
     marginBottom: spacing.md,
+    ...shadows.md,
+  },
+  logoImage: {
+    width: 80,
+    height: 80,
   },
   title: {
     ...typography.displayMedium,
