@@ -36,9 +36,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Patch sentry.gradle exec() for Gradle 8.8+ compatibility
-        run: sed -i 's/\bexec {/project.exec {/g' node_modules/@sentry/react-native/sentry.gradle
-
       - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
         env:
@@ -46,11 +43,6 @@ jobs:
 
       - name: Remove hermesCommand (not needed in RN 0.73+, breaks CI path resolution)
         run: sed -i '/hermesCommand/d' android/app/build.gradle
-
-      - name: Pin Gradle to 8.6.1 (Project.exec() removed in 8.8, needed by sentry.gradle)
-        run: |
-          sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's|validateDistributionUrl=true|validateDistributionUrl=false|' android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew

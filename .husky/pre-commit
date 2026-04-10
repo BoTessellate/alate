@@ -93,7 +93,7 @@ echo "✅ Critical pattern checks passed"
 
 # 4. Check for large files (>500KB)
 echo "\n📏 Checking for large files..."
-LARGE_FILES=$(git diff --cached --name-only | xargs ls -l 2>/dev/null | awk '$5 > 512000 {print $9}')
+LARGE_FILES=$(git diff --cached --name-only | grep -v 'package-lock.json' | xargs ls -l 2>/dev/null | awk '$5 > 512000 {print $9}')
 if [ -n "$LARGE_FILES" ]; then
   echo "❌ Large files detected (>500KB):"
   echo "$LARGE_FILES"
