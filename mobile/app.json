@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.alate.checkfit"
+      "bundleIdentifier": "com.tessellate.alate"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1E0B45"
       },
-      "package": "com.alate.checkfit",
+      "package": "com.tessellate.alate",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true
     },
