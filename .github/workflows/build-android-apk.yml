@@ -41,8 +41,11 @@ jobs:
         env:
           EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
 
-      - name: Remove hermesCommand (not needed in RN 0.73+, breaks CI path resolution)
+      - name: Remove hermesCommand (hermes-compiler not in node_modules, breaks path resolution)
         run: sed -i '/hermesCommand/d' android/app/build.gradle
+
+      - name: Patch MainApplication.kt (Expo 54 prebuild template omits reactNativeHost, required by RN 0.81)
+        run: cp patches/MainApplication.kt android/app/src/main/java/com/tessellate/alate/MainApplication.kt
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
