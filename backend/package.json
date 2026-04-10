@@ -17,7 +17,7 @@
     "@google/generative-ai": "^0.24.1",
     "@imgly/background-removal-node": "^1.4.5",
     "@notionhq/client": "^5.8.0",
-    "@pinecone-database/pinecone": "^6.1.4",
+    "@pinecone-database/pinecone": "^7.1.0",
     "@sentry/node": "^10.47.0",
     "@sparticuz/chromium": "^143.0.4",
     "@supabase/supabase-js": "^2.93.0",
