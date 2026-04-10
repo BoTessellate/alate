@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Mobile (Expo / React Native)
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+    # Only alert on production dependencies — dev tooling (appium, jest, wdio) is noisy
+    allow:
+      - dependency-type: "production"
+    groups:
+      expo:
+        patterns:
+          - "expo*"
+          - "@expo/*"
+      react-navigation:
+        patterns:
+          - "@react-navigation/*"
+
+  # Backend (Node / Vercel)
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-type: "production"
+    groups:
+      anthropic:
+        patterns:
+          - "@anthropic-ai/*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
