@@ -47,9 +47,6 @@ jobs:
       - name: Remove hermesCommand (not needed in RN 0.73+, breaks CI path resolution)
         run: sed -i '/hermesCommand/d' android/app/build.gradle
 
-      - name: Pin Gradle to 8.6.1 (8.7+ removed exec() in task actions, breaks sentry.gradle)
-        run: sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.6.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
-
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
