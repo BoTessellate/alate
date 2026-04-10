@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Patch sentry.gradle exec() for Gradle 8.8+ compatibility
+        run: sed -i 's/\bexec {/project.exec {/g' node_modules/@sentry/react-native/sentry.gradle
+
       - name: Expo prebuild
         run: npx expo prebuild --platform android --clean
         env:
