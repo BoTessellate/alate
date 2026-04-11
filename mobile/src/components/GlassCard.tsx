@@ -28,6 +28,9 @@ export interface GlassCardProps {
   tint?: 'light' | 'dark' | 'default' | 'extraLight' | 'systemMaterial' | 'systemUltraThinMaterial' | 'systemThinMaterial' | 'systemMaterialLight' | 'systemUltraThinMaterialLight' | 'systemThinMaterialLight' | 'systemMaterialDark' | 'systemUltraThinMaterialDark' | 'systemThinMaterialDark';
   /** Disable the elevation shadow (use when nested inside another shadowed card) */
   noShadow?: boolean;
+  /** Accessibility id forwarded to the outer View for E2E selectors */
+  testID?: string;
+  accessibilityLabel?: string;
 }
 
 export default function GlassCard({
@@ -36,13 +39,19 @@ export default function GlassCard({
   intensity = 60,
   tint = 'light',
   noShadow = false,
+  testID,
+  accessibilityLabel,
 }: GlassCardProps) {
   // On Android, expo-blur quality is lower — bump intensity slightly so the
   // frost reads as glass rather than as a flat translucent rectangle.
   const effectiveIntensity = Platform.OS === 'android' ? Math.min(100, intensity + 20) : intensity;
 
   return (
-    <View style={[styles.outer, !noShadow && shadows.glass, style]}>
+    <View
+      testID={testID}
+      accessibilityLabel={accessibilityLabel}
+      style={[styles.outer, !noShadow && shadows.glass, style]}
+    >
       <BlurView
         intensity={effectiveIntensity}
         tint={tint}

@@ -96,17 +96,21 @@ function ChipSelector({
   selected,
   onSelect,
   columns = 3,
+  testIDPrefix,
 }: {
   options: ChipOption[];
   selected: string | null;
   onSelect: (value: string) => void;
   columns?: number;
+  /** Namespace chip testIDs so values don't collide across groups */
+  testIDPrefix?: string;
 }) {
   return (
     <View style={chipStyles.container}>
       {options.map((option) => (
         <TouchableOpacity
           key={option.value}
+          testID={testIDPrefix ? `${testIDPrefix}-chip-${option.value}` : undefined}
           style={[
             chipStyles.chip,
             columns === 2 && chipStyles.chipWide,
@@ -277,7 +281,7 @@ export default function AvatarSetupScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Body profile</Text>
+            <Text testID="avatar-setup-title" style={styles.title}>Body profile</Text>
             <Text style={styles.subtitle}>
               Select each measurement — your figurine updates live
             </Text>
@@ -316,6 +320,7 @@ export default function AvatarSetupScreen() {
               selected={height ? String(height) : null}
               onSelect={(v) => { setHeight(Number(v)); setActivePart('height'); }}
               columns={2}
+              testIDPrefix="height"
             />
           </View>
 
@@ -332,6 +337,7 @@ export default function AvatarSetupScreen() {
               options={SHOULDER_OPTIONS}
               selected={shoulders}
               onSelect={(v) => { setShoulders(v as ShoulderType); setActivePart('shoulders'); }}
+              testIDPrefix="shoulders"
             />
           </View>
 
@@ -349,6 +355,7 @@ export default function AvatarSetupScreen() {
               selected={bust}
               onSelect={(v) => { setBust(v as BustType); setActivePart('bust'); }}
               columns={2}
+              testIDPrefix="bust"
             />
           </View>
 
@@ -365,6 +372,7 @@ export default function AvatarSetupScreen() {
               options={WAIST_OPTIONS}
               selected={waist}
               onSelect={(v) => { setWaist(v as WaistType); setActivePart('waist'); }}
+              testIDPrefix="waist"
             />
           </View>
 
@@ -382,6 +390,7 @@ export default function AvatarSetupScreen() {
               selected={hips}
               onSelect={(v) => { setHips(v as HipType); setActivePart('hips'); }}
               columns={2}
+              testIDPrefix="hips"
             />
           </View>
 
@@ -399,6 +408,7 @@ export default function AvatarSetupScreen() {
               selected={thighs}
               onSelect={(v) => { setThighs(v as ThighType); setActivePart('thighs'); }}
               columns={2}
+              testIDPrefix="thighs"
             />
           </View>
 
@@ -415,6 +425,7 @@ export default function AvatarSetupScreen() {
               options={TORSO_OPTIONS}
               selected={torso}
               onSelect={(v) => { setTorso(v as TorsoType); setActivePart('torso'); }}
+              testIDPrefix="torso"
             />
           </View>
 

@@ -108,7 +108,7 @@ export default function HistoryScreen() {
 
   const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
-  const renderItem = ({ item }: { item: FitHistoryEntry }) => {
+  const renderItem = ({ item, index }: { item: FitHistoryEntry; index: number }) => {
     const scoreConfig = getScoreConfig(item.fitScore);
     const priceText = formatPrice(item.price);
     const safeBrand = sanitize(item.brand);
@@ -119,6 +119,7 @@ export default function HistoryScreen() {
 
     return (
       <TouchableOpacity
+        testID={`history-entry-${index}`}
         onPress={() => navigation.navigate('FitResult', {
           product: {
             name: item.productName,
@@ -254,6 +255,7 @@ export default function HistoryScreen() {
 
         {/* List */}
         <FlatList
+          testID="history-list"
           data={entries}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}

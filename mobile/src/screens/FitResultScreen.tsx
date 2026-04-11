@@ -332,12 +332,12 @@ export default function FitResultScreen() {
         </GlassCard>
 
         {/* Score card */}
-        <GlassCard style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
+        <GlassCard testID="fit-score-display" style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
           <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
             <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
           </View>
           <View style={styles.scoreTextContainer}>
-            <Text style={[styles.scoreTitle, { color: scoreConfig.color }]}>
+            <Text testID="fit-score-label" style={[styles.scoreTitle, { color: scoreConfig.color }]}>
               {scoreConfig.text}
             </Text>
             <Text style={styles.scoreDescription}>
@@ -363,10 +363,10 @@ export default function FitResultScreen() {
 
         {/* Size Recommendation */}
         {sizeRec && (
-          <GlassCard style={[styles.card, styles.sizeCard]}>
+          <GlassCard testID="size-recommendation" style={[styles.card, styles.sizeCard]}>
             <View style={styles.sizeCardLeft}>
               <Text style={styles.sizeCardLabel}>Recommended Size</Text>
-              <Text style={styles.sizeCardValue}>{sizeRec.size}</Text>
+              <Text testID="recommended-size-value" style={styles.sizeCardValue}>{sizeRec.size}</Text>
               {sizeRec.note && (
                 <Text style={styles.sizeCardNote}>{sizeRec.note}</Text>
               )}
@@ -475,6 +475,7 @@ export default function FitResultScreen() {
           {isHistoryMode ? (
             <>
               <TouchableOpacity
+                testID="reevaluate-button"
                 style={styles.primaryButton}
                 onPress={() => {
                   wentToAvatarSetup.current = true;
@@ -485,6 +486,7 @@ export default function FitResultScreen() {
                 <Text style={styles.primaryButtonText}>Re-evaluate</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="change-measurements-button"
                 style={styles.secondaryButton}
                 onPress={() => {
                   wentToAvatarSetup.current = true;
@@ -495,6 +497,7 @@ export default function FitResultScreen() {
                 <Text style={styles.secondaryButtonText}>Change your measurements</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="view-on-store-button"
                 style={styles.ghostButton}
                 onPress={openProductPage}
                 activeOpacity={0.8}
@@ -505,6 +508,7 @@ export default function FitResultScreen() {
           ) : (
             <>
               <TouchableOpacity
+                testID="view-on-store-button"
                 style={styles.primaryButton}
                 onPress={openProductPage}
                 activeOpacity={0.8}
@@ -512,6 +516,7 @@ export default function FitResultScreen() {
                 <Text style={styles.primaryButtonText}>View on Store</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="check-another-button"
                 style={styles.secondaryButton}
                 onPress={() => navigation.goBack()}
                 activeOpacity={0.8}

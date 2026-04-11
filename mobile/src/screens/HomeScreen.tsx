@@ -185,7 +185,7 @@ export default function HomeScreen() {
 
           {/* Brand Nudge Card */}
           {failedBrand && (
-            <GlassCard style={styles.nudgeCard}>
+            <GlassCard testID="brand-nudge-card" style={styles.nudgeCard}>
               <View style={styles.nudgeHeader}>
                 <Feather name="send" size={18} color={colors.secondary} />
                 <Text style={styles.nudgeTitle}>
@@ -206,6 +206,7 @@ export default function HomeScreen() {
                     before making the final purchase.
                   </Text>
                   <TouchableOpacity
+                    testID="nudge-brand-button"
                     style={styles.nudgeButton}
                     onPress={async () => {
                       setNudging(true);
