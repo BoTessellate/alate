@@ -284,10 +284,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: spacing.lg,
-    justifyContent: 'center',
+    paddingTop: spacing.xl,
   },
   heroSection: {
     alignItems: 'center',
+    marginTop: spacing.lg,
     marginBottom: spacing.xl,
   },
   logoContainer: {
@@ -332,13 +333,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    backgroundColor: 'transparent',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 0,
     ...typography.body,
     color: colors.text,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
   },
   errorContainer: {
     backgroundColor: colors.errorLight + '20',
