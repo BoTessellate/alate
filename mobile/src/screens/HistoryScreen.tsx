@@ -17,6 +17,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, ms } from '../constants/theme';
 import GlassCard from '../components/GlassCard';
+import GradientBackground from '../components/GradientBackground';
 import { sanitize } from '../utils/sanitize';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
@@ -216,26 +217,29 @@ export default function HistoryScreen() {
 
   if (entries.length === 0) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <View testID="history-screen" style={styles.emptyContainer}>
-          <Text style={styles.pageTitle}>History</Text>
-          <View style={styles.emptyIconContainer}>
-            <Feather name="clock" size={36} color={colors.primaryLight} />
+      <GradientBackground>
+        <SafeAreaView style={styles.safeArea}>
+          <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+          <View testID="history-screen" style={styles.emptyContainer}>
+            <Text style={styles.pageTitle}>History</Text>
+            <View style={styles.emptyIconContainer}>
+              <Feather name="clock" size={36} color={colors.primaryLight} />
+            </View>
+            <Text style={styles.emptyTitle}>No fit checks yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Check some products to build your{'\n'}personalized fit history
+            </Text>
           </View>
-          <Text style={styles.emptyTitle}>No fit checks yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Check some products to build your{'\n'}personalized fit history
-          </Text>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </GradientBackground>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <View testID="history-screen" style={styles.container}>
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <View testID="history-screen" style={styles.container}>
         {/* Page Title */}
         <Text style={styles.pageTitle}>History</Text>
 
@@ -284,19 +288,20 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </View>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   pageTitle: {
     ...typography.headingXL,

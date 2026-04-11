@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import GradientBackground from '../components/GradientBackground';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
@@ -266,10 +267,10 @@ export default function FitResultScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <GradientBackground>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
         <FitLoader />
-      </View>
+      </GradientBackground>
     );
   }
 
@@ -282,7 +283,7 @@ export default function FitResultScreen() {
   const showTags = !!(enrichedProduct?.tags?.length);
 
   return (
-    <View style={styles.root}>
+    <GradientBackground style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Fixed hero image — stays behind scroll */}
@@ -293,7 +294,7 @@ export default function FitResultScreen() {
           <View style={[styles.heroImage, styles.heroPlaceholder]} />
         )}
         <LinearGradient
-          colors={['transparent', colors.background]}
+          colors={['transparent', colors.background] as readonly [string, string]}
           style={styles.heroGradient}
         />
       </View>
@@ -527,18 +528,16 @@ export default function FitResultScreen() {
           )}
         </View>
       </ScrollView>
-    </View>
+    </GradientBackground>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   // --- Hero ---
   heroFixed: {
@@ -778,7 +777,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(64, 45, 101, 0.1)',
+    borderBottomColor: 'rgba(90, 67, 119, 0.1)',
   },
   detailRowLast: {
     borderBottomWidth: 0,

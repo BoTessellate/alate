@@ -18,55 +18,56 @@ export const fontFamily = {
 };
 
 // =============================================================================
-// COLOR PALETTE - Editorial Purple Theme (mature, beautiful, modern)
-// Brand palette:
-//   Deep:    #0f0325  #2c1853  #402d65  #625380
-//   Mid:     #74698a  #968ab0  #a69fb5
-//   Light:   #bbb1ce  #baaed2  #efedf5
+// COLOR PALETTE - Gray-Purple system (matches website tonal scale)
+// Background gradient:  #e4e2e9 → #c5c0d2 → #b5afc4 → #9a92ac
+// Primary brand:        #5a4377  (used for buttons + bold text)
 // =============================================================================
 export const colors = {
-  // Primary - Deep brand purple (confident, editorial)
-  primary: '#402d65',
-  primaryLight: '#625380',
-  primaryDark: '#2c1853',
+  // Primary - Gray-purple brand colour (buttons, bold text)
+  primary: '#5a4377',
+  primaryLight: '#7d6699',
+  primaryDark: '#3f2b54',
 
-  // CTA - Mid-lilac (the most abundantly used interactive colour)
-  cta: '#7a6a92',
+  // CTA - Same as primary (the main interactive colour everywhere)
+  cta: '#5a4377',
 
-  // Secondary - Mid-purple for emphasis (price, callouts)
-  secondary: '#2c1853',
-  secondaryLight: '#625380',
-  secondaryDark: '#0f0325',
+  // Secondary - Slightly darker brand purple for emphasis (price, callouts)
+  secondary: '#3f2b54',
+  secondaryLight: '#5a4377',
+  secondaryDark: '#2a1c3a',
 
-  // Accent - Soft lavender (backgrounds of pills, subtle surfaces)
-  accent: '#bbb1ce',
-  accentLight: '#efedf5',
-  accentDark: '#968ab0',
+  // Accent - Mid-tone gray-purple (pills, subtle surfaces)
+  accent: '#9a92ac',
+  accentLight: '#c5c0d2',
+  accentDark: '#5a4377',
 
-  // Highlight - Brand purple family (CTAs)
-  highlight: '#402d65',
-  highlightLight: '#625380',
-  highlightDark: '#2c1853',
+  // Highlight - Brand purple family
+  highlight: '#5a4377',
+  highlightLight: '#7d6699',
+  highlightDark: '#3f2b54',
 
-  // Background - Warm lavender (glass cards pop against this)
-  background: '#F0EBF8',
-  backgroundSecondary: '#E8E0F4',
-  backgroundTertiary: '#DDD4EE',
+  // Background tonal scale — lightest = canvas, darker stops feed the gradient
+  background: '#e4e2e9',
+  backgroundSecondary: '#c5c0d2',
+  backgroundTertiary: '#b5afc4',
+  backgroundDark: '#9a92ac',
+  /** Linear gradient stops, 180° (top → bottom) */
+  backgroundGradient: ['#e4e2e9', '#c5c0d2', '#b5afc4', '#9a92ac'] as readonly [string, string, string, string],
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
   surfaceLight: '#FBFAFD',
   surfaceElevated: '#FFFFFF',
 
-  // Text - Deep brand black for readability
-  text: '#0f0325',
-  textSecondary: '#4A3566',   // darkened from #625380 for WCAG AA contrast on light backgrounds
-  textMuted: '#7A6D96',       // darkened from #968ab0 for WCAG AA contrast on light backgrounds
+  // Text - Deep brand purple-black for readability on the light end of the gradient
+  text: '#2a1c3a',
+  textSecondary: '#5a4377',   // brand purple as secondary text
+  textMuted: '#7d6699',       // lighter brand purple, still WCAG AA on #e4e2e9
   textOnPrimary: '#FFFFFF',
   textOnSecondary: '#FFFFFF',
   white: '#FFFFFF',
 
-  // Status colors (semantic — tuned to feel harmonious with purple)
+  // Status colors (semantic — tuned to feel harmonious with gray-purple)
   success: '#2E7D5B',
   successLight: '#4AA37F',
   warning: '#C2410C',
@@ -77,19 +78,19 @@ export const colors = {
   infoLight: '#0891B2',
 
   // Border colors
-  border: '#E6DFF0',
-  borderLight: '#F2EEF8',
-  borderAccent: '#402d65',
+  border: '#c5c0d2',
+  borderLight: '#d8d4de',
+  borderAccent: '#5a4377',
 
   // Overlay
-  overlay: 'rgba(15, 3, 37, 0.8)',
-  overlayLight: 'rgba(15, 3, 37, 0.5)',
+  overlay: 'rgba(42, 28, 58, 0.8)',
+  overlayLight: 'rgba(42, 28, 58, 0.5)',
 
   // Gradient endpoints
-  gradientPrimary: ['#402d65', '#2c1853'],
-  gradientAccent: ['#625380', '#402d65'],
-  gradientWarm: ['#74698a', '#625380'],
-  gradientCool: ['#968ab0', '#625380'],
+  gradientPrimary: ['#5a4377', '#3f2b54'],
+  gradientAccent: ['#7d6699', '#5a4377'],
+  gradientWarm: ['#9a92ac', '#5a4377'],
+  gradientCool: ['#b5afc4', '#5a4377'],
 };
 
 // =============================================================================
@@ -261,24 +262,24 @@ export const shadows = {
     shadowRadius: 16,
     elevation: 12,
   },
-  // Glass shadow — purple-tinted for glass cards on lavender bg
+  // Glass shadow — gray-purple tint for glass cards on the gradient bg
   glass: {
-    shadowColor: '#2c1853',
+    shadowColor: '#3f2b54',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.10,
+    shadowOpacity: 0.12,
     shadowRadius: 20,
     elevation: 6,
   },
-  // Colored shadows — brand purple
+  // Colored shadows — brand gray-purple
   glow: {
-    shadowColor: '#402d65',
+    shadowColor: '#5a4377',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
   glowAccent: {
-    shadowColor: '#625380',
+    shadowColor: '#7d6699',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -287,13 +288,13 @@ export const shadows = {
 };
 
 // =============================================================================
-// GLASS STYLE — semi-transparent cards on lavender background
+// GLASS STYLE — semi-transparent cards on gray-purple gradient background
 // Subtle Chrome-style frost: soft white tint + hairline border, separation
 // comes primarily from shadow rather than background contrast.
 // =============================================================================
 export const glass = {
-  backgroundColor: 'rgba(255, 255, 255, 0.45)',
-  borderColor: 'rgba(255, 255, 255, 0.35)',
+  backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  borderColor: 'rgba(255, 255, 255, 0.55)',
   borderWidth: 0.5,
 };
 

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import GradientBackground from '../components/GradientBackground';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
@@ -46,9 +47,10 @@ export default function BrandIntegrationScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <GradientBackground>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.badge}>
@@ -127,22 +129,23 @@ export default function BrandIntegrationScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.footerNote}>
-          Currently onboarding select brand partners for our early access programme.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+          <Text style={styles.footerNote}>
+            Currently onboarding select brand partners for our early access programme.
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   content: {
     padding: spacing.lg,
