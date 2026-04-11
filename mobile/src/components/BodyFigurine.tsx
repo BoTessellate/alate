@@ -54,12 +54,13 @@ interface BodyFigurineProps {
   style?: StyleProp<ViewStyle>;
 }
 
-// Fashion-illustration palette — warm lavender body, hairline outline.
-const OUTLINE = '#3F2C5E';
-const HIGHLIGHT = '#5A9BE8';
-const HIGHLIGHT_SOFT = '#C9E3FB';
-const GUIDE = '#D8CFE9';
-const GUIDE_DARK = '#A99BC4';
+// Fashion-illustration palette — gray-purple body matching brand palette,
+// hairline outline, brand-purple highlight (#5a4377) for active focus areas.
+const OUTLINE = '#3f2b54';
+const HIGHLIGHT = '#5a4377';
+const HIGHLIGHT_SOFT = '#c5c0d2';
+const GUIDE = '#d8d4de';
+const GUIDE_DARK = '#9a92ac';
 const SHEEN = 'rgba(255, 255, 255, 0.55)';
 
 export default function BodyFigurine({
@@ -273,29 +274,29 @@ export default function BodyFigurine({
     <View style={[styles.container, style]} testID="body-figurine">
       <Svg width="100%" height="100%" viewBox="0 0 220 420">
         <Defs>
-          {/* Body fill — soft warm lavender, lighter on the front, deeper on the side. */}
+          {/* Body fill — gray-purple, lighter on the front, deeper on the side. */}
           <LinearGradient id="bodyFill" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#9F8FBE" />
-            <Stop offset="0.45" stopColor="#C5B6E4" />
-            <Stop offset="1" stopColor="#7E6DA1" />
+            <Stop offset="0" stopColor="#9a92ac" />
+            <Stop offset="0.45" stopColor="#c5c0d2" />
+            <Stop offset="1" stopColor="#7d6699" />
           </LinearGradient>
           {/* Limb fill — slightly deeper to give the limbs depth against torso */}
           <LinearGradient id="limbFill" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#8C7BAC" />
-            <Stop offset="0.5" stopColor="#B0A0D0" />
-            <Stop offset="1" stopColor="#6F5E92" />
+            <Stop offset="0" stopColor="#867a9c" />
+            <Stop offset="0.5" stopColor="#b5afc4" />
+            <Stop offset="1" stopColor="#6a577f" />
           </LinearGradient>
-          {/* Head fill — same warm lavender, vertical gradient for hair shadow */}
+          {/* Head fill — same gray-purple, vertical gradient for hair shadow */}
           <LinearGradient id="headFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#7E6DA1" />
-            <Stop offset="0.5" stopColor="#B6A6D4" />
-            <Stop offset="1" stopColor="#9685B7" />
+            <Stop offset="0" stopColor="#7d6699" />
+            <Stop offset="0.5" stopColor="#b5afc4" />
+            <Stop offset="1" stopColor="#867a9c" />
           </LinearGradient>
-          {/* Active highlight fill */}
+          {/* Active highlight fill — brand purple #5a4377 */}
           <LinearGradient id="highlightFill" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#4F8FE0" />
-            <Stop offset="0.5" stopColor="#80B7F0" />
-            <Stop offset="1" stopColor="#4884D6" />
+            <Stop offset="0" stopColor="#5a4377" />
+            <Stop offset="0.5" stopColor="#7d6699" />
+            <Stop offset="1" stopColor="#3f2b54" />
           </LinearGradient>
         </Defs>
 

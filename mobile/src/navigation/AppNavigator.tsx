@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography } from '../constants/theme';
+import GradientBackground from '../components/GradientBackground';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
@@ -195,10 +196,10 @@ export default function AppNavigator() {
   // Show loading overlay when processing share intent
   if (isProcessingShare) {
     return (
-      <View style={styles.loadingOverlay}>
+      <GradientBackground style={styles.loadingOverlay}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Processing shared URL...</Text>
-      </View>
+      </GradientBackground>
     );
   }
 
@@ -258,7 +259,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
   loadingText: {
     ...typography.body,

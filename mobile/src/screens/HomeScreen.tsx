@@ -27,6 +27,7 @@ import { colors, spacing, typography, shadows, borderRadius } from '../constants
 import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import GlassCard from '../components/GlassCard';
+import GradientBackground from '../components/GradientBackground';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -123,8 +124,8 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+    <GradientBackground style={{ paddingTop: insets.top }}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -271,18 +272,19 @@ export default function HomeScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </GradientBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  // Background gradient is provided by <GradientBackground>; safeArea/container
+  // are now transparent so the gradient shows through.
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: 'transparent',
   },
   content: {
     flex: 1,

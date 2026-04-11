@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-    backgroundColor: colors.background,
+    // No background — wraps inside <GradientBackground> on caller screens
   },
   iconWrapper: {
     width: 96,
