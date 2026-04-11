@@ -264,10 +264,10 @@ export const shadows = {
   // Glass shadow — purple-tinted for glass cards on lavender bg
   glass: {
     shadowColor: '#2c1853',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 28,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    elevation: 6,
   },
   // Colored shadows — brand purple
   glow: {
@@ -290,9 +290,9 @@ export const shadows = {
 // GLASS STYLE — semi-transparent cards on lavender background
 // =============================================================================
 export const glass = {
-  backgroundColor: 'rgba(255, 255, 255, 0.72)',
-  borderColor: 'rgba(255, 255, 255, 0.95)',
-  borderWidth: 1.5,
+  backgroundColor: 'rgba(255, 255, 255, 0.60)',
+  borderColor: 'rgba(255, 255, 255, 0.65)',
+  borderWidth: 1,
 };
 
 // =============================================================================

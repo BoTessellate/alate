@@ -6,9 +6,9 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -24,6 +24,8 @@ import {
 } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
+import BodyFigurine from '../components/BodyFigurine';
+import { BodyFocusArea } from '../components/bodyFigurineModel';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
 
@@ -146,8 +148,8 @@ const chipStyles = StyleSheet.create({
   chip: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.sm,
     borderWidth: 2,
     borderColor: colors.border,
     minWidth: '30%',
@@ -165,6 +167,7 @@ const chipStyles = StyleSheet.create({
   chipLabel: {
     ...typography.labelLarge,
     color: colors.text,
+    fontSize: 12,
   },
   chipLabelSelected: {
     color: colors.primary,
@@ -174,6 +177,7 @@ const chipStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     textAlign: 'center',
+    fontSize: 10,
   },
   chipDescriptionSelected: {
     color: colors.primary,
@@ -182,9 +186,11 @@ const chipStyles = StyleSheet.create({
 
 export default function AvatarSetupScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
   const { avatar, setAvatar } = useAvatarStore();
   const { pendingUrl, clearPendingUrl } = usePendingShareStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activePart, setActivePart] = useState<BodyFocusArea | null>(null);
 
   const [height, setHeight] = useState<number | null>(avatar?.height_cm ?? null);
   const [shoulders, setShoulders] = useState<ShoulderType | null>(avatar?.shoulders ?? null);
@@ -245,180 +251,202 @@ export default function AvatarSetupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Build your body profile</Text>
-          <Text style={styles.subtitle}>
-            We use each measurement to predict how clothes will fit your unique shape
-          </Text>
+
+      <View style={styles.row}>
+        {/* Left pane — BodyFigurine, sticky */}
+        <View style={styles.figurePane}>
+          <BodyFigurine
+            heightCm={height}
+            shoulders={shoulders}
+            bust={bust}
+            waist={waist}
+            hips={hips}
+            thighs={thighs}
+            torsoLength={torso}
+            activePart={activePart}
+          />
         </View>
 
-        {/* Progress bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${(filledCount / STEPS.length) * 100}%` },
-              ]}
+        {/* Right pane — scrollable form */}
+        <ScrollView
+          style={styles.formPane}
+          contentContainerStyle={styles.formContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Body profile</Text>
+            <Text style={styles.subtitle}>
+              Select each measurement — your figurine updates live
+            </Text>
+          </View>
+
+          {/* Progress bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${(filledCount / STEPS.length) * 100}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {filledCount}/{STEPS.length}
+            </Text>
+          </View>
+
+          {/* Step 1: Height */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>1</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[0].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[0].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={HEIGHT_OPTIONS.map((o) => ({
+                label: o.label,
+                value: String(o.value),
+                description: o.metric,
+              }))}
+              selected={height ? String(height) : null}
+              onSelect={(v) => { setHeight(Number(v)); setActivePart('height'); }}
+              columns={2}
             />
           </View>
-          <Text style={styles.progressText}>
-            {filledCount} of {STEPS.length}
-          </Text>
-        </View>
 
-        {/* Step 1: Height */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>1</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[0].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[0].subtitle}</Text>
+          {/* Step 2: Shoulders */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>2</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[1].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[1].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={SHOULDER_OPTIONS}
+              selected={shoulders}
+              onSelect={(v) => { setShoulders(v as ShoulderType); setActivePart('shoulders'); }}
+            />
           </View>
-          <ChipSelector
-            options={HEIGHT_OPTIONS.map((o) => ({
-              label: o.label,
-              value: String(o.value),
-              description: o.metric,
-            }))}
-            selected={height ? String(height) : null}
-            onSelect={(v) => setHeight(Number(v))}
-            columns={2}
-          />
-        </View>
 
-        {/* Step 2: Shoulders */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>2</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[1].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[1].subtitle}</Text>
+          {/* Step 3: Bust */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>3</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[2].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[2].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={BUST_OPTIONS}
+              selected={bust}
+              onSelect={(v) => { setBust(v as BustType); setActivePart('bust'); }}
+              columns={2}
+            />
           </View>
-          <ChipSelector
-            options={SHOULDER_OPTIONS}
-            selected={shoulders}
-            onSelect={(v) => setShoulders(v as ShoulderType)}
-          />
-        </View>
 
-        {/* Step 3: Bust */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>3</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[2].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[2].subtitle}</Text>
+          {/* Step 4: Waist */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>4</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[3].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[3].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={WAIST_OPTIONS}
+              selected={waist}
+              onSelect={(v) => { setWaist(v as WaistType); setActivePart('waist'); }}
+            />
           </View>
-          <ChipSelector
-            options={BUST_OPTIONS}
-            selected={bust}
-            onSelect={(v) => setBust(v as BustType)}
-            columns={2}
-          />
-        </View>
 
-        {/* Step 4: Waist */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>4</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[3].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[3].subtitle}</Text>
+          {/* Step 5: Hips */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>5</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[4].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[4].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={HIP_OPTIONS}
+              selected={hips}
+              onSelect={(v) => { setHips(v as HipType); setActivePart('hips'); }}
+              columns={2}
+            />
           </View>
-          <ChipSelector
-            options={WAIST_OPTIONS}
-            selected={waist}
-            onSelect={(v) => setWaist(v as WaistType)}
-          />
-        </View>
 
-        {/* Step 5: Hips */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>5</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[4].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[4].subtitle}</Text>
+          {/* Step 6: Thighs */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>6</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={THIGH_OPTIONS}
+              selected={thighs}
+              onSelect={(v) => { setThighs(v as ThighType); setActivePart('thighs'); }}
+              columns={2}
+            />
           </View>
-          <ChipSelector
-            options={HIP_OPTIONS}
-            selected={hips}
-            onSelect={(v) => setHips(v as HipType)}
-            columns={2}
-          />
-        </View>
 
-        {/* Step 6: Thighs */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>6</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
+          {/* Step 7: Torso Length */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>7</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
+              </View>
             </View>
+            <ChipSelector
+              options={TORSO_OPTIONS}
+              selected={torso}
+              onSelect={(v) => { setTorso(v as TorsoType); setActivePart('torso'); }}
+            />
           </View>
-          <ChipSelector
-            options={THIGH_OPTIONS}
-            selected={thighs}
-            onSelect={(v) => setThighs(v as ThighType)}
-            columns={2}
-          />
-        </View>
 
-        {/* Step 7: Torso Length */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.stepNumber}>7</Text>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
-              <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
-            </View>
-          </View>
-          <ChipSelector
-            options={TORSO_OPTIONS}
-            selected={torso}
-            onSelect={(v) => setTorso(v as TorsoType)}
-          />
-        </View>
+          {/* Save Button */}
+          <TouchableOpacity
+            style={[styles.button, !canContinue && styles.buttonDisabled]}
+            onPress={handleContinue}
+            disabled={!canContinue}
+            testID="continue-button"
+            activeOpacity={0.8}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>
+                {pendingUrl ? 'Save & Check Fit' : 'Save Profile'}
+              </Text>
+            )}
+          </TouchableOpacity>
 
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.button, !canContinue && styles.buttonDisabled]}
-          onPress={handleContinue}
-          disabled={!canContinue}
-          testID="continue-button"
-          activeOpacity={0.8}
-        >
-          {isProcessing ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.buttonText}>
-              {pendingUrl ? 'Save & Check Fit' : 'Save Profile'}
+          {!allFieldsFilled && (
+            <Text style={styles.remainingNote}>
+              {STEPS.length - filledCount} selection{STEPS.length - filledCount !== 1 ? 's' : ''} remaining
             </Text>
           )}
-        </TouchableOpacity>
 
-        {!allFieldsFilled && (
-          <Text style={styles.remainingNote}>
-            {STEPS.length - filledCount} selection{STEPS.length - filledCount !== 1 ? 's' : ''} remaining
+          <Text style={styles.privacyNote}>
+            Your body profile is stored locally on your device and never shared.
           </Text>
-        )}
-
-        <Text style={styles.privacyNote}>
-          Your body profile is stored locally on your device and never shared.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
@@ -427,32 +455,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  container: {
+  row: {
     flex: 1,
-    backgroundColor: colors.background,
+    flexDirection: 'row',
   },
-  content: {
-    padding: spacing.lg,
+  figurePane: {
+    width: '42%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(64, 45, 101, 0.08)',
+  },
+  formPane: {
+    width: '58%',
+  },
+  formContent: {
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
   header: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   title: {
-    ...typography.headingXL,
+    ...typography.headingL,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   subtitle: {
-    ...typography.body,
+    ...typography.caption,
     color: colors.textSecondary,
-    lineHeight: 22,
+    lineHeight: 18,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
   },
   progressBarBg: {
     flex: 1,
@@ -469,47 +508,48 @@ const styles = StyleSheet.create({
   progressText: {
     ...typography.labelSmall,
     color: colors.textSecondary,
-    minWidth: 36,
+    minWidth: 28,
     textAlign: 'right',
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   stepNumber: {
     ...typography.labelLarge,
     color: colors.white,
     backgroundColor: colors.primary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     textAlign: 'center',
-    lineHeight: 28,
+    lineHeight: 24,
     overflow: 'hidden',
+    fontSize: 12,
   },
   sectionHeaderText: {
     flex: 1,
   },
   sectionTitle: {
-    ...typography.headingS,
+    ...typography.labelLarge,
     color: colors.text,
   },
   sectionSubtitle: {
-    ...typography.bodySmall,
+    ...typography.caption,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   button: {
     backgroundColor: colors.secondary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     ...shadows.sm,
   },
   buttonDisabled: {

@@ -5,14 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Alert,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -51,19 +50,16 @@ const GLASS_CARD = {
   ...shadows.glass,
 };
 
-export default function AccountScreen() {
-  const navigation = useNavigation<NavigationProp>();
-  const { avatar, clearAvatar } = useAvatarStore();
-  const { entries } = useFitHistoryStore();
+/** Google auth isolated in its own component so a hook crash here can't blank the whole screen */
+function GoogleSignInCard() {
   const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-
   const hasGoogleConfig = !!(googleClientId || googleAndroidClientId || googleIosClientId);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
+  const [, response, promptAsync] = Google.useAuthRequest({
     clientId: googleClientId,
     androidClientId: googleAndroidClientId,
     iosClientId: googleIosClientId,
@@ -73,35 +69,23 @@ export default function AccountScreen() {
     if (response?.type === 'success') {
       const { authentication } = response;
       if (authentication?.accessToken) {
-        fetchGoogleUser(authentication.accessToken);
+        fetch('https://www.googleapis.com/userinfo/v2/me', {
+          headers: { Authorization: `Bearer ${authentication.accessToken}` },
+        })
+          .then((r) => r.json())
+          .then((user) =>
+            setGoogleUser({ id: user.id, email: user.email, name: user.name, picture: user.picture })
+          )
+          .catch(() =>
+            Alert.alert('Sign-in error', 'Could not fetch your Google profile. Please try again.')
+          );
       }
     }
   }, [response]);
 
-  const fetchGoogleUser = async (accessToken: string) => {
-    try {
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const user = await res.json();
-      setGoogleUser({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        picture: user.picture,
-      });
-    } catch {
-      Alert.alert('Sign-in error', 'Could not fetch your Google profile. Please try again.');
-    }
-  };
-
-  const handleGoogleSignIn = () => {
+  const handleSignIn = () => {
     if (!hasGoogleConfig) {
-      Alert.alert(
-        'Not configured',
-        'Google Sign-In is not set up yet. Add EXPO_PUBLIC_GOOGLE_CLIENT_ID to your .env file.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }]);
       return;
     }
     promptAsync();
@@ -114,10 +98,45 @@ export default function AccountScreen() {
     ]);
   };
 
+  return (
+    <View style={[styles.accountCard, GLASS_CARD]}>
+      {googleUser ? (
+        <View style={styles.signedInRow}>
+          {googleUser.picture ? (
+            <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Feather name="user" size={22} color={colors.primary} />
+            </View>
+          )}
+          <View style={styles.signedInInfo}>
+            {googleUser.name && <Text style={styles.userName}>{googleUser.name}</Text>}
+            <Text style={styles.userEmail}>{googleUser.email}</Text>
+          </View>
+          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.googleButton} onPress={handleSignIn} activeOpacity={0.8}>
+          <Feather name="log-in" size={18} color={colors.white} />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+export default function AccountScreen() {
+  const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
+  const { avatar, clearAvatar } = useAvatarStore();
+  const { entries } = useFitHistoryStore();
+
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
@@ -125,38 +144,8 @@ export default function AccountScreen() {
           <Text style={styles.title}>Account</Text>
         </View>
 
-        {/* Google account card */}
-        <View style={[styles.accountCard, GLASS_CARD]}>
-          {googleUser ? (
-            <View style={styles.signedInRow}>
-              {googleUser.picture ? (
-                <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Feather name="user" size={22} color={colors.primary} />
-                </View>
-              )}
-              <View style={styles.signedInInfo}>
-                {googleUser.name && (
-                  <Text style={styles.userName}>{googleUser.name}</Text>
-                )}
-                <Text style={styles.userEmail}>{googleUser.email}</Text>
-              </View>
-              <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-                <Text style={styles.signOutText}>Sign out</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              activeOpacity={0.8}
-            >
-              <Feather name="log-in" size={18} color={colors.white} />
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Google account card — isolated so a hook crash here can't blank the page */}
+        <GoogleSignInCard />
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
@@ -198,7 +187,7 @@ export default function AccountScreen() {
             ).map((key) => (
               <View key={key} style={styles.profileRow}>
                 <Text style={styles.profileLabel}>{MEASUREMENT_LABELS[key]}</Text>
-                <Text style={styles.profileValue}>{capitalize(avatar[key])}</Text>
+                <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
               </View>
             ))}
           </View>
@@ -240,7 +229,7 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
