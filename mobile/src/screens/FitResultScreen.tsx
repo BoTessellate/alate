@@ -17,6 +17,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { sanitize } from '../utils/sanitize';
 import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
@@ -28,15 +29,6 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HERO_HEIGHT = 360;
-
-/** Strip "undefined"/"null" tokens the scraper sometimes returns (including "undefined undefined") */
-function sanitize(val?: string): string | undefined {
-  if (!val) return undefined;
-  const cleaned = val.trim().split(/\s+/)
-    .filter(t => t !== 'undefined' && t !== 'null')
-    .join(' ');
-  return cleaned || undefined;
-}
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 

@@ -16,15 +16,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, ms, glass } from '../constants/theme';
-
-/** Strip "undefined"/"null" tokens the scraper sometimes returns (including "undefined undefined") */
-function sanitize(val?: string): string | undefined {
-  if (!val) return undefined;
-  const cleaned = val.trim().split(/\s+/)
-    .filter(t => t !== 'undefined' && t !== 'null')
-    .join(' ');
-  return cleaned || undefined;
-}
+import { sanitize } from '../utils/sanitize';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 

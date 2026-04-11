@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Component, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,9 @@ import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
-import { useAccountStore } from '../store/accountStore';
+import { useAccountStore, GoogleUser } from '../store/accountStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
+import { captureError } from '../utils/sentry';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -50,14 +51,79 @@ const GLASS_CARD = {
   ...shadows.glass,
 };
 
-/** Google auth isolated in its own component so a hook crash here can't blank the whole screen */
-function GoogleSignInCard() {
+/**
+ * Error boundary around the Google sign-in card. A crash inside useAuthRequest
+ * (e.g. missing redirect URI on Android) must NOT blank the whole Account page.
+ */
+class GoogleSignInErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    captureError(error, { feature: 'google-signin-card' });
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * Signed-in / signed-out card UI — pure view, no hooks that can throw.
+ * Used as both the success path body and the fallback when auth isn't configured.
+ */
+function AccountCardView({
+  googleUser,
+  onSignIn,
+  onSignOut,
+}: {
+  googleUser: GoogleUser | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <View style={[styles.accountCard, GLASS_CARD]}>
+      {googleUser ? (
+        <View style={styles.signedInRow}>
+          {googleUser.picture ? (
+            <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Feather name="user" size={22} color={colors.primary} />
+            </View>
+          )}
+          <View style={styles.signedInInfo}>
+            {googleUser.name && <Text style={styles.userName}>{googleUser.name}</Text>}
+            <Text style={styles.userEmail}>{googleUser.email}</Text>
+          </View>
+          <TouchableOpacity onPress={onSignOut} style={styles.signOutButton}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.googleButton} onPress={onSignIn} activeOpacity={0.8}>
+          <Feather name="log-in" size={18} color={colors.white} />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Hook-bearing variant — only mounted when Google IDs exist so useAuthRequest
+ * always has valid inputs. Still wrapped in an ErrorBoundary at the call site
+ * for defence in depth.
+ */
+function GoogleSignInCardConfigured() {
   const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-  const hasGoogleConfig = !!(googleClientId || googleAndroidClientId || googleIosClientId);
 
   const [, response, promptAsync] = Google.useAuthRequest({
     clientId: googleClientId,
@@ -83,14 +149,6 @@ function GoogleSignInCard() {
     }
   }, [response]);
 
-  const handleSignIn = () => {
-    if (!hasGoogleConfig) {
-      Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }]);
-      return;
-    }
-    promptAsync();
-  };
-
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -99,31 +157,52 @@ function GoogleSignInCard() {
   };
 
   return (
-    <View style={[styles.accountCard, GLASS_CARD]}>
-      {googleUser ? (
-        <View style={styles.signedInRow}>
-          {googleUser.picture ? (
-            <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Feather name="user" size={22} color={colors.primary} />
-            </View>
-          )}
-          <View style={styles.signedInInfo}>
-            {googleUser.name && <Text style={styles.userName}>{googleUser.name}</Text>}
-            <Text style={styles.userEmail}>{googleUser.email}</Text>
-          </View>
-          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-            <Text style={styles.signOutText}>Sign out</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity style={styles.googleButton} onPress={handleSignIn} activeOpacity={0.8}>
-          <Feather name="log-in" size={18} color={colors.white} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <AccountCardView
+      googleUser={googleUser}
+      onSignIn={() => promptAsync()}
+      onSignOut={handleSignOut}
+    />
+  );
+}
+
+/**
+ * Account card entry point. Chooses between hook-bearing variant (when config
+ * exists) and a plain "not configured" card that never calls the auth hook.
+ * The hook-bearing variant is wrapped in an ErrorBoundary so a throw in
+ * useAuthRequest or any child cannot blank the whole Account screen.
+ */
+function GoogleSignInCard() {
+  const { googleUser, clearAccount } = useAccountStore();
+
+  const hasGoogleConfig = !!(
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  );
+
+  const notConfiguredCard = (
+    <AccountCardView
+      googleUser={googleUser}
+      onSignIn={() =>
+        Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }])
+      }
+      onSignOut={() =>
+        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign out', style: 'destructive', onPress: clearAccount },
+        ])
+      }
+    />
+  );
+
+  if (!hasGoogleConfig) {
+    return notConfiguredCard;
+  }
+
+  return (
+    <GoogleSignInErrorBoundary fallback={notConfiguredCard}>
+      <GoogleSignInCardConfigured />
+    </GoogleSignInErrorBoundary>
   );
 }
 

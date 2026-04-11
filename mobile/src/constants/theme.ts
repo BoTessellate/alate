@@ -288,11 +288,13 @@ export const shadows = {
 
 // =============================================================================
 // GLASS STYLE — semi-transparent cards on lavender background
+// Subtle Chrome-style frost: soft white tint + hairline border, separation
+// comes primarily from shadow rather than background contrast.
 // =============================================================================
 export const glass = {
-  backgroundColor: 'rgba(255, 255, 255, 0.60)',
-  borderColor: 'rgba(255, 255, 255, 0.65)',
-  borderWidth: 1,
+  backgroundColor: 'rgba(255, 255, 255, 0.45)',
+  borderColor: 'rgba(255, 255, 255, 0.35)',
+  borderWidth: 0.5,
 };
 
 // =============================================================================
