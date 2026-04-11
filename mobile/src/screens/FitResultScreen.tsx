@@ -29,11 +29,16 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HERO_HEIGHT = 360;
 
-/** Strip string "undefined"/"null" from the scraper */
+/** Strip "undefined"/"null" tokens the scraper sometimes returns (including "undefined undefined") */
 function sanitize(val?: string): string | undefined {
-  if (!val || val === 'undefined' || val === 'null') return undefined;
-  return val;
+  if (!val) return undefined;
+  const cleaned = val.trim().split(/\s+/)
+    .filter(t => t !== 'undefined' && t !== 'null')
+    .join(' ');
+  return cleaned || undefined;
 }
+
+const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
 /** Glass card style constant */
 const GLASS = {
@@ -271,7 +276,9 @@ export default function FitResultScreen() {
   const safeBrand = sanitize(product.brand);
   const safeName = sanitize(product.name);
 
-  const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
+  const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
+  const showMaterial = !!enrichedProduct?.material;
+  const showTags = !!(enrichedProduct?.tags?.length);
 
   return (
     <View style={styles.root}>
@@ -288,13 +295,6 @@ export default function FitResultScreen() {
           colors={['transparent', colors.background]}
           style={styles.heroGradient}
         />
-        {/* Score badge pinned to bottom of hero */}
-        <View style={[styles.scoreBadgeWrapper, { top: insets.top + 8 }]}>
-          <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.bgColor, borderColor: scoreConfig.border }]}>
-            <Text style={[styles.scoreBadgeIcon, { color: scoreConfig.color }]}>{scoreConfig.icon}</Text>
-            <Text style={[styles.scoreBadgeText, { color: scoreConfig.color }]}>{scoreConfig.text}</Text>
-          </View>
-        </View>
       </View>
 
       {/* Scrollable content — slides up over hero */}
@@ -303,8 +303,15 @@ export default function FitResultScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Spacer so first card starts below hero */}
-        <View style={{ height: HERO_HEIGHT - 80 }} />
+        {/* Spacer so first card starts below hero; badge sits here and scrolls away naturally */}
+        <View style={{ height: HERO_HEIGHT - 80 }}>
+          <View style={[styles.scoreBadgeWrapper, { top: insets.top + 8 }]}>
+            <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.bgColor, borderColor: scoreConfig.border }]}>
+              <Text style={[styles.scoreBadgeIcon, { color: scoreConfig.color }]}>{scoreConfig.icon}</Text>
+              <Text style={[styles.scoreBadgeText, { color: scoreConfig.color }]}>{scoreConfig.text}</Text>
+            </View>
+          </View>
+        </View>
 
         {/* Product info card */}
         <View style={[styles.card, styles.productCard]}>
@@ -429,29 +436,28 @@ export default function FitResultScreen() {
           </View>
         )}
 
-        {/* Product Details */}
-        {(enrichedProduct?.category || enrichedProduct?.material) && (
+        {/* Product Details — only render if at least one row is visible */}
+        {(showCategory || showMaterial || showTags) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Product Details</Text>
             <View style={[styles.card, styles.detailsCard]}>
-              {enrichedProduct?.category &&
-                !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()) && (
+              {showCategory && (
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Category</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct.category}</Text>
+                  <Text style={styles.detailValue}>{enrichedProduct!.category}</Text>
                 </View>
               )}
-              {enrichedProduct?.material && (
+              {showMaterial && (
                 <View style={[styles.detailRow, styles.detailRowLast]}>
                   <Text style={styles.detailLabel}>Material</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct.material}</Text>
+                  <Text style={styles.detailValue}>{enrichedProduct!.material}</Text>
                 </View>
               )}
-              {enrichedProduct?.tags && enrichedProduct.tags.length > 0 && (
+              {showTags && (
                 <View style={[styles.tagsRow]}>
                   <Text style={styles.detailLabel}>Tags</Text>
                   <View style={styles.tagsContainer}>
-                    {enrichedProduct.tags.slice(0, 5).map((tag: string, i: number) => (
+                    {enrichedProduct!.tags!.slice(0, 5).map((tag: string, i: number) => (
                       <View key={i} style={styles.tag}>
                         <Text style={styles.tagText}>{tag}</Text>
                       </View>
