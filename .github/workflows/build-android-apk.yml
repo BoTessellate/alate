@@ -50,6 +50,49 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Setup release signing keystore
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE }}" ]; then
+            echo "Using stored keystore from secret"
+            echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 -d > android/app/alate-release.keystore
+          else
+            echo "No ANDROID_KEYSTORE secret found — generating a new keystore"
+            keytool -genkeypair -v \
+              -keystore android/app/alate-release.keystore \
+              -alias alate \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Alate,OU=Mobile,O=Tessellate,L=London,S=England,C=GB" \
+              -storepass "${{ secrets.KEYSTORE_PASSWORD || 'alate_dev_2024' }}" \
+              -keypass "${{ secrets.KEY_PASSWORD || 'alate_dev_2024' }}" 2>&1
+            echo ""
+            echo "========================================================"
+            echo "ACTION REQUIRED: Save the following as GitHub secret ANDROID_KEYSTORE"
+            echo "so all future builds use the same certificate:"
+            echo "========================================================"
+            base64 -w 0 android/app/alate-release.keystore
+            echo ""
+            echo "========================================================"
+          fi
+
+      - name: Patch build.gradle to use release keystore
+        run: |
+          STOREPASS="${{ secrets.KEYSTORE_PASSWORD }}"
+          KEYPASS="${{ secrets.KEY_PASSWORD }}"
+          STOREPASS="${STOREPASS:-alate_dev_2024}"
+          KEYPASS="${KEYPASS:-alate_dev_2024}"
+          cat >> android/app/build.gradle << EOF
+
+          android.signingConfigs {
+            release {
+              storeFile = file("alate-release.keystore")
+              storePassword = "$STOREPASS"
+              keyAlias = "alate"
+              keyPassword = "$KEYPASS"
+            }
+          }
+          android.buildTypes.release.signingConfig = android.signingConfigs.release
+          EOF
+
       - name: Build release APK
         run: cd android && ./gradlew assembleRelease --no-daemon
         env:
