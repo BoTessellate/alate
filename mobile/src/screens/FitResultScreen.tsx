@@ -17,10 +17,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { sanitize } from '../utils/sanitize';
 import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
+import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
+import GlassCard from '../components/GlassCard';
 import { captureError } from '../utils/sentry';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
@@ -28,15 +31,6 @@ type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HERO_HEIGHT = 360;
-
-/** Strip "undefined"/"null" tokens the scraper sometimes returns (including "undefined undefined") */
-function sanitize(val?: string): string | undefined {
-  if (!val) return undefined;
-  const cleaned = val.trim().split(/\s+/)
-    .filter(t => t !== 'undefined' && t !== 'null')
-    .join(' ');
-  return cleaned || undefined;
-}
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
@@ -53,6 +47,7 @@ export default function FitResultScreen() {
   const { product, url, historyEntryId, precomputed } = route.params;
   const { avatar } = useAvatarStore();
   const { addEntry, updateEntry } = useFitHistoryStore();
+  const { garments: calibrationGarments } = useCalibrationStore();
 
   const isHistoryMode = !!historyEntryId && !!precomputed;
 
@@ -122,6 +117,7 @@ export default function FitResultScreen() {
         });
       }
 
+      const calibration = averageCalibration(calibrationGarments);
       const fitResult = await checkFit(
         {
           id: enrichedData?.id || 'temp',
@@ -131,7 +127,9 @@ export default function FitResultScreen() {
           tags: enrichedData?.tags,
           description: product.description,
         },
-        avatar
+        avatar,
+        calibration ?? undefined,
+        calibrationGarments.length
       );
 
       if (fitResult.success) {
@@ -178,6 +176,7 @@ export default function FitResultScreen() {
     if (!avatar || !historyEntryId) return;
     setReevaluating(true);
     try {
+      const calibration = averageCalibration(calibrationGarments);
       const fitResult = await checkFit(
         {
           id: historyEntryId,
@@ -186,7 +185,9 @@ export default function FitResultScreen() {
           material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
           tags: enrichedProduct?.tags || precomputed?.enrichedProduct?.tags,
         },
-        avatar
+        avatar,
+        calibration ?? undefined,
+        calibrationGarments.length
       );
       if (fitResult.success) {
         const newWarnings = fitResult.warnings || [];
@@ -314,7 +315,7 @@ export default function FitResultScreen() {
         </View>
 
         {/* Product info card */}
-        <View style={[styles.card, styles.productCard]}>
+        <GlassCard style={[styles.card, styles.productCard]}>
           {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
           <Text style={styles.productName}>{safeName || 'Product'}</Text>
           {product.price && (
@@ -328,15 +329,15 @@ export default function FitResultScreen() {
           {reevaluated && (
             <Text style={styles.checkedAt}>Re-evaluated today</Text>
           )}
-        </View>
+        </GlassCard>
 
         {/* Score card */}
-        <View style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
+        <GlassCard testID="fit-score-display" style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
           <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
             <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
           </View>
           <View style={styles.scoreTextContainer}>
-            <Text style={[styles.scoreTitle, { color: scoreConfig.color }]}>
+            <Text testID="fit-score-label" style={[styles.scoreTitle, { color: scoreConfig.color }]}>
               {scoreConfig.text}
             </Text>
             <Text style={styles.scoreDescription}>
@@ -345,27 +346,27 @@ export default function FitResultScreen() {
                 : `${warnings.length} potential concern${warnings.length > 1 ? 's' : ''} found`}
             </Text>
           </View>
-        </View>
+        </GlassCard>
 
         {/* Re-evaluation banners */}
         {reevaluating && (
-          <View style={[styles.card, styles.reevalBanner]}>
+          <GlassCard style={[styles.card, styles.reevalBanner]}>
             <ActivityIndicator size="small" color={colors.accentDark} />
             <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
-          </View>
+          </GlassCard>
         )}
         {reevaluated && !reevaluating && (
-          <View style={[styles.card, styles.reevalSuccessBanner]}>
+          <GlassCard style={[styles.card, styles.reevalSuccessBanner]}>
             <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
-          </View>
+          </GlassCard>
         )}
 
         {/* Size Recommendation */}
         {sizeRec && (
-          <View style={[styles.card, styles.sizeCard]}>
+          <GlassCard testID="size-recommendation" style={[styles.card, styles.sizeCard]}>
             <View style={styles.sizeCardLeft}>
               <Text style={styles.sizeCardLabel}>Recommended Size</Text>
-              <Text style={styles.sizeCardValue}>{sizeRec.size}</Text>
+              <Text testID="recommended-size-value" style={styles.sizeCardValue}>{sizeRec.size}</Text>
               {sizeRec.note && (
                 <Text style={styles.sizeCardNote}>{sizeRec.note}</Text>
               )}
@@ -413,7 +414,7 @@ export default function FitResultScreen() {
                 </View>
               )}
             </View>
-          </View>
+          </GlassCard>
         )}
 
         {/* Concerns */}
@@ -423,14 +424,14 @@ export default function FitResultScreen() {
             {warnings.map((warning, index) => {
               const config = getSeverityConfig(warning.severity);
               return (
-                <View key={index} style={[styles.card, styles.warningCard]}>
+                <GlassCard key={index} style={[styles.card, styles.warningCard]}>
                   <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
                     <Text style={[styles.severityText, { color: config.color }]}>
                       {config.label}
                     </Text>
                   </View>
                   <Text style={styles.warningText}>{warning.message}</Text>
-                </View>
+                </GlassCard>
               );
             })}
           </View>
@@ -440,7 +441,7 @@ export default function FitResultScreen() {
         {(showCategory || showMaterial || showTags) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Product Details</Text>
-            <View style={[styles.card, styles.detailsCard]}>
+            <GlassCard style={[styles.card, styles.detailsCard]}>
               {showCategory && (
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Category</Text>
@@ -465,7 +466,7 @@ export default function FitResultScreen() {
                   </View>
                 </View>
               )}
-            </View>
+            </GlassCard>
           </View>
         )}
 
@@ -474,6 +475,7 @@ export default function FitResultScreen() {
           {isHistoryMode ? (
             <>
               <TouchableOpacity
+                testID="reevaluate-button"
                 style={styles.primaryButton}
                 onPress={() => {
                   wentToAvatarSetup.current = true;
@@ -484,6 +486,7 @@ export default function FitResultScreen() {
                 <Text style={styles.primaryButtonText}>Re-evaluate</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="change-measurements-button"
                 style={styles.secondaryButton}
                 onPress={() => {
                   wentToAvatarSetup.current = true;
@@ -494,6 +497,7 @@ export default function FitResultScreen() {
                 <Text style={styles.secondaryButtonText}>Change your measurements</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="view-on-store-button"
                 style={styles.ghostButton}
                 onPress={openProductPage}
                 activeOpacity={0.8}
@@ -504,6 +508,7 @@ export default function FitResultScreen() {
           ) : (
             <>
               <TouchableOpacity
+                testID="view-on-store-button"
                 style={styles.primaryButton}
                 onPress={openProductPage}
                 activeOpacity={0.8}
@@ -511,6 +516,7 @@ export default function FitResultScreen() {
                 <Text style={styles.primaryButtonText}>View on Store</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                testID="check-another-button"
                 style={styles.secondaryButton}
                 onPress={() => navigation.goBack()}
                 activeOpacity={0.8}
@@ -586,9 +592,8 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
   },
-  // --- Glass card base ---
+  // --- Glass card base (GlassCard provides the frost; this only sets layout) ---
   card: {
-    ...GLASS,
     borderRadius: borderRadius.xl,
     marginBottom: spacing.md,
   },

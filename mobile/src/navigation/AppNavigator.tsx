@@ -100,6 +100,7 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
+          tabBarButtonTestID: 'tab-home',
         }}
       />
       <Tab.Screen
@@ -107,6 +108,7 @@ function MainTabs() {
         component={HistoryScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="History" focused={focused} />,
+          tabBarButtonTestID: 'tab-history',
         }}
       />
       <Tab.Screen
@@ -114,6 +116,7 @@ function MainTabs() {
         component={AccountScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Account" focused={focused} />,
+          tabBarButtonTestID: 'tab-account',
         }}
       />
     </Tab.Navigator>

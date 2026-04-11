@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Component, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
-import { useAccountStore } from '../store/accountStore';
+import { useAccountStore, GoogleUser } from '../store/accountStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
+import { captureError } from '../utils/sentry';
+import FitCalibrationCard from '../components/FitCalibrationCard';
+import GlassCard from '../components/GlassCard';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -45,19 +48,81 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ');
 }
 
-const GLASS_CARD = {
-  ...glass,
-  ...shadows.glass,
-};
+// GLASS_CARD removed — replaced by <GlassCard> component everywhere
 
-/** Google auth isolated in its own component so a hook crash here can't blank the whole screen */
-function GoogleSignInCard() {
+/**
+ * Error boundary around the Google sign-in card. A crash inside useAuthRequest
+ * (e.g. missing redirect URI on Android) must NOT blank the whole Account page.
+ */
+class GoogleSignInErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    captureError(error, { feature: 'google-signin-card' });
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * Signed-in / signed-out card UI — pure view, no hooks that can throw.
+ * Used as both the success path body and the fallback when auth isn't configured.
+ */
+function AccountCardView({
+  googleUser,
+  onSignIn,
+  onSignOut,
+}: {
+  googleUser: GoogleUser | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <GlassCard style={styles.accountCard}>
+      {googleUser ? (
+        <View style={styles.signedInRow}>
+          {googleUser.picture ? (
+            <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Feather name="user" size={22} color={colors.primary} />
+            </View>
+          )}
+          <View style={styles.signedInInfo}>
+            {googleUser.name && <Text style={styles.userName}>{googleUser.name}</Text>}
+            <Text style={styles.userEmail}>{googleUser.email}</Text>
+          </View>
+          <TouchableOpacity onPress={onSignOut} style={styles.signOutButton}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.googleButton} onPress={onSignIn} activeOpacity={0.8}>
+          <Feather name="log-in" size={18} color={colors.white} />
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+      )}
+    </GlassCard>
+  );
+}
+
+/**
+ * Hook-bearing variant — only mounted when Google IDs exist so useAuthRequest
+ * always has valid inputs. Still wrapped in an ErrorBoundary at the call site
+ * for defence in depth.
+ */
+function GoogleSignInCardConfigured() {
   const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
   const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-  const hasGoogleConfig = !!(googleClientId || googleAndroidClientId || googleIosClientId);
 
   const [, response, promptAsync] = Google.useAuthRequest({
     clientId: googleClientId,
@@ -83,14 +148,6 @@ function GoogleSignInCard() {
     }
   }, [response]);
 
-  const handleSignIn = () => {
-    if (!hasGoogleConfig) {
-      Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }]);
-      return;
-    }
-    promptAsync();
-  };
-
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -99,31 +156,52 @@ function GoogleSignInCard() {
   };
 
   return (
-    <View style={[styles.accountCard, GLASS_CARD]}>
-      {googleUser ? (
-        <View style={styles.signedInRow}>
-          {googleUser.picture ? (
-            <Image source={{ uri: googleUser.picture }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Feather name="user" size={22} color={colors.primary} />
-            </View>
-          )}
-          <View style={styles.signedInInfo}>
-            {googleUser.name && <Text style={styles.userName}>{googleUser.name}</Text>}
-            <Text style={styles.userEmail}>{googleUser.email}</Text>
-          </View>
-          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-            <Text style={styles.signOutText}>Sign out</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity style={styles.googleButton} onPress={handleSignIn} activeOpacity={0.8}>
-          <Feather name="log-in" size={18} color={colors.white} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <AccountCardView
+      googleUser={googleUser}
+      onSignIn={() => promptAsync()}
+      onSignOut={handleSignOut}
+    />
+  );
+}
+
+/**
+ * Account card entry point. Chooses between hook-bearing variant (when config
+ * exists) and a plain "not configured" card that never calls the auth hook.
+ * The hook-bearing variant is wrapped in an ErrorBoundary so a throw in
+ * useAuthRequest or any child cannot blank the whole Account screen.
+ */
+function GoogleSignInCard() {
+  const { googleUser, clearAccount } = useAccountStore();
+
+  const hasGoogleConfig = !!(
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  );
+
+  const notConfiguredCard = (
+    <AccountCardView
+      googleUser={googleUser}
+      onSignIn={() =>
+        Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }])
+      }
+      onSignOut={() =>
+        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign out', style: 'destructive', onPress: clearAccount },
+        ])
+      }
+    />
+  );
+
+  if (!hasGoogleConfig) {
+    return notConfiguredCard;
+  }
+
+  return (
+    <GoogleSignInErrorBoundary fallback={notConfiguredCard}>
+      <GoogleSignInCardConfigured />
+    </GoogleSignInErrorBoundary>
   );
 }
 
@@ -149,14 +227,14 @@ export default function AccountScreen() {
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, GLASS_CARD]}>
+          <GlassCard style={styles.statCard}>
             <Text style={styles.statNumber}>{entries.length}</Text>
             <Text style={styles.statLabel}>Checked</Text>
-          </View>
-          <View style={[styles.statCard, GLASS_CARD]}>
+          </GlassCard>
+          <GlassCard style={styles.statCard}>
             <Text style={[styles.statNumber, { color: colors.success }]}>{greatFits}</Text>
             <Text style={styles.statLabel}>Great Fits</Text>
-          </View>
+          </GlassCard>
         </View>
 
         {/* Body Profile */}
@@ -173,7 +251,7 @@ export default function AccountScreen() {
         </View>
 
         {avatar ? (
-          <View style={[styles.profileCard, GLASS_CARD]}>
+          <GlassCard style={styles.profileCard}>
             {/* Height row */}
             <View style={styles.profileRow}>
               <Text style={styles.profileLabel}>Height</Text>
@@ -190,32 +268,36 @@ export default function AccountScreen() {
                 <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
               </View>
             ))}
-          </View>
+          </GlassCard>
         ) : (
           <TouchableOpacity
-            style={[styles.emptyProfileCard, GLASS_CARD]}
             onPress={() => navigation.navigate('AvatarSetup')}
             activeOpacity={0.8}
           >
-            <Text style={styles.emptyProfileIcon}>📏</Text>
-            <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
-            <Text style={styles.emptyProfileSubtitle}>
-              Add your measurements to get accurate fit predictions and size recommendations
-            </Text>
-            <View style={styles.emptyProfileCta}>
-              <Text style={styles.emptyProfileCtaText}>Get started →</Text>
-            </View>
+            <GlassCard style={styles.emptyProfileCard}>
+              <Text style={styles.emptyProfileIcon}>📏</Text>
+              <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
+              <Text style={styles.emptyProfileSubtitle}>
+                Add your measurements to get accurate fit predictions and size recommendations
+              </Text>
+              <View style={styles.emptyProfileCta}>
+                <Text style={styles.emptyProfileCtaText}>Get started →</Text>
+              </View>
+            </GlassCard>
           </TouchableOpacity>
         )}
 
+        {/* Fit Calibration — Zalando "user's normal size" anchor */}
+        {avatar && <FitCalibrationCard />}
+
         {/* Tip */}
         {avatar && (
-          <View style={[styles.tipCard, GLASS_CARD]}>
+          <GlassCard style={styles.tipCard}>
             <Feather name="info" size={16} color={colors.accentDark} style={styles.tipIcon} />
             <Text style={styles.tipText}>
               Size accuracy improves the more you check products. Your fit history helps calibrate predictions over time.
             </Text>
-          </View>
+          </GlassCard>
         )}
 
         {/* Reset Profile */}

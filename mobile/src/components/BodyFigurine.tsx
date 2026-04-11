@@ -1,12 +1,30 @@
+/**
+ * BodyFigurine — polished fashion croquis silhouette.
+ *
+ * Renders a parametric body figurine driven by 7 measurement inputs (height,
+ * shoulders, bust, waist, hips, thighs, torso length). The silhouette is built
+ * from smooth bezier curves and filled with a LinearGradient for a soft
+ * fashion-illustration look. Active body zones glow blue when `activePart` is
+ * set so the AvatarSetup screen can highlight the area being edited.
+ *
+ * The metrics come from `bodyFigurineModel.ts` — this file is purely the
+ * visual rendering layer. Limbs that used to be rotated <Rect>s are now
+ * tapered <Path>s built from cubic beziers so the result reads as a single
+ * organic figure rather than stacked rectangles.
+ */
+
 import React from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Svg, {
   Circle,
+  Defs,
   Ellipse,
   G,
   Line,
+  LinearGradient,
   Path,
   Rect,
+  Stop,
   Text as SvgText,
 } from 'react-native-svg';
 import { colors } from '../constants/theme';
@@ -36,12 +54,13 @@ interface BodyFigurineProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const BODY_FILL = '#231531';
-const BODY_STROKE = '#6B5B8A';
-const GUIDE = '#D9D2E7';
-const GUIDE_DARK = '#BFB4D8';
-const HIGHLIGHT = '#63B4F4';
-const HIGHLIGHT_SOFT = '#D7EEFF';
+// Fashion-illustration palette — warm lavender body, hairline outline.
+const OUTLINE = '#3F2C5E';
+const HIGHLIGHT = '#5A9BE8';
+const HIGHLIGHT_SOFT = '#C9E3FB';
+const GUIDE = '#D8CFE9';
+const GUIDE_DARK = '#A99BC4';
+const SHEEN = 'rgba(255, 255, 255, 0.55)';
 
 export default function BodyFigurine({
   heightCm,
@@ -65,89 +84,222 @@ export default function BodyFigurine({
   });
   const focusFill = getFocusFill(activePart);
 
-  const neckHalf = 7;
-  const headCx = metrics.centerX;
+  // ----------------------------------------------------------------
+  // Geometry helpers — derived from metrics
+  // ----------------------------------------------------------------
+  const cx = metrics.centerX;
   const headCy = 32;
-  const shoulderCapY = metrics.shoulderY + 10;
-  const upperArmLength = metrics.waistY - metrics.shoulderY + 20;
-  const forearmLength = metrics.hipY - metrics.waistY + 34;
-  const armBaseX = metrics.centerX - metrics.shoulderHalf + 3;
-  const rightArmBaseX = metrics.centerX + metrics.shoulderHalf - 3;
-  const leftElbowX = metrics.centerX - metrics.shoulderHalf - 6;
-  const rightElbowX = metrics.centerX + metrics.shoulderHalf + 6;
-  const leftWristX = metrics.centerX - metrics.hipHalf + 2;
-  const rightWristX = metrics.centerX + metrics.hipHalf - 2;
-  const thighInnerLeftX = metrics.centerX - metrics.legGap / 2 - metrics.thighWidth;
-  const thighInnerRightX = metrics.centerX + metrics.legGap / 2;
-  const calfLeftX = metrics.centerX - metrics.legGap / 2 - metrics.calfWidth;
-  const calfRightX = metrics.centerX + metrics.legGap / 2;
+  const headRx = 16;
+  const headRy = 21;
+  const neckHalf = 6.2;
+
+  // Torso curve points
+  const shoulderCapY = metrics.shoulderY + 9;
+
+  // Arm geometry — arms hang down with a gentle outward curve
+  const armTopY = shoulderCapY - 1;
+  const armBottomY = metrics.hipY + 70;
+  const upperArmWidthShoulder = 9.5;
+  const upperArmWidthElbow = 7;
+  const forearmWidthElbow = 6.5;
+  const forearmWidthWrist = 5.2;
+
+  // Left arm anchor points (the figure's left = viewer's right)
+  const armLeftShoulderX = cx - metrics.shoulderHalf + 2;
+  const armLeftElbowX = cx - metrics.shoulderHalf - 4;
+  const armLeftWristX = cx - metrics.hipHalf - 1;
+  const elbowY = metrics.waistY + 10;
+
+  const armRightShoulderX = cx + metrics.shoulderHalf - 2;
+  const armRightElbowX = cx + metrics.shoulderHalf + 4;
+  const armRightWristX = cx + metrics.hipHalf + 1;
+
+  // Leg geometry — tapered thigh → calf → ankle
+  const thighCenterLeftX = cx - metrics.legGap / 2 - metrics.thighWidth / 2;
+  const thighCenterRightX = cx + metrics.legGap / 2 + metrics.thighWidth / 2;
+  const ankleHalfWidth = Math.max(3.5, metrics.calfWidth * 0.42);
+  const calfMaxHalfWidth = metrics.calfWidth * 0.62;
+  const thighHalfWidth = metrics.thighWidth * 0.7;
+  const legBottomY = metrics.footY - 4;
+
+  // ----------------------------------------------------------------
+  // Path builders
+  // ----------------------------------------------------------------
+
+  // Main torso silhouette — flowing single path from neck to crotch
   const torsoPath = [
-    `M ${metrics.centerX - neckHalf} ${metrics.neckBottomY}`,
-    `C ${metrics.centerX - 14} ${metrics.neckBottomY + 4}, ${metrics.centerX - metrics.shoulderHalf * 0.84} ${metrics.shoulderY - 2}, ${metrics.centerX - metrics.shoulderHalf} ${shoulderCapY}`,
-    `C ${metrics.centerX - metrics.bustHalf * 1.05} ${metrics.bustY - 20}, ${metrics.centerX - metrics.bustHalf * 0.98} ${metrics.waistY - 14}, ${metrics.centerX - metrics.waistHalf} ${metrics.waistY}`,
-    `C ${metrics.centerX - metrics.waistHalf * 0.96} ${metrics.hipY - 10}, ${metrics.centerX - metrics.hipHalf} ${metrics.hipY - 4}, ${metrics.centerX - metrics.hipHalf} ${metrics.hipY + 9}`,
-    `C ${metrics.centerX - metrics.hipHalf * 0.8} ${metrics.crotchY - 2}, ${metrics.centerX - metrics.legGap / 2 - 8} ${metrics.crotchY}, ${metrics.centerX - metrics.legGap / 2 - 4} ${metrics.crotchY + 7}`,
-    `L ${metrics.centerX + metrics.legGap / 2 + 4} ${metrics.crotchY + 7}`,
-    `C ${metrics.centerX + metrics.legGap / 2 + 8} ${metrics.crotchY}, ${metrics.centerX + metrics.hipHalf * 0.8} ${metrics.crotchY - 2}, ${metrics.centerX + metrics.hipHalf} ${metrics.hipY + 9}`,
-    `C ${metrics.centerX + metrics.hipHalf} ${metrics.hipY - 4}, ${metrics.centerX + metrics.waistHalf * 0.96} ${metrics.hipY - 10}, ${metrics.centerX + metrics.waistHalf} ${metrics.waistY}`,
-    `C ${metrics.centerX + metrics.bustHalf * 0.98} ${metrics.waistY - 14}, ${metrics.centerX + metrics.bustHalf * 1.05} ${metrics.bustY - 20}, ${metrics.centerX + metrics.shoulderHalf} ${shoulderCapY}`,
-    `C ${metrics.centerX + metrics.shoulderHalf * 0.84} ${metrics.shoulderY - 2}, ${metrics.centerX + 14} ${metrics.neckBottomY + 4}, ${metrics.centerX + neckHalf} ${metrics.neckBottomY}`,
+    `M ${cx - neckHalf} ${metrics.neckBottomY}`,
+    // Right side of neck → shoulder cap (figure's left)
+    `C ${cx - 12} ${metrics.neckBottomY + 5}, ${cx - metrics.shoulderHalf * 0.78} ${metrics.shoulderY - 2}, ${cx - metrics.shoulderHalf} ${shoulderCapY}`,
+    // Shoulder → bust → waist
+    `C ${cx - metrics.bustHalf * 1.04} ${metrics.bustY - 18}, ${cx - metrics.bustHalf * 0.97} ${metrics.waistY - 12}, ${cx - metrics.waistHalf} ${metrics.waistY}`,
+    // Waist → hips
+    `C ${cx - metrics.waistHalf * 0.98} ${metrics.hipY - 14}, ${cx - metrics.hipHalf} ${metrics.hipY - 6}, ${cx - metrics.hipHalf} ${metrics.hipY + 8}`,
+    // Hip → crotch (figure's left thigh upper)
+    `C ${cx - metrics.hipHalf * 0.85} ${metrics.crotchY - 4}, ${cx - metrics.legGap / 2 - 6} ${metrics.crotchY - 1}, ${cx - metrics.legGap / 2 - 2} ${metrics.crotchY + 6}`,
+    // Crotch base
+    `L ${cx + metrics.legGap / 2 + 2} ${metrics.crotchY + 6}`,
+    // Right thigh upper → hip
+    `C ${cx + metrics.legGap / 2 + 6} ${metrics.crotchY - 1}, ${cx + metrics.hipHalf * 0.85} ${metrics.crotchY - 4}, ${cx + metrics.hipHalf} ${metrics.hipY + 8}`,
+    // Hips → waist
+    `C ${cx + metrics.hipHalf} ${metrics.hipY - 6}, ${cx + metrics.waistHalf * 0.98} ${metrics.hipY - 14}, ${cx + metrics.waistHalf} ${metrics.waistY}`,
+    // Waist → bust → shoulder
+    `C ${cx + metrics.bustHalf * 0.97} ${metrics.waistY - 12}, ${cx + metrics.bustHalf * 1.04} ${metrics.bustY - 18}, ${cx + metrics.shoulderHalf} ${shoulderCapY}`,
+    // Shoulder → neck
+    `C ${cx + metrics.shoulderHalf * 0.78} ${metrics.shoulderY - 2}, ${cx + 12} ${metrics.neckBottomY + 5}, ${cx + neckHalf} ${metrics.neckBottomY}`,
     'Z',
   ].join(' ');
 
+  // Tapered limb path: builds a curved ribbon from a top point (with width)
+  // through a mid point (with width) to a bottom point (with width). All
+  // sides use cubic beziers so the limb reads as organic, not boxy.
+  const taperedLimb = (
+    topX: number,
+    topY: number,
+    topHalf: number,
+    midX: number,
+    midY: number,
+    midHalf: number,
+    botX: number,
+    botY: number,
+    botHalf: number
+  ) => {
+    return [
+      `M ${topX - topHalf} ${topY}`,
+      // Down the outer (left) edge
+      `C ${midX - midHalf - 0.5} ${(topY + midY) / 2}, ${midX - midHalf} ${midY - 1}, ${midX - midHalf} ${midY}`,
+      `C ${midX - midHalf} ${midY + 1}, ${botX - botHalf - 0.3} ${(midY + botY) / 2}, ${botX - botHalf} ${botY}`,
+      // Across the bottom
+      `C ${botX - botHalf * 0.4} ${botY + 2.5}, ${botX + botHalf * 0.4} ${botY + 2.5}, ${botX + botHalf} ${botY}`,
+      // Up the inner (right) edge
+      `C ${botX + botHalf + 0.3} ${(midY + botY) / 2}, ${midX + midHalf} ${midY + 1}, ${midX + midHalf} ${midY}`,
+      `C ${midX + midHalf} ${midY - 1}, ${topX + topHalf + 0.5} ${(topY + midY) / 2}, ${topX + topHalf} ${topY}`,
+      'Z',
+    ].join(' ');
+  };
+
+  // Mirrored tapered limb (for the figure's right limbs)
+  const leftArmPath = taperedLimb(
+    armLeftShoulderX, armTopY, upperArmWidthShoulder / 2,
+    armLeftElbowX, elbowY, upperArmWidthElbow / 2,
+    armLeftWristX, armBottomY, forearmWidthWrist / 2
+  );
+  const rightArmPath = taperedLimb(
+    armRightShoulderX, armTopY, upperArmWidthShoulder / 2,
+    armRightElbowX, elbowY, upperArmWidthElbow / 2,
+    armRightWristX, armBottomY, forearmWidthWrist / 2
+  );
+
+  const leftLegPath = taperedLimb(
+    thighCenterLeftX, metrics.crotchY + 4, thighHalfWidth,
+    thighCenterLeftX - 0.5, metrics.kneeY, calfMaxHalfWidth,
+    thighCenterLeftX - 1, legBottomY, ankleHalfWidth
+  );
+  const rightLegPath = taperedLimb(
+    thighCenterRightX, metrics.crotchY + 4, thighHalfWidth,
+    thighCenterRightX + 0.5, metrics.kneeY, calfMaxHalfWidth,
+    thighCenterRightX + 1, legBottomY, ankleHalfWidth
+  );
+
+  // Foot paths (small organic shapes at the ankle base)
+  const leftFoot = `M ${thighCenterLeftX - ankleHalfWidth - 1} ${legBottomY + 1} C ${thighCenterLeftX - ankleHalfWidth - 5} ${legBottomY + 5}, ${thighCenterLeftX - ankleHalfWidth - 8} ${legBottomY + 9}, ${thighCenterLeftX - 4} ${legBottomY + 11} C ${thighCenterLeftX + ankleHalfWidth} ${legBottomY + 11}, ${thighCenterLeftX + ankleHalfWidth} ${legBottomY + 4}, ${thighCenterLeftX + ankleHalfWidth + 0.5} ${legBottomY} Z`;
+  const rightFoot = `M ${thighCenterRightX + ankleHalfWidth + 1} ${legBottomY + 1} C ${thighCenterRightX + ankleHalfWidth + 5} ${legBottomY + 5}, ${thighCenterRightX + ankleHalfWidth + 8} ${legBottomY + 9}, ${thighCenterRightX + 4} ${legBottomY + 11} C ${thighCenterRightX - ankleHalfWidth} ${legBottomY + 11}, ${thighCenterRightX - ankleHalfWidth} ${legBottomY + 4}, ${thighCenterRightX - ankleHalfWidth - 0.5} ${legBottomY} Z`;
+
+  // Centreline highlight stripe — thin curve down the front of the torso
+  // gives the figure an inner sheen for 3D feel.
+  const sheenPath = [
+    `M ${cx - 2} ${metrics.neckBottomY + 6}`,
+    `C ${cx - 5} ${metrics.bustY - 4}, ${cx - 4} ${metrics.waistY - 2}, ${cx - 3} ${metrics.hipY + 4}`,
+    `L ${cx + 3} ${metrics.hipY + 4}`,
+    `C ${cx + 4} ${metrics.waistY - 2}, ${cx + 5} ${metrics.bustY - 4}, ${cx + 2} ${metrics.neckBottomY + 6}`,
+    'Z',
+  ].join(' ');
+
+  // ----------------------------------------------------------------
+  // Region highlight paths (for activePart glow) — kept compact, only
+  // the shapes that actually need to glow on the figurine.
+  // ----------------------------------------------------------------
   const shouldersHighlightPath = [
-    `M ${metrics.centerX - metrics.shoulderHalf + 4} ${shoulderCapY + 1}`,
-    `C ${metrics.centerX - metrics.bustHalf * 1.04} ${metrics.bustY - 18}, ${metrics.centerX - metrics.bustHalf * 0.8} ${metrics.bustY - 12}, ${metrics.centerX - metrics.bustHalf * 0.55} ${metrics.bustY - 10}`,
-    `L ${metrics.centerX + metrics.bustHalf * 0.55} ${metrics.bustY - 10}`,
-    `C ${metrics.centerX + metrics.bustHalf * 0.8} ${metrics.bustY - 12}, ${metrics.centerX + metrics.bustHalf * 1.04} ${metrics.bustY - 18}, ${metrics.centerX + metrics.shoulderHalf - 4} ${shoulderCapY + 1}`,
-    `C ${metrics.centerX + metrics.shoulderHalf * 0.62} ${metrics.shoulderY + 2}, ${metrics.centerX + 11} ${metrics.neckBottomY + 9}, ${metrics.centerX + 5} ${metrics.neckBottomY + 15}`,
-    `L ${metrics.centerX - 5} ${metrics.neckBottomY + 15}`,
-    `C ${metrics.centerX - 11} ${metrics.neckBottomY + 9}, ${metrics.centerX - metrics.shoulderHalf * 0.62} ${metrics.shoulderY + 2}, ${metrics.centerX - metrics.shoulderHalf + 4} ${shoulderCapY + 1}`,
+    `M ${cx - metrics.shoulderHalf + 3} ${shoulderCapY + 1}`,
+    `C ${cx - metrics.bustHalf * 1.04} ${metrics.bustY - 16}, ${cx - metrics.bustHalf * 0.78} ${metrics.bustY - 12}, ${cx - metrics.bustHalf * 0.5} ${metrics.bustY - 10}`,
+    `L ${cx + metrics.bustHalf * 0.5} ${metrics.bustY - 10}`,
+    `C ${cx + metrics.bustHalf * 0.78} ${metrics.bustY - 12}, ${cx + metrics.bustHalf * 1.04} ${metrics.bustY - 16}, ${cx + metrics.shoulderHalf - 3} ${shoulderCapY + 1}`,
+    `C ${cx + metrics.shoulderHalf * 0.6} ${metrics.shoulderY + 1}, ${cx + 10} ${metrics.neckBottomY + 8}, ${cx + 5} ${metrics.neckBottomY + 14}`,
+    `L ${cx - 5} ${metrics.neckBottomY + 14}`,
+    `C ${cx - 10} ${metrics.neckBottomY + 8}, ${cx - metrics.shoulderHalf * 0.6} ${metrics.shoulderY + 1}, ${cx - metrics.shoulderHalf + 3} ${shoulderCapY + 1}`,
     'Z',
   ].join(' ');
 
   const bustHighlightPath = [
-    `M ${metrics.centerX - metrics.bustHalf * 0.84} ${metrics.bustY - 8}`,
-    `C ${metrics.centerX - metrics.bustHalf * 0.96} ${metrics.bustY + 4}, ${metrics.centerX - metrics.waistHalf * 1.1} ${metrics.waistY - 12}, ${metrics.centerX - metrics.waistHalf * 0.9} ${metrics.waistY - 4}`,
-    `L ${metrics.centerX + metrics.waistHalf * 0.9} ${metrics.waistY - 4}`,
-    `C ${metrics.centerX + metrics.waistHalf * 1.1} ${metrics.waistY - 12}, ${metrics.centerX + metrics.bustHalf * 0.96} ${metrics.bustY + 4}, ${metrics.centerX + metrics.bustHalf * 0.84} ${metrics.bustY - 8}`,
-    `C ${metrics.centerX + metrics.bustHalf * 0.46} ${metrics.bustY - 2}, ${metrics.centerX - metrics.bustHalf * 0.46} ${metrics.bustY - 2}, ${metrics.centerX - metrics.bustHalf * 0.84} ${metrics.bustY - 8}`,
+    `M ${cx - metrics.bustHalf * 0.86} ${metrics.bustY - 8}`,
+    `C ${cx - metrics.bustHalf * 0.96} ${metrics.bustY + 4}, ${cx - metrics.waistHalf * 1.08} ${metrics.waistY - 12}, ${cx - metrics.waistHalf * 0.92} ${metrics.waistY - 4}`,
+    `L ${cx + metrics.waistHalf * 0.92} ${metrics.waistY - 4}`,
+    `C ${cx + metrics.waistHalf * 1.08} ${metrics.waistY - 12}, ${cx + metrics.bustHalf * 0.96} ${metrics.bustY + 4}, ${cx + metrics.bustHalf * 0.86} ${metrics.bustY - 8}`,
+    `C ${cx + metrics.bustHalf * 0.46} ${metrics.bustY - 2}, ${cx - metrics.bustHalf * 0.46} ${metrics.bustY - 2}, ${cx - metrics.bustHalf * 0.86} ${metrics.bustY - 8}`,
     'Z',
   ].join(' ');
 
   const waistHighlightPath = [
-    `M ${metrics.centerX - metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
-    `C ${metrics.centerX - metrics.waistHalf * 0.95} ${metrics.waistY + 6}, ${metrics.centerX - metrics.waistHalf * 0.98} ${metrics.hipY - 16}, ${metrics.centerX - metrics.waistHalf * 0.8} ${metrics.hipY - 10}`,
-    `L ${metrics.centerX + metrics.waistHalf * 0.8} ${metrics.hipY - 10}`,
-    `C ${metrics.centerX + metrics.waistHalf * 0.98} ${metrics.hipY - 16}, ${metrics.centerX + metrics.waistHalf * 0.95} ${metrics.waistY + 6}, ${metrics.centerX + metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
-    `C ${metrics.centerX + metrics.waistHalf * 0.44} ${metrics.waistY - 3}, ${metrics.centerX - metrics.waistHalf * 0.44} ${metrics.waistY - 3}, ${metrics.centerX - metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
+    `M ${cx - metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
+    `C ${cx - metrics.waistHalf * 0.95} ${metrics.waistY + 6}, ${cx - metrics.waistHalf * 0.98} ${metrics.hipY - 16}, ${cx - metrics.waistHalf * 0.82} ${metrics.hipY - 10}`,
+    `L ${cx + metrics.waistHalf * 0.82} ${metrics.hipY - 10}`,
+    `C ${cx + metrics.waistHalf * 0.98} ${metrics.hipY - 16}, ${cx + metrics.waistHalf * 0.95} ${metrics.waistY + 6}, ${cx + metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
+    `C ${cx + metrics.waistHalf * 0.44} ${metrics.waistY - 3}, ${cx - metrics.waistHalf * 0.44} ${metrics.waistY - 3}, ${cx - metrics.waistHalf * 1.05} ${metrics.waistY - 8}`,
     'Z',
   ].join(' ');
 
   const hipsHighlightPath = [
-    `M ${metrics.centerX - metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
-    `C ${metrics.centerX - metrics.hipHalf * 0.82} ${metrics.hipY + 18}, ${metrics.centerX - metrics.legGap / 2 - 7} ${metrics.crotchY + 2}, ${metrics.centerX - metrics.legGap / 2 - 5} ${metrics.crotchY + 9}`,
-    `L ${metrics.centerX + metrics.legGap / 2 + 5} ${metrics.crotchY + 9}`,
-    `C ${metrics.centerX + metrics.legGap / 2 + 7} ${metrics.crotchY + 2}, ${metrics.centerX + metrics.hipHalf * 0.82} ${metrics.hipY + 18}, ${metrics.centerX + metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
-    `C ${metrics.centerX + metrics.hipHalf * 0.4} ${metrics.hipY - 8}, ${metrics.centerX - metrics.hipHalf * 0.4} ${metrics.hipY - 8}, ${metrics.centerX - metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
+    `M ${cx - metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
+    `C ${cx - metrics.hipHalf * 0.84} ${metrics.hipY + 18}, ${cx - metrics.legGap / 2 - 5} ${metrics.crotchY + 2}, ${cx - metrics.legGap / 2 - 3} ${metrics.crotchY + 8}`,
+    `L ${cx + metrics.legGap / 2 + 3} ${metrics.crotchY + 8}`,
+    `C ${cx + metrics.legGap / 2 + 5} ${metrics.crotchY + 2}, ${cx + metrics.hipHalf * 0.84} ${metrics.hipY + 18}, ${cx + metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
+    `C ${cx + metrics.hipHalf * 0.4} ${metrics.hipY - 8}, ${cx - metrics.hipHalf * 0.4} ${metrics.hipY - 8}, ${cx - metrics.hipHalf * 0.92} ${metrics.hipY - 4}`,
     'Z',
   ].join(' ');
 
   const torsoHighlightPath = [
-    `M ${metrics.centerX - metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
-    `C ${metrics.centerX - metrics.bustHalf * 1.02} ${metrics.bustY + 10}, ${metrics.centerX - metrics.hipHalf * 0.7} ${metrics.hipY - 12}, ${metrics.centerX - metrics.hipHalf * 0.78} ${metrics.hipY + 8}`,
-    `L ${metrics.centerX + metrics.hipHalf * 0.78} ${metrics.hipY + 8}`,
-    `C ${metrics.centerX + metrics.hipHalf * 0.7} ${metrics.hipY - 12}, ${metrics.centerX + metrics.bustHalf * 1.02} ${metrics.bustY + 10}, ${metrics.centerX + metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
-    `C ${metrics.centerX + metrics.bustHalf * 0.42} ${metrics.bustY - 4}, ${metrics.centerX - metrics.bustHalf * 0.42} ${metrics.bustY - 4}, ${metrics.centerX - metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
+    `M ${cx - metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
+    `C ${cx - metrics.bustHalf * 1.02} ${metrics.bustY + 10}, ${cx - metrics.hipHalf * 0.7} ${metrics.hipY - 12}, ${cx - metrics.hipHalf * 0.78} ${metrics.hipY + 8}`,
+    `L ${cx + metrics.hipHalf * 0.78} ${metrics.hipY + 8}`,
+    `C ${cx + metrics.hipHalf * 0.7} ${metrics.hipY - 12}, ${cx + metrics.bustHalf * 1.02} ${metrics.bustY + 10}, ${cx + metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
+    `C ${cx + metrics.bustHalf * 0.42} ${metrics.bustY - 4}, ${cx - metrics.bustHalf * 0.42} ${metrics.bustY - 4}, ${cx - metrics.bustHalf * 0.9} ${metrics.bustY - 10}`,
     'Z',
   ].join(' ');
 
   const heightGuideColor = focusFill.height ? HIGHLIGHT : GUIDE_DARK;
-  const strokeWidth = 1.7;
+  const strokeWidth = 1.4;
 
   return (
     <View style={[styles.container, style]} testID="body-figurine">
       <Svg width="100%" height="100%" viewBox="0 0 220 420">
+        <Defs>
+          {/* Body fill — soft warm lavender, lighter on the front, deeper on the side. */}
+          <LinearGradient id="bodyFill" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#9F8FBE" />
+            <Stop offset="0.45" stopColor="#C5B6E4" />
+            <Stop offset="1" stopColor="#7E6DA1" />
+          </LinearGradient>
+          {/* Limb fill — slightly deeper to give the limbs depth against torso */}
+          <LinearGradient id="limbFill" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#8C7BAC" />
+            <Stop offset="0.5" stopColor="#B0A0D0" />
+            <Stop offset="1" stopColor="#6F5E92" />
+          </LinearGradient>
+          {/* Head fill — same warm lavender, vertical gradient for hair shadow */}
+          <LinearGradient id="headFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#7E6DA1" />
+            <Stop offset="0.5" stopColor="#B6A6D4" />
+            <Stop offset="1" stopColor="#9685B7" />
+          </LinearGradient>
+          {/* Active highlight fill */}
+          <LinearGradient id="highlightFill" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#4F8FE0" />
+            <Stop offset="0.5" stopColor="#80B7F0" />
+            <Stop offset="1" stopColor="#4884D6" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Backdrop card */}
         <Rect x="20" y="10" width="180" height="400" rx="28" fill={colors.surface} />
         <Rect
           x="20.5"
@@ -159,6 +311,7 @@ export default function BodyFigurine({
           stroke={GUIDE}
         />
 
+        {/* Height ruler */}
         <Line x1="170" y1="88" x2="170" y2="392" stroke={heightGuideColor} strokeDasharray="3 4" />
         <Line x1="162" y1="88" x2="178" y2="88" stroke={heightGuideColor} strokeWidth="1.5" />
         <Line x1="162" y1="392" x2="178" y2="392" stroke={heightGuideColor} strokeWidth="1.5" />
@@ -173,188 +326,156 @@ export default function BodyFigurine({
           H
         </SvgText>
 
+        {/* Figure (height-scaled) */}
         <G transform={`translate(0 ${392 - 392 * metrics.figureScaleY}) scale(1 ${metrics.figureScaleY})`}>
+          {/* Centerline guide */}
           <Line
-            x1={metrics.centerX}
+            x1={cx}
             y1="64"
-            x2={metrics.centerX}
+            x2={cx}
             y2={metrics.footY}
             stroke={GUIDE}
-            strokeWidth="1"
+            strokeWidth="0.7"
             strokeDasharray="2 5"
           />
 
+          {/* --- Legs (rendered first so torso overlaps cleanly at hips) --- */}
+          <Path
+            d={leftLegPath}
+            fill={focusFill.thighs ? 'url(#highlightFill)' : 'url(#limbFill)'}
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+          <Path
+            d={rightLegPath}
+            fill={focusFill.thighs ? 'url(#highlightFill)' : 'url(#limbFill)'}
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+
+          {/* Feet */}
+          <Path d={leftFoot} fill="url(#limbFill)" stroke={OUTLINE} strokeWidth={strokeWidth} strokeLinejoin="round" />
+          <Path d={rightFoot} fill="url(#limbFill)" stroke={OUTLINE} strokeWidth={strokeWidth} strokeLinejoin="round" />
+
+          {/* --- Arms (also rendered before torso so shoulder caps blend) --- */}
+          <Path
+            d={leftArmPath}
+            fill={focusFill.shoulders ? 'url(#highlightFill)' : 'url(#limbFill)'}
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+          <Path
+            d={rightArmPath}
+            fill={focusFill.shoulders ? 'url(#highlightFill)' : 'url(#limbFill)'}
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+
+          {/* Hands (small soft ovals) */}
           <Ellipse
-            cx={headCx}
+            cx={armLeftWristX - 1}
+            cy={armBottomY + 6}
+            rx="4.2"
+            ry="6.5"
+            fill="url(#limbFill)"
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+          />
+          <Ellipse
+            cx={armRightWristX + 1}
+            cy={armBottomY + 6}
+            rx="4.2"
+            ry="6.5"
+            fill="url(#limbFill)"
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+          />
+
+          {/* --- Head + neck --- */}
+          <Path
+            d={`M ${cx - 4.5} 53 L ${cx - neckHalf} ${metrics.neckBottomY} L ${cx + neckHalf} ${metrics.neckBottomY} L ${cx + 4.5} 53 Z`}
+            fill="url(#headFill)"
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+          <Ellipse
+            cx={cx}
             cy={headCy}
-            rx="17"
-            ry="23"
-            fill={focusFill.height ? HIGHLIGHT_SOFT : colors.surface}
-            stroke={focusFill.height ? HIGHLIGHT : GUIDE_DARK}
+            rx={headRx}
+            ry={headRy}
+            fill={focusFill.height ? HIGHLIGHT_SOFT : 'url(#headFill)'}
+            stroke={focusFill.height ? HIGHLIGHT : OUTLINE}
             strokeWidth={strokeWidth}
           />
+          {/* Hair sheen — short curve over the crown */}
+          <Path
+            d={`M ${cx - headRx + 3} ${headCy - 8} C ${cx - 4} ${headCy - headRy + 1}, ${cx + 4} ${headCy - headRy + 1}, ${cx + headRx - 3} ${headCy - 8}`}
+            stroke={SHEEN}
+            strokeWidth="1.2"
+            fill="none"
+          />
 
-          <Path d={`M ${metrics.centerX - 5} 54 L ${metrics.centerX - neckHalf} ${metrics.neckBottomY} L ${metrics.centerX + neckHalf} ${metrics.neckBottomY} L ${metrics.centerX + 5} 54`} fill={BODY_FILL} stroke={BODY_STROKE} strokeWidth={strokeWidth} />
-          <Path d={torsoPath} fill={BODY_FILL} stroke={BODY_STROKE} strokeWidth={strokeWidth} />
+          {/* --- Torso (drawn over arms/legs for clean shoulder + hip joins) --- */}
+          <Path
+            d={torsoPath}
+            fill="url(#bodyFill)"
+            stroke={OUTLINE}
+            strokeWidth={strokeWidth}
+            strokeLinejoin="round"
+          />
+          {/* Centerline sheen — gives the body a 3D inner highlight */}
+          <Path d={sheenPath} fill={SHEEN} />
 
+          {/* --- Active region highlights (sit on top of torso) --- */}
           {focusFill.shoulders && (
-            <Path d={shouldersHighlightPath} fill={HIGHLIGHT} opacity="0.9" />
+            <Path d={shouldersHighlightPath} fill={HIGHLIGHT} opacity="0.85" />
           )}
-          {focusFill.bust && <Path d={bustHighlightPath} fill={HIGHLIGHT} opacity="0.92" />}
-          {focusFill.waist && <Path d={waistHighlightPath} fill={HIGHLIGHT} opacity="0.94" />}
-          {focusFill.hips && <Path d={hipsHighlightPath} fill={HIGHLIGHT} opacity="0.92" />}
-          {focusFill.torso && <Path d={torsoHighlightPath} fill={HIGHLIGHT} opacity="0.92" />}
+          {focusFill.bust && <Path d={bustHighlightPath} fill={HIGHLIGHT} opacity="0.88" />}
+          {focusFill.waist && <Path d={waistHighlightPath} fill={HIGHLIGHT} opacity="0.9" />}
+          {focusFill.hips && <Path d={hipsHighlightPath} fill={HIGHLIGHT} opacity="0.88" />}
+          {focusFill.torso && <Path d={torsoHighlightPath} fill={HIGHLIGHT} opacity="0.88" />}
 
+          {/* Subtle anatomy lines — bust, waist, hip (as guidelines) */}
           <Line
-            x1={metrics.centerX - metrics.bustHalf * 0.95}
+            x1={cx - metrics.bustHalf * 0.6}
             y1={metrics.bustY - 4}
-            x2={metrics.centerX + metrics.bustHalf * 0.95}
+            x2={cx + metrics.bustHalf * 0.6}
             y2={metrics.bustY - 4}
-            stroke={GUIDE}
-            strokeWidth="1"
+            stroke={SHEEN}
+            strokeWidth="0.8"
           />
           <Line
-            x1={metrics.centerX - metrics.waistHalf * 1.02}
+            x1={cx - metrics.waistHalf * 0.7}
             y1={metrics.waistY - 1}
-            x2={metrics.centerX + metrics.waistHalf * 1.02}
+            x2={cx + metrics.waistHalf * 0.7}
             y2={metrics.waistY - 1}
-            stroke={GUIDE}
-            strokeWidth="1"
-          />
-          <Line
-            x1={metrics.centerX - metrics.hipHalf * 0.92}
-            y1={metrics.hipY + 2}
-            x2={metrics.centerX + metrics.hipHalf * 0.92}
-            y2={metrics.hipY + 2}
-            stroke={GUIDE}
-            strokeWidth="1"
+            stroke={SHEEN}
+            strokeWidth="0.8"
           />
 
-          <Rect
-            x={armBaseX}
-            y={metrics.shoulderY + 10}
-            width={metrics.upperArmWidth}
-            height={upperArmLength}
-            rx={metrics.upperArmWidth / 2}
-            fill={focusFill.shoulders ? HIGHLIGHT : BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(8 ${armBaseX + metrics.upperArmWidth / 2} ${metrics.shoulderY + 10})`}
-          />
-          <Rect
-            x={rightArmBaseX - metrics.upperArmWidth}
-            y={metrics.shoulderY + 10}
-            width={metrics.upperArmWidth}
-            height={upperArmLength}
-            rx={metrics.upperArmWidth / 2}
-            fill={focusFill.shoulders ? HIGHLIGHT : BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(-8 ${rightArmBaseX - metrics.upperArmWidth / 2} ${metrics.shoulderY + 10})`}
-          />
-
-          <Rect
-            x={leftElbowX}
-            y={metrics.waistY + 12}
-            width={metrics.forearmWidth}
-            height={forearmLength}
-            rx={metrics.forearmWidth / 2}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(4 ${leftElbowX + metrics.forearmWidth / 2} ${metrics.waistY + 12})`}
-          />
-          <Rect
-            x={rightElbowX - metrics.forearmWidth}
-            y={metrics.waistY + 12}
-            width={metrics.forearmWidth}
-            height={forearmLength}
-            rx={metrics.forearmWidth / 2}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(-4 ${rightElbowX - metrics.forearmWidth / 2} ${metrics.waistY + 12})`}
-          />
-
-          <Ellipse cx={leftWristX} cy={metrics.hipY + 72} rx="5" ry="11" fill={BODY_FILL} stroke={BODY_STROKE} strokeWidth={strokeWidth} transform={`rotate(6 ${leftWristX} ${metrics.hipY + 72})`} />
-          <Ellipse cx={rightWristX} cy={metrics.hipY + 72} rx="5" ry="11" fill={BODY_FILL} stroke={BODY_STROKE} strokeWidth={strokeWidth} transform={`rotate(-6 ${rightWristX} ${metrics.hipY + 72})`} />
-
-          <Rect
-            x={thighInnerLeftX}
-            y={metrics.crotchY + 6}
-            width={metrics.thighWidth}
-            height={metrics.kneeY - metrics.crotchY - 2}
-            rx={metrics.thighWidth / 2}
-            fill={focusFill.thighs ? HIGHLIGHT : BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(1 ${thighInnerLeftX + metrics.thighWidth / 2} ${metrics.crotchY + 6})`}
-          />
-          <Rect
-            x={thighInnerRightX}
-            y={metrics.crotchY + 6}
-            width={metrics.thighWidth}
-            height={metrics.kneeY - metrics.crotchY - 2}
-            rx={metrics.thighWidth / 2}
-            fill={focusFill.thighs ? HIGHLIGHT : BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(-1 ${thighInnerRightX + metrics.thighWidth / 2} ${metrics.crotchY + 6})`}
-          />
-
-          <Rect
-            x={calfLeftX}
-            y={metrics.kneeY - 4}
-            width={metrics.calfWidth}
-            height={metrics.ankleY - metrics.kneeY + 2}
-            rx={metrics.calfWidth / 2}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(1 ${calfLeftX + metrics.calfWidth / 2} ${metrics.kneeY - 4})`}
-          />
-          <Rect
-            x={calfRightX}
-            y={metrics.kneeY - 4}
-            width={metrics.calfWidth}
-            height={metrics.ankleY - metrics.kneeY + 2}
-            rx={metrics.calfWidth / 2}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-            transform={`rotate(-1 ${calfRightX + metrics.calfWidth / 2} ${metrics.kneeY - 4})`}
-          />
-
-          <Path
-            d={`M ${calfLeftX + metrics.calfWidth / 2} ${metrics.footY - 6} C ${calfLeftX + metrics.calfWidth / 2 - 3} ${metrics.footY + 4}, ${calfLeftX - 4} ${metrics.footY + 8}, ${calfLeftX - 10} ${metrics.footY + 2} C ${calfLeftX - 2} ${metrics.footY + 10}, ${calfLeftX + 10} ${metrics.footY + 10}, ${calfLeftX + 12} ${metrics.footY} Z`}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-          />
-          <Path
-            d={`M ${calfRightX + metrics.calfWidth / 2} ${metrics.footY - 6} C ${calfRightX + metrics.calfWidth / 2 + 3} ${metrics.footY + 4}, ${calfRightX + metrics.calfWidth + 4} ${metrics.footY + 8}, ${calfRightX + metrics.calfWidth + 10} ${metrics.footY + 2} C ${calfRightX + metrics.calfWidth + 2} ${metrics.footY + 10}, ${calfRightX + metrics.calfWidth - 10} ${metrics.footY + 10}, ${calfRightX + metrics.calfWidth - 12} ${metrics.footY} Z`}
-            fill={BODY_FILL}
-            stroke={BODY_STROKE}
-            strokeWidth={strokeWidth}
-          />
-
+          {/* Active measurement caliper line */}
           {(focusFill.waist || focusFill.hips || focusFill.bust || focusFill.torso) && (
             <>
               <Line
-                x1={metrics.centerX - Math.max(metrics.bustHalf, metrics.hipHalf) - 6}
+                x1={cx - Math.max(metrics.bustHalf, metrics.hipHalf) - 6}
                 y1={
                   focusFill.bust ? metrics.bustY - 3 : focusFill.waist ? metrics.waistY - 1 : focusFill.hips ? metrics.hipY + 1 : metrics.waistY
                 }
-                x2={metrics.centerX + Math.max(metrics.bustHalf, metrics.hipHalf) + 6}
+                x2={cx + Math.max(metrics.bustHalf, metrics.hipHalf) + 6}
                 y2={
                   focusFill.bust ? metrics.bustY - 3 : focusFill.waist ? metrics.waistY - 1 : focusFill.hips ? metrics.hipY + 1 : metrics.waistY
                 }
                 stroke={HIGHLIGHT}
-                strokeWidth="1.6"
+                strokeWidth="1.4"
                 strokeDasharray="3 3"
               />
               <Circle
-                cx={metrics.centerX - Math.max(metrics.bustHalf, metrics.hipHalf) - 6}
+                cx={cx - Math.max(metrics.bustHalf, metrics.hipHalf) - 6}
                 cy={
                   focusFill.bust ? metrics.bustY - 3 : focusFill.waist ? metrics.waistY - 1 : focusFill.hips ? metrics.hipY + 1 : metrics.waistY
                 }
@@ -362,7 +483,7 @@ export default function BodyFigurine({
                 fill={HIGHLIGHT}
               />
               <Circle
-                cx={metrics.centerX + Math.max(metrics.bustHalf, metrics.hipHalf) + 6}
+                cx={cx + Math.max(metrics.bustHalf, metrics.hipHalf) + 6}
                 cy={
                   focusFill.bust ? metrics.bustY - 3 : focusFill.waist ? metrics.waistY - 1 : focusFill.hips ? metrics.hipY + 1 : metrics.waistY
                 }

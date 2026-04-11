@@ -57,6 +57,21 @@ export interface FitCheckResult {
   error?: string;
 }
 
+/** Body cm measurements estimated from a garment the user owns */
+export interface CalibrationData {
+  bust_cm: number;
+  waist_cm: number;
+  hips_cm: number;
+  shoulders_cm: number;
+}
+
+export interface CalibrateGarmentResult {
+  success: boolean;
+  estimated_cm?: CalibrationData;
+  error?: string;
+  message?: string;
+}
+
 const TIMEOUT = 30000;
 
 async function apiRequest<T>(
@@ -215,9 +230,17 @@ export async function checkFit(
     tags?: string[];
     description?: string;
   },
-  avatar: Avatar
+  avatar: Avatar,
+  calibration?: CalibrationData,
+  garmentCount?: number
 ): Promise<FitCheckResult> {
   try {
+    const body: Record<string, unknown> = { product, avatar };
+    if (calibration) {
+      body.calibration = calibration;
+      body.garment_count = garmentCount ?? 0;
+    }
+
     const result = await apiRequest<{
       success: boolean;
       warnings?: FitWarning[];
@@ -228,8 +251,30 @@ export async function checkFit(
         note?: string;
       };
       error?: string;
-    }>('check-fit', { product, avatar });
+    }>('check-fit', body);
 
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Estimate the user's body measurements (in cm) from a garment they own.
+ * Calls the backend Claude-powered calibration endpoint. The result is stored
+ * in the calibration store and averaged across all entries when checking fit.
+ */
+export async function calibrateGarment(input: {
+  brand: string;
+  size: string;
+  fit: 'perfect' | 'slightly-tight' | 'slightly-loose';
+  avatar: Avatar;
+}): Promise<CalibrateGarmentResult> {
+  try {
+    const result = await apiRequest<CalibrateGarmentResult>('calibrate-garment', input);
     return result;
   } catch (error) {
     return {
