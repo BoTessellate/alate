@@ -17,12 +17,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useAccountStore, GoogleUser } from '../store/accountStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { captureError } from '../utils/sentry';
+import FitCalibrationCard from '../components/FitCalibrationCard';
+import GlassCard from '../components/GlassCard';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -46,10 +48,7 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ');
 }
 
-const GLASS_CARD = {
-  ...glass,
-  ...shadows.glass,
-};
+// GLASS_CARD removed — replaced by <GlassCard> component everywhere
 
 /**
  * Error boundary around the Google sign-in card. A crash inside useAuthRequest
@@ -85,7 +84,7 @@ function AccountCardView({
   onSignOut: () => void;
 }) {
   return (
-    <View style={[styles.accountCard, GLASS_CARD]}>
+    <GlassCard style={styles.accountCard}>
       {googleUser ? (
         <View style={styles.signedInRow}>
           {googleUser.picture ? (
@@ -109,7 +108,7 @@ function AccountCardView({
           <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -228,14 +227,14 @@ export default function AccountScreen() {
 
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, GLASS_CARD]}>
+          <GlassCard style={styles.statCard}>
             <Text style={styles.statNumber}>{entries.length}</Text>
             <Text style={styles.statLabel}>Checked</Text>
-          </View>
-          <View style={[styles.statCard, GLASS_CARD]}>
+          </GlassCard>
+          <GlassCard style={styles.statCard}>
             <Text style={[styles.statNumber, { color: colors.success }]}>{greatFits}</Text>
             <Text style={styles.statLabel}>Great Fits</Text>
-          </View>
+          </GlassCard>
         </View>
 
         {/* Body Profile */}
@@ -252,7 +251,7 @@ export default function AccountScreen() {
         </View>
 
         {avatar ? (
-          <View style={[styles.profileCard, GLASS_CARD]}>
+          <GlassCard style={styles.profileCard}>
             {/* Height row */}
             <View style={styles.profileRow}>
               <Text style={styles.profileLabel}>Height</Text>
@@ -269,32 +268,36 @@ export default function AccountScreen() {
                 <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
               </View>
             ))}
-          </View>
+          </GlassCard>
         ) : (
           <TouchableOpacity
-            style={[styles.emptyProfileCard, GLASS_CARD]}
             onPress={() => navigation.navigate('AvatarSetup')}
             activeOpacity={0.8}
           >
-            <Text style={styles.emptyProfileIcon}>📏</Text>
-            <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
-            <Text style={styles.emptyProfileSubtitle}>
-              Add your measurements to get accurate fit predictions and size recommendations
-            </Text>
-            <View style={styles.emptyProfileCta}>
-              <Text style={styles.emptyProfileCtaText}>Get started →</Text>
-            </View>
+            <GlassCard style={styles.emptyProfileCard}>
+              <Text style={styles.emptyProfileIcon}>📏</Text>
+              <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
+              <Text style={styles.emptyProfileSubtitle}>
+                Add your measurements to get accurate fit predictions and size recommendations
+              </Text>
+              <View style={styles.emptyProfileCta}>
+                <Text style={styles.emptyProfileCtaText}>Get started →</Text>
+              </View>
+            </GlassCard>
           </TouchableOpacity>
         )}
 
+        {/* Fit Calibration — Zalando "user's normal size" anchor */}
+        {avatar && <FitCalibrationCard />}
+
         {/* Tip */}
         {avatar && (
-          <View style={[styles.tipCard, GLASS_CARD]}>
+          <GlassCard style={styles.tipCard}>
             <Feather name="info" size={16} color={colors.accentDark} style={styles.tipIcon} />
             <Text style={styles.tipText}>
               Size accuracy improves the more you check products. Your fit history helps calibrate predictions over time.
             </Text>
-          </View>
+          </GlassCard>
         )}
 
         {/* Reset Profile */}

@@ -23,9 +23,10 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
 import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
+import GlassCard from '../components/GlassCard';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -145,7 +146,7 @@ export default function HomeScreen() {
           </View>
 
           {/* Input Card */}
-          <View style={styles.inputCard}>
+          <GlassCard style={styles.inputCard}>
             <Text style={styles.inputLabel}>Product URL</Text>
             <View style={styles.inputWrapper}>
               <TextInput
@@ -180,11 +181,11 @@ export default function HomeScreen() {
                 <Text style={styles.buttonText}>Check Fit</Text>
               )}
             </TouchableOpacity>
-          </View>
+          </GlassCard>
 
           {/* Brand Nudge Card */}
           {failedBrand && (
-            <View style={styles.nudgeCard}>
+            <GlassCard style={styles.nudgeCard}>
               <View style={styles.nudgeHeader}>
                 <Feather name="send" size={18} color={colors.secondary} />
                 <Text style={styles.nudgeTitle}>
@@ -228,26 +229,27 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </>
               )}
-            </View>
+            </GlassCard>
           )}
 
           {/* Profile Setup Prompt */}
           {!avatar && (
             <TouchableOpacity
-              style={styles.setupCard}
               onPress={() => navigation.navigate('AvatarSetup')}
               activeOpacity={0.8}
             >
-              <View style={styles.setupIconContainer}>
-                <Feather name="sliders" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.setupTextContainer}>
-                <Text style={styles.setupTitle}>Set up your body profile</Text>
-                <Text style={styles.setupSubtitle}>
-                  Tell us your height and body type for accurate fit predictions
-                </Text>
-              </View>
-              <Text style={styles.setupArrow}>→</Text>
+              <GlassCard style={styles.setupCard}>
+                <View style={styles.setupIconContainer}>
+                  <Feather name="sliders" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.setupTextContainer}>
+                  <Text style={styles.setupTitle}>Set up your body profile</Text>
+                  <Text style={styles.setupSubtitle}>
+                    Tell us your height and body type for accurate fit predictions
+                  </Text>
+                </View>
+                <Text style={styles.setupArrow}>→</Text>
+              </GlassCard>
             </TouchableOpacity>
           )}
 
@@ -316,11 +318,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   inputCard: {
-    ...glass,
     borderRadius: borderRadius.xxl,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.glass,
   },
   inputLabel: {
     ...typography.label,
@@ -368,14 +368,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   setupCard: {
-    ...glass,
     borderRadius: borderRadius.xxl,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
-    borderStyle: 'dashed',
-    ...shadows.glass,
   },
   setupIconContainer: {
     width: 44,
@@ -404,11 +401,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nudgeCard: {
-    ...glass,
     borderRadius: borderRadius.xxl,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    ...shadows.glass,
   },
   nudgeHeader: {
     flexDirection: 'row',

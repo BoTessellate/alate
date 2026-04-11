@@ -2,6 +2,17 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * Generate a collision-resistant id for history entries.
+ *
+ * Previously used `Date.now().toString()`, which collided when two entries
+ * were added in the same millisecond — `removeEntry(id)` then deleted both.
+ * Combining the timestamp with a random suffix keeps ids monotonic for
+ * natural sort order while making collisions effectively impossible.
+ */
+const generateEntryId = (): string =>
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+
 export interface FitWarning {
   severity: 'minor' | 'moderate' | 'major';
   message: string;
@@ -50,7 +61,7 @@ export const useFitHistoryStore = create<FitHistoryStore>()(
       addEntry: (entry) =>
         set((state) => ({
           entries: [
-            { ...entry, id: Date.now().toString() },
+            { ...entry, id: generateEntryId() },
             ...state.entries,
           ].slice(0, 50), // Keep last 50 entries
         })),

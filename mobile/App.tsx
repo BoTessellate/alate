@@ -9,12 +9,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShareIntentProvider } from './src/utils/shareIntent';
 import { initSentry, SentryWrap } from './src/utils/sentry';
+import { initCrashlytics } from './src/services/crashlytics';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/constants/theme';
 
-// Initialise Sentry as early as possible (before any component renders)
+// Initialise telemetry as early as possible (before any component renders).
+// Sentry catches JS + native crashes via its RN SDK; Crashlytics adds a
+// second channel for native-side faults and ANRs that stream to BigQuery.
 initSentry();
+initCrashlytics();
 
 function App() {
   return (

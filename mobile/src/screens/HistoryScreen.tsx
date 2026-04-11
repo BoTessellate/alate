@@ -15,7 +15,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, ms, glass } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, ms } from '../constants/theme';
+import GlassCard from '../components/GlassCard';
 import { sanitize } from '../utils/sanitize';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
@@ -118,7 +119,6 @@ export default function HistoryScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
         onPress={() => navigation.navigate('FitResult', {
           product: {
             name: item.productName,
@@ -142,6 +142,7 @@ export default function HistoryScreen() {
         })}
         activeOpacity={0.8}
       >
+        <GlassCard style={styles.card}>
         <View style={styles.cardImageContainer}>
           {item.productImage ? (
             <Image source={{ uri: item.productImage }} style={styles.thumbnail} />
@@ -207,6 +208,7 @@ export default function HistoryScreen() {
         >
           <Text style={styles.deleteText}>×</Text>
         </TouchableOpacity>
+        </GlassCard>
       </TouchableOpacity>
     );
   };
@@ -238,16 +240,16 @@ export default function HistoryScreen() {
 
         {/* Header Stats */}
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
+          <GlassCard style={styles.statCard}>
             <Text style={styles.statNumber}>{entries.length}</Text>
             <Text style={styles.statLabel}>Checked</Text>
-          </View>
-          <View style={styles.statCard}>
+          </GlassCard>
+          <GlassCard style={styles.statCard}>
             <Text style={[styles.statNumber, { color: colors.success }]}>
               {entries.filter((e) => e.fitScore === 'great').length}
             </Text>
             <Text style={styles.statLabel}>Great Fits</Text>
-          </View>
+          </GlassCard>
         </View>
 
         {/* List */}
@@ -309,11 +311,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    ...glass,
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     alignItems: 'center',
-    ...shadows.glass,
   },
   statNumber: {
     ...typography.headingL,
@@ -329,13 +329,11 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   card: {
-    ...glass,
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    ...shadows.glass,
   },
   cardImageContainer: {
     marginRight: spacing.md,

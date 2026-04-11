@@ -4,6 +4,7 @@
  * Captures:
  *  - Unhandled JS exceptions (automatic)
  *  - Native crashes (automatic via Sentry RN)
+ *  - Unhandled promise rejections (manual wiring below)
  *  - Enrichment / fit-check API failures (manual captures in FitResultScreen)
  *  - Share intent processing failures
  *
@@ -15,6 +16,11 @@ import * as Sentry from '@sentry/react-native';
 
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
+// Lower the trace sample rate in production to stay within Sentry quota —
+// 100 % is fine in dev, but prod traffic can chew through the free tier fast.
+const isProd = process.env.NODE_ENV === 'production';
+const TRACE_SAMPLE_RATE = isProd ? 0.2 : 1.0;
+
 export function initSentry() {
   if (!DSN) {
     console.warn('[Sentry] EXPO_PUBLIC_SENTRY_DSN not set — error reporting disabled');
@@ -23,15 +29,24 @@ export function initSentry() {
 
   Sentry.init({
     dsn: DSN,
-    // Send 100 % of errors; tune down in high-traffic production if needed
-    tracesSampleRate: 1.0,
-    // Tag every event with the app environment
+    tracesSampleRate: TRACE_SAMPLE_RATE,
     environment: process.env.NODE_ENV || 'production',
-    // Breadcrumbs make it easy to trace the user journey before a crash
     enableNativeCrashHandling: true,
     enableAutoSessionTracking: true,
     sessionTrackingIntervalMillis: 30000,
   });
+
+  // Catch unhandled promise rejections that React's error boundary misses.
+  // (e.g. a rogue `fetch().then(...)` chain with no `.catch`.)
+  const globalObj = global as unknown as {
+    HermesInternal?: unknown;
+    process?: { on?: (event: string, handler: (reason: unknown) => void) => void };
+  };
+  if (globalObj.process?.on) {
+    globalObj.process.on('unhandledRejection', (reason: unknown) => {
+      captureError(reason, { feature: 'unhandled-rejection' });
+    });
+  }
 }
 
 /** Capture a named error with optional structured context */
