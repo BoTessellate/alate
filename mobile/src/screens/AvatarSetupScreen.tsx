@@ -26,7 +26,6 @@ import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
 import BodyFigurine from '../components/BodyFigurine';
 import { BodyFocusArea } from '../components/bodyFigurineModel';
-import GradientBackground from '../components/GradientBackground';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
 
@@ -256,8 +255,8 @@ export default function AvatarSetupScreen() {
   };
 
   return (
-    <GradientBackground style={{ paddingTop: insets.top }}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
       <View style={styles.row}>
         {/* Left pane — BodyFigurine, sticky */}
@@ -406,13 +405,14 @@ export default function AvatarSetupScreen() {
           </Text>
         </ScrollView>
       </View>
-    </GradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   row: {
     flex: 1,
