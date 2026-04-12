@@ -80,14 +80,14 @@ jest.mock('@react-native-firebase/crashlytics', () => ({
     setCrashlyticsCollectionEnabled: jest.fn(() => Promise.resolve()),
     crash: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('@react-native-firebase/app', () => ({
   __esModule: true,
   default: {
     app: jest.fn(() => ({ name: '[DEFAULT]' })),
   },
-}));
+}), { virtual: true });
 
 // Silence console warnings during tests
 global.console = {
