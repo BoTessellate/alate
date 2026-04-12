@@ -25,7 +25,6 @@ import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator
 import { captureError } from '../utils/sentry';
 import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
-import GradientBackground from '../components/GradientBackground';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -215,8 +214,8 @@ export default function AccountScreen() {
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
   return (
-    <GradientBackground style={{ paddingTop: insets.top }}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
@@ -312,17 +311,17 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </GradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   content: {
     padding: spacing.lg,

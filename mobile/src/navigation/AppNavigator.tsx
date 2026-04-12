@@ -12,10 +12,10 @@ import { Feather } from '@expo/vector-icons';
 import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography } from '../constants/theme';
-import GradientBackground from '../components/GradientBackground';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
+import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -23,6 +23,14 @@ import HistoryScreen from '../screens/HistoryScreen';
 import AvatarSetupScreen from '../screens/AvatarSetupScreen';
 import FitResultScreen from '../screens/FitResultScreen';
 import AccountScreen from '../screens/AccountScreen';
+
+// Wrap each screen with an error boundary so a crash shows a fallback
+// instead of a white screen. The `name` prop tags the Sentry report.
+const SafeHome = () => <ScreenErrorBoundary name="HomeScreen"><HomeScreen /></ScreenErrorBoundary>;
+const SafeHistory = () => <ScreenErrorBoundary name="HistoryScreen"><HistoryScreen /></ScreenErrorBoundary>;
+const SafeAccount = () => <ScreenErrorBoundary name="AccountScreen"><AccountScreen /></ScreenErrorBoundary>;
+const SafeAvatarSetup = () => <ScreenErrorBoundary name="AvatarSetupScreen"><AvatarSetupScreen /></ScreenErrorBoundary>;
+const SafeFitResult = () => <ScreenErrorBoundary name="FitResultScreen"><FitResultScreen /></ScreenErrorBoundary>;
 
 // Navigation types
 export type RootStackParamList = {
@@ -98,7 +106,7 @@ function MainTabs() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={SafeHome}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
           tabBarButtonTestID: 'tab-home',
@@ -106,7 +114,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="History"
-        component={HistoryScreen}
+        component={SafeHistory}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="History" focused={focused} />,
           tabBarButtonTestID: 'tab-history',
@@ -114,7 +122,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Account"
-        component={AccountScreen}
+        component={SafeAccount}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Account" focused={focused} />,
           tabBarButtonTestID: 'tab-account',
@@ -196,10 +204,10 @@ export default function AppNavigator() {
   // Show loading overlay when processing share intent
   if (isProcessingShare) {
     return (
-      <GradientBackground style={styles.loadingOverlay}>
+      <View style={styles.loadingOverlay}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Processing shared URL...</Text>
-      </GradientBackground>
+      </View>
     );
   }
 
@@ -226,7 +234,7 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="AvatarSetup"
-          component={AvatarSetupScreen}
+          component={SafeAvatarSetup}
           options={{
             title: 'Body Profile',
             presentation: 'modal',
@@ -234,7 +242,7 @@ export default function AppNavigator() {
         />
         <Stack.Screen
           name="FitResult"
-          component={FitResultScreen}
+          component={SafeFitResult}
           options={{
             title: 'Fit Analysis',
             headerBackTitle: 'Back',
@@ -259,6 +267,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.background,
   },
   loadingText: {
     ...typography.body,

@@ -19,8 +19,8 @@ export const fontFamily = {
 
 // =============================================================================
 // COLOR PALETTE - Gray-Purple system (matches website tonal scale)
-// Background gradient:  #e4e2e9 → #c5c0d2 → #b5afc4 → #9a92ac
-// Primary brand:        #5a4377  (used for buttons + bold text)
+// Background:     #e4e2e9  (solid, lightest stop of the website's tonal scale)
+// Primary brand:  #5a4377  (used for buttons + bold text)
 // =============================================================================
 export const colors = {
   // Primary - Gray-purple brand colour (buttons, bold text)
@@ -46,13 +46,11 @@ export const colors = {
   highlightLight: '#7d6699',
   highlightDark: '#3f2b54',
 
-  // Background tonal scale — lightest = canvas, darker stops feed the gradient
+  // Background — solid, matches website canvas (lightest stop of tonal scale)
   background: '#e4e2e9',
-  backgroundSecondary: '#c5c0d2',
-  backgroundTertiary: '#b5afc4',
+  backgroundSecondary: '#d8d4de',
+  backgroundTertiary: '#c5c0d2',
   backgroundDark: '#9a92ac',
-  /** Linear gradient stops, 180° (top → bottom) */
-  backgroundGradient: ['#e4e2e9', '#c5c0d2', '#b5afc4', '#9a92ac'] as readonly [string, string, string, string],
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
@@ -262,13 +260,13 @@ export const shadows = {
     shadowRadius: 16,
     elevation: 12,
   },
-  // Glass shadow — gray-purple tint for glass cards on the gradient bg
+  // Glass shadow — gray-purple tint for glass cards on the light solid bg
   glass: {
     shadowColor: '#3f2b54',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   // Colored shadows — brand gray-purple
   glow: {
@@ -288,13 +286,13 @@ export const shadows = {
 };
 
 // =============================================================================
-// GLASS STYLE — semi-transparent cards on gray-purple gradient background
-// Subtle Chrome-style frost: soft white tint + hairline border, separation
-// comes primarily from shadow rather than background contrast.
+// GLASS STYLE — semi-transparent cards on solid gray-purple background
+// Frost card: white tint with hairline border. On the solid #e4e2e9 canvas
+// separation comes from shadow + slight brightness, no darker bottom to fight.
 // =============================================================================
 export const glass = {
-  backgroundColor: 'rgba(255, 255, 255, 0.55)',
-  borderColor: 'rgba(255, 255, 255, 0.55)',
+  backgroundColor: 'rgba(255, 255, 255, 0.75)',
+  borderColor: 'rgba(255, 255, 255, 0.85)',
   borderWidth: 0.5,
 };
 
