@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import GradientBackground from '../components/GradientBackground';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
@@ -267,10 +266,10 @@ export default function FitResultScreen() {
 
   if (loading) {
     return (
-      <GradientBackground>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <FitLoader />
-      </GradientBackground>
+      </View>
     );
   }
 
@@ -283,7 +282,7 @@ export default function FitResultScreen() {
   const showTags = !!(enrichedProduct?.tags?.length);
 
   return (
-    <GradientBackground style={styles.root}>
+    <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Fixed hero image — stays behind scroll */}
@@ -528,16 +527,18 @@ export default function FitResultScreen() {
           )}
         </View>
       </ScrollView>
-    </GradientBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   // --- Hero ---
   heroFixed: {

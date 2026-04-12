@@ -104,3 +104,12 @@ jobs:
           name: alate-release.apk
           path: mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
+
+      - name: Trigger guinea-pig E2E suite
+        if: github.ref == 'refs/heads/master'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GUINEA_PIG_DISPATCH_TOKEN }}
+          repository: BoTessellate/guinea-pig
+          event-type: alate-apk-ready
+          client-payload: '{"run_id": "${{ github.run_id }}", "sha": "${{ github.sha }}"}'
