@@ -159,24 +159,29 @@ function CoverFlowCard({
 }) {
   const animatedStyle = useAnimatedStyle(() => {
     // Distance from this card's snap point to the current scroll offset,
-    // expressed in units of ITEM_GAP. 0 = centred, ±1 = neighbour, etc.
+    // expressed in units of ITEM_GAP.
+    //   d > 0 : card sits to the LEFT of the centred card (we've scrolled past it)
+    //   d = 0 : card is the centred/main card
+    //   d < 0 : card sits to the RIGHT of the centred card (still ahead)
     const d = (scrollX.value - index * ITEM_GAP) / ITEM_GAP;
     // Inward tilt — side cards face the centre card (Vision Pro song
-    // shuffle / Apple Music style). Left-of-centre: positive rotateY turns
-    // the face to the right (toward centre). Right-of-centre: negative.
+    // shuffle reference). A left-of-centre card (d>0) needs to face RIGHT
+    // (positive rotateY rotates the card's front toward +X). A right-of-
+    // centre card (d<0) needs to face LEFT (negative rotateY).
     const rotateY = interpolate(
       d,
       [-2, -1, 0, 1, 2],
-      [70, 60, 0, -60, -70],
+      [-70, -60, 0, 60, 70],
       Extrapolation.CLAMP
     );
     const scale = interpolate(d, [-2, 0, 2], [0.78, 1, 0.78], Extrapolation.CLAMP);
-    // Shift left/right neighbours inward so they tuck behind the centre card,
-    // Cover-Flow style (no pure left/right spread).
+    // Tuck neighbours inward so they sit close to the centre card (overlap,
+    // not spread). Left-of-centre (d>0) pulls right; right-of-centre (d<0)
+    // pulls left — both move toward the centre.
     const translateX = interpolate(
       d,
       [-2, -1, 0, 1, 2],
-      [CARD_W * 0.18, CARD_W * 0.12, 0, -CARD_W * 0.12, -CARD_W * 0.18],
+      [-CARD_W * 0.18, -CARD_W * 0.12, 0, CARD_W * 0.12, CARD_W * 0.18],
       Extrapolation.CLAMP
     );
     const opacity = interpolate(
@@ -288,7 +293,10 @@ const styles = StyleSheet.create({
   cardPerspective: {
     width: CARD_W,
     height: CARD_H,
-    transform: [{ perspective: 1000 }],
+    // Tighter perspective = stronger foreshortening, so a 60° rotation
+    // reads clearly as 3D (not a flat shear). 700 matches the Vision Pro
+    // song-shuffle feel on a phone-scale viewport.
+    transform: [{ perspective: 700 }],
   },
   cardAnim: {
     width: CARD_W,
