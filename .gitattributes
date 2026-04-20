@@ -1,0 +1,56 @@
+# Normalize all text files to LF in the repo, auto-detect on checkout.
+# Prevents CRLF/LF churn across Windows, macOS, Linux, and WSL checkouts.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+# Shell/hook scripts must be LF
+*.sh        text eol=lf
+*.bash      text eol=lf
+.husky/*    text eol=lf
+
+# Explicit text files (belt and suspenders)
+*.ts     text
+*.tsx    text
+*.js     text
+*.jsx    text
+*.json   text
+*.md     text
+*.yml    text
+*.yaml   text
+*.html   text
+*.css    text
+*.sql    text
+*.kt     text
+
+# Binary files — never touch
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.webp    binary
+*.ico     binary
+*.svg     text
+*.pdf     binary
+*.mp3     binary
+*.mp4     binary
+*.mov     binary
+*.webm    binary
+*.ttf     binary
+*.otf     binary
+*.woff    binary
+*.woff2   binary
+*.eot     binary
+*.zip     binary
+*.gz      binary
+*.7z      binary
+*.tar     binary
+*.apk     binary
+*.aab     binary
+*.jks     binary
+*.keystore binary
+*.p8      binary
+*.p12     binary

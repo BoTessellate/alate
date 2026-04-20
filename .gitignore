@@ -59,3 +59,6 @@ tmpclaude-*-cwd
 
 .vercel
 .env*.local
+
+# Scheduled task runtime lockfile
+.claude/scheduled_tasks.lock
