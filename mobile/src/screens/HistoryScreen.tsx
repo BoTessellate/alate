@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +17,7 @@ import { colors, spacing, typography, borderRadius, ms } from '../constants/them
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
+import FitDetailBar from '../components/FitDetailBar';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'History'>,
@@ -82,10 +82,14 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { entries, addEntry, clearHistory } = useFitHistoryStore();
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const seedDemoData = () => {
     SEED_ENTRIES.forEach((e) => addEntry(e));
   };
+
+  const activeEntry =
+    entries.length > 0 ? entries[Math.min(activeIndex, entries.length - 1)] : null;
 
   const handleCardTap = (item: FitHistoryEntry) => {
     navigation.navigate('FitResult', {
@@ -154,32 +158,38 @@ export default function HistoryScreen() {
           </Text>
         </View>
 
-        {/* iPod Cover Flow-style horizontal carousel */}
+        {/* Vision Pro song-shuffle-style deck */}
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
+          onActiveIndexChange={setActiveIndex}
         />
 
-        {/* Clear Button */}
+        {/* Dynamic detail bar — mirrors the Vision Pro music bar reference.
+            Shows the centred card's fit verdict + name + size. */}
+        <View style={styles.detailBarWrap}>
+          <FitDetailBar entry={activeEntry} />
+        </View>
+
+        {/* Subtle text link — replaces the old loud red-pill CTA. */}
         {entries.length > 0 && (
-          <View style={styles.clearContainer}>
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                Alert.alert(
-                  'Clear History',
-                  'This will delete all your fit check history. This cannot be undone.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Clear All', style: 'destructive', onPress: clearHistory },
-                  ]
-                );
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.clearText}>Clear All History</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.clearLink}
+            onPress={() => {
+              Alert.alert(
+                'Clear history',
+                'This will delete all your fit check history. This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Clear', style: 'destructive', onPress: clearHistory },
+                ]
+              );
+            }}
+            activeOpacity={0.6}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.clearLinkText}>Clear history</Text>
+          </TouchableOpacity>
         )}
       </View>
     </SafeAreaView>
@@ -398,22 +408,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Clear button ---
-  clearContainer: {
-    padding: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
+  // --- Detail bar sits between deck and clear link ---
+  detailBarWrap: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  clearButton: {
-    padding: spacing.md,
-    alignItems: 'center',
-    backgroundColor: colors.error + '10',
-    borderRadius: borderRadius.lg,
+
+  // --- Clear link — muted underline tap target; destructive intent is
+  //     reserved for the confirmation Alert, not the surface styling. ---
+  clearLink: {
+    alignSelf: 'center',
+    paddingVertical: spacing.md,
+    paddingBottom: spacing.lg,
   },
-  clearText: {
-    ...typography.label,
-    color: colors.error,
-    fontWeight: '600',
+  clearLinkText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+    letterSpacing: 0.6,
   },
 });
