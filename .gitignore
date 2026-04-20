@@ -62,3 +62,10 @@ tmpclaude-*-cwd
 
 # Scheduled task runtime lockfile
 .claude/scheduled_tasks.lock
+
+# Root-level dev screenshots + adb UI dumps — debug artifacts, not project data.
+# Legit image assets live under mobile/assets/ and aren't affected by this.
+/*.png
+/*.jpg
+/*.jpeg
+/ui.xml
