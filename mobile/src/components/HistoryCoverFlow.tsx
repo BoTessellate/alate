@@ -39,9 +39,11 @@ import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-// Square-ish album-cover proportions — iPod Cover Flow used square covers.
+// Elongated rectangular proportions — portrait-heavy so product images
+// (dresses, tops, full-length looks) read as full-body shots without
+// aggressive cropping. Aspect ratio ~ 1 : 1.65.
 const CARD_W = Math.min(SCREEN_W * 0.62, 260);
-const CARD_H = Math.min(CARD_W * 1.35, 350);
+const CARD_H = Math.min(CARD_W * 1.65, 430);
 // Each "snap" step = CARD_W * 0.72 so adjacent cards overlap slightly (like Cover Flow).
 const ITEM_GAP = CARD_W * 0.72;
 // Side padding centres the ITEM_GAP slot (not the whole card) in the viewport
