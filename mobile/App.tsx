@@ -31,6 +31,8 @@ LogBox.ignoreLogs([
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/constants/theme';
+import { useFitHistoryStore } from './src/store/fitHistoryStore';
+import { DEV_FIT_ENTRIES } from './src/devSeed';
 
 // Keep the splash visible while we initialise telemetry.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -40,6 +42,14 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // second channel for native-side faults and ANRs that stream to BigQuery.
 initSentry();
 initCrashlytics();
+
+// Dev-only: populate an empty history with 15 fixture entries so the
+// cover flow has something to scroll during visual review. No-op in
+// production builds (__DEV__ is false) and no-op when the user already
+// has real history, so it never clobbers anything.
+if (__DEV__) {
+  useFitHistoryStore.getState().seedDevHistory(DEV_FIT_ENTRIES);
+}
 
 function App() {
   // Display serif used by all heading tokens (see theme.ts). Splash stays up

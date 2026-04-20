@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageTitle: {
-    ...typography.headingXL,
+    ...typography.displayMedium,
     color: colors.text,
     textAlign: 'center',
   },

@@ -52,6 +52,10 @@ interface FitHistoryStore {
   updateEntry: (id: string, patch: Partial<Omit<FitHistoryEntry, 'id'>>) => void;
   removeEntry: (id: string) => void;
   clearHistory: () => void;
+  // Dev-only: bulk-seed history when it's empty so the cover flow has
+  // something to scroll. No-op if entries already exist, so running the app
+  // again doesn't duplicate. Intended to be called from App.tsx under __DEV__.
+  seedDevHistory: (raw: Omit<FitHistoryEntry, 'id'>[]) => void;
 }
 
 export const useFitHistoryStore = create<FitHistoryStore>()(
@@ -74,6 +78,12 @@ export const useFitHistoryStore = create<FitHistoryStore>()(
           entries: state.entries.filter((e) => e.id !== id),
         })),
       clearHistory: () => set({ entries: [] }),
+      seedDevHistory: (raw) =>
+        set((state) =>
+          state.entries.length > 0
+            ? state
+            : { entries: raw.map((e) => ({ ...e, id: generateEntryId() })) }
+        ),
     }),
     {
       name: 'fit-history-storage',

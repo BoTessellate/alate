@@ -314,16 +314,9 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.displayMedium,
-    // System serif (Android's Noto Serif / iOS Times New Roman) for editorial
-    // weight without the awkward italic fallback that Georgia produces on
-    // Android. Heavy weight + tight tracking = confident headline.
-    fontFamily: Platform.OS === 'ios' ? 'Times New Roman' : 'serif',
-    fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
     marginBottom: spacing.sm,
-    letterSpacing: -1,
-    lineHeight: 44,
   },
   subtitle: {
     ...typography.body,

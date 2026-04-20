@@ -329,10 +329,12 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.lg,
+    alignItems: 'center',
   },
   title: {
-    ...typography.headingXL,
+    ...typography.displayMedium,
     color: colors.text,
+    textAlign: 'center',
   },
   // Google account card
   accountCard: {
