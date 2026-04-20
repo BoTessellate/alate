@@ -10,36 +10,47 @@ import {
   Linking,
   Dimensions,
   StatusBar,
-  Platform,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
-import GlassCard from '../components/GlassCard';
 import { captureError } from '../utils/sentry';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const HERO_HEIGHT = 360;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+// Card occupies 70% of the screen (test spec per user). Symmetric side
+// padding maintains visual symmetry; the product image fills the rest
+// above + behind the card.
+const CARD_HEIGHT = Math.round(SCREEN_H * 0.7);
+const SIDE_PAD = spacing.lg;
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
-/** Glass card style constant */
-const GLASS = {
-  ...glass,
-  ...shadows.glass,
+const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
+const formatPrice = (price?: { amount: number; currency: string }) => {
+  if (!price) return null;
+  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
+  const sym = CURRENCY_SYMBOLS[price.currency] || `${price.currency} `;
+  return `${sym}${price.amount}`;
 };
 
 export default function FitResultScreen() {
@@ -71,6 +82,21 @@ export default function FitResultScreen() {
 
   const wentToAvatarSetup = useRef(false);
   const prevAvatarRef = useRef(avatar);
+
+  // Enter animation — the card rises from below and scales up, approximating
+  // the history "fit pill" morphing into the full analysis box. No shared-
+  // element lib needed; opacity + translateY + scale carries the feel.
+  const enterProgress = useSharedValue(0);
+  useEffect(() => {
+    enterProgress.value = withTiming(1, { duration: 420 });
+  }, []);
+  const cardAnimStyle = useAnimatedStyle(() => ({
+    opacity: enterProgress.value,
+    transform: [
+      { translateY: interpolate(enterProgress.value, [0, 1], [80, 0]) },
+      { scale: interpolate(enterProgress.value, [0, 1], [0.94, 1]) },
+    ],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -223,29 +249,20 @@ export default function FitResultScreen() {
       case 'great':
         return {
           color: colors.success,
-          bgColor: colors.success + '20',
-          border: colors.success + '50',
           icon: '✓',
           text: 'Great Fit!',
-          description: 'This item should fit you well',
         };
       case 'moderate':
         return {
           color: colors.warning,
-          bgColor: colors.warning + '20',
-          border: colors.warning + '50',
           icon: '⚠',
           text: 'Some Concerns',
-          description: 'Review the notes below',
         };
       case 'poor':
         return {
           color: colors.error,
-          bgColor: colors.error + '20',
-          border: colors.error + '50',
           icon: '✕',
           text: 'May Not Fit Well',
-          description: 'Consider these carefully',
         };
     }
   };
@@ -253,18 +270,13 @@ export default function FitResultScreen() {
   const getSeverityConfig = (severity: string) => {
     switch (severity) {
       case 'major':
-        return { color: colors.error, label: 'Major', bgColor: colors.error + '15' };
+        return { color: colors.error, label: 'Major' };
       case 'moderate':
-        return { color: colors.warning, label: 'Moderate', bgColor: colors.warning + '15' };
+        return { color: colors.warning, label: 'Moderate' };
       default:
-        return { color: colors.info, label: 'Minor', bgColor: colors.info + '15' };
+        return { color: colors.info, label: 'Minor' };
     }
   };
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
 
   if (loading) {
     return (
@@ -278,14 +290,12 @@ export default function FitResultScreen() {
   const scoreConfig = getScoreConfig();
   const safeBrand = sanitize(product.brand);
   const safeName = sanitize(product.name);
+  const priceDisplay = formatPrice(product.price);
 
   const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
   const showMaterial = !!enrichedProduct?.material;
   const showTags = !!(enrichedProduct?.tags?.length);
 
-  // ----------------------------------------------------------------
-  // Derived values
-  // ----------------------------------------------------------------
   const confidenceLabel = sizeRec
     ? sizeRec.confidence === 'high'
       ? 'High'
@@ -294,153 +304,104 @@ export default function FitResultScreen() {
       : 'Low'
     : null;
 
-  const confidenceColor = sizeRec
-    ? sizeRec.confidence === 'high'
-      ? colors.success
-      : sizeRec.confidence === 'medium'
-      ? colors.primary
-      : colors.warning
-    : colors.text;
-
   const inStock =
     sizeRec && product.availableSizes && product.availableSizes.length > 0
       ? product.availableSizes.includes(sizeRec.size)
       : null;
 
-  /** Stat chip — circular accent surrounding a value with a label below.
-   *  Matches the reference image's round pill spec rows.
-   */
-  const StatChip = ({
-    label,
-    value,
-    subValue,
-    icon,
-    accent,
-    testID,
-  }: {
-    label: string;
-    value?: string | null;
-    subValue?: string | null;
-    icon?: React.ReactNode;
-    accent?: string;
-    testID?: string;
-  }) => (
-    <View style={styles.statChip}>
-      <View
-        style={[
-          styles.statCircle,
-          accent ? { backgroundColor: accent + '20', borderColor: accent + '40' } : null,
-        ]}
-      >
-        {icon ? (
-          icon
-        ) : (
-          <Text
-            testID={testID}
-            style={[styles.statValue, accent ? { color: accent } : null]}
-            numberOfLines={1}
-          >
-            {value}
-          </Text>
-        )}
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-      {subValue && <Text style={styles.statSubValue}>{subValue}</Text>}
-    </View>
-  );
-
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Full-bleed hero image — fixed behind the scrollable card */}
-      <View style={styles.heroWrap}>
-        {product.image ? (
-          <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.heroImage, styles.heroPlaceholder]}>
-            <Feather name="shopping-bag" size={64} color="rgba(255,255,255,0.4)" />
-          </View>
-        )}
-        {/* Soft gradient so text reads over any image */}
-        <LinearGradient
-          colors={[
-            'rgba(0,0,0,0.15)',
-            'rgba(0,0,0,0.05)',
-            'rgba(0,0,0,0.3)',
-          ] as readonly [string, string, string]}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-
-        {/* Title overlay near top of hero */}
-        <View style={[styles.heroTitleWrap, { paddingTop: insets.top + spacing.xl }]}>
-          {safeBrand && <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text>}
-          <Text style={styles.heroTitle} numberOfLines={2}>
-            {safeName || 'Product'}
-          </Text>
+      {/* Full-bleed product image behind everything */}
+      {product.image ? (
+        <Image source={{ uri: product.image }} style={styles.bgImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.bgImage, styles.bgPlaceholder]}>
+          <Feather name="shopping-bag" size={96} color="rgba(255,255,255,0.25)" />
         </View>
+      )}
+
+      {/* Subtle dim — helps the white back chevron + brand/name read */}
+      <LinearGradient
+        colors={['rgba(20,10,40,0.15)', 'rgba(20,10,40,0.05)', 'rgba(20,10,40,0.35)']}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* Back chevron */}
+      <TouchableOpacity
+        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
+        onPress={() => navigation.goBack()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+      >
+        <Feather name="chevron-left" size={22} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Brand + product name centred near the top of the image */}
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
+        {safeBrand ? <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text> : null}
+        <Text style={styles.heroName} numberOfLines={2}>
+          {safeName || 'Product'}
+        </Text>
       </View>
 
-      {/* Floating rounded card — bottom half */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + spacing.xxl },
+      {/* Glass info card — 70% screen, symmetric side + bottom padding, enters
+          from below with opacity + scale + slide. Scroll happens inside. */}
+      <Animated.View
+        style={[
+          styles.cardWrap,
+          { bottom: insets.bottom + spacing.lg },
+          cardAnimStyle,
         ]}
-        showsVerticalScrollIndicator={false}
       >
-        {/* Spacer so card starts below the hero */}
-        <View style={styles.heroSpacer} />
+        <BlurView intensity={55} tint="light" style={StyleSheet.absoluteFill} />
+        {/* Opaque-ish white tint so content reads clearly on any image bg.
+            Android's BlurView is a soft stub; the tint does the heavy lifting. */}
+        <View style={styles.cardTint} pointerEvents="none" />
 
-        <View style={styles.sheet}>
-          {/* Drag handle (decorative) */}
-          <View style={styles.sheetHandle} />
+        <ScrollView
+          style={styles.cardScroll}
+          contentContainerStyle={styles.cardContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.handle} />
 
-          {/* Row 1 — score label + price */}
-          <View style={styles.sheetHeader}>
-            <View style={styles.sheetHeaderLeft}>
-              <Text testID="fit-score-label" style={[styles.scoreHero, { color: scoreConfig.color }]}>
+          {/* H1: Fit verdict — biggest element in the card. Sets the answer
+              the user came here for before anything else. */}
+          <View style={styles.verdictRow}>
+            <View style={styles.verdictMain}>
+              <Text testID="fit-score-label" style={[styles.verdictText, { color: scoreConfig.color }]}>
                 {scoreConfig.text}
               </Text>
-              <Text style={styles.scoreSub}>
+              <Text style={styles.verdictSub}>
                 {warnings.length === 0
                   ? 'No fit concerns'
                   : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
               </Text>
             </View>
-            {product.price && (
-              <View style={styles.priceTag}>
-                <Text style={styles.priceText}>
-                  {product.price.currency} {product.price.amount}
-                </Text>
+            {priceDisplay && (
+              <View style={styles.pricePill}>
+                <Text style={styles.priceText}>{priceDisplay}</Text>
               </View>
             )}
           </View>
 
-          {/* Divider */}
           <View style={styles.divider} />
 
-          {/* Row 2 — circular stat chips */}
-          <View
-            testID="fit-score-display"
-            style={styles.statsRow}
-          >
+          {/* H2: Stats row — size / confidence / fit / stock */}
+          <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
               <StatChip
                 label="Size"
                 value={sizeRec.size}
-                accent={colors.primary}
                 testID="recommended-size-value"
               />
             )}
             {confidenceLabel && (
-              <StatChip
-                label="Confidence"
-                value={confidenceLabel}
-                accent={confidenceColor}
-              />
+              <StatChip label="Confidence" value={confidenceLabel} />
             )}
             <StatChip
               label="Fit"
@@ -449,7 +410,6 @@ export default function FitResultScreen() {
                   {scoreConfig.icon}
                 </Text>
               }
-              accent={scoreConfig.color}
             />
             {inStock !== null && (
               <StatChip
@@ -457,16 +417,15 @@ export default function FitResultScreen() {
                 icon={
                   <Feather
                     name={inStock ? 'check' : 'alert-circle'}
-                    size={20}
+                    size={18}
                     color={inStock ? colors.success : colors.warning}
                   />
                 }
-                accent={inStock ? colors.success : colors.warning}
               />
             )}
           </View>
 
-          {/* Re-eval banners inline */}
+          {/* Re-eval banners */}
           {reevaluating && (
             <View style={styles.banner}>
               <ActivityIndicator size="small" color={colors.primary} />
@@ -475,14 +434,14 @@ export default function FitResultScreen() {
           )}
           {reevaluated && !reevaluating && (
             <View style={[styles.banner, styles.bannerSuccess]}>
-              <Feather name="check-circle" size={16} color={colors.success} />
+              <Feather name="check-circle" size={14} color={colors.success} />
               <Text style={[styles.bannerText, { color: colors.success }]}>
                 Re-evaluated with your updated profile
               </Text>
             </View>
           )}
 
-          {/* Note from size rec */}
+          {/* Sizing note */}
           {sizeRec?.note && (
             <View style={styles.noteBlock}>
               <Text style={styles.noteLabel}>SIZING NOTE</Text>
@@ -490,41 +449,9 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Tags */}
-          {showTags && (
-            <View style={styles.tagsSection}>
-              <Text style={styles.sectionLabel}>TAGS</Text>
-              <View style={styles.tagsContainer}>
-                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
-                  <View key={i} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Product meta */}
-          {(showCategory || showMaterial) && (
-            <View style={styles.metaSection}>
-              {showCategory && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
-                </View>
-              )}
-              {showMaterial && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Material</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
           {/* Concerns */}
           {warnings.length > 0 && (
-            <View style={styles.concernsSection}>
+            <View style={styles.section}>
               <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
               {warnings.map((warning, index) => {
                 const config = getSeverityConfig(warning.severity);
@@ -543,70 +470,129 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Action Buttons — inside the sheet, at the bottom */}
-          <View style={styles.actionsSection}>
-          {isHistoryMode ? (
-            <>
-              <TouchableOpacity
-                testID="reevaluate-button"
-                style={styles.primaryButton}
-                onPress={() => {
-                  wentToAvatarSetup.current = true;
-                  navigation.navigate('AvatarSetup');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>Re-evaluate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="change-measurements-button"
-                style={styles.secondaryButton}
-                onPress={() => {
-                  wentToAvatarSetup.current = true;
-                  navigation.navigate('AvatarSetup');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>Change your measurements</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="view-on-store-button"
-                style={styles.ghostButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.ghostButtonText}>View on Store</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                testID="view-on-store-button"
-                style={styles.primaryButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>View on Store</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="check-another-button"
-                style={styles.secondaryButton}
-                onPress={() => navigation.goBack()}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>Check Another Product</Text>
-              </TouchableOpacity>
-            </>
+          {/* Tags */}
+          {showTags && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>TAGS</Text>
+              <View style={styles.tagsContainer}>
+                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           )}
+
+          {/* Meta rows */}
+          {(showCategory || showMaterial) && (
+            <View style={styles.metaSection}>
+              {showCategory && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Category</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
+                </View>
+              )}
+              {showMaterial && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Material</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Action buttons */}
+          <View style={styles.actionsSection}>
+            {isHistoryMode ? (
+              <>
+                <TouchableOpacity
+                  testID="reevaluate-button"
+                  style={styles.primaryButton}
+                  onPress={() => {
+                    wentToAvatarSetup.current = true;
+                    navigation.navigate('AvatarSetup');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="change-measurements-button"
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    wentToAvatarSetup.current = true;
+                    navigation.navigate('AvatarSetup');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryButtonText}>Change your measurements</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="view-on-store-button"
+                  style={styles.ghostButton}
+                  onPress={openProductPage}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.ghostButtonText}>View on Store</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  testID="view-on-store-button"
+                  style={styles.primaryButton}
+                  onPress={openProductPage}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryButtonText}>View on Store</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="check-another-button"
+                  style={styles.secondaryButton}
+                  onPress={() => navigation.goBack()}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryButtonText}>Check Another Product</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </Animated.View>
     </View>
   );
 }
 
-const SERIF = Platform.OS === 'ios' ? 'Times New Roman' : 'serif';
-const HERO_H = Math.round(Dimensions.get('window').height * 0.45);
+// Circular stat chip — each stat sits in a purple-tinted ring. Uses purple
+// for all accents (colour consistency). Fit score icon keeps its semantic
+// colour because users need instant good/bad readability.
+function StatChip({
+  label,
+  value,
+  icon,
+  testID,
+}: {
+  label: string;
+  value?: string | null;
+  icon?: React.ReactNode;
+  testID?: string;
+}) {
+  return (
+    <View style={styles.statChip}>
+      <View style={styles.statCircle}>
+        {icon ? (
+          icon
+        ) : (
+          <Text testID={testID} style={styles.statValue} numberOfLines={1}>
+            {value}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   root: {
@@ -620,113 +606,116 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // --- Hero (full-bleed image) ---
-  heroWrap: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: HERO_H + 40, // extra so card's rounded top overlaps
-  },
-  heroImage: {
+  // --- Background product image (full-bleed) ---
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
     backgroundColor: colors.primaryDark,
   },
-  heroPlaceholder: {
-    justifyContent: 'center',
+  bgPlaceholder: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  heroTitleWrap: {
+
+  // --- Back chevron ---
+  backBtn: {
+    position: 'absolute',
+    left: spacing.lg,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+
+  // --- Hero (brand + product name over image) ---
+  hero: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.lg,
+    left: SIDE_PAD,
+    right: SIDE_PAD,
+    alignItems: 'center',
   },
   heroBrand: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 3,
-    color: 'rgba(255,255,255,0.85)',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.4)',
+    ...typography.overline,
+    color: 'rgba(255,255,255,0.92)',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  heroTitle: {
-    fontFamily: SERIF,
-    fontSize: 28,
-    fontWeight: '700',
+  heroName: {
+    ...typography.headingXL, // DM Serif Italic lowercase, 28px, from token
     color: '#fff',
-    letterSpacing: -0.5,
-    lineHeight: 32,
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    textShadowRadius: 8,
   },
 
-  // --- Scroll + sheet ---
-  scroll: {
+  // --- Glass card ---
+  cardWrap: {
+    position: 'absolute',
+    left: SIDE_PAD,
+    right: SIDE_PAD,
+    height: CARD_HEIGHT,
+    borderRadius: borderRadius.xxxl,
+    overflow: 'hidden',
+    // Deep purple-tinted drop shadow — grounds the card over the image.
+    shadowColor: '#1a0f28',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.48,
+    shadowRadius: 28,
+    elevation: 18,
+  },
+  cardTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+  },
+  cardScroll: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  heroSpacer: {
-    height: HERO_H,
-  },
-  sheet: {
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28, // card rises over bottom of hero
-    paddingTop: spacing.md,
+  cardContent: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
-    minHeight: 400,
-    shadowColor: 'rgba(63, 43, 84, 0.2)',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
   },
-  sheetHandle: {
+  handle: {
     alignSelf: 'center',
-    width: 44,
+    width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(63, 43, 84, 0.25)',
+    backgroundColor: 'rgba(63, 43, 84, 0.22)',
     marginBottom: spacing.md,
   },
 
-  // --- Sheet header: score hero + price ---
-  sheetHeader: {
+  // --- Verdict row (H1) ---
+  verdictRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  sheetHeaderLeft: {
+  verdictMain: {
     flex: 1,
   },
-  scoreHero: {
-    fontFamily: SERIF,
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+  verdictText: {
+    ...typography.headingL, // 24px DM Serif Italic lowercase
   },
-  scoreSub: {
-    fontSize: 13,
+  verdictSub: {
+    ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: 2,
-    letterSpacing: 0.2,
   },
-  priceTag: {
-    backgroundColor: colors.primary + '15',
+  pricePill: {
+    backgroundColor: 'rgba(90, 67, 119, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
+    marginLeft: spacing.sm,
   },
   priceText: {
     fontSize: 15,
@@ -738,54 +727,45 @@ const styles = StyleSheet.create({
   // --- Divider ---
   divider: {
     height: 1,
-    backgroundColor: 'rgba(63, 43, 84, 0.1)',
-    marginBottom: spacing.lg,
+    backgroundColor: 'rgba(63, 43, 84, 0.12)',
+    marginBottom: spacing.md,
   },
 
-  // --- Circular stat chips row ---
+  // --- Stats row (H2) ---
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   statChip: {
     alignItems: 'center',
     flex: 1,
   },
   statCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(90, 67, 119, 0.18)',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    borderWidth: 1.25,
+    borderColor: 'rgba(90, 67, 119, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   statValue: {
-    fontFamily: SERIF,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.primary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   statIconText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    ...typography.labelSmall,
     color: colors.textSecondary,
     textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  statSubValue: {
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
     textAlign: 'center',
   },
 
@@ -796,11 +776,11 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
     borderRadius: borderRadius.md,
   },
   bannerSuccess: {
-    backgroundColor: colors.success + '12',
+    backgroundColor: 'rgba(46, 125, 91, 0.1)',
   },
   bannerText: {
     ...typography.bodySmall,
@@ -810,44 +790,68 @@ const styles = StyleSheet.create({
 
   // --- Sizing note ---
   noteBlock: {
-    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
   noteLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
+    ...typography.overline,
     color: colors.primary,
     marginBottom: 4,
   },
   noteText: {
-    fontSize: 14,
+    ...typography.bodySmall,
     color: colors.text,
     lineHeight: 20,
   },
 
-  // --- Section labels ---
+  // --- Generic section ---
+  section: {
+    marginBottom: spacing.md,
+  },
   sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 2,
+    ...typography.overline,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
 
-  // --- Tags ---
-  tagsSection: {
-    marginBottom: spacing.md,
+  // --- Concerns ---
+  concernRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
+  concernDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  concernBody: {
+    flex: 1,
+  },
+  concernSeverity: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  concernText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    lineHeight: 19,
+  },
+
+  // --- Tags ---
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
   tag: {
-    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    backgroundColor: 'rgba(90, 67, 119, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
@@ -859,10 +863,10 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // --- Meta (category / material) ---
+  // --- Meta ---
   metaSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(63, 43, 84, 0.08)',
+    borderTopColor: 'rgba(63, 43, 84, 0.1)',
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
@@ -873,90 +877,55 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   metaLabel: {
-    fontSize: 13,
+    ...typography.bodySmall,
     color: colors.textSecondary,
-    fontWeight: '500',
   },
   metaValue: {
-    fontSize: 13,
+    ...typography.bodySmall,
     fontWeight: '700',
     color: colors.text,
     textTransform: 'capitalize',
   },
 
-  // --- Concerns ---
-  concernsSection: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(63, 43, 84, 0.08)',
-    paddingTop: spacing.md,
-    marginBottom: spacing.md,
-  },
-  concernRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  concernDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-  },
-  concernBody: {
-    flex: 1,
-  },
-  concernSeverity: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 2,
-  },
-  concernText: {
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 19,
-  },
-
-  // --- Action buttons ---
+  // --- Actions ---
   actionsSection: {
     gap: spacing.sm,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     width: '100%',
   },
   primaryButton: {
     backgroundColor: colors.cta,
     borderRadius: borderRadius.lg,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    ...shadows.glow,
+    ...shadows.md,
   },
   primaryButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     color: colors.white,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   secondaryButton: {
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    backgroundColor: 'rgba(90, 67, 119, 0.1)',
     borderRadius: borderRadius.lg,
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.primary,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   ghostButton: {
-    padding: spacing.md,
+    padding: spacing.sm,
     alignItems: 'center',
   },
   ghostButtonText: {
-    fontSize: 14,
+    ...typography.bodySmall,
     color: colors.textSecondary,
     fontWeight: '500',
   },
