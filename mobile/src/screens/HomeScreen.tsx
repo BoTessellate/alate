@@ -271,7 +271,7 @@ export default function HomeScreen() {
               <Text style={styles.featureText}>Instant AI-powered fit analysis</Text>
             </View>
             <View style={styles.featureItem}>
-              <View style={[styles.featureDot, { backgroundColor: colors.success }]} />
+              <View style={[styles.featureDot, { backgroundColor: colors.accentDark }]} />
               <Text style={styles.featureText}>Save to your fit history</Text>
             </View>
           </View>
@@ -363,7 +363,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    ...shadows.glow,
+    // Soft lift, not a halo — matches History's restrained shadow palette.
+    ...shadows.md,
   },
   buttonDisabled: {
     opacity: 0.6,

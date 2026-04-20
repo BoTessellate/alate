@@ -232,7 +232,7 @@ export default function AccountScreen() {
             <Text style={styles.statLabel}>Checked</Text>
           </GlassCard>
           <GlassCard style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: colors.success }]}>{greatFits}</Text>
+            <Text style={styles.statNumber}>{greatFits}</Text>
             <Text style={styles.statLabel}>Great Fits</Text>
           </GlassCard>
         </View>
@@ -394,11 +394,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: borderRadius.pill,
-    backgroundColor: colors.error + '12',
+    // Muted purple chip instead of the red-tinted destructive pill.
+    // The action is still destructive, but the confirm dialog gates the
+    // actual sign-out — the chip doesn't need to shout.
+    backgroundColor: 'rgba(90, 67, 119, 0.12)',
   },
   signOutText: {
     ...typography.label,
-    color: colors.error,
+    color: colors.textSecondary,
     fontWeight: '600',
     fontSize: 12,
   },

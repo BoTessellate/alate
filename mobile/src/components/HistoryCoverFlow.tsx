@@ -151,26 +151,43 @@ function CoverFlowCard({
     // shuffle reference). A left-of-centre card (d>0) needs to face RIGHT
     // (positive rotateY rotates the card's front toward +X). A right-of-
     // centre card (d<0) needs to face LEFT (negative rotateY).
+    // Seven-point interpolation so the d=±2 card peeks out from behind
+    // d=±1, and d=±3 peeks out from behind d=±2 — stacked receding cards,
+    // Cover-Flow / Vision Pro style. Inward tilt intensifies with distance
+    // (72°–78°) without going fully edge-on (which would invisibly thin
+    // the card at the side). At the extremes, Extrapolation.CLAMP freezes
+    // further cards at the d=±3 pose so nothing flies off.
     const rotateY = interpolate(
       d,
-      [-2, -1, 0, 1, 2],
-      [-70, -60, 0, 60, 70],
+      [-3, -2, -1, 0, 1, 2, 3],
+      [-78, -72, -60, 0, 60, 72, 78],
       Extrapolation.CLAMP
     );
-    const scale = interpolate(d, [-2, 0, 2], [0.78, 1, 0.78], Extrapolation.CLAMP);
-    // Tuck neighbours inward so they sit close to the centre card (overlap,
-    // not spread). Left-of-centre (d>0) pulls right; right-of-centre (d<0)
-    // pulls left — both move toward the centre.
+    const scale = interpolate(
+      d,
+      [-3, -2, -1, 0, 1, 2, 3],
+      [0.5, 0.62, 0.78, 1, 0.78, 0.62, 0.5],
+      Extrapolation.CLAMP
+    );
+    // Aggressive inward tuck for |d|≥2 so outer cards sit BEHIND-and-just-
+    // peeking-past the nearer ones instead of flying off-screen. Left-of-
+    // centre (d>0) pulls right; right-of-centre (d<0) pulls left. Values
+    // expressed as a fraction of CARD_W (tuned against ITEM_GAP so outer
+    // cards overlap with the inner neighbours, not spread).
     const translateX = interpolate(
       d,
-      [-2, -1, 0, 1, 2],
-      [-CARD_W * 0.18, -CARD_W * 0.12, 0, CARD_W * 0.12, CARD_W * 0.18],
+      [-3, -2, -1, 0, 1, 2, 3],
+      [-CARD_W * 1.2, -CARD_W * 0.7, -CARD_W * 0.12, 0,
+        CARD_W * 0.12, CARD_W * 0.7, CARD_W * 1.2],
       Extrapolation.CLAMP
     );
+    // Progressive atmospheric fade — distant cards wash into the bg so
+    // the centre card gets the visual attention. Paired with the opacity
+    // gradient veil (styles.veil below) to simulate depth-of-field.
     const opacity = interpolate(
       Math.abs(d),
-      [0, 1, 2.5],
-      [1, 0.82, 0.4],
+      [0, 1, 2, 3],
+      [1, 0.88, 0.45, 0.18],
       Extrapolation.CLAMP
     );
     return {
@@ -180,6 +197,22 @@ function CoverFlowCard({
         { scale },
       ],
       opacity,
+    };
+  });
+
+  // Atmospheric haze overlay: an absolutely-positioned veil matching the
+  // background colour, whose opacity grows with |d|. Combined with the
+  // card's own opacity fade + scale reduction, this pushes side cards
+  // visually "into the distance" so the centre card owns the focus.
+  const veilStyle = useAnimatedStyle(() => {
+    const d = (scrollX.value - index * ITEM_GAP) / ITEM_GAP;
+    return {
+      opacity: interpolate(
+        Math.abs(d),
+        [0, 1, 2, 3],
+        [0, 0.05, 0.28, 0.48],
+        Extrapolation.CLAMP
+      ),
     };
   });
 
@@ -203,6 +236,7 @@ function CoverFlowCard({
           <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
             <CardFace entry={entry} />
           </TouchableOpacity>
+          <Animated.View style={[styles.veil, veilStyle]} pointerEvents="none" />
         </Animated.View>
       </View>
     </View>
@@ -232,23 +266,29 @@ export default function HistoryCoverFlow({
     return Math.max(0, Math.min(entries.length - 1, raw));
   });
 
-  // Mirror the UI-thread snapped index to JS. Two jobs:
-  //   1. update local state → re-renders the slots' zIndex so the centre
-  //      card climbs above both neighbours on Android.
-  //   2. fire the onActiveIndexChange callback so a sibling detail bar can
-  //      follow along.
+  // Live-track the snapped index for the external callback (detail bar)
+  // only. Cheap — only the consumer re-renders, not the whole grid.
   useAnimatedReaction(
     () => activeIndexShared.value,
     (curr, prev) => {
-      if (curr !== prev) {
-        runOnJS(setActiveIndex)(curr);
-        if (onActiveIndexChange) {
-          runOnJS(onActiveIndexChange)(curr);
-        }
+      if (curr !== prev && onActiveIndexChange) {
+        runOnJS(onActiveIndexChange)(curr);
       }
     },
     [onActiveIndexChange]
   );
+
+  // Local JS activeIndex drives the slot zIndex, which forces React to
+  // re-render all CoverFlowCard siblings whenever it changes. Doing that
+  // on every snap-crossing during a rapid scroll stutters the animation.
+  // Defer it to momentum-end: the z-order only needs to be right when the
+  // card lands. During the glide the animated transform already hides
+  // any transient paint-order flicker.
+  const onMomentumEnd = (e: { nativeEvent: { contentOffset: { x: number } } }) => {
+    const raw = Math.round(e.nativeEvent.contentOffset.x / ITEM_GAP);
+    const snapped = Math.max(0, Math.min(entries.length - 1, raw));
+    setActiveIndex(snapped);
+  };
 
   const snapOffsets = useMemo(
     () => entries.map((_, i) => i * ITEM_GAP),
@@ -261,8 +301,14 @@ export default function HistoryCoverFlow({
         horizontal
         showsHorizontalScrollIndicator={false}
         onScroll={scrollHandler}
+        onMomentumScrollEnd={onMomentumEnd}
         scrollEventThrottle={16}
         snapToOffsets={snapOffsets}
+        // "fast" ≈ 0.99 — snappy response to rapid swipes. The real smooth-
+        // ness fix is NOT a slower deceleration (would feel sluggish); it's
+        // deferring the JS activeIndex update to momentum-end (see below),
+        // so rapid scrolls don't trigger 15-card re-renders per snap
+        // crossing during the glide.
         decelerationRate="fast"
         contentContainerStyle={[
           styles.scrollContent,
@@ -319,7 +365,23 @@ const styles = StyleSheet.create({
     height: CARD_H,
     borderRadius: borderRadius.xxl,
     overflow: 'hidden',
-    ...shadows.lg,
+    // Deep drop shadow grounds the card — lifts it off the solid bg and
+    // gives the centre card clear depth separation from the receding
+    // neighbours. Purple-tinted instead of stock black so the shadow
+    // reads as part of the brand palette, not a generic drop.
+    shadowColor: '#1a0f28',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.42,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  // Atmospheric haze overlay, placed over each card. Opacity is animated
+  // in CoverFlowCard's useAnimatedStyle (veilStyle) so side cards wash
+  // toward the background colour as they recede.
+  veil: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xxl,
   },
   cardInner: {
     flex: 1,
