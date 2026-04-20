@@ -72,12 +72,11 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const iconName = TAB_ICONS[name] || 'circle';
 
   return (
-    <View style={styles.tabIconContainer}>
+    <View style={[styles.tabIconPill, focused && styles.tabIconPillFocused]}>
       <Feather
         name={iconName}
         size={22}
-        color={focused ? colors.primary : colors.textSecondary}
-        style={focused ? styles.tabIconFocused : undefined}
+        color={focused ? colors.primary : colors.textMuted}
       />
     </View>
   );
@@ -96,8 +95,8 @@ function MainTabs() {
           borderTopColor: colors.border,
           borderTopWidth: 1,
           paddingBottom: insets.bottom,
-          paddingTop: spacing.sm,
-          height: 70 + insets.bottom,
+          paddingTop: 4,
+          height: 48 + insets.bottom,
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
@@ -218,6 +217,7 @@ export default function AppNavigator() {
           headerStyle: {
             backgroundColor: colors.background,
           },
+          headerShadowVisible: false,
           headerTintColor: colors.text,
           headerTitleStyle: {
             fontWeight: '600',
@@ -254,14 +254,15 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabIconContainer: {
+  tabIconPill: {
     alignItems: 'center',
     justifyContent: 'center',
     width: 44,
-    height: 44,
+    height: 28,
+    borderRadius: 14,
   },
-  tabIconFocused: {
-    transform: [{ scale: 1.1 }],
+  tabIconPillFocused: {
+    backgroundColor: 'rgba(90, 67, 119, 0.14)',
   },
   loadingOverlay: {
     flex: 1,

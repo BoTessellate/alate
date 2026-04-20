@@ -3,16 +3,36 @@
  * Know if it fits BEFORE you buy
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
+import { LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShareIntentProvider } from './src/utils/shareIntent';
 import { initSentry, SentryWrap } from './src/utils/sentry';
 import { initCrashlytics } from './src/services/crashlytics';
 
+// Silence known dev-mode noise that otherwise covers the UI with a warning
+// banner. These are Firebase/RN deprecation warnings — tracked in the
+// crashlytics migration backlog, not actionable for users.
+// Using regex so we catch every variant (one per method).
+LogBox.ignoreLogs([
+  /React Native Firebase namespaced API/i,
+  /Please use `getApp\(\)` instead/i,
+  /Bridgeless doesn't support CatalystInstance/i,
+  /setCrashlyticsCollectionEnabled/,
+  /Method called was/i,
+  /rnfirebase\.io\/migrating-to-v22/,
+  /SafeAreaView has been deprecated/i,
+  /expo-linear-gradient/i,
+]);
+
 import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/constants/theme';
+
+// Keep the splash visible while we initialise telemetry.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Initialise telemetry as early as possible (before any component renders).
 // Sentry catches JS + native crashes via its RN SDK; Crashlytics adds a
@@ -21,11 +41,15 @@ initSentry();
 initCrashlytics();
 
 function App() {
+  const onLayoutReady = useCallback(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayoutReady}>
       <SafeAreaProvider>
         <ShareIntentProvider>
-          <StatusBar style="light" backgroundColor={colors.background} />
+          <StatusBar style="dark" backgroundColor={colors.background} />
           <AppNavigator />
         </ShareIntentProvider>
       </SafeAreaProvider>

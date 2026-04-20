@@ -263,10 +263,10 @@ export const shadows = {
   // Glass shadow — gray-purple tint for glass cards on the light solid bg
   glass: {
     shadowColor: '#3f2b54',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 6,
   },
   // Colored shadows — brand gray-purple
   glow: {

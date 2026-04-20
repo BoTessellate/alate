@@ -10,11 +10,13 @@ import {
   Linking,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
@@ -281,197 +283,268 @@ export default function FitResultScreen() {
   const showMaterial = !!enrichedProduct?.material;
   const showTags = !!(enrichedProduct?.tags?.length);
 
+  // ----------------------------------------------------------------
+  // Derived values
+  // ----------------------------------------------------------------
+  const confidenceLabel = sizeRec
+    ? sizeRec.confidence === 'high'
+      ? 'High'
+      : sizeRec.confidence === 'medium'
+      ? 'Medium'
+      : 'Low'
+    : null;
+
+  const confidenceColor = sizeRec
+    ? sizeRec.confidence === 'high'
+      ? colors.success
+      : sizeRec.confidence === 'medium'
+      ? colors.primary
+      : colors.warning
+    : colors.text;
+
+  const inStock =
+    sizeRec && product.availableSizes && product.availableSizes.length > 0
+      ? product.availableSizes.includes(sizeRec.size)
+      : null;
+
+  /** Stat chip — circular accent surrounding a value with a label below.
+   *  Matches the reference image's round pill spec rows.
+   */
+  const StatChip = ({
+    label,
+    value,
+    subValue,
+    icon,
+    accent,
+    testID,
+  }: {
+    label: string;
+    value?: string | null;
+    subValue?: string | null;
+    icon?: React.ReactNode;
+    accent?: string;
+    testID?: string;
+  }) => (
+    <View style={styles.statChip}>
+      <View
+        style={[
+          styles.statCircle,
+          accent ? { backgroundColor: accent + '20', borderColor: accent + '40' } : null,
+        ]}
+      >
+        {icon ? (
+          icon
+        ) : (
+          <Text
+            testID={testID}
+            style={[styles.statValue, accent ? { color: accent } : null]}
+            numberOfLines={1}
+          >
+            {value}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.statLabel}>{label}</Text>
+      {subValue && <Text style={styles.statSubValue}>{subValue}</Text>}
+    </View>
+  );
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Fixed hero image — stays behind scroll */}
-      <View style={styles.heroFixed}>
+      {/* Full-bleed hero image — fixed behind the scrollable card */}
+      <View style={styles.heroWrap}>
         {product.image ? (
           <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
         ) : (
-          <View style={[styles.heroImage, styles.heroPlaceholder]} />
+          <View style={[styles.heroImage, styles.heroPlaceholder]}>
+            <Feather name="shopping-bag" size={64} color="rgba(255,255,255,0.4)" />
+          </View>
         )}
+        {/* Soft gradient so text reads over any image */}
         <LinearGradient
-          colors={['transparent', colors.background] as readonly [string, string]}
-          style={styles.heroGradient}
+          colors={[
+            'rgba(0,0,0,0.15)',
+            'rgba(0,0,0,0.05)',
+            'rgba(0,0,0,0.3)',
+          ] as readonly [string, string, string]}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
         />
+
+        {/* Title overlay near top of hero */}
+        <View style={[styles.heroTitleWrap, { paddingTop: insets.top + spacing.xl }]}>
+          {safeBrand && <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text>}
+          <Text style={styles.heroTitle} numberOfLines={2}>
+            {safeName || 'Product'}
+          </Text>
+        </View>
       </View>
 
-      {/* Scrollable content — slides up over hero */}
+      {/* Floating rounded card — bottom half */}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + spacing.xxl },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Spacer so first card starts below hero; badge sits here and scrolls away naturally */}
-        <View style={{ height: HERO_HEIGHT - 80 }}>
-          <View style={[styles.scoreBadgeWrapper, { top: insets.top + 8 }]}>
-            <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.bgColor, borderColor: scoreConfig.border }]}>
-              <Text style={[styles.scoreBadgeIcon, { color: scoreConfig.color }]}>{scoreConfig.icon}</Text>
-              <Text style={[styles.scoreBadgeText, { color: scoreConfig.color }]}>{scoreConfig.text}</Text>
+        {/* Spacer so card starts below the hero */}
+        <View style={styles.heroSpacer} />
+
+        <View style={styles.sheet}>
+          {/* Drag handle (decorative) */}
+          <View style={styles.sheetHandle} />
+
+          {/* Row 1 — score label + price */}
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetHeaderLeft}>
+              <Text testID="fit-score-label" style={[styles.scoreHero, { color: scoreConfig.color }]}>
+                {scoreConfig.text}
+              </Text>
+              <Text style={styles.scoreSub}>
+                {warnings.length === 0
+                  ? 'No fit concerns'
+                  : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
+              </Text>
             </View>
-          </View>
-        </View>
-
-        {/* Product info card */}
-        <GlassCard style={[styles.card, styles.productCard]}>
-          {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
-          <Text style={styles.productName}>{safeName || 'Product'}</Text>
-          {product.price && (
-            <Text style={styles.price}>
-              {product.price.currency} {product.price.amount}
-            </Text>
-          )}
-          {isHistoryMode && precomputed?.checkedAt && !reevaluated && (
-            <Text style={styles.checkedAt}>Checked {formatDate(precomputed.checkedAt)}</Text>
-          )}
-          {reevaluated && (
-            <Text style={styles.checkedAt}>Re-evaluated today</Text>
-          )}
-        </GlassCard>
-
-        {/* Score card */}
-        <GlassCard testID="fit-score-display" style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
-          <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
-            <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
-          </View>
-          <View style={styles.scoreTextContainer}>
-            <Text testID="fit-score-label" style={[styles.scoreTitle, { color: scoreConfig.color }]}>
-              {scoreConfig.text}
-            </Text>
-            <Text style={styles.scoreDescription}>
-              {warnings.length === 0
-                ? 'No fit concerns detected'
-                : `${warnings.length} potential concern${warnings.length > 1 ? 's' : ''} found`}
-            </Text>
-          </View>
-        </GlassCard>
-
-        {/* Re-evaluation banners */}
-        {reevaluating && (
-          <GlassCard style={[styles.card, styles.reevalBanner]}>
-            <ActivityIndicator size="small" color={colors.accentDark} />
-            <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
-          </GlassCard>
-        )}
-        {reevaluated && !reevaluating && (
-          <GlassCard style={[styles.card, styles.reevalSuccessBanner]}>
-            <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
-          </GlassCard>
-        )}
-
-        {/* Size Recommendation */}
-        {sizeRec && (
-          <GlassCard testID="size-recommendation" style={[styles.card, styles.sizeCard]}>
-            <View style={styles.sizeCardLeft}>
-              <Text style={styles.sizeCardLabel}>Recommended Size</Text>
-              <Text testID="recommended-size-value" style={styles.sizeCardValue}>{sizeRec.size}</Text>
-              {sizeRec.note && (
-                <Text style={styles.sizeCardNote}>{sizeRec.note}</Text>
-              )}
-            </View>
-            <View style={styles.sizeCardRight}>
-              <View style={[
-                styles.confidenceBadge,
-                {
-                  backgroundColor:
-                    sizeRec.confidence === 'high' ? colors.primary + '18'
-                    : sizeRec.confidence === 'medium' ? colors.primaryLight + '20'
-                    : colors.accentDark + '22',
-                },
-              ]}>
-                <View style={[
-                  styles.confidenceDot,
-                  {
-                    backgroundColor:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
-                  },
-                ]} />
-                <Text style={[
-                  styles.confidenceText,
-                  {
-                    color:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
-                  },
-                ]}>
-                  {sizeRec.confidence === 'high' ? 'High confidence'
-                    : sizeRec.confidence === 'medium' ? 'Medium confidence'
-                    : 'Low confidence'}
+            {product.price && (
+              <View style={styles.priceTag}>
+                <Text style={styles.priceText}>
+                  {product.price.currency} {product.price.amount}
                 </Text>
               </View>
-              {product.availableSizes && product.availableSizes.length > 0 && (
-                <View style={styles.availabilityRow}>
-                  {product.availableSizes.includes(sizeRec.size) ? (
-                    <Text style={styles.availableText}>✓ In stock on site</Text>
-                  ) : (
-                    <Text style={styles.unavailableText}>⚠ Size may be unavailable</Text>
-                  )}
-                </View>
-              )}
-            </View>
-          </GlassCard>
-        )}
-
-        {/* Concerns */}
-        {warnings.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Fit Concerns</Text>
-            {warnings.map((warning, index) => {
-              const config = getSeverityConfig(warning.severity);
-              return (
-                <GlassCard key={index} style={[styles.card, styles.warningCard]}>
-                  <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
-                    <Text style={[styles.severityText, { color: config.color }]}>
-                      {config.label}
-                    </Text>
-                  </View>
-                  <Text style={styles.warningText}>{warning.message}</Text>
-                </GlassCard>
-              );
-            })}
+            )}
           </View>
-        )}
 
-        {/* Product Details — only render if at least one row is visible */}
-        {(showCategory || showMaterial || showTags) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Product Details</Text>
-            <GlassCard style={[styles.card, styles.detailsCard]}>
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Row 2 — circular stat chips */}
+          <View
+            testID="fit-score-display"
+            style={styles.statsRow}
+          >
+            {sizeRec && (
+              <StatChip
+                label="Size"
+                value={sizeRec.size}
+                accent={colors.primary}
+                testID="recommended-size-value"
+              />
+            )}
+            {confidenceLabel && (
+              <StatChip
+                label="Confidence"
+                value={confidenceLabel}
+                accent={confidenceColor}
+              />
+            )}
+            <StatChip
+              label="Fit"
+              icon={
+                <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
+                  {scoreConfig.icon}
+                </Text>
+              }
+              accent={scoreConfig.color}
+            />
+            {inStock !== null && (
+              <StatChip
+                label={inStock ? 'In stock' : 'Check stock'}
+                icon={
+                  <Feather
+                    name={inStock ? 'check' : 'alert-circle'}
+                    size={20}
+                    color={inStock ? colors.success : colors.warning}
+                  />
+                }
+                accent={inStock ? colors.success : colors.warning}
+              />
+            )}
+          </View>
+
+          {/* Re-eval banners inline */}
+          {reevaluating && (
+            <View style={styles.banner}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.bannerText}>Re-evaluating with updated profile…</Text>
+            </View>
+          )}
+          {reevaluated && !reevaluating && (
+            <View style={[styles.banner, styles.bannerSuccess]}>
+              <Feather name="check-circle" size={16} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>
+                Re-evaluated with your updated profile
+              </Text>
+            </View>
+          )}
+
+          {/* Note from size rec */}
+          {sizeRec?.note && (
+            <View style={styles.noteBlock}>
+              <Text style={styles.noteLabel}>SIZING NOTE</Text>
+              <Text style={styles.noteText}>{sizeRec.note}</Text>
+            </View>
+          )}
+
+          {/* Tags */}
+          {showTags && (
+            <View style={styles.tagsSection}>
+              <Text style={styles.sectionLabel}>TAGS</Text>
+              <View style={styles.tagsContainer}>
+                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Product meta */}
+          {(showCategory || showMaterial) && (
+            <View style={styles.metaSection}>
               {showCategory && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Category</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct!.category}</Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Category</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
                 </View>
               )}
               {showMaterial && (
-                <View style={[styles.detailRow, styles.detailRowLast]}>
-                  <Text style={styles.detailLabel}>Material</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct!.material}</Text>
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Material</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
                 </View>
               )}
-              {showTags && (
-                <View style={[styles.tagsRow]}>
-                  <Text style={styles.detailLabel}>Tags</Text>
-                  <View style={styles.tagsContainer}>
-                    {enrichedProduct!.tags!.slice(0, 5).map((tag: string, i: number) => (
-                      <View key={i} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </GlassCard>
-          </View>
-        )}
+            </View>
+          )}
 
-        {/* Action Buttons */}
-        <View style={styles.actionsSection}>
+          {/* Concerns */}
+          {warnings.length > 0 && (
+            <View style={styles.concernsSection}>
+              <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
+              {warnings.map((warning, index) => {
+                const config = getSeverityConfig(warning.severity);
+                return (
+                  <View key={index} style={styles.concernRow}>
+                    <View style={[styles.concernDot, { backgroundColor: config.color }]} />
+                    <View style={styles.concernBody}>
+                      <Text style={[styles.concernSeverity, { color: config.color }]}>
+                        {config.label.toUpperCase()}
+                      </Text>
+                      <Text style={styles.concernText}>{warning.message}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Action Buttons — inside the sheet, at the bottom */}
+          <View style={styles.actionsSection}>
           {isHistoryMode ? (
             <>
               <TouchableOpacity
@@ -525,331 +598,365 @@ export default function FitResultScreen() {
               </TouchableOpacity>
             </>
           )}
+          </View>
         </View>
       </ScrollView>
     </View>
   );
 }
 
+const SERIF = Platform.OS === 'ios' ? 'Times New Roman' : 'serif';
+const HERO_H = Math.round(Dimensions.get('window').height * 0.45);
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primaryDark,
   },
   loadingContainer: {
     flex: 1,
     backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  // --- Hero ---
-  heroFixed: {
+
+  // --- Hero (full-bleed image) ---
+  heroWrap: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: HERO_HEIGHT,
-    overflow: 'hidden',
+    height: HERO_H + 40, // extra so card's rounded top overlaps
   },
   heroImage: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-    backgroundColor: colors.backgroundSecondary,
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.primaryDark,
   },
   heroPlaceholder: {
-    backgroundColor: colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  heroGradient: {
+  heroTitleWrap: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: 140,
+    paddingHorizontal: spacing.lg,
   },
-  scoreBadgeWrapper: {
-    position: 'absolute',
-    left: spacing.lg,
+  heroBrand: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 3,
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: borderRadius.pill,
-    borderWidth: 1.5,
-  },
-  scoreBadgeIcon: {
-    fontSize: 14,
+  heroTitle: {
+    fontFamily: SERIF,
+    fontSize: 28,
     fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.5,
+    lineHeight: 32,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
-  scoreBadgeText: {
-    ...typography.label,
-    fontWeight: '700',
-  },
-  // --- Scroll ---
+
+  // --- Scroll + sheet ---
   scroll: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
+  scrollContent: {
+    flexGrow: 1,
   },
-  // --- Glass card base (GlassCard provides the frost; this only sets layout) ---
-  card: {
-    borderRadius: borderRadius.xl,
+  heroSpacer: {
+    height: HERO_H,
+  },
+  sheet: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28, // card rises over bottom of hero
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    minHeight: 400,
+    shadowColor: 'rgba(63, 43, 84, 0.2)',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(63, 43, 84, 0.25)',
     marginBottom: spacing.md,
   },
-  // --- Product card ---
-  productCard: {
-    padding: spacing.lg,
-  },
-  brandText: {
-    ...typography.labelSmall,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  productName: {
-    ...typography.headingL,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  price: {
-    ...typography.headingM,
-    color: colors.secondary,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  checkedAt: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  // --- Score card ---
-  scoreCard: {
-    padding: spacing.lg,
+
+  // --- Sheet header: score hero + price ---
+  sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-  },
-  scoreIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  scoreIcon: {
-    fontSize: 24,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  scoreTextContainer: {
-    flex: 1,
-  },
-  scoreTitle: {
-    ...typography.headingM,
-    marginBottom: 2,
-  },
-  scoreDescription: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  // --- Reeval banners ---
-  reevalBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  reevalBannerText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  reevalSuccessBanner: {
-    padding: spacing.md,
-    backgroundColor: colors.success + '20',
-  },
-  reevalSuccessText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  // --- Size card ---
-  sizeCard: {
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    marginBottom: spacing.md,
   },
-  sizeCardLeft: {
+  sheetHeaderLeft: {
     flex: 1,
   },
-  sizeCardLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  sizeCardValue: {
-    fontSize: 42,
+  scoreHero: {
+    fontFamily: SERIF,
+    fontSize: 26,
     fontWeight: '700',
-    color: colors.primary,
-    lineHeight: 48,
-    marginBottom: 2,
+    letterSpacing: -0.5,
   },
-  sizeCardNote: {
-    ...typography.bodySmall,
+  scoreSub: {
+    fontSize: 13,
     color: colors.textSecondary,
-    marginTop: spacing.xs,
-    maxWidth: 160,
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
-  sizeCardRight: {
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-  },
-  confidenceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+  priceTag: {
+    backgroundColor: colors.primary + '15',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
     borderRadius: borderRadius.pill,
   },
-  confidenceDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  priceText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.3,
   },
-  confidenceText: {
-    ...typography.labelSmall,
-    fontWeight: '600',
+
+  // --- Divider ---
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(63, 43, 84, 0.1)',
+    marginBottom: spacing.lg,
   },
-  availabilityRow: {
-    marginTop: spacing.xs,
-  },
-  availableText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '500',
-  },
-  unavailableText: {
-    ...typography.bodySmall,
-    color: colors.warning,
-    fontWeight: '500',
-  },
-  // --- Sections ---
-  section: {
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.headingS,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  warningCard: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  severityBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
-  },
-  severityText: {
-    ...typography.labelSmall,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  warningText: {
-    ...typography.body,
-    color: colors.text,
-  },
-  detailsCard: {
-    padding: spacing.md,
-    overflow: 'hidden',
-  },
-  detailRow: {
+
+  // --- Circular stat chips row ---
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    marginBottom: spacing.lg,
+  },
+  statChip: {
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.1)',
+    flex: 1,
   },
-  detailRowLast: {
-    borderBottomWidth: 0,
+  statCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(90, 67, 119, 0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  detailLabel: {
-    ...typography.label,
+  statValue: {
+    fontFamily: SERIF,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: -0.3,
+  },
+  statIconText: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
     color: colors.textSecondary,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
-  detailValue: {
-    ...typography.body,
+  statSubValue: {
+    fontSize: 10,
+    color: colors.textMuted,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // --- Banners ---
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    borderRadius: borderRadius.md,
+  },
+  bannerSuccess: {
+    backgroundColor: colors.success + '12',
+  },
+  bannerText: {
+    ...typography.bodySmall,
     color: colors.text,
-    fontWeight: '500',
-    textTransform: 'capitalize',
+    flex: 1,
   },
-  tagsRow: {
-    paddingVertical: spacing.sm,
+
+  // --- Sizing note ---
+  noteBlock: {
+    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  noteLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  noteText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+  },
+
+  // --- Section labels ---
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+
+  // --- Tags ---
+  tagsSection: {
+    marginBottom: spacing.md,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.sm,
-    gap: spacing.xs,
+    gap: 6,
   },
   tag: {
-    backgroundColor: colors.primaryLight + '30',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: borderRadius.pill,
   },
   tagText: {
-    ...typography.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
     color: colors.primary,
+  },
+
+  // --- Meta (category / material) ---
+  metaSection: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(63, 43, 84, 0.08)',
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  metaLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
-  // --- Buttons ---
+  metaValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    textTransform: 'capitalize',
+  },
+
+  // --- Concerns ---
+  concernsSection: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(63, 43, 84, 0.08)',
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  concernRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  concernDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  concernBody: {
+    flex: 1,
+  },
+  concernSeverity: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  concernText: {
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 19,
+  },
+
+  // --- Action buttons ---
   actionsSection: {
-    gap: spacing.md,
+    gap: spacing.sm,
     marginTop: spacing.sm,
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: colors.cta,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    ...shadows.sm,
+    ...shadows.glow,
   },
   primaryButtonText: {
-    ...typography.label,
     fontSize: 16,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   secondaryButton: {
-    ...GLASS,
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    ...typography.label,
     fontSize: 15,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   ghostButton: {
     padding: spacing.md,
     alignItems: 'center',
   },
   ghostButtonText: {
-    ...typography.label,
+    fontSize: 14,
     color: colors.textSecondary,
     fontWeight: '500',
   },
