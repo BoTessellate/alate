@@ -11,7 +11,7 @@
  * onActiveIndexChange → lets a sibling detail bar follow the snap.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -120,15 +120,23 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
 /** One card in the cover-flow carousel. Its transform is driven by the
  *  global scroll offset — when the card is at the current snap position it
  *  sits upright; otherwise it tilts away in 3D.
+ *
+ *  The STATIC zIndex on the outer slot (driven by React state, not the UI
+ *  thread) is what actually wins on Android. Animated zIndex on the inner
+ *  transformed view gets clobbered by sibling paint order — which is why
+ *  the right neighbour (rendered later in the array) used to climb in
+ *  front of the centre card.
  */
 function CoverFlowCard({
   entry,
   index,
+  activeIndex,
   scrollX,
   onTap,
 }: {
   entry: FitHistoryEntry;
   index: number;
+  activeIndex: number;
   scrollX: SharedValue<number>;
   onTap: () => void;
 }) {
@@ -172,21 +180,24 @@ function CoverFlowCard({
         { scale },
       ],
       opacity,
-      // Android composites transformed siblings by draw order, so the
-      // centre card must ALSO have a higher elevation to stay on top of
-      // the neighbours' tucked-in edges. Big gap between states so
-      // neighbours can't climb in front during the tilt transition.
-      zIndex: Math.abs(d) < 0.5 ? 100 : 10,
-      elevation: Math.abs(d) < 0.5 ? 12 : 2,
     };
   });
+
+  // Static zIndex on the OUTER slot: centre card is 1000, neighbours drop
+  // off steeply. React applies this as a view prop, which Android honours
+  // in sibling draw order — unlike animated zIndex, which loses to DOM
+  // render order when transforms are involved. We intentionally DON'T set
+  // `elevation` here: Fabric rejects inline `elevation` on a non-leaf view
+  // that already has transformed/shadowed descendants.
+  const slotDistance = Math.abs(index - activeIndex);
+  const slotZ = { zIndex: 1000 - slotDistance * 100 };
 
   // Perspective lives on the static parent wrapper, NOT in the animated
   // transform array. On Android RN, inlining `{ perspective }` alongside
   // `rotateY` silently degenerates to a 2D shear — the Z-axis only stays
   // alive when perspective is mounted a layer up.
   return (
-    <View style={styles.cardSlot}>
+    <View style={[styles.cardSlot, slotZ]}>
       <View style={styles.cardPerspective}>
         <Animated.View style={[styles.cardAnim, animatedStyle]}>
           <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
@@ -204,6 +215,9 @@ export default function HistoryCoverFlow({
   onActiveIndexChange,
 }: HistoryCoverFlowProps) {
   const scrollX = useSharedValue(0);
+  // Local JS copy of the snapped index — drives the static zIndex on each
+  // card slot so the centre card wins the paint-order fight on Android.
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
@@ -212,19 +226,25 @@ export default function HistoryCoverFlow({
   });
 
   // Derive the snapped index on the UI thread and surface it to JS only when
-  // it changes. Avoids re-rendering the bar on every scroll pixel.
-  const activeIndex = useDerivedValue(() => {
+  // it changes. Avoids re-rendering on every scroll pixel.
+  const activeIndexShared = useDerivedValue(() => {
     const raw = Math.round(scrollX.value / ITEM_GAP);
     return Math.max(0, Math.min(entries.length - 1, raw));
   });
 
-  // Mirror the UI-thread snapped index to JS only when it changes, so the
-  // detail bar re-renders on snap transitions instead of every scroll pixel.
+  // Mirror the UI-thread snapped index to JS. Two jobs:
+  //   1. update local state → re-renders the slots' zIndex so the centre
+  //      card climbs above both neighbours on Android.
+  //   2. fire the onActiveIndexChange callback so a sibling detail bar can
+  //      follow along.
   useAnimatedReaction(
-    () => activeIndex.value,
+    () => activeIndexShared.value,
     (curr, prev) => {
-      if (curr !== prev && onActiveIndexChange) {
-        runOnJS(onActiveIndexChange)(curr);
+      if (curr !== prev) {
+        runOnJS(setActiveIndex)(curr);
+        if (onActiveIndexChange) {
+          runOnJS(onActiveIndexChange)(curr);
+        }
       }
     },
     [onActiveIndexChange]
@@ -254,6 +274,7 @@ export default function HistoryCoverFlow({
             key={entry.id}
             entry={entry}
             index={i}
+            activeIndex={activeIndex}
             scrollX={scrollX}
             onTap={() => onCardTap(entry)}
           />

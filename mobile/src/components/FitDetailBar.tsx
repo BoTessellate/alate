@@ -38,7 +38,7 @@ export default function FitDetailBar({ entry }: Props) {
 
   return (
     <View style={styles.wrap} testID="fit-detail-bar">
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={30} tint="default" style={StyleSheet.absoluteFill} />
       <View style={styles.tint} pointerEvents="none" />
 
       <View style={styles.left}>
@@ -78,9 +78,10 @@ const styles = StyleSheet.create({
   },
   tint: {
     ...StyleSheet.absoluteFillObject,
-    // On Android BlurView is a soft stub — the translucent dark tint on top
-    // guarantees the dark-glass read regardless of the platform's blur.
-    backgroundColor: 'rgba(28, 18, 42, 0.62)',
+    // Medium-shade glass: brand purple at mid opacity. Sits between the
+    // light #e4e2e9 canvas and a fully-dark reference bar — reads as a
+    // soft tonal pill, not a heavy dark overlay.
+    backgroundColor: 'rgba(90, 67, 119, 0.52)',
     borderRadius: borderRadius.pill,
   },
   left: {
@@ -90,7 +91,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    // Slightly stronger inner chip — the medium bg needs a nudge to keep
+    // the fit-pill readable as a distinct token, not a flat label.
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   dot: {
     width: 7,
@@ -117,7 +120,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   sizeLabel: {
     fontSize: 10,
