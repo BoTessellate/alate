@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 import { ShareIntentProvider } from './src/utils/shareIntent';
 import { initSentry, SentryWrap } from './src/utils/sentry';
 import { initCrashlytics } from './src/services/crashlytics';
@@ -41,9 +42,19 @@ initSentry();
 initCrashlytics();
 
 function App() {
+  // Display serif used by all heading tokens (see theme.ts). Splash stays up
+  // (preventAutoHideAsync above) until both the font is loaded AND onLayout
+  // fires, so the first visible frame renders in the real face, not a
+  // fallback that would then snap over.
+  const [fontsLoaded] = useFonts({
+    'DMSerifDisplay-Italic': require('./assets/fonts/DMSerifDisplay-Italic.ttf'),
+  });
+
   const onLayoutReady = useCallback(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayoutReady}>

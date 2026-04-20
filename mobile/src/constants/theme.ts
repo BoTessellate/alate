@@ -11,10 +11,20 @@ export const fontFamily = {
   primary: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   // Accent/Display font - elegant serif for headings
   accent: 'Georgia, "Times New Roman", serif',
+  // Display font loaded via expo-font (see App.tsx). Stand-in for TAN Nightingale
+  // until we buy the real thing. Rendered lowercase on all heading tokens.
+  display: 'DMSerifDisplay-Italic',
   // Monospace for code/data
   mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
   // Fallback
   fallback: 'system-ui, sans-serif',
+};
+
+// Shared heading trait: every display/heading token mixes this in so the
+// serif italic + lowercase transform stays consistent across the app.
+const headingSerif = {
+  fontFamily: 'DMSerifDisplay-Italic',
+  textTransform: 'lowercase' as const,
 };
 
 // =============================================================================
@@ -127,34 +137,39 @@ export const borderRadius = {
 export const typography = {
   // Display - Large hero text
   displayLarge: {
+    ...headingSerif,
     fontSize: 48,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 56,
     letterSpacing: -1,
   },
   displayMedium: {
+    ...headingSerif,
     fontSize: 36,
-    fontWeight: '600' as const,
+    fontWeight: '400' as const,
     lineHeight: 44,
     letterSpacing: -0.5,
   },
 
   // Headings
   headingXL: {
+    ...headingSerif,
     fontSize: 28,
-    fontWeight: '600' as const,
+    fontWeight: '400' as const,
     lineHeight: 36,
     letterSpacing: -0.5,
   },
   headingL: {
+    ...headingSerif,
     fontSize: 24,
-    fontWeight: '600' as const,
+    fontWeight: '400' as const,
     lineHeight: 32,
     letterSpacing: -0.25,
   },
   headingM: {
+    ...headingSerif,
     fontSize: 20,
-    fontWeight: '600' as const,
+    fontWeight: '400' as const,
     lineHeight: 28,
   },
   headingS: {
