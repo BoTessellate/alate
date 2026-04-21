@@ -259,6 +259,11 @@ export default function HistoryCoverFlow({
     onScroll: (e) => {
       scrollX.value = e.contentOffset.x;
     },
+    onMomentumEnd: (e) => {
+      const raw = Math.round(e.contentOffset.x / ITEM_GAP);
+      const snapped = Math.max(0, Math.min(entries.length - 1, raw));
+      runOnJS(setActiveIndex)(snapped);
+    },
   });
 
   // Derive the snapped index on the UI thread and surface it to JS only when
@@ -280,18 +285,6 @@ export default function HistoryCoverFlow({
     [onActiveIndexChange]
   );
 
-  // Local JS activeIndex drives the slot zIndex, which forces React to
-  // re-render all CoverFlowCard siblings whenever it changes. Doing that
-  // on every snap-crossing during a rapid scroll stutters the animation.
-  // Defer it to momentum-end: the z-order only needs to be right when the
-  // card lands. During the glide the animated transform already hides
-  // any transient paint-order flicker.
-  const onMomentumEnd = (e: { nativeEvent: { contentOffset: { x: number } } }) => {
-    const raw = Math.round(e.nativeEvent.contentOffset.x / ITEM_GAP);
-    const snapped = Math.max(0, Math.min(entries.length - 1, raw));
-    setActiveIndex(snapped);
-  };
-
   const snapOffsets = useMemo(
     () => entries.map((_, i) => i * ITEM_GAP),
     [entries.length]
@@ -303,7 +296,6 @@ export default function HistoryCoverFlow({
         horizontal
         showsHorizontalScrollIndicator={false}
         onScroll={scrollHandler}
-        onMomentumScrollEnd={onMomentumEnd}
         scrollEventThrottle={16}
         snapToOffsets={snapOffsets}
         // "fast" ≈ 0.99 — snappy response to rapid swipes. The real smooth-
