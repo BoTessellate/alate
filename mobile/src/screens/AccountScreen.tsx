@@ -334,8 +334,13 @@ export default function AccountScreen() {
           reads as a true floating element, not a glass pane over
           scrollable list rows. */}
       <LinearGradient
-        colors={['rgba(76, 67, 86, 0)', 'rgba(76, 67, 86, 0.85)', '#4c4356']}
-        locations={[0, 0.55, 1]}
+        colors={[
+          'rgba(76, 67, 86, 0)',
+          'rgba(76, 67, 86, 0.35)',
+          'rgba(76, 67, 86, 0.9)',
+          '#4c4356',
+        ]}
+        locations={[0, 0.35, 0.75, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
       />
@@ -593,13 +598,15 @@ const styles = StyleSheet.create({
   },
 
   // Bottom-edge fade — content fades into the gradient's deepest stop
-  // so the floating tab bar reads as a true floating element.
+  // so the floating tab bar reads as a true floating element. 200px
+  // gives a softer ramp than 170 and pairs with the 200px content
+  // paddingBottom so the Reset button lives safely ABOVE the fade.
   bottomFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 170,
+    height: 200,
     zIndex: 1,
   },
 });

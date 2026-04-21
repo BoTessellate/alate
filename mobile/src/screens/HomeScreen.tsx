@@ -340,8 +340,16 @@ export default function HomeScreen() {
           pointerEvents="none" so the fade doesn't eat taps on cards
           above it. */}
       <LinearGradient
-        colors={['rgba(76, 67, 86, 0)', 'rgba(76, 67, 86, 0.85)', '#4c4356']}
-        locations={[0, 0.55, 1]}
+        // Softer ramp — fade starts earlier (0 → 0.35 transparent-ish
+        // before it really darkens) so the horizon reads as gradual
+        // rather than a sudden band.
+        colors={[
+          'rgba(76, 67, 86, 0)',
+          'rgba(76, 67, 86, 0.35)',
+          'rgba(76, 67, 86, 0.9)',
+          '#4c4356',
+        ]}
+        locations={[0, 0.35, 0.75, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
       />
@@ -400,7 +408,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     // Extra clearance so the RECENT list + any other bottom content
     // isn't hidden behind the floating glass tab bar.
-    paddingBottom: 120,
+    // Covers: insets.bottom (~40) + tab-bar offset (24) + tab-bar
+    // height (64) + fade soft ramp (~50) + breathing room.
+    paddingBottom: 200,
   },
   // --- Hero — Claude Design mockup layout, inverted for dark gradient
   //     backdrop. Text reads as light on the hero; glass cards below
@@ -582,12 +592,14 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 10,
     borderRadius: borderRadius.xl,
-    // Override GlassCard's default near-opaque white (0.92) — recent
-    // rows are short so the gradient-bleed bug isn't an issue, and a
-    // proper translucent frost reads as glass on the dark backdrop.
-    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+    // White frost opaque enough for dark text to pass WCAG AA against
+    // the dark-gradient backdrop. At 0.38 the card was mid-tone, so
+    // neither white nor dark text read well. 0.78 reads as frosted
+    // glass (gradient still perceptible at the edges) but carries the
+    // dark ink cleanly.
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+    borderColor: 'rgba(255, 255, 255, 0.85)',
   },
   recentThumb: {
     width: 44,
@@ -608,19 +620,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
-    // On translucent glass over dark gradient, muted text vanishes —
-    // bump to white with reduced opacity instead.
-    color: 'rgba(255, 255, 255, 0.85)',
+    // Dark text on the frosted card — WCAG AA passes on the 0.78
+    // white-tint bg. Light text was failing contrast on the mid-
+    // tone cards.
+    color: colors.textMuted,
   },
   recentName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.text,
     lineHeight: 18,
   },
   recentSize: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: colors.textMuted,
     lineHeight: 13,
     marginTop: 1,
   },
@@ -642,15 +655,14 @@ const styles = StyleSheet.create({
   },
 
   // Bottom-edge fade — sits over the ScrollView, under the floating
-  // tab bar. Height covers the tab-bar footprint + a soft ramp above
-  // it so content recedes into the dark backdrop instead of showing
-  // through the glass pill.
+  // tab bar. Tall enough that the ramp from transparent → dark reads
+  // as a soft horizon (200px) instead of a hard band.
   bottomFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 170,
+    height: 200,
     zIndex: 1,
   },
 });
