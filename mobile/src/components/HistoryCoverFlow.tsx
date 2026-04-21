@@ -39,13 +39,15 @@ import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-// Elongated rectangular proportions — portrait-heavy so product images
-// (dresses, tops, full-length looks) read as full-body shots without
-// aggressive cropping. Aspect ratio ~ 1 : 1.65.
-const CARD_W = Math.min(SCREEN_W * 0.62, 260);
-const CARD_H = Math.min(CARD_W * 1.65, 430);
-// Each "snap" step = CARD_W * 0.72 so adjacent cards overlap slightly (like Cover Flow).
-const ITEM_GAP = CARD_W * 0.72;
+// Portrait-heavy product cards. Per Claude Design mockup: cards are
+// roughly 47% of the viewport wide with a 1:1.65 aspect. Smaller than
+// the previous 0.62 setting so both neighbours (d=±1 and d=±2) on each
+// side have room to sit on-screen without cropping.
+const CARD_W = Math.min(SCREEN_W * 0.55, 220);
+const CARD_H = Math.min(CARD_W * 1.65, 380);
+// Snap step ~ 0.65·CARD_W so adjacent cards overlap enough to read
+// as a tight deck (looser gap made the d=±1 card feel detached).
+const ITEM_GAP = CARD_W * 0.65;
 // Side padding centres the ITEM_GAP slot (not the whole card) in the viewport
 // so the active card — which gets translateX=0 and sits in the slot centre —
 // lands at true screen centre. This also makes the last card reach its snap
@@ -162,43 +164,40 @@ function CoverFlowCard({
     // shuffle reference). A left-of-centre card (d>0) needs to face RIGHT
     // (positive rotateY rotates the card's front toward +X). A right-of-
     // centre card (d<0) needs to face LEFT (negative rotateY).
-    // Seven-point interpolation so the d=±2 card peeks out from behind
-    // d=±1, and d=±3 peeks out from behind d=±2 — stacked receding cards,
-    // Cover-Flow / Vision Pro style. Inward tilt intensifies with distance
-    // (72°–78°) without going fully edge-on (which would invisibly thin
-    // the card at the side). At the extremes, Extrapolation.CLAMP freezes
-    // further cards at the d=±3 pose so nothing flies off.
+    // Five-point interpolation per Claude Design mockup — exactly two
+    // visible neighbours per side (d=±1 at ~0.88 opacity, d=±2 at
+    // ~0.45). Tilts 0 / ±60° / ±72° read as 3D without going fully
+    // edge-on. Cards at |d|>2 fade fully (opacity clamps to 0) and are
+    // compressed against d=±2 so they don't stack weirdly behind.
     const rotateY = interpolate(
       d,
-      [-3, -2, -1, 0, 1, 2, 3],
-      [-78, -72, -60, 0, 60, 72, 78],
+      [-2, -1, 0, 1, 2],
+      [-72, -60, 0, 60, 72],
       Extrapolation.CLAMP
     );
     const scale = interpolate(
       d,
-      [-3, -2, -1, 0, 1, 2, 3],
-      [0.5, 0.62, 0.78, 1, 0.78, 0.62, 0.5],
+      [-2, -1, 0, 1, 2],
+      [0.66, 0.82, 1, 0.82, 0.66],
       Extrapolation.CLAMP
     );
-    // Aggressive inward tuck for |d|≥2 so outer cards sit BEHIND-and-just-
-    // peeking-past the nearer ones instead of flying off-screen. Left-of-
-    // centre (d>0) pulls right; right-of-centre (d<0) pulls left. Values
-    // expressed as a fraction of CARD_W (tuned against ITEM_GAP so outer
-    // cards overlap with the inner neighbours, not spread).
+    // Inward tuck — tuned so that at CARD_W ≈ 0.55·SCREEN_W, both
+    // neighbours on each side sit comfortably on-screen with a visible
+    // 3D depth band. Less aggressive than the previous 7-point values
+    // (which pushed d=±2 partially off-screen).
     const translateX = interpolate(
       d,
-      [-3, -2, -1, 0, 1, 2, 3],
-      [-CARD_W * 1.2, -CARD_W * 0.7, -CARD_W * 0.12, 0,
-        CARD_W * 0.12, CARD_W * 0.7, CARD_W * 1.2],
+      [-2, -1, 0, 1, 2],
+      [-CARD_W * 0.56, -CARD_W * 0.1, 0, CARD_W * 0.1, CARD_W * 0.56],
       Extrapolation.CLAMP
     );
-    // Progressive atmospheric fade — distant cards wash into the bg so
-    // the centre card gets the visual attention. Paired with the opacity
-    // gradient veil (styles.veil below) to simulate depth-of-field.
+    // Opacity curve matches the design mockup: centre + both neighbours
+    // stay legible, anything beyond d=±2 washes out entirely so it
+    // doesn't stack up behind the visible deck.
     const opacity = interpolate(
       Math.abs(d),
-      [0, 1, 2, 3],
-      [1, 0.88, 0.45, 0.18],
+      [0, 1, 2, 2.8],
+      [1, 0.88, 0.45, 0],
       Extrapolation.CLAMP
     );
     return {
@@ -220,8 +219,8 @@ function CoverFlowCard({
     return {
       opacity: interpolate(
         Math.abs(d),
-        [0, 1, 2, 3],
-        [0, 0.05, 0.28, 0.48],
+        [0, 1, 2, 2.8],
+        [0, 0.04, 0.22, 0],
         Extrapolation.CLAMP
       ),
     };

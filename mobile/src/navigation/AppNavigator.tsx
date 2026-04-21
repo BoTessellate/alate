@@ -9,6 +9,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography } from '../constants/theme';
@@ -65,30 +66,39 @@ export type MainTabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Tab icon names mapping
+// Tab icon + label mapping — Claude Design uses a floating glass pill
+// with three tabs: Check / History / Profile (not "Home"/"Account").
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 const TAB_ICONS: Record<string, FeatherIconName> = {
-  Home: 'search',
-  History: 'server',
+  Home: 'home',
+  History: 'clock',
   Account: 'user',
 };
 
-// Tab Bar Icon Component
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const iconName = TAB_ICONS[name] || 'circle';
-
   return (
-    <View style={[styles.tabIconPill, focused && styles.tabIconPillFocused]}>
-      <Feather
-        name={iconName}
-        size={22}
-        color={focused ? colors.primary : colors.textMuted}
-      />
+    <Feather
+      name={iconName}
+      size={22}
+      color={focused ? colors.primary : colors.text}
+      style={{ opacity: focused ? 1 : 0.45 }}
+    />
+  );
+}
+
+// Floating glass tab bar background — blur + white tint + hairline edge,
+// matching the design's `.a-glass` card styling.
+function TabBarBackground() {
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+      <View style={styles.tabBarTint} />
     </View>
   );
 }
 
-// Main Tab Navigator
+// Main Tab Navigator — floating glass pill at the bottom (not docked).
 function MainTabs() {
   const insets = useSafeAreaInsets();
 
@@ -96,23 +106,46 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        tabBarBackground: TabBarBackground,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingBottom: insets.bottom,
-          paddingTop: 4,
-          height: 48 + insets.bottom,
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: insets.bottom > 0 ? insets.bottom : 16,
+          height: 62,
+          borderRadius: 28,
+          borderTopWidth: 0,
+          // Hairline border all around — the glass edge-highlight.
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.5)',
+          // Deep purple-tinted shadow grounds the floating pill.
+          shadowColor: '#2f2937',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.16,
+          shadowRadius: 20,
+          elevation: 12,
+          // No background — TabBarBackground handles the fill + blur.
+          backgroundColor: 'transparent',
+          paddingTop: 8,
+          paddingBottom: 6,
         },
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          letterSpacing: 0.3,
+          marginTop: 2,
+        },
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarInactiveTintColor: colors.text,
+        tabBarItemStyle: { opacity: 1 },
       }}
     >
       <Tab.Screen
         name="Home"
         component={SafeHome}
         options={{
+          tabBarLabel: 'Check',
           tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
           tabBarButtonTestID: 'tab-home',
         }}
@@ -121,6 +154,7 @@ function MainTabs() {
         name="History"
         component={SafeHistory}
         options={{
+          tabBarLabel: 'History',
           tabBarIcon: ({ focused }) => <TabIcon name="History" focused={focused} />,
           tabBarButtonTestID: 'tab-history',
         }}
@@ -129,6 +163,7 @@ function MainTabs() {
         name="Account"
         component={SafeAccount}
         options={{
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ focused }) => <TabIcon name="Account" focused={focused} />,
           tabBarButtonTestID: 'tab-account',
         }}
@@ -264,15 +299,12 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabIconPill: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 44,
-    height: 28,
-    borderRadius: 14,
-  },
-  tabIconPillFocused: {
-    backgroundColor: 'rgba(106, 95, 117, 0.14)',
+  // Glass tint layer inside the floating tab bar pill — sits over the
+  // BlurView to keep labels legible on any background.
+  tabBarTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.45)',
+    borderRadius: 28,
   },
   loadingOverlay: {
     flex: 1,
