@@ -24,7 +24,10 @@ import {
 } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
-import BodyFigurine from '../components/BodyFigurine';
+// Swapped from BodyFigurine → BodyCroquis. Same prop API (see
+// project_body_croquis_plan.md memory). BodyFigurine is kept in the
+// repo as the fallback; revert this one import to roll back.
+import BodyCroquis from '../components/BodyCroquis';
 import { BodyFocusArea } from '../components/bodyFigurineModel';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
@@ -262,7 +265,7 @@ export default function AvatarSetupScreen() {
       <View style={styles.row}>
         {/* Left pane — BodyFigurine, sticky */}
         <View style={styles.figurePane}>
-          <BodyFigurine
+          <BodyCroquis
             heightCm={height}
             shoulders={shoulders}
             bust={bust}
