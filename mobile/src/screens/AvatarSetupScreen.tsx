@@ -29,6 +29,7 @@ import { scrapeProduct } from '../services/api';
 // BodyFigurine.tsx remain in the repo as dead code for a future v3
 // rebuild — see `project_body_croquis_plan.md` memory.
 import { BodyFocusArea } from '../components/bodyFigurineModel';
+import HeadingImage from '../components/HeadingImage';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
 
@@ -276,7 +277,14 @@ export default function AvatarSetupScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text testID="avatar-setup-title" style={styles.title}>body profile</Text>
+            <HeadingImage
+              testID="avatar-setup-title"
+              slot="body-profile"
+              fallback="body profile"
+              height={36}
+              color={colors.text}
+              textStyle={styles.title}
+            />
             <Text style={styles.subtitle}>
               Select each measurement to build your fit model
             </Text>

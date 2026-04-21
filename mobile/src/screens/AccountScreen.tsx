@@ -26,6 +26,7 @@ import { captureError } from '../utils/sentry';
 import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import HeadingImage from '../components/HeadingImage';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -227,9 +228,16 @@ export default function AccountScreen() {
         style={StyleSheet.absoluteFill}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header — italic serif lowercase "profile" per Claude Design */}
+        {/* Header — TAN Nightingale "profile" SVG with styled text
+            fallback if the asset is missing. */}
         <View style={styles.header}>
-          <Text style={styles.title}>profile</Text>
+          <HeadingImage
+            slot="profile"
+            fallback="profile"
+            height={44}
+            color="#fff"
+            textStyle={styles.title}
+          />
         </View>
 
         {/* Google account card — isolated so a hook crash here can't blank the page */}

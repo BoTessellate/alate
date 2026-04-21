@@ -43,6 +43,7 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
+import HeadingImage from '../components/HeadingImage';
 import { captureError } from '../utils/sentry';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
@@ -580,13 +581,25 @@ export default function FitResultScreen() {
               showsVerticalScrollIndicator={false}
             >
 
-          {/* H1: Fit verdict — biggest element in the card. Sets the answer
-              the user came here for before anything else. */}
+          {/* H1: Fit verdict — biggest element in the card. Uses the
+              TAN Nightingale SVG for the score label; styled-text
+              fallback kicks in if the asset is missing. */}
           <View style={styles.verdictRow}>
             <View style={styles.verdictMain}>
-              <Text testID="fit-score-label" style={[styles.verdictText, { color: scoreConfig.color }]}>
-                {scoreConfig.text}
-              </Text>
+              <HeadingImage
+                testID="fit-score-label"
+                slot={
+                  fitScore === 'great'
+                    ? 'great-fit'
+                    : fitScore === 'moderate'
+                    ? 'some-concerns'
+                    : 'may-not-fit'
+                }
+                fallback={scoreConfig.text}
+                height={30}
+                color={scoreConfig.color}
+                textStyle={[styles.verdictText, { color: scoreConfig.color }]}
+              />
               <Text style={styles.verdictSub}>
                 {warnings.length === 0
                   ? 'No fit concerns'

@@ -6,6 +6,11 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // SVG imports are compiled to React components by react-native-svg-
+    // transformer at runtime, but jest doesn't run that transform.
+    // Map all .svg imports to a tiny stub so HeadingImage's SVG slots
+    // render as a passthrough component in tests.
+    '\\.svg$': '<rootDir>/jest.svg.js',
   },
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)', '**/*.test.[jt]s?(x)'],
   collectCoverageFrom: [

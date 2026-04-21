@@ -18,6 +18,7 @@ import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
+import HeadingImage from '../components/HeadingImage';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'History'>,
@@ -169,10 +170,16 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View testID="history-screen" style={styles.container}>
-        {/* Page title + slim stats pill under it — copy per Claude Design:
-            lowercase italic "your history" + count subtitle with swipe hint. */}
+        {/* Page title + slim stats pill under it. TAN Nightingale SVG
+            via HeadingImage falls back to styled text if missing. */}
         <View style={styles.header}>
-          <Text style={styles.pageTitle}>your history</Text>
+          <HeadingImage
+            slot="history"
+            fallback="your history"
+            height={44}
+            color={colors.text}
+            textStyle={styles.pageTitle}
+          />
           <Text style={styles.headerMeta}>
             {entries.length} {entries.length === 1 ? 'item' : 'items'} · swipe through to revisit
           </Text>

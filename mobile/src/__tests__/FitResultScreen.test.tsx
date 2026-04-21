@@ -164,11 +164,12 @@ describe('FitResultScreen', () => {
     });
 
     it('shows the precomputed score label and recommended size', async () => {
-      const { findByTestId, getAllByText } = render(<FitResultScreen />);
+      const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
       await findByTestId('fit-score-label');
-      // "Great Fit!" appears twice — once in the floating badge, once in the
-      // score card. That's intentional so it's visible before/after scroll.
-      expect(getAllByText('Great Fit!').length).toBeGreaterThan(0);
+      // Verdict is now rendered as a TAN Nightingale SVG via HeadingImage;
+      // the human-readable label lives on the wrapper's accessibilityLabel
+      // so screen readers + tests can still locate it.
+      expect(getAllByLabelText('Great Fit!').length).toBeGreaterThan(0);
       const sizeValue = await findByTestId('recommended-size-value');
       expect(sizeValue).toBeTruthy();
       expect(sizeValue.props.children).toBe('M');
@@ -271,9 +272,11 @@ describe('FitResultScreen', () => {
         warnings: [{ severity: 'minor', message: 'Check the sleeves' }],
       });
 
-      const { findByTestId, getAllByText } = render(<FitResultScreen />);
+      const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
       await findByTestId('fit-score-display');
-      expect(getAllByText('Some Concerns').length).toBeGreaterThan(0);
+      // Verdict label now lives on the HeadingImage wrapper's
+      // accessibilityLabel, not a raw Text node.
+      expect(getAllByLabelText('Some Concerns').length).toBeGreaterThan(0);
     });
 
     it('renders live-mode action buttons', async () => {

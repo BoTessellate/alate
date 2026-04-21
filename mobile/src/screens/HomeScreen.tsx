@@ -30,6 +30,7 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import HeadingImage from '../components/HeadingImage';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -155,9 +156,14 @@ export default function HomeScreen() {
               Eyebrow wordmark + 3-line italic serif verse + plain tagline. */}
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>ALATE</Text>
-            <Text style={styles.heroVerse}>
-              paste anything.{'\n'}we'll tell you{'\n'}if it fits.
-            </Text>
+            <HeadingImage
+              slot="home-verse"
+              fallback={"paste anything.\nwe'll tell you\nif it fits."}
+              height={150}
+              color="#fff"
+              style={styles.heroVerseWrap}
+              textStyle={styles.heroVerse}
+            />
             <Text style={styles.heroTagline}>
               from any store. dresses, denim, knitwear — we read the brand's size chart against your body.
             </Text>
@@ -392,6 +398,9 @@ const styles = StyleSheet.create({
     ...typography.overline,
     color: 'rgba(255,255,255,0.9)',
     letterSpacing: 2.2,
+  },
+  heroVerseWrap: {
+    marginTop: 14,
   },
   heroVerse: {
     ...typography.displayLarge,
