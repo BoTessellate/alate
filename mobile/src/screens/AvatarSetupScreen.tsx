@@ -276,7 +276,7 @@ export default function AvatarSetupScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text testID="avatar-setup-title" style={styles.title}>Body profile</Text>
+            <Text testID="avatar-setup-title" style={styles.title}>body profile</Text>
             <Text style={styles.subtitle}>
               Select each measurement to build your fit model
             </Text>
@@ -473,18 +473,25 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
+  // Header — italic serif "body profile" + subtle 12px sub copy per
+  // Claude Design ScreenOnboarding.
   header: {
     marginBottom: spacing.md,
   },
   title: {
-    ...typography.headingL,
+    // displayMedium already renders DM Serif Italic lowercase from the
+    // theme token, but at 36px it's too heavy for this pane — dial down
+    // to 30px while keeping the serif italic voice.
+    ...typography.displayMedium,
+    fontSize: 30,
+    lineHeight: 34,
     color: colors.text,
-    marginBottom: spacing.xs,
+    marginBottom: 6,
   },
   subtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
   },
   progressContainer: {
     flexDirection: 'row',

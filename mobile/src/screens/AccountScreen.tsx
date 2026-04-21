@@ -217,9 +217,9 @@ export default function AccountScreen() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header */}
+        {/* Header — italic serif lowercase "profile" per Claude Design */}
         <View style={styles.header}>
-          <Text style={styles.title}>Account</Text>
+          <Text style={styles.title}>profile</Text>
         </View>
 
         {/* Google account card — isolated so a hook crash here can't blank the page */}
@@ -327,14 +327,13 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xxl,
   },
+  // Header — left-aligned italic serif title per Claude Design ScreenProfile
   header: {
     marginBottom: spacing.lg,
-    alignItems: 'center',
   },
   title: {
     ...typography.displayMedium,
     color: colors.text,
-    textAlign: 'center',
   },
   // Google account card
   accountCard: {
