@@ -79,6 +79,18 @@ jest.mock('expo-blur', () => {
   };
 });
 
+// Mock @react-native-community/blur — swapped in for Android glass fidelity
+// on FitResult. Same jest treatment as expo-blur: render a passthrough View
+// so layout assertions work without a native renderer.
+jest.mock('@react-native-community/blur', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    BlurView: ({ children, style, ...props }) =>
+      React.createElement(View, { style, ...props }, children),
+  };
+});
+
 // Mock expo modules
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),

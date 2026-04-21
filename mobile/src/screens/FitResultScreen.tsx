@@ -17,7 +17,12 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
-import { BlurView } from 'expo-blur';
+// @react-native-community/blur uses Dimezis' BlurView on Android (bitmap
+// snapshot + RenderEffect/RenderScript) — much higher-fidelity glass than
+// expo-blur on Android, where blur is only real on Android 12+ and
+// silently degrades to a tinted view on older versions. iOS path uses
+// UIVisualEffectView. Both are autolinked.
+import { BlurView } from '@react-native-community/blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -357,9 +362,15 @@ export default function FitResultScreen() {
           cardAnimStyle,
         ]}
       >
-        <BlurView intensity={55} tint="light" style={StyleSheet.absoluteFill} />
-        {/* Opaque-ish white tint so content reads clearly on any image bg.
-            Android's BlurView is a soft stub; the tint does the heavy lifting. */}
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          blurType="xlight"
+          blurAmount={18}
+          reducedTransparencyFallbackColor="white"
+        />
+        {/* Thin white tint so content keeps contrast over busy images. With
+            real blur below, the tint is lighter than before — the blur now
+            carries the glass effect; the tint just lifts legibility. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
         <ScrollView
@@ -673,7 +684,13 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    // Lighter than before because the Dimezis blur underneath now does
+    // the real glass work. Hairline inner border completes the frosted
+    // feel — the edge catches "light" the way real glass does.
+    backgroundColor: 'rgba(255, 255, 255, 0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderRadius: borderRadius.xxxl,
   },
   cardScroll: {
     flex: 1,

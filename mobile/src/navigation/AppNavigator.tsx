@@ -244,8 +244,12 @@ export default function AppNavigator() {
           name="FitResult"
           component={SafeFitResult}
           options={{
-            title: 'Fit Analysis',
-            headerBackTitle: 'Back',
+            // Hide the native stack header entirely — the screen paints its
+            // product image edge-to-edge as the page background, with its
+            // own in-card brand/name hero and a floating back chevron. The
+            // native 'Fit Analysis' header would otherwise (a) cover the
+            // top of the image and (b) add a second redundant back arrow.
+            headerShown: false,
           }}
         />
       </Stack.Navigator>
