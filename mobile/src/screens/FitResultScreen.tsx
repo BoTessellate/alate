@@ -801,7 +801,10 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const percent = level === 'high' ? 0.92 : level === 'medium' ? 0.6 : 0.28;
+  // Arc lengths per level. `high` stops just shy of 100% (0.98) — a
+  // fully-closed ring reads as "complete" which is wrong for confidence;
+  // the tiny gap signals "strong but not absolute".
+  const percent = level === 'high' ? 0.98 : level === 'medium' ? 0.6 : 0.28;
   const colour =
     level === 'high'
       ? 'rgba(106, 95, 117, 1)'
