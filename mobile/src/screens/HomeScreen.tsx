@@ -330,6 +330,21 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Bottom-edge fade — content "disappears into the darkness" where
+          it meets the floating tab bar. Makes the glass tab bar read as
+          a true floating element instead of a translucent pane with the
+          RECENT list bleeding through from behind. Gradient fades from
+          transparent at the top to the page backdrop's deepest stop
+          (matching #4c4356) over the height the tab pill occupies.
+          pointerEvents="none" so the fade doesn't eat taps on cards
+          above it. */}
+      <LinearGradient
+        colors={['rgba(76, 67, 86, 0)', 'rgba(76, 67, 86, 0.85)', '#4c4356']}
+        locations={[0, 0.55, 1]}
+        style={styles.bottomFade}
+        pointerEvents="none"
+      />
     </View>
   );
 }
@@ -624,5 +639,18 @@ const styles = StyleSheet.create({
   // Setup prompt wrapper (glass card for users without avatar)
   setupWrap: {
     marginBottom: spacing.md,
+  },
+
+  // Bottom-edge fade — sits over the ScrollView, under the floating
+  // tab bar. Height covers the tab-bar footprint + a soft ramp above
+  // it so content recedes into the dark backdrop instead of showing
+  // through the glass pill.
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 170,
+    zIndex: 1,
   },
 });

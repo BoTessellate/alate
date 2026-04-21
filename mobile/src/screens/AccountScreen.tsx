@@ -328,6 +328,17 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Bottom-edge fade — same pattern as Home. Content melts into
+          the backdrop gradient's dark stop so the floating tab bar
+          reads as a true floating element, not a glass pane over
+          scrollable list rows. */}
+      <LinearGradient
+        colors={['rgba(76, 67, 86, 0)', 'rgba(76, 67, 86, 0.85)', '#4c4356']}
+        locations={[0, 0.55, 1]}
+        style={styles.bottomFade}
+        pointerEvents="none"
+      />
     </View>
   );
 }
@@ -579,5 +590,16 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: 'rgba(255,255,255,0.75)',
     fontWeight: '600',
+  },
+
+  // Bottom-edge fade — content fades into the gradient's deepest stop
+  // so the floating tab bar reads as a true floating element.
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 170,
+    zIndex: 1,
   },
 });
