@@ -29,6 +29,7 @@ import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api'
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -129,7 +130,17 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      {/* Full-bleed gradient backdrop — same visual as fit-analysis hero
+          screens per user direction. Radial-style angle from the top-left
+          light edge through brand purple to the deep purple base. */}
+      <LinearGradient
+        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+        locations={[0, 0.3, 0.6, 0.9]}
+        start={{ x: 0.15, y: 0.1 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -370,26 +381,31 @@ const styles = StyleSheet.create({
     // isn't hidden behind the floating glass tab bar.
     paddingBottom: 120,
   },
-  // --- Hero — Claude Design mockup layout ---
+  // --- Hero — Claude Design mockup layout, inverted for dark gradient
+  //     backdrop. Text reads as light on the hero; glass cards below
+  //     keep their white tint + dark text.
   hero: {
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
   eyebrow: {
     ...typography.overline,
-    color: colors.primary,
+    color: 'rgba(255,255,255,0.9)',
     letterSpacing: 2.2,
   },
   heroVerse: {
     ...typography.displayLarge,
     fontSize: 40,
     lineHeight: 44,
-    color: colors.text,
+    color: '#fff',
     marginTop: 14,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   heroTagline: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 14,
     maxWidth: 300,
     lineHeight: 21,
@@ -419,7 +435,7 @@ const styles = StyleSheet.create({
   },
   shareHint: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     letterSpacing: 0.3,
     marginTop: spacing.xs,
@@ -530,7 +546,7 @@ const styles = StyleSheet.create({
   },
   recentLabel: {
     ...typography.overline,
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.75)',
     marginBottom: spacing.sm,
   },
   recentList: {

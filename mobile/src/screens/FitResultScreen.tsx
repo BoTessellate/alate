@@ -203,9 +203,13 @@ export default function FitResultScreen() {
     ),
   }));
 
-  // Vertical drag on the handle toggles collapse. 300px of drag = full
-  // transition; snap to 0 or 1 on release based on the midpoint.
+  // Vertical drag toggles collapse. Lives on the outer card so the user
+  // can drag from anywhere on the overlay (per user direction "from any
+  // place on the upper half"). `activeOffsetY([-10, 10])` means small
+  // nudges still go to the inner ScrollView; only deliberate vertical
+  // swipes trigger the collapse. 300px of drag = full transition.
   const dragGesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
     .onBegin(() => {
       startProgress.value = collapseProgress.value;
     })
@@ -222,15 +226,16 @@ export default function FitResultScreen() {
       runOnJS(setIsExpanded)(target === 1);
     });
 
-  // Horizontal drag on the content sifts to the next/prev entry. Uses
-  // activeOffsetX so vertical motion still goes to the ScrollView inside
-  // (otherwise pan would swallow scroll gestures).
+  // Horizontal drag sifts to the next/prev entry. Also lives on the
+  // outer card so it works in both expanded AND collapsed states (user
+  // direction: "swipe possible when the overlay is collapsed").
+  // `activeOffsetX` keeps small horizontal nudges out; `failOffsetY`
+  // cedes to the drag gesture on clear vertical motion.
   const swipeX = useSharedValue(0);
   const siftGesture = Gesture.Pan()
     .activeOffsetX([-15, 15])
-    .failOffsetY([-20, 20])
+    .failOffsetY([-25, 25])
     .onUpdate((e) => {
-      // Dampened follow so the user feels the drag but doesn't overshoot.
       swipeX.value = e.translationX * 0.4;
     })
     .onEnd((e) => {
@@ -242,6 +247,10 @@ export default function FitResultScreen() {
       }
       swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
     });
+
+  // Run both simultaneously — drag claims vertical >10px, sift claims
+  // horizontal >15px, small movements go to the inner ScrollView.
+  const cardGesture = Gesture.Simultaneous(dragGesture, siftGesture);
   const siftStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: swipeX.value }],
   }));
@@ -552,16 +561,19 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Drag handle — vertical pan toggles collapse. Bigger hit target
-            than the thin bar so it's easy to grab. */}
-        <GestureDetector gesture={dragGesture}>
-          <View style={styles.handleHit}>
-            <View style={styles.handle} />
-          </View>
-        </GestureDetector>
-
-        <GestureDetector gesture={siftGesture}>
+        {/* Single gesture wrapper covering the entire card — drag +
+            sift run simultaneously. Drag triggers on vertical pan > 10px,
+            sift on horizontal > 15px. Smaller nudges pass through to the
+            inner ScrollView. This is what enables both (a) drag-to-
+            collapse from anywhere on the overlay, and (b) horizontal
+            swipe-between-products in both expanded and collapsed state. */}
+        <GestureDetector gesture={cardGesture}>
           <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+            {/* Visual drag handle — no longer a gesture target itself,
+                since the whole card receives drag. Purely decorative. */}
+            <View style={styles.handleHit} pointerEvents="none">
+              <View style={styles.handle} />
+            </View>
             <ScrollView
               style={styles.cardScroll}
               contentContainerStyle={styles.cardContent}

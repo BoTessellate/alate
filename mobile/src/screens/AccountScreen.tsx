@@ -25,6 +25,7 @@ import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator
 import { captureError } from '../utils/sentry';
 import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -215,7 +216,16 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      {/* Full-bleed gradient backdrop — same treatment as Home, matches
+          the fit-analysis hero screens. */}
+      <LinearGradient
+        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+        locations={[0, 0.3, 0.6, 0.9]}
+        start={{ x: 0.15, y: 0.1 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         {/* Header — italic serif lowercase "profile" per Claude Design */}
         <View style={styles.header}>
@@ -327,13 +337,17 @@ const styles = StyleSheet.create({
     // Clears the floating glass tab bar at the bottom.
     paddingBottom: 120,
   },
-  // Header — left-aligned italic serif title per Claude Design ScreenProfile
+  // Header — left-aligned italic serif title, white on the dark
+  // gradient backdrop per Claude Design ScreenProfile + user direction.
   header: {
     marginBottom: spacing.lg,
   },
   title: {
     ...typography.displayMedium,
-    color: colors.text,
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   // Google account card
   accountCard: {
@@ -443,7 +457,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 1.8,
     textTransform: 'uppercase',
-    color: colors.textMuted,
+    // Light on dark gradient bg.
+    color: 'rgba(255,255,255,0.8)',
   },
   editPill: {
     flexDirection: 'row',
@@ -452,12 +467,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
-    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+    // White-tinted pill on the dark bg.
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   editPillText: {
     fontSize: 10,
     fontWeight: '600',
-    color: colors.primary,
+    color: '#fff',
   },
   prefValue: {
     flexDirection: 'row',
@@ -547,11 +563,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: borderRadius.pill,
-    backgroundColor: colors.error + '10',
+    // Subdued on dark gradient — quieter text link feel, not a bright red button.
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginTop: spacing.lg,
   },
   resetText: {
     ...typography.label,
-    color: colors.error,
+    color: 'rgba(255,255,255,0.75)',
     fontWeight: '600',
   },
 });
