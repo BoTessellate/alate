@@ -24,10 +24,10 @@ import {
 } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
-// Swapped from BodyFigurine → BodyCroquis. Same prop API (see
-// project_body_croquis_plan.md memory). BodyFigurine is kept in the
-// repo as the fallback; revert this one import to roll back.
-import BodyCroquis from '../components/BodyCroquis';
+// Croquis figurine was retired per Claude Design handoff (user: "fashion
+// croquis is inaccurate and really bad looking"). BodyCroquis.tsx +
+// BodyFigurine.tsx remain in the repo as dead code for a future v3
+// rebuild — see `project_body_croquis_plan.md` memory.
 import { BodyFocusArea } from '../components/bodyFigurineModel';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
@@ -262,22 +262,13 @@ export default function AvatarSetupScreen() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
+      {/* Claude Design handoff direction: body croquis removed from the
+          onboarding flow ("inaccurate and really bad looking" — user
+          words). Full-width chip flow is what the design landed on.
+          BodyCroquis.tsx + BodyFigurine.tsx stay in the repo as dead
+          components for now so the v3 rebuild has the same starting
+          point; see `project_body_croquis_plan.md` memory. */}
       <View style={styles.row}>
-        {/* Left pane — BodyFigurine, sticky */}
-        <View style={styles.figurePane}>
-          <BodyCroquis
-            heightCm={height}
-            shoulders={shoulders}
-            bust={bust}
-            waist={waist}
-            hips={hips}
-            thighs={thighs}
-            torsoLength={torso}
-            activePart={activePart}
-          />
-        </View>
-
-        {/* Right pane — scrollable form */}
         <ScrollView
           style={styles.formPane}
           contentContainerStyle={styles.formContent}
@@ -287,7 +278,7 @@ export default function AvatarSetupScreen() {
           <View style={styles.header}>
             <Text testID="avatar-setup-title" style={styles.title}>Body profile</Text>
             <Text style={styles.subtitle}>
-              Select each measurement — your figurine updates live
+              Select each measurement to build your fit model
             </Text>
           </View>
 
@@ -474,16 +465,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
-  figurePane: {
-    width: '42%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(90, 67, 119, 0.08)',
-  },
+  // Croquis pane retired — form now takes full width.
   formPane: {
-    width: '58%',
+    width: '100%',
   },
   formContent: {
     padding: spacing.md,

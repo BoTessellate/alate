@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     // Medium-shade glass: brand purple at mid opacity. Sits between the
     // light #e4e2e9 canvas and a fully-dark reference bar — reads as a
     // soft tonal pill, not a heavy dark overlay.
-    backgroundColor: 'rgba(90, 67, 119, 0.52)',
+    backgroundColor: 'rgba(106, 95, 117, 0.52)',
     borderRadius: borderRadius.pill,
   },
   left: {

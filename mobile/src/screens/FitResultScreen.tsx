@@ -586,29 +586,29 @@ export default function FitResultScreen() {
 
           <View style={styles.divider} />
 
-          {/* H2: Stats row — size badge + confidence bar + fit icon. Labels
-              dropped because they overflowed the circular chips ("Me…")
-              and stacked labels underneath; each element is now self-
-              descriptive (letter / progress segments / semantic icon). */}
+          {/* H2: Stats row — three centred, evenly-spaced elements with
+              SIZE / CONFIDENCE / FIT labels underneath. Per Claude Design
+              handoff: the trio reads left-to-right, labels anchor meaning,
+              no 4th in-stock icon (removed as visually confusing). */}
           <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
-              <StatBadge value={sizeRec.size} testID="recommended-size-value" />
-            )}
-            <ConfidenceDonut level={sizeRec?.confidence ?? null} />
-            <View style={styles.fitBadge}>
-              <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
-                {scoreConfig.icon}
-              </Text>
-            </View>
-            {inStock !== null && (
-              <View style={styles.fitBadge}>
-                <Feather
-                  name={inStock ? 'check' : 'alert-circle'}
-                  size={18}
-                  color={inStock ? colors.success : colors.warning}
-                />
+              <View style={styles.statCol}>
+                <StatBadge value={sizeRec.size} testID="recommended-size-value" />
+                <Text style={styles.statLabel}>SIZE</Text>
               </View>
             )}
+            <View style={styles.statCol}>
+              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
+              <Text style={styles.statLabel}>CONFIDENCE</Text>
+            </View>
+            <View style={styles.statCol}>
+              <View style={styles.fitBadge}>
+                <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
+                  {scoreConfig.icon}
+                </Text>
+              </View>
+              <Text style={styles.statLabel}>FIT</Text>
+            </View>
           </View>
 
           {/* Re-eval banners */}
@@ -788,10 +788,10 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
   const percent = level === 'high' ? 0.92 : level === 'medium' ? 0.6 : 0.28;
   const colour =
     level === 'high'
-      ? 'rgba(90, 67, 119, 1)'
+      ? 'rgba(106, 95, 117, 1)'
       : level === 'medium'
-      ? 'rgba(90, 67, 119, 0.72)'
-      : 'rgba(90, 67, 119, 0.45)';
+      ? 'rgba(106, 95, 117, 0.72)'
+      : 'rgba(106, 95, 117, 0.45)';
   const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
   return (
     <View style={styles.confidenceDonut}>
@@ -801,7 +801,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke="rgba(90, 67, 119, 0.14)"
+          stroke="rgba(106, 95, 117, 0.14)"
           strokeWidth={stroke}
           fill="transparent"
         />
@@ -909,7 +909,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xxxl,
     overflow: 'hidden',
     // Deep purple-tinted drop shadow — grounds the card over the image.
-    shadowColor: '#1a0f28',
+    shadowColor: '#1a1118',
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.48,
     shadowRadius: 28,
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(63, 43, 84, 0.22)',
+    backgroundColor: 'rgba(76, 67, 86, 0.22)',
   },
 
   // --- Verdict row (H1) ---
@@ -974,7 +974,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pricePill: {
-    backgroundColor: 'rgba(90, 67, 119, 0.14)',
+    backgroundColor: 'rgba(106, 95, 117, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
@@ -990,25 +990,38 @@ const styles = StyleSheet.create({
   // --- Divider ---
   divider: {
     height: 1,
-    backgroundColor: 'rgba(63, 43, 84, 0.12)',
+    backgroundColor: 'rgba(76, 67, 86, 0.12)',
     marginBottom: spacing.md,
   },
 
-  // --- Stats row (H2) — labels removed; each element is self-descriptive ---
+  // --- Stats row (H2) — 3 centred columns, each with a tiny caps label
+  //     underneath per Claude Design handoff ---
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: spacing.lg,
     marginBottom: spacing.md,
+  },
+  statCol: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
   },
   // Size badge — circle with the size letter/number
   statBadge: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    backgroundColor: 'rgba(106, 95, 117, 0.1)',
     borderWidth: 1.25,
-    borderColor: 'rgba(90, 67, 119, 0.22)',
+    borderColor: 'rgba(106, 95, 117, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1017,7 +1030,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    backgroundColor: 'rgba(106, 95, 117, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1056,7 +1069,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    backgroundColor: 'rgba(106, 95, 117, 0.08)',
     borderRadius: borderRadius.md,
   },
   bannerSuccess: {
@@ -1070,7 +1083,7 @@ const styles = StyleSheet.create({
 
   // --- Sizing note ---
   noteBlock: {
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    backgroundColor: 'rgba(106, 95, 117, 0.08)',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1131,7 +1144,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tag: {
-    backgroundColor: 'rgba(90, 67, 119, 0.12)',
+    backgroundColor: 'rgba(106, 95, 117, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
@@ -1146,7 +1159,7 @@ const styles = StyleSheet.create({
   // --- Meta ---
   metaSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(63, 43, 84, 0.1)',
+    borderTopColor: 'rgba(76, 67, 86, 0.1)',
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
@@ -1188,7 +1201,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   secondaryButton: {
-    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    backgroundColor: 'rgba(106, 95, 117, 0.1)',
     borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,

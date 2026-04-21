@@ -28,77 +28,79 @@ const headingSerif = {
 };
 
 // =============================================================================
-// COLOR PALETTE - Gray-Purple system (matches website tonal scale)
-// Background:     #e4e2e9  (solid, lightest stop of the website's tonal scale)
-// Primary brand:  #5a4377  (used for buttons + bold text)
+// COLOR PALETTE - Grey-Purple system (per Claude Design handoff)
+// Background:     #e6e4e9  (solid, lightest stop of the tonal scale)
+// Primary brand:  #6a5f75  (grey-purple — quieter than the old saturated purple)
+// Semantic:       dusty sage / terracotta / clay red / slate blue (all muted)
+// Source:         alate-design-system/project/colors_and_type.css
 // =============================================================================
 export const colors = {
-  // Primary - Gray-purple brand colour (buttons, bold text)
-  primary: '#5a4377',
-  primaryLight: '#7d6699',
-  primaryDark: '#3f2b54',
+  // Primary - Grey-purple brand colour
+  primary: '#6a5f75',
+  primaryLight: '#8a7e94',
+  primaryDark: '#4c4356',
 
-  // CTA - Same as primary (the main interactive colour everywhere)
-  cta: '#5a4377',
+  // CTA - Same as primary
+  cta: '#6a5f75',
 
-  // Secondary - Slightly darker brand purple for emphasis (price, callouts)
-  secondary: '#3f2b54',
-  secondaryLight: '#5a4377',
-  secondaryDark: '#2a1c3a',
+  // Secondary - Slightly darker brand grey-purple for emphasis
+  secondary: '#4c4356',
+  secondaryLight: '#6a5f75',
+  secondaryDark: '#2f2937',
 
-  // Accent - Mid-tone gray-purple (pills, subtle surfaces)
-  accent: '#9a92ac',
-  accentLight: '#c5c0d2',
-  accentDark: '#5a4377',
+  // Accent - Mid-tone grey-purple (pills, subtle surfaces)
+  accent: '#97919f',
+  accentLight: '#c7c2cd',
+  accentDark: '#6a5f75',
 
-  // Highlight - Brand purple family
-  highlight: '#5a4377',
-  highlightLight: '#7d6699',
-  highlightDark: '#3f2b54',
+  // Highlight - Brand grey-purple family
+  highlight: '#6a5f75',
+  highlightLight: '#8a7e94',
+  highlightDark: '#4c4356',
 
-  // Background — solid, matches website canvas (lightest stop of tonal scale)
-  background: '#e4e2e9',
-  backgroundSecondary: '#d8d4de',
-  backgroundTertiary: '#c5c0d2',
-  backgroundDark: '#9a92ac',
+  // Background — solid canvas (never a gradient)
+  background: '#e6e4e9',
+  backgroundSecondary: '#d9d6dd',
+  backgroundTertiary: '#c7c2cd',
+  backgroundDark: '#97919f',
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
   surfaceLight: '#FBFAFD',
   surfaceElevated: '#FFFFFF',
 
-  // Text - Deep brand purple-black for readability on the light end of the gradient
-  text: '#2a1c3a',
-  textSecondary: '#5a4377',   // brand purple as secondary text
-  textMuted: '#7d6699',       // lighter brand purple, still WCAG AA on #e4e2e9
+  // Text - Deepest grey-purple for readability on the light canvas
+  text: '#2f2937',
+  textSecondary: '#4c4356',   // primary-dark as secondary text
+  textMuted: '#8a7e94',
   textOnPrimary: '#FFFFFF',
   textOnSecondary: '#FFFFFF',
   white: '#FFFFFF',
 
-  // Status colors (semantic — tuned to feel harmonious with gray-purple)
-  success: '#2E7D5B',
-  successLight: '#4AA37F',
-  warning: '#C2410C',
-  warningLight: '#E06E1C',
-  error: '#B91C1C',
-  errorLight: '#DC2626',
-  info: '#0E7490',            // teal-blue — distinct from primary purple, still harmonious
-  infoLight: '#0891B2',
+  // Status colours — muted, earthy, harmonious with grey-purple
+  success: '#5a7a68',         // dusty sage
+  successLight: '#7a9a88',
+  warning: '#a8724a',         // terracotta
+  warningLight: '#c28a62',
+  error: '#9a4a4a',           // clay red
+  errorLight: '#b46868',
+  info: '#5a7585',            // slate blue
+  infoLight: '#7a95a5',
 
   // Border colors
-  border: '#c5c0d2',
-  borderLight: '#d8d4de',
-  borderAccent: '#5a4377',
+  border: '#c7c2cd',
+  borderLight: '#d9d6dd',
+  borderAccent: '#6a5f75',
 
   // Overlay
-  overlay: 'rgba(42, 28, 58, 0.8)',
-  overlayLight: 'rgba(42, 28, 58, 0.5)',
+  overlay: 'rgba(47, 41, 55, 0.8)',
+  overlayLight: 'rgba(47, 41, 55, 0.5)',
 
-  // Gradient endpoints
-  gradientPrimary: ['#5a4377', '#3f2b54'],
-  gradientAccent: ['#7d6699', '#5a4377'],
-  gradientWarm: ['#9a92ac', '#5a4377'],
-  gradientCool: ['#b5afc4', '#5a4377'],
+  // Gradient endpoints — grey-purple scale
+  gradientPrimary: ['#6a5f75', '#4c4356'],
+  gradientAccent: ['#8a7e94', '#6a5f75'],
+  gradientWarm: ['#97919f', '#6a5f75'],
+  gradientCool: ['#b4afbb', '#6a5f75'],
 };
 
 // =============================================================================

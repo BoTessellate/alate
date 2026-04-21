@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(42, 28, 58, 0.55)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     justifyContent: 'flex-end',
   },
   modalSheet: {

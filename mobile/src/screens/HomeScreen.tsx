@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.15)',
+    borderBottomColor: 'rgba(106, 95, 117, 0.15)',
   },
   errorContainer: {
     backgroundColor: colors.errorLight + '20',

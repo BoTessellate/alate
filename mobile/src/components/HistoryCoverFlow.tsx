@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     // gives the centre card clear depth separation from the receding
     // neighbours. Purple-tinted instead of stock black so the shadow
     // reads as part of the brand palette, not a generic drop.
-    shadowColor: '#1a0f28',
+    shadowColor: '#1a1118',
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.42,
     shadowRadius: 24,

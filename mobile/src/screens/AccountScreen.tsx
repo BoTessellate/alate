@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     // Muted purple chip instead of the red-tinted destructive pill.
     // The action is still destructive, but the confirm dialog gates the
     // actual sign-out — the chip doesn't need to shout.
-    backgroundColor: 'rgba(90, 67, 119, 0.12)',
+    backgroundColor: 'rgba(106, 95, 117, 0.12)',
   },
   signOutText: {
     ...typography.label,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.1)',
+    borderBottomColor: 'rgba(106, 95, 117, 0.1)',
   },
   profileLabel: {
     ...typography.label,

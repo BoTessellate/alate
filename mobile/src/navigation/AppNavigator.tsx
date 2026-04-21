@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   tabIconPillFocused: {
-    backgroundColor: 'rgba(90, 67, 119, 0.14)',
+    backgroundColor: 'rgba(106, 95, 117, 0.14)',
   },
   loadingOverlay: {
     flex: 1,
