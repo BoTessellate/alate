@@ -11,7 +11,7 @@
  * onActiveIndexChange → lets a sibling detail bar follow the snap.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -123,22 +123,26 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
  *  global scroll offset — when the card is at the current snap position it
  *  sits upright; otherwise it tilts away in 3D.
  *
- *  The STATIC zIndex on the outer slot (driven by React state, not the UI
- *  thread) is what actually wins on Android. Animated zIndex on the inner
- *  transformed view gets clobbered by sibling paint order — which is why
- *  the right neighbour (rendered later in the array) used to climb in
- *  front of the centre card.
+ *  zIndex is animated on the UI thread on the OUTER slot (not the inner
+ *  transformed view). Key distinctions:
+ *    - Inner animated view's zIndex gets clobbered by sibling paint order
+ *      when transforms are involved — that's why we tried static zIndex.
+ *    - Static zIndex only updates on snap-end → paint-order flip happens
+ *      AFTER the card arrives, causing a visible "stop, then pop behind"
+ *      stutter at the crossover.
+ *    - Animated zIndex on the UNTRANSFORMED slot wrapper is respected by
+ *      Fabric's sibling draw order and updates on every scroll frame, so
+ *      the flip is continuous — the approaching card climbs in front at
+ *      the exact midpoint of the crossover.
  */
 function CoverFlowCard({
   entry,
   index,
-  activeIndex,
   scrollX,
   onTap,
 }: {
   entry: FitHistoryEntry;
   index: number;
-  activeIndex: number;
   scrollX: SharedValue<number>;
   onTap: () => void;
 }) {
@@ -218,21 +222,25 @@ function CoverFlowCard({
     };
   });
 
-  // Static zIndex on the OUTER slot: centre card is 1000, neighbours drop
-  // off steeply. React applies this as a view prop, which Android honours
-  // in sibling draw order — unlike animated zIndex, which loses to DOM
-  // render order when transforms are involved. We intentionally DON'T set
-  // `elevation` here: Fabric rejects inline `elevation` on a non-leaf view
-  // that already has transformed/shadowed descendants.
-  const slotDistance = Math.abs(index - activeIndex);
-  const slotZ = { zIndex: 1000 - slotDistance * 100 };
+  // Animated zIndex on the OUTER slot — updates every frame from scrollX
+  // so the paint order transitions smoothly as one card approaches the
+  // centre and the previous centre recedes. Linear fall-off with |d|
+  // (1000 at centre, -200 per unit distance); the rounding stabilises
+  // the integer zIndex value Fabric actually uses. No `elevation` here
+  // because Fabric rejects elevation on non-leaf transformed subtrees.
+  const slotStyle = useAnimatedStyle(() => {
+    const d = (scrollX.value - index * ITEM_GAP) / ITEM_GAP;
+    return {
+      zIndex: Math.round(1000 - Math.abs(d) * 200),
+    };
+  });
 
   // Perspective lives on the static parent wrapper, NOT in the animated
   // transform array. On Android RN, inlining `{ perspective }` alongside
   // `rotateY` silently degenerates to a 2D shear — the Z-axis only stays
   // alive when perspective is mounted a layer up.
   return (
-    <View style={[styles.cardSlot, slotZ]}>
+    <Animated.View style={[styles.cardSlot, slotStyle]}>
       <View style={styles.cardPerspective}>
         <Animated.View style={[styles.cardAnim, animatedStyle]}>
           <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
@@ -241,7 +249,7 @@ function CoverFlowCard({
           <Animated.View style={[styles.veil, veilStyle]} pointerEvents="none" />
         </Animated.View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -251,18 +259,14 @@ export default function HistoryCoverFlow({
   onActiveIndexChange,
 }: HistoryCoverFlowProps) {
   const scrollX = useSharedValue(0);
-  // Local JS copy of the snapped index — drives the static zIndex on each
-  // card slot so the centre card wins the paint-order fight on Android.
-  const [activeIndex, setActiveIndex] = useState(0);
 
+  // Scroll handler just mirrors the offset to a SharedValue. zIndex + all
+  // transforms derive from this on the UI thread — no JS state re-renders
+  // on scroll, so rapid swipes stay smooth and the paint-order transition
+  // is continuous (not a stop-then-pop at momentum-end).
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
       scrollX.value = e.contentOffset.x;
-    },
-    onMomentumEnd: (e) => {
-      const raw = Math.round(e.contentOffset.x / ITEM_GAP);
-      const snapped = Math.max(0, Math.min(entries.length - 1, raw));
-      runOnJS(setActiveIndex)(snapped);
     },
   });
 
@@ -314,7 +318,6 @@ export default function HistoryCoverFlow({
             key={entry.id}
             entry={entry}
             index={i}
-            activeIndex={activeIndex}
             scrollX={scrollX}
             onTap={() => onCardTap(entry)}
           />

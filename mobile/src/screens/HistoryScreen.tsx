@@ -158,39 +158,44 @@ export default function HistoryScreen() {
           </Text>
         </View>
 
-        {/* Vision Pro song-shuffle-style deck */}
+        {/* Vision Pro song-shuffle-style deck — occupies the full area below
+            the header. Detail bar + clear link FLOAT on top of it so they
+            don't steal vertical space that the elongated cards need. */}
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
           onActiveIndexChange={setActiveIndex}
         />
 
-        {/* Dynamic detail bar — mirrors the Vision Pro music bar reference.
-            Shows the centred card's fit verdict + name + size. */}
-        <View style={styles.detailBarWrap}>
-          <FitDetailBar entry={activeEntry} />
-        </View>
+        {/* Floating footer: detail pill + clear link. Absolute-positioned so
+            the cover flow underneath uses the full height, and card images
+            don't get cropped to make room. `pointerEvents="box-none"` lets
+            scroll gestures pass through the empty area around the pill. */}
+        <View style={styles.floatingFooter} pointerEvents="box-none">
+          <View style={styles.detailBarWrap}>
+            <FitDetailBar entry={activeEntry} />
+          </View>
 
-        {/* Subtle text link — replaces the old loud red-pill CTA. */}
-        {entries.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearLink}
-            onPress={() => {
-              Alert.alert(
-                'Clear history',
-                'This will delete all your fit check history. This cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Clear', style: 'destructive', onPress: clearHistory },
-                ]
-              );
-            }}
-            activeOpacity={0.6}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Text style={styles.clearLinkText}>Clear history</Text>
-          </TouchableOpacity>
-        )}
+          {entries.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearLink}
+              onPress={() => {
+                Alert.alert(
+                  'Clear history',
+                  'This will delete all your fit check history. This cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Clear', style: 'destructive', onPress: clearHistory },
+                  ]
+                );
+              }}
+              activeOpacity={0.6}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={styles.clearLinkText}>Clear history</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -408,18 +413,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Detail bar sits between deck and clear link ---
+  // --- Floating footer overlay (pill + clear link on top of deck) ---
+  floatingFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+  },
   detailBarWrap: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xs,
   },
 
   // --- Clear link — muted underline tap target; destructive intent is
   //     reserved for the confirmation Alert, not the surface styling. ---
   clearLink: {
     alignSelf: 'center',
-    paddingVertical: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingBottom: spacing.md,
   },
   clearLinkText: {
     ...typography.caption,
