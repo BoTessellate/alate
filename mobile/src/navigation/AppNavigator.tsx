@@ -13,6 +13,7 @@ import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography } from '../constants/theme';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
+import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
@@ -47,6 +48,11 @@ export type RootStackParamList = {
       enrichedProduct?: { category?: string; material?: string; tags?: string[] };
       checkedAt?: string;
     };
+    // When navigating from History, pass the full entries list + the
+    // starting index so the user can horizontally swipe to sift through
+    // the rest from inside fit analysis — no fetch, it's all local.
+    historyEntries?: FitHistoryEntry[];
+    currentIndex?: number;
   };
 };
 

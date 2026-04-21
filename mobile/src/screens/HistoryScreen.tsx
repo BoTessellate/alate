@@ -92,6 +92,7 @@ export default function HistoryScreen() {
     entries.length > 0 ? entries[Math.min(activeIndex, entries.length - 1)] : null;
 
   const handleCardTap = (item: FitHistoryEntry) => {
+    const startIndex = entries.findIndex((e) => e.id === item.id);
     navigation.navigate('FitResult', {
       product: {
         name: item.productName,
@@ -112,6 +113,10 @@ export default function HistoryScreen() {
         },
         checkedAt: item.checkedAt,
       },
+      // Pass the whole list + starting index so FitResult can let the user
+      // horizontally swipe through siblings without going back to History.
+      historyEntries: entries,
+      currentIndex: startIndex >= 0 ? startIndex : 0,
     });
   };
 

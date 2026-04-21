@@ -15,8 +15,11 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   interpolate,
+  runOnJS,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 // expo-blur — we tried @react-native-community/blur for higher-fidelity
 // Android glass (Dimezis BlurView wrapper), but v4.4.1 pulls a newer
 // eightbitlab:blurview AAR than it was built against, causing a runtime
@@ -45,11 +48,15 @@ type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-// Card occupies 70% of the screen (test spec per user). Symmetric side
-// padding maintains visual symmetry; the product image fills the rest
-// above + behind the card.
-const CARD_HEIGHT = Math.round(SCREEN_H * 0.7);
+// Expanded card occupies 70% of screen with symmetric side + bottom
+// padding. Collapsed card docks at the screen bottom (full width, no
+// padding, rounded top corners only) and is short enough to show just
+// the verdict + price + stats row; fit concerns are hidden at that
+// point. The user drags the handle up/down to switch.
+const EXPANDED_H = Math.round(SCREEN_H * 0.7);
+const COLLAPSED_H = 290;
 const SIDE_PAD = spacing.lg;
+const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
@@ -65,45 +72,175 @@ export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
-  const { product, url, historyEntryId, precomputed } = route.params;
+  const {
+    product: routeProduct,
+    url: routeUrl,
+    historyEntryId: routeHistoryId,
+    precomputed,
+    historyEntries,
+    currentIndex = 0,
+  } = route.params;
   const { avatar } = useAvatarStore();
   const { addEntry, updateEntry } = useFitHistoryStore();
   const { garments: calibrationGarments } = useCalibrationStore();
 
-  const isHistoryMode = !!historyEntryId && !!precomputed;
+  // When we navigated in from History with a siblings list, the user can
+  // swipe horizontally to sift through products without going back.
+  const canSift = !!historyEntries && historyEntries.length > 1;
+  const [localIndex, setLocalIndex] = useState(currentIndex);
+  const activeEntry = canSift ? historyEntries![localIndex] : null;
 
+  // Effective route-derived values. Either come from the swiped-to entry
+  // (history+sift mode) or direct route params (live mode).
+  const product = activeEntry
+    ? {
+        name: activeEntry.productName,
+        image: activeEntry.productImage,
+        price: activeEntry.price,
+        brand: activeEntry.brand,
+      }
+    : routeProduct;
+  const url = activeEntry ? activeEntry.url : routeUrl;
+  const historyEntryId = activeEntry ? activeEntry.id : routeHistoryId;
+  const isHistoryMode = !!historyEntryId && (!!activeEntry || !!precomputed);
+
+  // Lazy state init — from activeEntry when available, else precomputed.
   const [loading, setLoading] = useState(!isHistoryMode);
-  const [warnings, setWarnings] = useState<FitWarning[]>(precomputed?.warnings ?? []);
-  const [fitScore, setFitScore] = useState<'great' | 'moderate' | 'poor'>(precomputed?.fitScore ?? 'great');
+  const [warnings, setWarnings] = useState<FitWarning[]>(() =>
+    activeEntry?.warnings ?? precomputed?.warnings ?? []
+  );
+  const [fitScore, setFitScore] = useState<'great' | 'moderate' | 'poor'>(() =>
+    activeEntry?.fitScore ?? precomputed?.fitScore ?? 'great'
+  );
   const [enrichedProduct, setEnrichedProduct] = useState<{
     category?: string;
     material?: string;
     tags?: string[];
-  } | null>(precomputed?.enrichedProduct ?? null);
+  } | null>(() =>
+    activeEntry
+      ? {
+          category: activeEntry.category,
+          material: activeEntry.material,
+          tags: activeEntry.tags,
+        }
+      : precomputed?.enrichedProduct ?? null
+  );
   const [sizeRec, setSizeRec] = useState<{
     size: string;
     confidence: 'high' | 'medium' | 'low';
     note?: string;
-  } | null>(precomputed?.sizeRecommendation ?? null);
+  } | null>(() => activeEntry?.sizeRecommendation ?? precomputed?.sizeRecommendation ?? null);
   const [reevaluating, setReevaluating] = useState(false);
   const [reevaluated, setReevaluated] = useState(false);
+
+  // Collapse/expand state + progress. 1 = expanded (default), 0 = collapsed.
+  const [isExpanded, setIsExpanded] = useState(true);
+  const collapseProgress = useSharedValue(1);
+  const startProgress = useSharedValue(1);
 
   const wentToAvatarSetup = useRef(false);
   const prevAvatarRef = useRef(avatar);
 
+  // Sync local fit-result state whenever the sift index changes. Skip on
+  // first mount — the lazy useState initialisers already handled that.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (!activeEntry) return;
+    setWarnings(activeEntry.warnings);
+    setFitScore(activeEntry.fitScore);
+    setSizeRec(activeEntry.sizeRecommendation ?? null);
+    setEnrichedProduct({
+      category: activeEntry.category,
+      material: activeEntry.material,
+      tags: activeEntry.tags,
+    });
+    setReevaluated(false);
+  }, [localIndex]);
+
   // Enter animation — the card rises from below and scales up, approximating
-  // the history "fit pill" morphing into the full analysis box. No shared-
-  // element lib needed; opacity + translateY + scale carries the feel.
+  // the history "fit pill" morphing into the full analysis box. Separate
+  // from the collapse progress so both can compose on the same view.
   const enterProgress = useSharedValue(0);
   useEffect(() => {
     enterProgress.value = withTiming(1, { duration: 420 });
   }, []);
-  const cardAnimStyle = useAnimatedStyle(() => ({
+  const cardEnterStyle = useAnimatedStyle(() => ({
     opacity: enterProgress.value,
     transform: [
       { translateY: interpolate(enterProgress.value, [0, 1], [80, 0]) },
-      { scale: interpolate(enterProgress.value, [0, 1], [0.94, 1]) },
     ],
+  }));
+
+  // Animated layout: height + side + bottom padding + border radii all
+  // interpolate off collapseProgress so the card smoothly docks to the
+  // screen edge on collapse and lifts back to its 70% floating state on
+  // expand.
+  const cardLayoutStyle = useAnimatedStyle(() => ({
+    height: interpolate(collapseProgress.value, [0, 1], [COLLAPSED_H, EXPANDED_H]),
+    left: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
+    right: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
+    bottom: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, insets.bottom + SIDE_PAD]
+    ),
+    borderBottomLeftRadius: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, borderRadius.xxxl]
+    ),
+    borderBottomRightRadius: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, borderRadius.xxxl]
+    ),
+  }));
+
+  // Vertical drag on the handle toggles collapse. 300px of drag = full
+  // transition; snap to 0 or 1 on release based on the midpoint.
+  const dragGesture = Gesture.Pan()
+    .onBegin(() => {
+      startProgress.value = collapseProgress.value;
+    })
+    .onUpdate((e) => {
+      const delta = -e.translationY / 300;
+      collapseProgress.value = Math.max(
+        0,
+        Math.min(1, startProgress.value + delta)
+      );
+    })
+    .onEnd(() => {
+      const target = collapseProgress.value > 0.5 ? 1 : 0;
+      collapseProgress.value = withSpring(target, { damping: 18, stiffness: 160 });
+      runOnJS(setIsExpanded)(target === 1);
+    });
+
+  // Horizontal drag on the content sifts to the next/prev entry. Uses
+  // activeOffsetX so vertical motion still goes to the ScrollView inside
+  // (otherwise pan would swallow scroll gestures).
+  const swipeX = useSharedValue(0);
+  const siftGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-20, 20])
+    .onUpdate((e) => {
+      // Dampened follow so the user feels the drag but doesn't overshoot.
+      swipeX.value = e.translationX * 0.4;
+    })
+    .onEnd((e) => {
+      const entriesLen = historyEntries?.length ?? 0;
+      if (e.translationX < -SWIPE_THRESHOLD && localIndex < entriesLen - 1) {
+        runOnJS(setLocalIndex)(localIndex + 1);
+      } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
+        runOnJS(setLocalIndex)(localIndex - 1);
+      }
+      swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
+    });
+  const siftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: swipeX.value }],
   }));
 
   useFocusEffect(
@@ -356,14 +493,13 @@ export default function FitResultScreen() {
         </Text>
       </View>
 
-      {/* Glass info card — 70% screen, symmetric side + bottom padding, enters
-          from below with opacity + scale + slide. Scroll happens inside. */}
+      {/* Glass info card — expanded = 70% screen + symmetric side/bottom
+          padding, collapsed = screen-wide dock anchored to the bottom.
+          Layout interpolates from collapseProgress; enter anim composes
+          on top. ScrollView inside scrolls the analysis content; the
+          horizontal sift gesture wraps it. */}
       <Animated.View
-        style={[
-          styles.cardWrap,
-          { bottom: insets.bottom + spacing.lg },
-          cardAnimStyle,
-        ]}
+        style={[styles.cardWrap, cardLayoutStyle, cardEnterStyle]}
       >
         <BlurView
           intensity={90}
@@ -376,12 +512,21 @@ export default function FitResultScreen() {
             on the edge; outer tint keeps text legible over busy images. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        <ScrollView
-          style={styles.cardScroll}
-          contentContainerStyle={styles.cardContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.handle} />
+        {/* Drag handle — vertical pan toggles collapse. Bigger hit target
+            than the thin bar so it's easy to grab. */}
+        <GestureDetector gesture={dragGesture}>
+          <View style={styles.handleHit}>
+            <View style={styles.handle} />
+          </View>
+        </GestureDetector>
+
+        <GestureDetector gesture={siftGesture}>
+          <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+            <ScrollView
+              style={styles.cardScroll}
+              contentContainerStyle={styles.cardContent}
+              showsVerticalScrollIndicator={false}
+            >
 
           {/* H1: Fit verdict — biggest element in the card. Sets the answer
               the user came here for before anything else. */}
@@ -454,8 +599,11 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Concerns */}
-          {warnings.length > 0 && (
+          {/* Concerns — only render when the card is expanded. When the user
+              drags the handle down to collapse, this section disappears and
+              the card shrinks to show just the verdict + stats + meta/tags.
+              Re-expanding brings it back. */}
+          {isExpanded && warnings.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
               {warnings.map((warning, index) => {
@@ -567,7 +715,9 @@ export default function FitResultScreen() {
               </>
             )}
           </View>
-        </ScrollView>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
       </Animated.View>
     </View>
   );
@@ -679,12 +829,13 @@ const styles = StyleSheet.create({
   },
 
   // --- Glass card ---
+  // Layout props (height / left / right / bottom / bottom-radii) are all
+  // driven by `cardLayoutStyle` — animated from collapseProgress. We keep
+  // the top radii + shadow static here; the animated style composes on top.
   cardWrap: {
     position: 'absolute',
-    left: SIDE_PAD,
-    right: SIDE_PAD,
-    height: CARD_HEIGHT,
-    borderRadius: borderRadius.xxxl,
+    borderTopLeftRadius: borderRadius.xxxl,
+    borderTopRightRadius: borderRadius.xxxl,
     overflow: 'hidden',
     // Deep purple-tinted drop shadow — grounds the card over the image.
     shadowColor: '#1a0f28',
@@ -702,23 +853,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.45)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.6)',
-    borderRadius: borderRadius.xxxl,
+    borderTopLeftRadius: borderRadius.xxxl,
+    borderTopRightRadius: borderRadius.xxxl,
+  },
+  // Wrapper around the ScrollView that receives the horizontal sift pan.
+  // `flex: 1` under the card (after the handle) so the scrollable area
+  // fills the remaining height.
+  cardScrollWrap: {
+    flex: 1,
   },
   cardScroll: {
     flex: 1,
   },
   cardContent: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
+  // Bigger hit target around the handle bar so the drag gesture is easy
+  // to grab without hitting the thin visual bar exactly.
+  handleHit: {
+    width: '100%',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
   handle: {
-    alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(63, 43, 84, 0.22)',
-    marginBottom: spacing.md,
   },
 
   // --- Verdict row (H1) ---
