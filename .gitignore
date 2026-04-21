@@ -50,6 +50,7 @@ backend/sdk/productEnrichment/generated-images/
 
 # Claude Code working files (not committed)
 .claude/working directory/
+.claude/worktrees/
 .claude/settings.local.json
 notion-specs.md
 TML_BACKEND_COMPLETE_SUMMARY.md
