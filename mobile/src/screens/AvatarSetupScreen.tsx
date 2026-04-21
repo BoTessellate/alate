@@ -281,7 +281,7 @@ export default function AvatarSetupScreen() {
               testID="avatar-setup-title"
               slot="body-profile"
               fallback="body profile"
-              height={36}
+              height={48}
               color={colors.text}
               textStyle={styles.title}
             />

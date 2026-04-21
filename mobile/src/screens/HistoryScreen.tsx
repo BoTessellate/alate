@@ -176,7 +176,7 @@ export default function HistoryScreen() {
           <HeadingImage
             slot="history"
             fallback="your history"
-            height={44}
+            height={60}
             color={colors.text}
             textStyle={styles.pageTitle}
           />

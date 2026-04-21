@@ -4,20 +4,26 @@
  */
 
 // =============================================================================
-// FONT FAMILIES - Using system fonts for cross-platform consistency
+// FONT FAMILIES
 // =============================================================================
+// The display face is TAN Nightingale (rendered as SVGs by HeadingImage).
+// Body copy now runs on a system serif so it pairs with Nightingale's
+// art-deco serif character — mixing sans body with a display serif made
+// the headings feel like stickers dropped onto sans-serif chrome.
+// Platform-specific serifs: 'Times New Roman' (iOS Western default),
+// 'serif' (Android → Noto Serif, which ships on every Android device).
 export const fontFamily = {
-  // Primary UI font - clean, professional sans-serif
-  primary: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  // Accent/Display font - elegant serif for headings
-  accent: 'Georgia, "Times New Roman", serif',
+  // Primary UI font — system serif that pairs with TAN Nightingale.
+  primary: 'serif',
+  // Legacy alias for the editorial body face
+  accent: 'Georgia',
   // Display font loaded via expo-font (see App.tsx). Stand-in for TAN Nightingale
-  // until we buy the real thing. Rendered lowercase on all heading tokens.
+  // when the SVG slot falls back to text (i.e. missing asset).
   display: 'DMSerifDisplay-Italic',
   // Monospace for code/data
   mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
   // Fallback
-  fallback: 'system-ui, sans-serif',
+  fallback: 'serif',
 };
 
 // Shared heading trait: every display/heading token mixes this in so the
@@ -178,42 +184,49 @@ export const typography = {
     lineHeight: 28,
   },
   headingS: {
+    fontFamily: 'serif',
     fontSize: 16,
     fontWeight: '600' as const,
     lineHeight: 24,
   },
 
-  // Body text
+  // Body text — now on system serif to pair with TAN Nightingale
   bodyLarge: {
+    fontFamily: 'serif',
     fontSize: 18,
     fontWeight: '400' as const,
     lineHeight: 28,
   },
   body: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '400' as const,
     lineHeight: 22,
   },
   bodySmall: {
+    fontFamily: 'serif',
     fontSize: 13,
     fontWeight: '400' as const,
     lineHeight: 18,
   },
 
-  // Labels & Buttons
+  // Labels & Buttons — serif so small copy matches the editorial voice
   labelLarge: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '500' as const,
     lineHeight: 22,
     letterSpacing: 0.1,
   },
   label: {
+    fontFamily: 'serif',
     fontSize: 13,
     fontWeight: '500' as const,
     lineHeight: 18,
     letterSpacing: 0.1,
   },
   labelSmall: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '500' as const,
     lineHeight: 16,
@@ -222,11 +235,13 @@ export const typography = {
 
   // Caption & Overline
   caption: {
+    fontFamily: 'serif',
     fontSize: 12,
     fontWeight: '400' as const,
     lineHeight: 16,
   },
   overline: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '600' as const,
     lineHeight: 14,

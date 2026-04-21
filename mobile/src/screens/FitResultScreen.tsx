@@ -596,7 +596,7 @@ export default function FitResultScreen() {
                     : 'may-not-fit'
                 }
                 fallback={scoreConfig.text}
-                height={30}
+                height={42}
                 color={scoreConfig.color}
                 textStyle={[styles.verdictText, { color: scoreConfig.color }]}
               />
@@ -949,12 +949,13 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Lighter now that QmBlurView (via @sbaiahmed1/react-native-blur)
-    // does real blur on mid-range Android. Hairline inner border catches
-    // "light" on the edge for the frosted-glass feel.
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    // Bumped 0.28 → 0.62 so body text (sizing note, concerns, tag
+    // labels, meta rows) passes WCAG AA contrast against the busy
+    // product-image backdrop. The image-through-glass feel is still
+    // there, just with a firmer frost tint so text reads clearly.
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderColor: 'rgba(255, 255, 255, 0.65)',
     borderTopLeftRadius: borderRadius.xxxl,
     borderTopRightRadius: borderRadius.xxxl,
   },

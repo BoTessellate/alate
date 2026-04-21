@@ -109,23 +109,29 @@ function MainTabs() {
         tabBarBackground: TabBarBackground,
         tabBarStyle: {
           position: 'absolute',
-          left: 16,
-          right: 16,
-          bottom: insets.bottom > 0 ? insets.bottom : 16,
-          height: 62,
-          borderRadius: 28,
+          // Tucked in further from all edges so the pill reads as a
+          // floating element rather than a docked bar snapped to the
+          // bottom. 24px inset on sides, 24+insets on bottom.
+          left: 24,
+          right: 24,
+          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 24,
+          height: 64,
+          // Full pill — borderRadius matches the height/2 cap so the
+          // shape is unambiguously capsule-shaped at any width.
+          borderRadius: 32,
           borderTopWidth: 0,
-          // Hairline border all around — the glass edge-highlight.
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.5)',
-          // Deep purple-tinted shadow grounds the floating pill.
           shadowColor: '#2f2937',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.16,
-          shadowRadius: 20,
-          elevation: 12,
-          // No background — TabBarBackground handles the fill + blur.
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.22,
+          shadowRadius: 24,
+          elevation: 14,
+          // Background transparent — TabBarBackground renders the blur.
           backgroundColor: 'transparent',
+          // Clip the BlurView + tint to the rounded edge. Without this
+          // the corners show sharp blur rectangles outside the pill.
+          overflow: 'hidden',
           paddingTop: 8,
           paddingBottom: 6,
         },
@@ -300,11 +306,12 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   // Glass tint layer inside the floating tab bar pill — sits over the
-  // BlurView to keep labels legible on any background.
+  // BlurView to keep labels legible on any background. Matches the
+  // tab bar's borderRadius so it clips cleanly inside the capsule.
   tabBarTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.45)',
-    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.58)',
+    borderRadius: 32,
   },
   loadingOverlay: {
     flex: 1,

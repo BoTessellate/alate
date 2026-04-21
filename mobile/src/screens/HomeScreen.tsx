@@ -159,7 +159,7 @@ export default function HomeScreen() {
             <HeadingImage
               slot="home-verse"
               fallback={"paste anything.\nwe'll tell you\nif it fits."}
-              height={150}
+              height={200}
               color="#fff"
               style={styles.heroVerseWrap}
               textStyle={styles.heroVerse}
@@ -567,6 +567,12 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 10,
     borderRadius: borderRadius.xl,
+    // Override GlassCard's default near-opaque white (0.92) — recent
+    // rows are short so the gradient-bleed bug isn't an issue, and a
+    // proper translucent frost reads as glass on the dark backdrop.
+    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   recentThumb: {
     width: 44,
@@ -587,17 +593,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
-    color: colors.textMuted,
+    // On translucent glass over dark gradient, muted text vanishes —
+    // bump to white with reduced opacity instead.
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   recentName: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.text,
-    lineHeight: 17,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    lineHeight: 18,
   },
   recentSize: {
     fontSize: 11,
-    color: colors.textMuted,
+    color: 'rgba(255, 255, 255, 0.7)',
     lineHeight: 13,
     marginTop: 1,
   },

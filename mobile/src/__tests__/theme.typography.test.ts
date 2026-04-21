@@ -1,21 +1,21 @@
 /**
- * Theme typography tests — DM Serif Display Italic for headings, lowercase.
+ * Theme typography tests.
  *
- * User picked DM Serif Display (Google Fonts) as a free stand-in for the
- * paid TAN Nightingale that Canva mocks used. Rule:
- *   - Display + heading tokens use the serif display family
- *   - Display + heading tokens render in lowercase
- *   - Body/label/caption stay on the default sans (untouched)
+ *   - Display + heading tokens use the DM Serif Italic fallback face
+ *     (TAN Nightingale SVGs replace these at the screen level when
+ *     rendered — see HeadingImage).
+ *   - Display + heading tokens render in lowercase.
+ *   - Body / label / caption tokens run on the SYSTEM SERIF to pair
+ *     with the display serif — the whole app now reads as serif-led.
  *
- * These tokens are the single source of truth — if a heading anywhere drifts
- * off them, that's a bug. Keeps typography consistent across screens without
- * every screen having to remember to set fontFamily + textTransform.
+ * These tokens are the single source of truth — if a heading anywhere
+ * drifts off them, that's a bug.
  */
 
 import { typography, fontFamily } from '../constants/theme';
 
 describe('theme — heading typography', () => {
-  it('exposes DMSerifDisplay-Italic as the display font family', () => {
+  it('exposes DMSerifDisplay-Italic as the display font family fallback', () => {
     expect(fontFamily.display).toBe('DMSerifDisplay-Italic');
   });
 
@@ -37,14 +37,15 @@ describe('theme — heading typography', () => {
     });
   });
 
-  // Body / label tokens should not be touched — they stay on system sans
+  // Body / label tokens now use the system serif (paired with TAN
+  // Nightingale headings) — they should not inherit lowercase.
   const nonHeadingKeys = ['body', 'bodyLarge', 'bodySmall', 'label', 'labelLarge', 'caption'] as const;
   nonHeadingKeys.forEach((key) => {
     it(`${key} is not forced into lowercase`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
-    it(`${key} does not hard-code the display serif`, () => {
-      expect((typography as any)[key].fontFamily).toBeUndefined();
+    it(`${key} uses the system serif (paired with the display serif)`, () => {
+      expect((typography as any)[key].fontFamily).toBe('serif');
     });
   });
 });
