@@ -60,6 +60,9 @@ interface HistoryCoverFlowProps {
   onCardTap: (entry: FitHistoryEntry) => void;
   /** Fires on every snap change so a sibling detail bar can follow along. */
   onActiveIndexChange?: (index: number) => void;
+  /** Fires when the user taps the trash icon on a card's top-right corner.
+   *  Parent is responsible for confirming + removing from the store. */
+  onCardDelete?: (entry: FitHistoryEntry) => void;
 }
 
 const formatPrice = (price?: { amount: number; currency: string }) => {
@@ -140,11 +143,13 @@ function CoverFlowCard({
   index,
   scrollX,
   onTap,
+  onDelete,
 }: {
   entry: FitHistoryEntry;
   index: number;
   scrollX: SharedValue<number>;
   onTap: () => void;
+  onDelete?: () => void;
 }) {
   const animatedStyle = useAnimatedStyle(() => {
     // Distance from this card's snap point to the current scroll offset,
@@ -246,6 +251,17 @@ function CoverFlowCard({
           <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
             <CardFace entry={entry} />
           </TouchableOpacity>
+          {onDelete && (
+            <TouchableOpacity
+              onPress={onDelete}
+              activeOpacity={0.75}
+              style={styles.deleteBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID={`history-card-delete-${entry.id}`}
+            >
+              <Feather name="trash-2" size={14} color="#fff" />
+            </TouchableOpacity>
+          )}
           <Animated.View style={[styles.veil, veilStyle]} pointerEvents="none" />
         </Animated.View>
       </View>
@@ -257,6 +273,7 @@ export default function HistoryCoverFlow({
   entries,
   onCardTap,
   onActiveIndexChange,
+  onCardDelete,
 }: HistoryCoverFlowProps) {
   const scrollX = useSharedValue(0);
 
@@ -320,6 +337,7 @@ export default function HistoryCoverFlow({
             index={i}
             scrollX={scrollX}
             onTap={() => onCardTap(entry)}
+            onDelete={onCardDelete ? () => onCardDelete(entry) : undefined}
           />
         ))}
       </Animated.ScrollView>
@@ -371,6 +389,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.42,
     shadowRadius: 24,
     elevation: 14,
+  },
+  // Floating trash icon on the top-right of each card. Semi-transparent
+  // dark pill so it reads on any product image without fighting the
+  // card content. Not part of the tappable cardTouch so the tap-to-open
+  // gesture still works on the rest of the card.
+  deleteBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.38)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   // Atmospheric haze overlay, placed over each card. Opacity is animated
   // in CoverFlowCard's useAnimatedStyle (veilStyle) so side cards wash

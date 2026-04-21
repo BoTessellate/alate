@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -20,19 +21,19 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-// expo-blur — we tried @react-native-community/blur for higher-fidelity
-// Android glass (Dimezis BlurView wrapper), but v4.4.1 pulls a newer
-// eightbitlab:blurview AAR than it was built against, causing a runtime
-// NoSuchMethodError (`setupWith(ViewGroup)` signature changed in v2.0)
-// when the first BlurView mounts — plus its ViewManagerPropertyUpdater
-// isn't Fabric-ready. Sticking with expo-blur: native RenderEffect on
-// Android 12+, tinted fallback below. The heavier tint + hairline edge
-// border carries the glass read where the blur degrades.
-import { BlurView } from 'expo-blur';
+// @sbaiahmed1/react-native-blur — Fabric/new-arch-ready Turbo Module.
+// Android backend is QmBlurView (com.qmdeve.blurview) which wraps
+// RenderEffect (12+) / RenderScript (10–11) / overlay fallback with
+// better quality than expo-blur on mid-range Android. iOS path uses
+// UIVisualEffectView. We tried @react-native-community/blur first and
+// it crashed on Fabric with a NoSuchMethodError (Dimezis v2 signature
+// mismatch) — this library avoids that whole class of issue.
+import { BlurView } from '@sbaiahmed1/react-native-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
@@ -54,7 +55,9 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // the verdict + price + stats row; fit concerns are hidden at that
 // point. The user drags the handle up/down to switch.
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
-const COLLAPSED_H = 290;
+// Collapsed dock height — tight enough to feel like a dock, wide enough
+// to keep the verdict + stats row + tags readable without scrolling.
+const COLLAPSED_H = 200;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -81,7 +84,7 @@ export default function FitResultScreen() {
     currentIndex = 0,
   } = route.params;
   const { avatar } = useAvatarStore();
-  const { addEntry, updateEntry } = useFitHistoryStore();
+  const { addEntry, updateEntry, removeEntry } = useFitHistoryStore();
   const { garments: calibrationGarments } = useCalibrationStore();
 
   // When we navigated in from History with a siblings list, the user can
@@ -485,6 +488,39 @@ export default function FitResultScreen() {
         <Feather name="chevron-left" size={22} color="#fff" />
       </TouchableOpacity>
 
+      {/* Remove-from-history trash — mirrors the back chevron on the
+          right. Only shown in history mode (live mode just saved the
+          entry; removing it here would feel adversarial). Acts on the
+          CURRENTLY displayed entry (which may differ from the entered
+          entry when the user has sifted). */}
+      {isHistoryMode && historyEntryId && (
+        <TouchableOpacity
+          testID="remove-from-history-button"
+          style={[styles.deleteBtn, { top: insets.top + spacing.sm }]}
+          onPress={() => {
+            Alert.alert(
+              'Remove from history',
+              `Remove "${safeName || 'this item'}" from your history?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Remove',
+                  style: 'destructive',
+                  onPress: () => {
+                    removeEntry(historyEntryId);
+                    navigation.goBack();
+                  },
+                },
+              ]
+            );
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.75}
+        >
+          <Feather name="trash-2" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
+
       {/* Brand + product name centred near the top of the image */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
         {safeBrand ? <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text> : null}
@@ -502,14 +538,14 @@ export default function FitResultScreen() {
         style={[styles.cardWrap, cardLayoutStyle, cardEnterStyle]}
       >
         <BlurView
-          intensity={90}
-          tint="light"
           style={StyleSheet.absoluteFill}
-          experimentalBlurMethod="dimezisBlurView"
+          blurType="light"
+          blurAmount={22}
+          reducedTransparencyFallbackColor="rgba(255,255,255,0.75)"
         />
-        {/* Layered tint does the glass heavy-lifting on Android where blur
-            may degrade to a passthrough view. Inner border catches "light"
-            on the edge; outer tint keeps text legible over busy images. */}
+        {/* Tint is lighter now that the QmBlurView backend does a real
+            blur on mid-range Android. Inner border catches "light" on
+            the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
         {/* Drag handle — vertical pan toggles collapse. Bigger hit target
@@ -558,7 +594,7 @@ export default function FitResultScreen() {
             {sizeRec && (
               <StatBadge value={sizeRec.size} testID="recommended-size-value" />
             )}
-            <ConfidenceBar level={sizeRec?.confidence ?? null} />
+            <ConfidenceDonut level={sizeRec?.confidence ?? null} />
             <View style={styles.fitBadge}>
               <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
                 {scoreConfig.icon}
@@ -740,28 +776,51 @@ function StatBadge({ value, testID }: { value: string; testID?: string }) {
 // High → all three at full brand purple
 // Unfilled segments sit at a very light purple tint so the track is
 // always visible. Replaces the circular "Me…"-truncating chip.
-function ConfidenceBar({ level }: { level: 'high' | 'medium' | 'low' | null }) {
+function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null }) {
   if (!level) return null;
-  const filled = level === 'high' ? 3 : level === 'medium' ? 2 : 1;
-  const fillColours = [
-    'rgba(90, 67, 119, 0.35)',
-    'rgba(90, 67, 119, 0.65)',
-    'rgba(90, 67, 119, 1.0)',
-  ];
+  // Arc length grows with confidence (28% / 60% / 92% of circumference) and
+  // the stroke colour saturates with it (light → mid → full brand purple).
+  // Rotated -90° so the fill starts from 12 o'clock and sweeps clockwise.
+  const size = 48;
+  const stroke = 6;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const percent = level === 'high' ? 0.92 : level === 'medium' ? 0.6 : 0.28;
+  const colour =
+    level === 'high'
+      ? 'rgba(90, 67, 119, 1)'
+      : level === 'medium'
+      ? 'rgba(90, 67, 119, 0.72)'
+      : 'rgba(90, 67, 119, 0.45)';
+  const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
   return (
-    <View style={styles.confidenceBar}>
-      {[0, 1, 2].map((i) => (
-        <View
-          key={i}
-          style={[
-            styles.confidenceSegment,
-            {
-              backgroundColor:
-                i < filled ? fillColours[i] : 'rgba(90, 67, 119, 0.08)',
-            },
-          ]}
+    <View style={styles.confidenceDonut}>
+      <Svg width={size} height={size}>
+        {/* Track ring — always a full circle at very low alpha */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="rgba(90, 67, 119, 0.14)"
+          strokeWidth={stroke}
+          fill="transparent"
         />
-      ))}
+        {/* Filled arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colour}
+          strokeWidth={stroke}
+          strokeDasharray={`${c * percent} ${c}`}
+          strokeLinecap="round"
+          fill="transparent"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      {/* Single-letter centre glyph keeps the donut readable without a
+          separate label — the H/M/L maps directly to the arc length. */}
+      <Text style={styles.confidenceDonutLabel}>{label}</Text>
     </View>
   );
 }
@@ -794,6 +853,18 @@ const styles = StyleSheet.create({
   backBtn: {
     position: 'absolute',
     left: spacing.lg,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  // --- Remove-from-history trash (mirror of backBtn, right side) ---
+  deleteBtn: {
+    position: 'absolute',
+    right: spacing.lg,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -846,13 +917,12 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Heavier than with a real-blur lib because expo-blur's Android fall-
-    // back can be a passthrough view on older/edge-case devices. 0.45 keeps
-    // the image tint readable through the tint. Hairline inner border
-    // simulates the light-catching edge of real frosted glass.
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    // Lighter now that QmBlurView (via @sbaiahmed1/react-native-blur)
+    // does real blur on mid-range Android. Hairline inner border catches
+    // "light" on the edge for the frosted-glass feel.
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.55)',
     borderTopLeftRadius: borderRadius.xxxl,
     borderTopRightRadius: borderRadius.xxxl,
   },
@@ -962,18 +1032,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  // --- Confidence bar — 3 segments, purple saturation increases with level ---
-  confidenceBar: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 6,
-    height: 8,
+  // --- Confidence donut — circular arc, purple saturation + arc length
+  //     both grow with confidence. Centre letter (H/M/L) is the legible
+  //     label without stealing space. ---
+  confidenceDonut: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  confidenceSegment: {
-    flex: 1,
-    height: 8,
-    borderRadius: borderRadius.pill,
+  confidenceDonutLabel: {
+    position: 'absolute',
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.3,
   },
 
   // --- Banners ---

@@ -81,7 +81,25 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { entries, addEntry, clearHistory } = useFitHistoryStore();
+  const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+
+  // Delete a single history card. Confirms first, then removes from the
+  // store. Cover flow re-renders automatically because the store drives
+  // the list; the active-index derived value reclamps to the new range.
+  const handleCardDelete = (item: FitHistoryEntry) => {
+    Alert.alert(
+      'Remove from history',
+      `Remove "${item.productName}" from your history?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeEntry(item.id),
+        },
+      ]
+    );
+  };
   const [activeIndex, setActiveIndex] = useState(0);
 
   const seedDemoData = () => {
@@ -169,6 +187,7 @@ export default function HistoryScreen() {
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
+          onCardDelete={handleCardDelete}
           onActiveIndexChange={setActiveIndex}
         />
 

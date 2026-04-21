@@ -86,6 +86,18 @@ jest.mock('expo-blur', () => {
   };
 });
 
+// Mock @sbaiahmed1/react-native-blur — Fabric-ready Turbo Module for real
+// Android glass. Passthrough View in tests so layout assertions work
+// without the native renderer.
+jest.mock('@sbaiahmed1/react-native-blur', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    BlurView: ({ children, style, ...props }) =>
+      React.createElement(View, { style, ...props }, children),
+  };
+});
+
 
 // Mock expo modules
 jest.mock('expo-haptics', () => ({
