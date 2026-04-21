@@ -283,7 +283,12 @@ export default function AppNavigator() {
           name="AvatarSetup"
           component={SafeAvatarSetup}
           options={{
-            title: 'Body Profile',
+            // Hide the native stack header — the screen paints its own
+            // TAN Nightingale "body profile" title via HeadingImage, so
+            // the native title + back button would duplicate what the
+            // screen already owns. Back navigation is handled by the
+            // screen's own back chevron.
+            headerShown: false,
             presentation: 'modal',
           }}
         />

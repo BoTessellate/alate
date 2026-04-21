@@ -1228,6 +1228,7 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
+    fontFamily: 'serif',
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
@@ -1241,6 +1242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
+    fontFamily: 'serif',
     fontSize: 14,
     color: colors.primary,
     fontWeight: '700',

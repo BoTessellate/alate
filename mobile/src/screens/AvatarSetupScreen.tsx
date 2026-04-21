@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -263,6 +264,18 @@ export default function AvatarSetupScreen() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
+      {/* Back chevron — native stack header is hidden so the TAN
+          Nightingale "body profile" title below is the sole page
+          heading (no duplicate "Body Profile" next to a chevron). */}
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={[styles.backChev, { top: insets.top + spacing.sm }]}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+      >
+        <Feather name="chevron-left" size={22} color={colors.text} />
+      </TouchableOpacity>
+
       {/* Claude Design handoff direction: body croquis removed from the
           onboarding flow ("inaccurate and really bad looking" — user
           words). Full-width chip flow is what the design landed on.
@@ -476,6 +489,18 @@ const styles = StyleSheet.create({
   // Croquis pane retired — form now takes full width.
   formPane: {
     width: '100%',
+  },
+  // Back chevron — floats top-left with safe-area offset applied inline.
+  backChev: {
+    position: 'absolute',
+    left: spacing.md,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(47, 41, 55, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   formContent: {
     padding: spacing.md,

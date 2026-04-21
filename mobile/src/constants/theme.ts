@@ -250,10 +250,10 @@ export const typography = {
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: 'serif', fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: 'serif', fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: 'serif', fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: 'serif', fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
 };
 
 // =============================================================================

@@ -294,26 +294,10 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Preferences — per mockup: static chevron rows (fit pref, notifs) */}
-        <View style={[styles.sectionRow, styles.sectionRowSpaced]}>
-          <Text style={styles.sectionLabel}>PREFERENCES</Text>
-        </View>
-        <GlassCard style={styles.profileCard}>
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Fit preference</Text>
-            <View style={styles.prefValue}>
-              <Text style={styles.profileValue}>Relaxed</Text>
-              <Feather name="chevron-right" size={14} color={colors.accentLight} />
-            </View>
-          </View>
-          <View style={[styles.profileRow, styles.profileRowLast]}>
-            <Text style={styles.profileLabel}>Notifications</Text>
-            <View style={styles.prefValue}>
-              <Text style={styles.profileValue}>On</Text>
-              <Feather name="chevron-right" size={14} color={colors.accentLight} />
-            </View>
-          </View>
-        </GlassCard>
+        {/* Preferences section removed — the Fit preference / Notifications
+            rows were mockup placeholders that weren't wired to any store.
+            When real preferences land (toggle component, persisted in
+            zustand), reintroduce this section backed by real state. */}
 
         {/* Reset — quiet link at the bottom. Calibration + Tip cards
             removed from Account per design mockup (they may return as
