@@ -17,12 +17,15 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
-// @react-native-community/blur uses Dimezis' BlurView on Android (bitmap
-// snapshot + RenderEffect/RenderScript) — much higher-fidelity glass than
-// expo-blur on Android, where blur is only real on Android 12+ and
-// silently degrades to a tinted view on older versions. iOS path uses
-// UIVisualEffectView. Both are autolinked.
-import { BlurView } from '@react-native-community/blur';
+// expo-blur — we tried @react-native-community/blur for higher-fidelity
+// Android glass (Dimezis BlurView wrapper), but v4.4.1 pulls a newer
+// eightbitlab:blurview AAR than it was built against, causing a runtime
+// NoSuchMethodError (`setupWith(ViewGroup)` signature changed in v2.0)
+// when the first BlurView mounts — plus its ViewManagerPropertyUpdater
+// isn't Fabric-ready. Sticking with expo-blur: native RenderEffect on
+// Android 12+, tinted fallback below. The heavier tint + hairline edge
+// border carries the glass read where the blur degrades.
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -363,14 +366,14 @@ export default function FitResultScreen() {
         ]}
       >
         <BlurView
+          intensity={90}
+          tint="light"
           style={StyleSheet.absoluteFill}
-          blurType="xlight"
-          blurAmount={18}
-          reducedTransparencyFallbackColor="white"
+          experimentalBlurMethod="dimezisBlurView"
         />
-        {/* Thin white tint so content keeps contrast over busy images. With
-            real blur below, the tint is lighter than before — the blur now
-            carries the glass effect; the tint just lifts legibility. */}
+        {/* Layered tint does the glass heavy-lifting on Android where blur
+            may degrade to a passthrough view. Inner border catches "light"
+            on the edge; outer tint keeps text legible over busy images. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
         <ScrollView
@@ -684,12 +687,13 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Lighter than before because the Dimezis blur underneath now does
-    // the real glass work. Hairline inner border completes the frosted
-    // feel — the edge catches "light" the way real glass does.
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
+    // Heavier than with a real-blur lib because expo-blur's Android fall-
+    // back can be a passthrough view on older/edge-case devices. 0.45 keeps
+    // the image tint readable through the tint. Hairline inner border
+    // simulates the light-catching edge of real frosted glass.
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     borderRadius: borderRadius.xxxl,
   },
   cardScroll: {
