@@ -393,22 +393,26 @@ export default function FitResultScreen() {
   };
 
   const getScoreConfig = () => {
+    // Use the *Deep text variants per Claude Design — the verdict label
+    // reads as hero text on a white-tinted glass card, so it needs more
+    // ink than the mid-saturation `success/warning/error` (which are
+    // tuned for chip backgrounds). Same hue family, darker shade.
     switch (fitScore) {
       case 'great':
         return {
-          color: colors.success,
+          color: colors.successDeep,
           icon: '✓',
           text: 'Great Fit!',
         };
       case 'moderate':
         return {
-          color: colors.warning,
+          color: colors.warningDeep,
           icon: '⚠',
           text: 'Some Concerns',
         };
       case 'poor':
         return {
-          color: colors.error,
+          color: colors.errorDeep,
           icon: '✕',
           text: 'May Not Fit Well',
         };

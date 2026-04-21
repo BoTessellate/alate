@@ -169,15 +169,12 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View testID="history-screen" style={styles.container}>
-        {/* Page title + slim stats pill under it */}
+        {/* Page title + slim stats pill under it — copy per Claude Design:
+            lowercase italic "your history" + count subtitle with swipe hint. */}
         <View style={styles.header}>
-          <Text style={styles.pageTitle}>History</Text>
+          <Text style={styles.pageTitle}>your history</Text>
           <Text style={styles.headerMeta}>
-            {entries.length} checked
-            {entries.filter((e) => e.fitScore === 'great').length > 0 &&
-              ` · ${entries.filter((e) => e.fitScore === 'great').length} great fit${
-                entries.filter((e) => e.fitScore === 'great').length > 1 ? 's' : ''
-              }`}
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · swipe through to revisit
           </Text>
         </View>
 

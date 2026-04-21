@@ -80,10 +80,13 @@ export const colors = {
   // Status colours — muted, earthy, harmonious with grey-purple
   success: '#5a7a68',         // dusty sage
   successLight: '#7a9a88',
+  successDeep: '#4a6a58',     // verdict text on white glass (higher contrast)
   warning: '#a8724a',         // terracotta
   warningLight: '#c28a62',
+  warningDeep: '#8a5a3a',
   error: '#9a4a4a',           // clay red
   errorLight: '#b46868',
+  errorDeep: '#7a3a3a',
   info: '#5a7585',            // slate blue
   infoLight: '#7a95a5',
 
