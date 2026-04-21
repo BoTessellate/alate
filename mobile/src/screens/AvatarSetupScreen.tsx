@@ -152,7 +152,7 @@ const chipStyles = StyleSheet.create({
   chip: {
     // Frosted chip — near-opaque so the gradient doesn't bleed through.
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 10,
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
@@ -558,12 +558,12 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     marginTop: spacing.sm,
-    ...shadows.glow,
+    ...shadows.md,
   },
   buttonDisabled: {
     opacity: 0.5,

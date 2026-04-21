@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.xl,
   },

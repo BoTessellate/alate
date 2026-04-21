@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     paddingVertical: 12,
     paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     ...shadows.sm,
   },
   ctaButtonText: {

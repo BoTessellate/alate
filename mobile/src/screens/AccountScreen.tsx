@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   },
   emptyProfileCta: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
   resetButton: {
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     backgroundColor: colors.error + '10',
   },
   resetText: {

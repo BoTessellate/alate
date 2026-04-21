@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
     ...shadows.sm,

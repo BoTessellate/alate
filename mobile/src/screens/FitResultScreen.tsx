@@ -405,37 +405,28 @@ export default function FitResultScreen() {
 
           <View style={styles.divider} />
 
-          {/* H2: Stats row — size / confidence / fit / stock */}
+          {/* H2: Stats row — size badge + confidence bar + fit icon. Labels
+              dropped because they overflowed the circular chips ("Me…")
+              and stacked labels underneath; each element is now self-
+              descriptive (letter / progress segments / semantic icon). */}
           <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
-              <StatChip
-                label="Size"
-                value={sizeRec.size}
-                testID="recommended-size-value"
-              />
+              <StatBadge value={sizeRec.size} testID="recommended-size-value" />
             )}
-            {confidenceLabel && (
-              <StatChip label="Confidence" value={confidenceLabel} />
-            )}
-            <StatChip
-              label="Fit"
-              icon={
-                <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
-                  {scoreConfig.icon}
-                </Text>
-              }
-            />
+            <ConfidenceBar level={sizeRec?.confidence ?? null} />
+            <View style={styles.fitBadge}>
+              <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
+                {scoreConfig.icon}
+              </Text>
+            </View>
             {inStock !== null && (
-              <StatChip
-                label={inStock ? 'In stock' : 'Check stock'}
-                icon={
-                  <Feather
-                    name={inStock ? 'check' : 'alert-circle'}
-                    size={18}
-                    color={inStock ? colors.success : colors.warning}
-                  />
-                }
-              />
+              <View style={styles.fitBadge}>
+                <Feather
+                  name={inStock ? 'check' : 'alert-circle'}
+                  size={18}
+                  color={inStock ? colors.success : colors.warning}
+                />
+              </View>
             )}
           </View>
 
@@ -498,19 +489,19 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Meta rows */}
+          {/* Meta rows — Material first, then Category (swapped per UX ask) */}
           {(showCategory || showMaterial) && (
             <View style={styles.metaSection}>
-              {showCategory && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
-                </View>
-              )}
               {showMaterial && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Material</Text>
                   <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
+                </View>
+              )}
+              {showCategory && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Category</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
                 </View>
               )}
             </View>
@@ -531,24 +522,28 @@ export default function FitResultScreen() {
                 >
                   <Text style={styles.primaryButtonText}>Re-evaluate</Text>
                 </TouchableOpacity>
+                {/* Swapped order: View on Store above Change measurements
+                    so the shopping-intent action sits closer to the
+                    primary Re-evaluate CTA, and the profile-editing
+                    action takes the deeper slot. */}
+                <TouchableOpacity
+                  testID="view-on-store-button"
+                  style={styles.secondaryButton}
+                  onPress={openProductPage}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryButtonText}>View on Store</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   testID="change-measurements-button"
-                  style={styles.secondaryButton}
+                  style={styles.ghostButton}
                   onPress={() => {
                     wentToAvatarSetup.current = true;
                     navigation.navigate('AvatarSetup');
                   }}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.secondaryButtonText}>Change your measurements</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  testID="view-on-store-button"
-                  style={styles.ghostButton}
-                  onPress={openProductPage}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.ghostButtonText}>View on Store</Text>
+                  <Text style={styles.ghostButtonText}>Change your measurements</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -578,32 +573,45 @@ export default function FitResultScreen() {
   );
 }
 
-// Circular stat chip — each stat sits in a purple-tinted ring. Uses purple
-// for all accents (colour consistency). Fit score icon keeps its semantic
-// colour because users need instant good/bad readability.
-function StatChip({
-  label,
-  value,
-  icon,
-  testID,
-}: {
-  label: string;
-  value?: string | null;
-  icon?: React.ReactNode;
-  testID?: string;
-}) {
+// Simple badge — circle with the size letter/number, no label below.
+function StatBadge({ value, testID }: { value: string; testID?: string }) {
   return (
-    <View style={styles.statChip}>
-      <View style={styles.statCircle}>
-        {icon ? (
-          icon
-        ) : (
-          <Text testID={testID} style={styles.statValue} numberOfLines={1}>
-            {value}
-          </Text>
-        )}
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.statBadge}>
+      <Text testID={testID} style={styles.statValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// Confidence as a 3-segment progress bar with increasing purple saturation.
+// Low  → first segment filled at light purple (0.3 alpha)
+// Med  → first + second at mid alpha
+// High → all three at full brand purple
+// Unfilled segments sit at a very light purple tint so the track is
+// always visible. Replaces the circular "Me…"-truncating chip.
+function ConfidenceBar({ level }: { level: 'high' | 'medium' | 'low' | null }) {
+  if (!level) return null;
+  const filled = level === 'high' ? 3 : level === 'medium' ? 2 : 1;
+  const fillColours = [
+    'rgba(90, 67, 119, 0.35)',
+    'rgba(90, 67, 119, 0.65)',
+    'rgba(90, 67, 119, 1.0)',
+  ];
+  return (
+    <View style={styles.confidenceBar}>
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={[
+            styles.confidenceSegment,
+            {
+              backgroundColor:
+                i < filled ? fillColours[i] : 'rgba(90, 67, 119, 0.08)',
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -752,42 +760,56 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // --- Stats row (H2) ---
+  // --- Stats row (H2) — labels removed; each element is self-descriptive ---
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  statChip: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  // Size badge — circle with the size letter/number
+  statBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(90, 67, 119, 0.1)',
     borderWidth: 1.25,
     borderColor: 'rgba(90, 67, 119, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+  },
+  // Smaller circle for the fit + stock icons (purely visual)
+  fitBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
   },
-  statLabel: {
-    ...typography.labelSmall,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+
+  // --- Confidence bar — 3 segments, purple saturation increases with level ---
+  confidenceBar: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    height: 8,
+    alignItems: 'center',
+  },
+  confidenceSegment: {
+    flex: 1,
+    height: 8,
+    borderRadius: borderRadius.pill,
   },
 
   // --- Banners ---
@@ -916,7 +938,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
@@ -930,7 +952,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: 'rgba(90, 67, 119, 0.1)',
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
