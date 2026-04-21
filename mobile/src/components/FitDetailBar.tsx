@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   label: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.22)',
   },
   sizeLabel: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,

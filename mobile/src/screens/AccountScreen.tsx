@@ -320,11 +320,11 @@ export default function AccountScreen() {
       <LinearGradient
         colors={[
           'rgba(76, 67, 86, 0)',
-          'rgba(76, 67, 86, 0.35)',
-          'rgba(76, 67, 86, 0.9)',
+          'rgba(76, 67, 86, 0.55)',
+          'rgba(76, 67, 86, 0.95)',
           '#4c4356',
         ]}
-        locations={[0, 0.35, 0.75, 1]}
+        locations={[0, 0.22, 0.55, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
       />
@@ -342,8 +342,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    // Clears the floating glass tab bar at the bottom.
-    paddingBottom: 120,
+    // Clears the fade ramp + tab-bar footprint so Reset stays above
+    // the dense fade region.
+    paddingBottom: 260,
   },
   // Header — left-aligned italic serif title, white on the dark
   // gradient backdrop per Claude Design ScreenProfile + user direction.
@@ -461,6 +462,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   sectionLabel: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1.8,
@@ -479,6 +481,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   editPillText: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '600',
     color: '#fff',
@@ -581,16 +584,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Bottom-edge fade — content fades into the gradient's deepest stop
-  // so the floating tab bar reads as a true floating element. 200px
-  // gives a softer ramp than 170 and pairs with the 200px content
-  // paddingBottom so the Reset button lives safely ABOVE the fade.
+  // Bottom-edge fade — 280px tall for a heavier horizon effect.
+  // Content padding bumped in parallel so the Reset button still
+  // lives above the dense part of the fade.
   bottomFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 200,
+    height: 280,
     zIndex: 1,
   },
 });

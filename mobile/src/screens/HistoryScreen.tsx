@@ -83,6 +83,10 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+  // Count of entries scored 'great' — surfaced in the header meta so the
+  // subtitle carries real signal ("3 good fits") instead of the redundant
+  // "swipe through to revisit" instruction the coverflow already implies.
+  const goodFits = entries.filter((e) => e.fitScore === 'great').length;
 
   // Delete a single history card. Confirms first, then removes from the
   // store. Cover flow re-renders automatically because the store drives
@@ -181,7 +185,7 @@ export default function HistoryScreen() {
             textStyle={styles.pageTitle}
           />
           <Text style={styles.headerMeta}>
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · swipe through to revisit
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}
           </Text>
         </View>
 
@@ -250,6 +254,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   headerMeta: {
+    fontFamily: 'serif',
     fontSize: 13,
     lineHeight: 19,
     color: colors.textMuted,
@@ -443,13 +448,16 @@ const styles = StyleSheet.create({
   },
 
   // --- Floating footer overlay (pill + clear link above the floating
-  //     tab bar). Tab bar sits at `insets + 16 + 62px` from the bottom;
-  //     this pushes the footer up enough to clear it. ---
+  //     tab bar). Dropped 100 → 72 so the detail pill isn't directly
+  //     touching the bottom of the product card — there's a visible gap
+  //     between the cover-flow card edge and the pill now, per user
+  //     feedback. Still sits clearly above the tab pill (which starts
+  //     at insets.bottom + 24 + 64 ≈ 88 from the bottom). ---
   floatingFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 100,
+    bottom: 72,
     alignItems: 'center',
   },
   detailBarWrap: {

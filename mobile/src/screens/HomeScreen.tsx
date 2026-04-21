@@ -340,16 +340,19 @@ export default function HomeScreen() {
           pointerEvents="none" so the fade doesn't eat taps on cards
           above it. */}
       <LinearGradient
-        // Softer ramp — fade starts earlier (0 → 0.35 transparent-ish
-        // before it really darkens) so the horizon reads as gradual
-        // rather than a sudden band.
+        // Heavier ramp — Recent cards need to wash OUT much earlier so
+        // the floating nav pill reads as a true floating element, not a
+        // glass pane with card artefacts bleeding behind/around it. User
+        // direction: "a lot more faded than it is right now". Dark stop
+        // reaches 90% opacity by the halfway mark, and the gradient is
+        // ~60% taller than the previous 200px version.
         colors={[
           'rgba(76, 67, 86, 0)',
-          'rgba(76, 67, 86, 0.35)',
-          'rgba(76, 67, 86, 0.9)',
+          'rgba(76, 67, 86, 0.7)',
+          'rgba(76, 67, 86, 0.97)',
           '#4c4356',
         ]}
-        locations={[0, 0.35, 0.75, 1]}
+        locations={[0, 0.22, 0.5, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
       />
@@ -406,11 +409,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    // Extra clearance so the RECENT list + any other bottom content
-    // isn't hidden behind the floating glass tab bar.
-    // Covers: insets.bottom (~40) + tab-bar offset (24) + tab-bar
-    // height (64) + fade soft ramp (~50) + breathing room.
-    paddingBottom: 200,
+    // Extra clearance so the RECENT list is visibly dying into the fade
+    // before it reaches the floating pill. Paired with the heavier fade
+    // gradient (height 320 below), the last RECENT row ends deep inside
+    // the dark zone — cards never show up cleanly near the nav pill.
+    paddingBottom: 280,
   },
   // --- Hero — Claude Design mockup layout, inverted for dark gradient
   //     backdrop. Text reads as light on the hero; glass cards below
@@ -532,6 +535,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   setupArrow: {
+    fontFamily: 'serif',
     fontSize: 22,
     color: colors.primary,
     fontWeight: '300',
@@ -617,6 +621,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   recentBrand: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -626,12 +631,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   recentName: {
+    fontFamily: 'serif',
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     lineHeight: 18,
   },
   recentSize: {
+    fontFamily: 'serif',
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 13,
@@ -643,6 +650,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   recentChipLabel: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,
@@ -655,14 +663,15 @@ const styles = StyleSheet.create({
   },
 
   // Bottom-edge fade — sits over the ScrollView, under the floating
-  // tab bar. Tall enough that the ramp from transparent → dark reads
-  // as a soft horizon (200px) instead of a hard band.
+  // tab bar. Bumped to 320px so the dark zone reaches further up the
+  // viewport and Recent cards wash into the darkness well before they
+  // get anywhere near the floating nav pill.
   bottomFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 200,
+    height: 320,
     zIndex: 1,
   },
 });

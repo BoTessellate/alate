@@ -449,6 +449,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   typicalValue: {
+    fontFamily: 'serif',
     fontSize: 38,
     fontWeight: '700',
     color: colors.primary,

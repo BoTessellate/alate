@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   urlText: {
+    fontFamily: 'serif',
     flex: 1,
     fontSize: 12,
     lineHeight: 16,
@@ -160,6 +161,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   subtitle: {
+    fontFamily: 'serif',
     fontSize: 13,
     lineHeight: 20,
     color: colors.textMuted,

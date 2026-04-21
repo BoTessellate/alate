@@ -390,9 +390,10 @@ const styles = StyleSheet.create({
     elevation: 14,
   },
   // Floating trash icon — BOTTOM-right of each card (moved from top-
-  // right per user direction). Semi-transparent dark pill so it reads
-  // on any product image without fighting the card content. Not part
-  // of the tappable cardTouch so tap-to-open still works elsewhere.
+  // right per user direction). Deep brand-purple tint (colors.text @ 0.55)
+  // instead of pure black — stock black rgba read as a grey chip that
+  // fought the grey-purple palette. The new fill picks up the brand
+  // palette without losing contrast on bright product images.
   deleteBtn: {
     position: 'absolute',
     bottom: 10,
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.38)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,

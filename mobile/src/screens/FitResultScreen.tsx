@@ -882,13 +882,16 @@ const styles = StyleSheet.create({
   },
 
   // --- Back chevron ---
+  //   Deep brand-purple tint (colors.text @ 0.55) instead of black @ 0.32 —
+  //   the old grey-black fill fought the grey-purple palette. Matches the
+  //   history trash + every other circular affordance now.
   backBtn: {
     position: 'absolute',
     left: spacing.lg,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -900,7 +903,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1014,6 +1017,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
   },
   priceText: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '800',
     color: colors.primary,
@@ -1041,6 +1045,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statLabel: {
+    fontFamily: 'serif',
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.3,
@@ -1068,12 +1073,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
+    fontFamily: 'serif',
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
+    fontFamily: 'serif',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1088,6 +1095,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confidenceDonutLabel: {
+    fontFamily: 'serif',
     position: 'absolute',
     fontSize: 13,
     fontWeight: '800',
@@ -1159,6 +1167,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   concernSeverity: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -1183,6 +1192,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   tagText: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,

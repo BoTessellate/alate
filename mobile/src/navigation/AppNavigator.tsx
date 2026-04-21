@@ -111,9 +111,12 @@ function MainTabs() {
           position: 'absolute',
           // Tucked in further from all edges so the pill reads as a
           // floating element rather than a docked bar snapped to the
-          // bottom. 24px inset on sides, 24+insets on bottom.
-          left: 24,
-          right: 24,
+          // bottom. 40px inset on sides (was 24) so the pill no longer
+          // stretches almost edge-to-edge on phone widths — sits as a
+          // discrete capsule with visible gradient backdrop on either
+          // side. 24+insets on bottom.
+          left: 40,
+          right: 40,
           bottom: (insets.bottom > 0 ? insets.bottom : 0) + 24,
           height: 64,
           // Full pill — borderRadius matches the height/2 cap so the
@@ -137,6 +140,7 @@ function MainTabs() {
         },
         tabBarShowLabel: true,
         tabBarLabelStyle: {
+          fontFamily: 'serif',
           fontSize: 10,
           fontWeight: '600',
           letterSpacing: 0.3,

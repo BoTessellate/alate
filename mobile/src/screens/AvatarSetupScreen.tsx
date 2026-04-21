@@ -491,13 +491,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   // Back chevron — floats top-left with safe-area offset applied inline.
+  // Primary @ 0.18 (instead of colors.text @ 0.06) so the chip carries a
+  // subtle lavender warmth on the solid #e6e4e9 background — the old fill
+  // was a near-transparent neutral that read as grey, not theme-aware.
   backChev: {
     position: 'absolute',
     left: spacing.md,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(47, 41, 55, 0.06)',
+    backgroundColor: 'rgba(106, 95, 117, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -522,6 +525,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   subtitle: {
+    fontFamily: 'serif',
     fontSize: 12,
     lineHeight: 17,
     color: colors.textMuted,
