@@ -230,22 +230,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Header — left-aligned per Claude Design mockup. Title is DM Serif
+  // italic lowercase via displayMedium; subtitle sits tight under it
+  // (marginTop 4) in plain body 13px, textMuted, no letter-spacing.
   header: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
-    alignItems: 'center',
   },
   pageTitle: {
     ...typography.displayMedium,
     color: colors.text,
-    textAlign: 'center',
   },
   headerMeta: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textMuted,
     marginTop: 4,
-    letterSpacing: 1,
   },
   list: {
     padding: spacing.md,
