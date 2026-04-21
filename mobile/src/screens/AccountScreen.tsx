@@ -225,45 +225,35 @@ export default function AccountScreen() {
         {/* Google account card — isolated so a hook crash here can't blank the page */}
         <GoogleSignInCard />
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>{entries.length}</Text>
-            <Text style={styles.statLabel}>Checked</Text>
-          </GlassCard>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>{greatFits}</Text>
-            <Text style={styles.statLabel}>Great Fits</Text>
-          </GlassCard>
-        </View>
-
-        {/* Body Profile */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Body Profile</Text>
+        {/* Body profile — section header with Edit pill on the right.
+            Per Claude Design ScreenProfile mockup. */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>BODY PROFILE</Text>
           <TouchableOpacity
-            style={styles.editButton}
+            style={styles.editPill}
             onPress={() => navigation.navigate('AvatarSetup')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <Feather name="edit-2" size={14} color={colors.accentDark} />
-            <Text style={styles.editButtonText}>{avatar ? 'Edit' : 'Set up'}</Text>
+            <Feather name="edit-2" size={11} color={colors.primary} />
+            <Text style={styles.editPillText}>{avatar ? 'Edit' : 'Set up'}</Text>
           </TouchableOpacity>
         </View>
 
         {avatar ? (
           <GlassCard style={styles.profileCard}>
-            {/* Height row */}
             <View style={styles.profileRow}>
               <Text style={styles.profileLabel}>Height</Text>
               <Text style={styles.profileValue}>
-                {avatar.height_cm} cm ({Math.floor(avatar.height_cm / 30.48)}′
-                {Math.round((avatar.height_cm / 2.54) % 12)}″)
+                {Math.floor(avatar.height_cm / 30.48)}′{Math.round((avatar.height_cm / 2.54) % 12)}″
               </Text>
             </View>
             {(
               ['shoulders', 'bust', 'waist', 'hips', 'thighs', 'torso_length'] as const
-            ).map((key) => (
-              <View key={key} style={styles.profileRow}>
+            ).map((key, i, arr) => (
+              <View
+                key={key}
+                style={[styles.profileRow, i === arr.length - 1 && styles.profileRowLast]}
+              >
                 <Text style={styles.profileLabel}>{MEASUREMENT_LABELS[key]}</Text>
                 <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
               </View>
@@ -272,13 +262,12 @@ export default function AccountScreen() {
         ) : (
           <TouchableOpacity
             onPress={() => navigation.navigate('AvatarSetup')}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <GlassCard style={styles.emptyProfileCard}>
-              <Text style={styles.emptyProfileIcon}>📏</Text>
               <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
               <Text style={styles.emptyProfileSubtitle}>
-                Add your measurements to get accurate fit predictions and size recommendations
+                Add measurements for accurate fit predictions
               </Text>
               <View style={styles.emptyProfileCta}>
                 <Text style={styles.emptyProfileCtaText}>Get started →</Text>
@@ -287,27 +276,37 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Fit Calibration — Zalando "user's normal size" anchor */}
-        {avatar && <FitCalibrationCard />}
+        {/* Preferences — per mockup: static chevron rows (fit pref, notifs) */}
+        <View style={[styles.sectionRow, styles.sectionRowSpaced]}>
+          <Text style={styles.sectionLabel}>PREFERENCES</Text>
+        </View>
+        <GlassCard style={styles.profileCard}>
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>Fit preference</Text>
+            <View style={styles.prefValue}>
+              <Text style={styles.profileValue}>Relaxed</Text>
+              <Feather name="chevron-right" size={14} color={colors.accentLight} />
+            </View>
+          </View>
+          <View style={[styles.profileRow, styles.profileRowLast]}>
+            <Text style={styles.profileLabel}>Notifications</Text>
+            <View style={styles.prefValue}>
+              <Text style={styles.profileValue}>On</Text>
+              <Feather name="chevron-right" size={14} color={colors.accentLight} />
+            </View>
+          </View>
+        </GlassCard>
 
-        {/* Tip */}
-        {avatar && (
-          <GlassCard style={styles.tipCard}>
-            <Feather name="info" size={16} color={colors.accentDark} style={styles.tipIcon} />
-            <Text style={styles.tipText}>
-              Size accuracy improves the more you check products. Your fit history helps calibrate predictions over time.
-            </Text>
-          </GlassCard>
-        )}
-
-        {/* Reset Profile */}
+        {/* Reset — quiet link at the bottom. Calibration + Tip cards
+            removed from Account per design mockup (they may return as
+            their own screen later). */}
         {avatar && (
           <TouchableOpacity
             style={styles.resetButton}
             onPress={clearAvatar}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetText}>Reset Profile</Text>
+            <Text style={styles.resetText}>Reset profile</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -325,7 +324,8 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    // Clears the floating glass tab bar at the bottom.
+    paddingBottom: 120,
   },
   // Header — left-aligned italic serif title per Claude Design ScreenProfile
   header: {
@@ -425,44 +425,62 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-  // Section header
-  sectionHeader: {
+  // Section label + pill — per Claude Design ScreenProfile: small
+  // uppercase label on the left, compact Edit pill on the right.
+  sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 4,
+    marginTop: spacing.lg,
   },
-  sectionTitle: {
-    ...typography.headingS,
-    color: colors.text,
+  sectionRowSpaced: {
+    marginTop: spacing.xl,
   },
-  editButton: {
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.pill,
+    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+  },
+  editPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  prefValue: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: borderRadius.pill,
-    backgroundColor: colors.accentDark + '18',
   },
-  editButtonText: {
-    ...typography.label,
-    color: colors.accentDark,
-    fontWeight: '600',
-  },
-  // Profile card
+  // Glass list card for body profile + preferences — inner rows are
+  // divided by hairlines except the last row.
   profileCard: {
     borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+    padding: 4,
   },
   profileRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(106, 95, 117, 0.1)',
+    borderBottomColor: 'rgba(47, 41, 55, 0.08)',
+  },
+  profileRowLast: {
+    borderBottomWidth: 0,
   },
   profileLabel: {
     ...typography.label,

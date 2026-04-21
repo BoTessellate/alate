@@ -435,12 +435,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Floating footer overlay (pill + clear link on top of deck) ---
+  // --- Floating footer overlay (pill + clear link above the floating
+  //     tab bar). Tab bar sits at `insets + 16 + 62px` from the bottom;
+  //     this pushes the footer up enough to clear it. ---
   floatingFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 100,
     alignItems: 'center',
   },
   detailBarWrap: {

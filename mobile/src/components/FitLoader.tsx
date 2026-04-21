@@ -76,9 +76,12 @@ export default function FitLoader({
       {/* Centered hero spinner */}
       <View style={styles.hero}>
         <LinearGradient
-          colors={[colors.primaryLight, colors.primary, colors.primaryDark]}
+          // Subtler 2-stop gradient (was 3-stop primaryLight→primary→
+          // primaryDark). Reads closer to the design's solid dark orb
+          // with a single top-to-bottom highlight.
+          colors={[colors.primary, colors.primaryDark]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 1 }}
           style={styles.gradientCircle}
         >
           <Spinner />
@@ -140,9 +143,11 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
-    borderTopColor: '#fff',
+    // Thinner (1.5px) than the previous 2px — reads more as a glow
+    // halo than a mechanical ring. Upper arc lights up as it rotates.
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    borderTopColor: 'rgba(255,255,255,0.95)',
     backgroundColor: 'transparent',
   },
   title: {

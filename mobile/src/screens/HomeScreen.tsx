@@ -366,7 +366,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    // Extra clearance so the RECENT list + any other bottom content
+    // isn't hidden behind the floating glass tab bar.
+    paddingBottom: 120,
   },
   // --- Hero — Claude Design mockup layout ---
   hero: {

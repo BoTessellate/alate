@@ -40,11 +40,11 @@ import { sanitize } from '../utils/sanitize';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Portrait-heavy product cards. Per Claude Design mockup: cards are
-// roughly 47% of the viewport wide with a 1:1.65 aspect. Smaller than
-// the previous 0.62 setting so both neighbours (d=±1 and d=±2) on each
-// side have room to sit on-screen without cropping.
+// roughly 47% of the viewport wide. Stretched to a 1:1.85 aspect per
+// user direction ("a little more longer") — gives a lookbook-magazine
+// feel rather than a square-ish thumbnail.
 const CARD_W = Math.min(SCREEN_W * 0.55, 220);
-const CARD_H = Math.min(CARD_W * 1.65, 380);
+const CARD_H = Math.min(CARD_W * 1.85, 420);
 // Snap step ~ 0.65·CARD_W so adjacent cards overlap enough to read
 // as a tight deck (looser gap made the d=±1 card feel detached).
 const ITEM_GAP = CARD_W * 0.65;
@@ -389,13 +389,13 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 14,
   },
-  // Floating trash icon on the top-right of each card. Semi-transparent
-  // dark pill so it reads on any product image without fighting the
-  // card content. Not part of the tappable cardTouch so the tap-to-open
-  // gesture still works on the rest of the card.
+  // Floating trash icon — BOTTOM-right of each card (moved from top-
+  // right per user direction). Semi-transparent dark pill so it reads
+  // on any product image without fighting the card content. Not part
+  // of the tappable cardTouch so tap-to-open still works elsewhere.
   deleteBtn: {
     position: 'absolute',
-    top: 10,
+    bottom: 10,
     right: 10,
     width: 28,
     height: 28,
