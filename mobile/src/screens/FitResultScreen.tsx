@@ -227,11 +227,20 @@ export default function FitResultScreen() {
       runOnJS(setIsExpanded)(target === 1);
     });
 
-  // Horizontal drag sifts to the next/prev entry. Also lives on the
-  // outer card so it works in both expanded AND collapsed states (user
-  // direction: "swipe possible when the overlay is collapsed").
-  // `activeOffsetX` keeps small horizontal nudges out; `failOffsetY`
-  // cedes to the drag gesture on clear vertical motion.
+  // Horizontal drag sifts to the next/prev entry. HOISTED to the root
+  // view (below) so it works regardless of where the card is — key for
+  // the collapsed state, where the card only occupies the bottom 200px
+  // and users instinctively swipe at mid-screen (i.e. OVER the product
+  // image, not the dock). Before this was scoped to cardScrollWrap and
+  // mid-screen swipes fell on dead area.
+  //
+  //   - `activeOffsetX([-15, 15])`: small horizontal nudges pass through
+  //   - `failOffsetY([-25, 25])`: yields to the inner drag gesture on
+  //     clear vertical motion (dragGesture lives on cardScrollWrap, so
+  //     within the card a vertical pan still collapses instead of sifts)
+  // The onEnd guard (`entriesLen > 0`) handles the non-sift case without
+  // needing `.enabled(canSift)` — keeping this gesture built unconditionally
+  // so the GestureDetector doesn't churn refs when canSift flips.
   const swipeX = useSharedValue(0);
   const siftGesture = Gesture.Pan()
     .activeOffsetX([-15, 15])
@@ -249,9 +258,6 @@ export default function FitResultScreen() {
       swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
     });
 
-  // Run both simultaneously — drag claims vertical >10px, sift claims
-  // horizontal >15px, small movements go to the inner ScrollView.
-  const cardGesture = Gesture.Simultaneous(dragGesture, siftGesture);
   const siftStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: swipeX.value }],
   }));
@@ -472,6 +478,14 @@ export default function FitResultScreen() {
       : null;
 
   return (
+    // Sift gesture wraps the ENTIRE screen so horizontal swipes on the
+    // product-image area (above the docked card) also trigger product-
+    // to-product sifting. Previously sift was scoped to the card, which
+    // only covers the bottom 200px when collapsed — mid-screen swipes
+    // hit the image and did nothing. Drag-to-collapse still lives on the
+    // inner GestureDetector so small vertical nudges go to the ScrollView
+    // instead of collapsing the overlay.
+    <GestureDetector gesture={siftGesture}>
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
@@ -562,13 +576,13 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Single gesture wrapper covering the entire card — drag +
-            sift run simultaneously. Drag triggers on vertical pan > 10px,
-            sift on horizontal > 15px. Smaller nudges pass through to the
-            inner ScrollView. This is what enables both (a) drag-to-
-            collapse from anywhere on the overlay, and (b) horizontal
-            swipe-between-products in both expanded and collapsed state. */}
-        <GestureDetector gesture={cardGesture}>
+        {/* Inner GestureDetector — drag-only. Sift was hoisted to the
+            root view (see top of component) so horizontal swipes on the
+            product-image area above the collapsed dock also sift. Drag
+            stays scoped to the card so its activeOffsetY threshold only
+            competes with the ScrollView's native vertical gesture, not
+            the whole screen (which would eat all vertical taps). */}
+        <GestureDetector gesture={dragGesture}>
           <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
             {/* Visual drag handle — no longer a gesture target itself,
                 since the whole card receives drag. Purely decorative. */}
@@ -785,6 +799,7 @@ export default function FitResultScreen() {
         </GestureDetector>
       </Animated.View>
     </View>
+    </GestureDetector>
   );
 }
 
