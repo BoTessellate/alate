@@ -1,217 +1,141 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, ms } from '../constants/theme';
-import GlassCard from '../components/GlassCard';
-import { sanitize } from '../utils/sanitize';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
+import HistoryCoverFlow from '../components/HistoryCoverFlow';
+import FitDetailBar from '../components/FitDetailBar';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'History'>,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+// --- Dev-only seed data so we can preview the stack/receipt without the
+// backend fit-check flow. Safe to leave behind __DEV__ guard.
+const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
+  {
+    url: 'https://www.asos.com/asos-design/asos-design-mini-t-shirt-dress-in-black/prd/206421568',
+    productName: 'Mini t-shirt dress with scoop neck in black',
+    productImage:
+      'https://images.asos-media.com/products/asos-design-mini-t-shirt-dress-with-scoop-neck-in-black/206421568-1-black',
+    brand: 'ASOS',
+    fitScore: 'great',
+    warnings: [],
+    checkedAt: new Date().toISOString(),
+    sizeRecommendation: { size: 'M', confidence: 'high', note: 'True to size' },
+    category: 'dress',
+    material: 'Cotton blend',
+    tags: ['casual', 'summer', 'minimal'],
+    price: { amount: 22, currency: 'GBP' },
+  },
+  {
+    url: 'https://www.uniqlo.com/uk/en/products/E470303-000/00',
+    productName: 'Broadcloth Striped Button-Down Shirt',
+    productImage:
+      'https://image.uniqlo.com/UQ/ST3/WesternCommon/imagesgoods/470303/item/goods_64_470303_3x4.jpg',
+    brand: 'UNIQLO',
+    fitScore: 'moderate',
+    warnings: [
+      { severity: 'moderate', message: 'Shoulders may run slightly wide for your frame.' },
+    ],
+    checkedAt: new Date(Date.now() - 86400000).toISOString(),
+    sizeRecommendation: { size: 'S', confidence: 'medium' },
+    category: 'shirt',
+    material: '100% Cotton',
+    tags: ['workwear', 'classic', 'striped'],
+    price: { amount: 29.9, currency: 'GBP' },
+  },
+  {
+    url: 'https://www.zara.com/uk/en/linen-blend-trousers-p04387025.html',
+    productName: 'Linen Blend Wide-Leg Trousers',
+    productImage:
+      'https://static.zara.net/assets/public/c4b1/f0e3/2ef848a4a93e/29dc5c89d5f0/04387025712-a1/04387025712-a1.jpg',
+    brand: 'ZARA',
+    fitScore: 'poor',
+    warnings: [
+      { severity: 'major', message: 'Waist is cut for a looser silhouette than your profile.' },
+      { severity: 'minor', message: 'Linen fabric stretches over time — size down if between.' },
+    ],
+    checkedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    sizeRecommendation: { size: 'XS', confidence: 'low', note: 'Consider tailoring' },
+    category: 'trousers',
+    material: 'Linen blend',
+    tags: ['summer', 'flowy', 'high-rise'],
+    price: { amount: 45.99, currency: 'GBP' },
+  },
+];
+
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { entries, removeEntry, clearHistory } = useFitHistoryStore();
+  const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
 
-  const getScoreConfig = (score: 'great' | 'moderate' | 'poor') => {
-    switch (score) {
-      case 'great':
-        return {
-          color: colors.success,
-          bgColor: colors.success + '15',
-          label: 'Great Fit',
-          icon: '✓',
-        };
-      case 'moderate':
-        return {
-          color: colors.warning,
-          bgColor: colors.warning + '15',
-          label: 'Some Concerns',
-          icon: '⚠',
-        };
-      case 'poor':
-        return {
-          color: colors.error,
-          bgColor: colors.error + '15',
-          label: 'May Not Fit',
-          icon: '✕',
-        };
-      default:
-        return {
-          color: colors.textSecondary,
-          bgColor: colors.backgroundSecondary,
-          label: 'Unknown',
-          icon: '?',
-        };
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
-    }
-  };
-
-  const formatPrice = (price?: { amount: number; currency: string }) => {
-    if (!price) return null;
-    const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-    const symbol = symbols[price.currency] || `${price.currency} `;
-    return `${symbol}${price.amount}`;
-  };
-
-  // Confidence uses the brand palette: high = deep brand purple,
-  // medium = mid purple, low = a lighter but still legible shade.
-  const getConfidenceColor = (confidence: 'high' | 'medium' | 'low') => {
-    switch (confidence) {
-      case 'high':
-        return colors.primary;
-      case 'medium':
-        return colors.primaryLight;
-      case 'low':
-        return colors.accentDark;
-    }
-  };
-
-  const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
-
-  const renderItem = ({ item, index }: { item: FitHistoryEntry; index: number }) => {
-    const scoreConfig = getScoreConfig(item.fitScore);
-    const priceText = formatPrice(item.price);
-    const safeBrand = sanitize(item.brand);
-    const safeName = sanitize(item.productName) ?? 'Unknown Product';
-    const safeCategory = sanitize(item.category);
-    const showCategory = safeCategory && !FILTERED_CATEGORIES.has(safeCategory.toLowerCase());
-    const hasBrandOrPrice = safeBrand || priceText;
-
-    return (
-      <TouchableOpacity
-        testID={`history-entry-${index}`}
-        onPress={() => navigation.navigate('FitResult', {
-          product: {
-            name: item.productName,
-            image: item.productImage,
-            price: item.price,
-            brand: item.brand,
-          },
-          url: item.url,
-          historyEntryId: item.id,
-          precomputed: {
-            fitScore: item.fitScore,
-            warnings: item.warnings,
-            sizeRecommendation: item.sizeRecommendation,
-            enrichedProduct: {
-              category: item.category,
-              material: item.material,
-              tags: item.tags,
-            },
-            checkedAt: item.checkedAt,
-          },
-        })}
-        activeOpacity={0.8}
-      >
-        <GlassCard style={styles.card}>
-        <View style={styles.cardImageContainer}>
-          {item.productImage ? (
-            <Image source={{ uri: item.productImage }} style={styles.thumbnail} />
-          ) : (
-            <View style={styles.thumbnailPlaceholder}>
-              <Feather name="shopping-bag" size={28} color={colors.textMuted} />
-            </View>
-          )}
-        </View>
-        <View style={styles.cardContent}>
-          {hasBrandOrPrice && (
-            <View style={styles.brandRow}>
-              {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
-              {safeBrand && priceText && <Text style={styles.dotSeparator}>•</Text>}
-              {priceText && <Text style={styles.priceText}>{priceText}</Text>}
-            </View>
-          )}
-          <Text style={styles.productName} numberOfLines={2}>
-            {safeName}
-          </Text>
-
-          <View style={styles.pillRow}>
-            {item.sizeRecommendation && (
-              <View style={[styles.pill, styles.sizePill]}>
-                <Text style={styles.sizePillLabel}>Size {item.sizeRecommendation.size}</Text>
-                <View
-                  style={[
-                    styles.confidenceDot,
-                    { backgroundColor: getConfidenceColor(item.sizeRecommendation.confidence) },
-                  ]}
-                />
-              </View>
-            )}
-            {showCategory && (
-              <View style={[styles.pill, styles.categoryPill]}>
-                <Text style={styles.categoryPillLabel} numberOfLines={1}>
-                  {safeCategory}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.bottomRow}>
-            <View style={styles.scoreRow}>
-              <View style={[styles.scoreDot, { backgroundColor: scoreConfig.color }]} />
-              <Text style={[styles.scoreLabel, { color: scoreConfig.color }]}>
-                {scoreConfig.label}
-              </Text>
-              <Text style={styles.dateSep}>·</Text>
-              <Text style={styles.dateText}>{formatDate(item.checkedAt)}</Text>
-            </View>
-            {item.warnings.length > 0 && (
-              <Text style={styles.warningCount}>
-                {item.warnings.length} concern{item.warnings.length > 1 ? 's' : ''}
-              </Text>
-            )}
-          </View>
-        </View>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => removeEntry(item.id)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.deleteText}>×</Text>
-        </TouchableOpacity>
-        </GlassCard>
-      </TouchableOpacity>
+  // Delete a single history card. Confirms first, then removes from the
+  // store. Cover flow re-renders automatically because the store drives
+  // the list; the active-index derived value reclamps to the new range.
+  const handleCardDelete = (item: FitHistoryEntry) => {
+    Alert.alert(
+      'Remove from history',
+      `Remove "${item.productName}" from your history?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeEntry(item.id),
+        },
+      ]
     );
+  };
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const seedDemoData = () => {
+    SEED_ENTRIES.forEach((e) => addEntry(e));
+  };
+
+  const activeEntry =
+    entries.length > 0 ? entries[Math.min(activeIndex, entries.length - 1)] : null;
+
+  const handleCardTap = (item: FitHistoryEntry) => {
+    const startIndex = entries.findIndex((e) => e.id === item.id);
+    navigation.navigate('FitResult', {
+      product: {
+        name: item.productName,
+        image: item.productImage,
+        price: item.price,
+        brand: item.brand,
+      },
+      url: item.url,
+      historyEntryId: item.id,
+      precomputed: {
+        fitScore: item.fitScore,
+        warnings: item.warnings,
+        sizeRecommendation: item.sizeRecommendation,
+        enrichedProduct: {
+          category: item.category,
+          material: item.material,
+          tags: item.tags,
+        },
+        checkedAt: item.checkedAt,
+      },
+      // Pass the whole list + starting index so FitResult can let the user
+      // horizontally swipe through siblings without going back to History.
+      historyEntries: entries,
+      currentIndex: startIndex >= 0 ? startIndex : 0,
+    });
   };
 
   if (entries.length === 0) {
@@ -219,14 +143,23 @@ export default function HistoryScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <View testID="history-screen" style={styles.emptyContainer}>
-            <Text style={styles.pageTitle}>History</Text>
-            <View style={styles.emptyIconContainer}>
-              <Feather name="clock" size={36} color={colors.primaryLight} />
-            </View>
-            <Text style={styles.emptyTitle}>No fit checks yet</Text>
+          <Text style={styles.pageTitle}>History</Text>
+          <View style={styles.emptyIconContainer}>
+            <Feather name="clock" size={36} color={colors.primaryLight} />
+          </View>
+          <Text style={styles.emptyTitle}>No fit checks yet</Text>
           <Text style={styles.emptySubtitle}>
             Check some products to build your{'\n'}personalized fit history
           </Text>
+          {__DEV__ && (
+            <TouchableOpacity
+              onPress={seedDemoData}
+              style={styles.seedButton}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.seedButtonText}>Load demo data (dev)</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -236,54 +169,57 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View testID="history-screen" style={styles.container}>
-        {/* Page Title */}
-        <Text style={styles.pageTitle}>History</Text>
-
-        {/* Header Stats */}
-        <View style={styles.statsContainer}>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>{entries.length}</Text>
-            <Text style={styles.statLabel}>Checked</Text>
-          </GlassCard>
-          <GlassCard style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: colors.success }]}>
-              {entries.filter((e) => e.fitScore === 'great').length}
-            </Text>
-            <Text style={styles.statLabel}>Great Fits</Text>
-          </GlassCard>
+        {/* Page title + slim stats pill under it */}
+        <View style={styles.header}>
+          <Text style={styles.pageTitle}>History</Text>
+          <Text style={styles.headerMeta}>
+            {entries.length} checked
+            {entries.filter((e) => e.fitScore === 'great').length > 0 &&
+              ` · ${entries.filter((e) => e.fitScore === 'great').length} great fit${
+                entries.filter((e) => e.fitScore === 'great').length > 1 ? 's' : ''
+              }`}
+          </Text>
         </View>
 
-        {/* List */}
-        <FlatList
-          testID="history-list"
-          data={entries}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
+        {/* Vision Pro song-shuffle-style deck — occupies the full area below
+            the header. Detail bar + clear link FLOAT on top of it so they
+            don't steal vertical space that the elongated cards need. */}
+        <HistoryCoverFlow
+          entries={entries}
+          onCardTap={handleCardTap}
+          onCardDelete={handleCardDelete}
+          onActiveIndexChange={setActiveIndex}
         />
 
-        {/* Clear Button */}
-        {entries.length > 0 && (
-          <View style={styles.clearContainer}>
+        {/* Floating footer: detail pill + clear link. Absolute-positioned so
+            the cover flow underneath uses the full height, and card images
+            don't get cropped to make room. `pointerEvents="box-none"` lets
+            scroll gestures pass through the empty area around the pill. */}
+        <View style={styles.floatingFooter} pointerEvents="box-none">
+          <View style={styles.detailBarWrap}>
+            <FitDetailBar entry={activeEntry} />
+          </View>
+
+          {entries.length > 0 && (
             <TouchableOpacity
-              style={styles.clearButton}
+              style={styles.clearLink}
               onPress={() => {
                 Alert.alert(
-                  'Clear History',
+                  'Clear history',
                   'This will delete all your fit check history. This cannot be undone.',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Clear All', style: 'destructive', onPress: clearHistory },
+                    { text: 'Clear', style: 'destructive', onPress: clearHistory },
                   ]
                 );
               }}
-              activeOpacity={0.7}
+              activeOpacity={0.6}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Text style={styles.clearText}>Clear All History</Text>
+              <Text style={styles.clearLinkText}>Clear history</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -297,121 +233,130 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  pageTitle: {
-    ...typography.headingXL,
-    color: colors.text,
+  header: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
-    gap: spacing.md,
-  },
-  statCard: {
-    flex: 1,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
     alignItems: 'center',
   },
-  statNumber: {
-    ...typography.headingL,
-    color: colors.primary,
-    marginBottom: spacing.xs,
+  pageTitle: {
+    ...typography.displayMedium,
+    color: colors.text,
+    textAlign: 'center',
   },
-  statLabel: {
+  headerMeta: {
     ...typography.caption,
     color: colors.textSecondary,
+    marginTop: 4,
+    letterSpacing: 1,
   },
   list: {
     padding: spacing.md,
     paddingTop: 0,
   },
+
+  // --- Apple Weather-style cards ---
   card: {
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
+    borderRadius: borderRadius.xxl,
+    overflow: 'hidden',
     marginBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    height: ms(220),
   },
-  cardImageContainer: {
-    marginRight: spacing.md,
-  },
-  thumbnail: {
-    width: ms(70),
-    height: ms(70),
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.backgroundSecondary,
-  },
-  thumbnailPlaceholder: {
-    width: ms(70),
-    height: ms(70),
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
+  cardBg: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  cardBgImage: {
+    borderRadius: borderRadius.xxl,
+  },
+  cardPlaceholderBg: {
+    backgroundColor: colors.backgroundTertiary,
+  },
+  cardGradient: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: ms(2),
+    gap: ms(6),
+    flex: 1,
+  },
+  brandPill: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(3),
+    borderRadius: borderRadius.pill,
   },
   brandText: {
     ...typography.labelSmall,
-    color: colors.textSecondary,
-    fontWeight: '600',
+    color: '#fff',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  dotSeparator: {
-    ...typography.labelSmall,
-    color: colors.textMuted,
-    marginHorizontal: ms(6),
+  pricePill: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(3),
+    borderRadius: borderRadius.pill,
   },
   priceText: {
     ...typography.labelSmall,
-    color: colors.secondary,
+    color: '#fff',
     fontWeight: '700',
   },
-  productName: {
-    ...typography.labelLarge,
-    color: colors.text,
-    marginBottom: spacing.sm,
+  deleteButton: {
+    width: ms(28),
+    height: ms(28),
+    borderRadius: ms(14),
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
   },
+  cardSpacer: {
+    flex: 1,
+  },
+  placeholderIcon: {
+    position: 'absolute',
+    top: '30%',
+    alignSelf: 'center',
+  },
+  productName: {
+    ...typography.headingS,
+    color: '#fff',
+    marginBottom: spacing.sm,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  cardFooter: {},
   pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: ms(6),
-    marginBottom: spacing.sm,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: ms(4),
-    borderRadius: borderRadius.pill,
-    gap: ms(4),
-  },
-  pillIcon: {
-    fontSize: ms(11),
-    fontWeight: '700',
-  },
-  pillLabel: {
-    ...typography.labelSmall,
-    fontWeight: '600',
+    marginBottom: ms(6),
   },
   sizePill: {
-    backgroundColor: colors.primary + '15',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(4),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(3),
+    borderRadius: borderRadius.pill,
   },
   sizePillLabel: {
     ...typography.labelSmall,
-    color: colors.primary,
+    color: '#fff',
     fontWeight: '700',
   },
   confidenceDot: {
@@ -419,25 +364,13 @@ const styles = StyleSheet.create({
     height: ms(6),
     borderRadius: ms(3),
   },
-  categoryPill: {
-    backgroundColor: colors.backgroundTertiary,
-    maxWidth: ms(110),
-  },
-  categoryPillLabel: {
-    ...typography.labelSmall,
-    color: colors.textSecondary,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  bottomRow: {
+  scorePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(5),
+    gap: ms(4),
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(3),
+    borderRadius: borderRadius.pill,
   },
   scoreDot: {
     width: ms(7),
@@ -445,36 +378,25 @@ const styles = StyleSheet.create({
     borderRadius: ms(4),
   },
   scoreLabel: {
-    ...typography.caption,
+    ...typography.labelSmall,
     fontWeight: '600',
   },
-  dateSep: {
-    ...typography.caption,
-    color: colors.textMuted,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   dateText: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.6)',
   },
   warningCount: {
     ...typography.caption,
-    color: colors.warning,
+    color: colors.warningLight,
     fontWeight: '500',
   },
-  deleteButton: {
-    width: ms(36),
-    height: ms(36),
-    borderRadius: ms(18),
-    backgroundColor: colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-  },
-  deleteText: {
-    fontSize: ms(20),
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
+
+  // --- Empty state ---
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -500,21 +422,44 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  clearContainer: {
-    padding: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+  seedButton: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.pill,
+    backgroundColor: colors.primary,
+    opacity: 0.75,
   },
-  clearButton: {
-    padding: spacing.md,
-    alignItems: 'center',
-    backgroundColor: colors.error + '10',
-    borderRadius: borderRadius.lg,
-  },
-  clearText: {
+  seedButtonText: {
     ...typography.label,
-    color: colors.error,
+    color: colors.white,
     fontWeight: '600',
+    fontSize: 13,
+  },
+
+  // --- Floating footer overlay (pill + clear link on top of deck) ---
+  floatingFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+  },
+  detailBarWrap: {
+    paddingBottom: spacing.xs,
+  },
+
+  // --- Clear link — muted underline tap target; destructive intent is
+  //     reserved for the confirmation Alert, not the surface styling. ---
+  clearLink: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  clearLinkText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+    letterSpacing: 0.6,
   },
 });

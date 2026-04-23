@@ -24,7 +24,10 @@ import {
 } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
-import BodyFigurine from '../components/BodyFigurine';
+// Swapped from BodyFigurine → BodyCroquis. Same prop API (see
+// project_body_croquis_plan.md memory). BodyFigurine is kept in the
+// repo as the fallback; revert this one import to roll back.
+import BodyCroquis from '../components/BodyCroquis';
 import { BodyFocusArea } from '../components/bodyFigurineModel';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
@@ -150,12 +153,13 @@ const chipStyles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    // Frosted chip — near-opaque so the gradient doesn't bleed through.
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderRadius: borderRadius.pill,
     paddingVertical: 10,
     paddingHorizontal: spacing.sm,
-    borderWidth: 2,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     minWidth: '30%',
     flexGrow: 1,
     alignItems: 'center',
@@ -261,7 +265,7 @@ export default function AvatarSetupScreen() {
       <View style={styles.row}>
         {/* Left pane — BodyFigurine, sticky */}
         <View style={styles.figurePane}>
-          <BodyFigurine
+          <BodyCroquis
             heightCm={height}
             shoulders={shoulders}
             bust={bust}
@@ -324,6 +328,23 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
+          {/* Step 2: Shoulders */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>2</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[1].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[1].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={SHOULDER_OPTIONS}
+              selected={shoulders}
+              onSelect={(v) => { setShoulders(v as ShoulderType); setActivePart('shoulders'); }}
+              testIDPrefix="shoulders"
+            />
+          </View>
+
           {/* Step 3: Bust */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -342,6 +363,23 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
+          {/* Step 4: Waist */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>4</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[3].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[3].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={WAIST_OPTIONS}
+              selected={waist}
+              onSelect={(v) => { setWaist(v as WaistType); setActivePart('waist'); }}
+              testIDPrefix="waist"
+            />
+          </View>
+
           {/* Step 5: Hips */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -357,6 +395,24 @@ export default function AvatarSetupScreen() {
               onSelect={(v) => { setHips(v as HipType); setActivePart('hips'); }}
               columns={2}
               testIDPrefix="hips"
+            />
+          </View>
+
+          {/* Step 6: Thighs */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>6</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={THIGH_OPTIONS}
+              selected={thighs}
+              onSelect={(v) => { setThighs(v as ThighType); setActivePart('thighs'); }}
+              columns={2}
+              testIDPrefix="thighs"
             />
           </View>
 
@@ -504,12 +560,13 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   button: {
-    backgroundColor: colors.secondary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    backgroundColor: colors.cta,
+    borderRadius: borderRadius.pill,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
     marginTop: spacing.sm,
-    ...shadows.sm,
+    ...shadows.md,
   },
   buttonDisabled: {
     opacity: 0.5,

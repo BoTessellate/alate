@@ -23,6 +23,7 @@
         "backgroundColor": "#1E0B45"
       },
       "package": "com.tessellate.alate",
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": true
     },
@@ -31,6 +32,8 @@
       "bundler": "metro"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
       "./plugins/withGradleMirrors",
       [
         "@sentry/react-native/expo",

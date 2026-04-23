@@ -52,17 +52,19 @@ export default function GlassCard({
       accessibilityLabel={accessibilityLabel}
       style={[styles.outer, !noShadow && shadows.glass, style]}
     >
+      {/* Blur & tint layers are absolute — they don't affect flex flow */}
       <BlurView
         intensity={effectiveIntensity}
         tint={tint}
         style={StyleSheet.absoluteFill}
       />
       {/* Frosted white tint over the blur for warmth */}
-      <View style={[StyleSheet.absoluteFill, styles.tint]} />
+      <View style={[StyleSheet.absoluteFill, styles.tint]} pointerEvents="none" />
       {/* Hairline highlight border */}
       <View style={[StyleSheet.absoluteFill, styles.border]} pointerEvents="none" />
-      {/* Content sits above the blur layers */}
-      <View style={styles.content}>{children}</View>
+      {/* Children render directly — they inherit flexDirection/alignItems from the
+          caller's `style` on the outer View, so `flexDirection: 'row'` works. */}
+      {children}
     </View>
   );
 }
@@ -71,18 +73,21 @@ const styles = StyleSheet.create({
   outer: {
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
+    // Near-opaque white base — critical for visual uniformity. The 4-stop
+    // gradient darkens noticeably from top to bottom of the screen; any
+    // transparency here lets the gradient bleed through the card and creates
+    // a visible top-light / bottom-purple split within a single tall card.
+    // 0.92 keeps it frost-feel (hint of gradient tint) without the 2-tone bug.
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   tint: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    // Near-zero — the solid outer already gives the frost read.
+    backgroundColor: 'transparent',
   },
   border: {
     borderRadius: borderRadius.xl,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-  },
-  content: {
-    position: 'relative',
-    zIndex: 1,
+    borderWidth: 1,
+    // Hairline edge — keeps card edges crisp on the gradient.
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
 });
