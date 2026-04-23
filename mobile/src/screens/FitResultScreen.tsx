@@ -43,6 +43,7 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
+import HeadingImage from '../components/HeadingImage';
 import { captureError } from '../utils/sentry';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
@@ -203,9 +204,13 @@ export default function FitResultScreen() {
     ),
   }));
 
-  // Vertical drag on the handle toggles collapse. 300px of drag = full
-  // transition; snap to 0 or 1 on release based on the midpoint.
+  // Vertical drag toggles collapse. Lives on the outer card so the user
+  // can drag from anywhere on the overlay (per user direction "from any
+  // place on the upper half"). `activeOffsetY([-10, 10])` means small
+  // nudges still go to the inner ScrollView; only deliberate vertical
+  // swipes trigger the collapse. 300px of drag = full transition.
   const dragGesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
     .onBegin(() => {
       startProgress.value = collapseProgress.value;
     })
@@ -222,15 +227,25 @@ export default function FitResultScreen() {
       runOnJS(setIsExpanded)(target === 1);
     });
 
-  // Horizontal drag on the content sifts to the next/prev entry. Uses
-  // activeOffsetX so vertical motion still goes to the ScrollView inside
-  // (otherwise pan would swallow scroll gestures).
+  // Horizontal drag sifts to the next/prev entry. HOISTED to the root
+  // view (below) so it works regardless of where the card is — key for
+  // the collapsed state, where the card only occupies the bottom 200px
+  // and users instinctively swipe at mid-screen (i.e. OVER the product
+  // image, not the dock). Before this was scoped to cardScrollWrap and
+  // mid-screen swipes fell on dead area.
+  //
+  //   - `activeOffsetX([-15, 15])`: small horizontal nudges pass through
+  //   - `failOffsetY([-25, 25])`: yields to the inner drag gesture on
+  //     clear vertical motion (dragGesture lives on cardScrollWrap, so
+  //     within the card a vertical pan still collapses instead of sifts)
+  // The onEnd guard (`entriesLen > 0`) handles the non-sift case without
+  // needing `.enabled(canSift)` — keeping this gesture built unconditionally
+  // so the GestureDetector doesn't churn refs when canSift flips.
   const swipeX = useSharedValue(0);
   const siftGesture = Gesture.Pan()
     .activeOffsetX([-15, 15])
-    .failOffsetY([-20, 20])
+    .failOffsetY([-25, 25])
     .onUpdate((e) => {
-      // Dampened follow so the user feels the drag but doesn't overshoot.
       swipeX.value = e.translationX * 0.4;
     })
     .onEnd((e) => {
@@ -242,6 +257,7 @@ export default function FitResultScreen() {
       }
       swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
     });
+
   const siftStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: swipeX.value }],
   }));
@@ -393,22 +409,26 @@ export default function FitResultScreen() {
   };
 
   const getScoreConfig = () => {
+    // Use the *Deep text variants per Claude Design — the verdict label
+    // reads as hero text on a white-tinted glass card, so it needs more
+    // ink than the mid-saturation `success/warning/error` (which are
+    // tuned for chip backgrounds). Same hue family, darker shade.
     switch (fitScore) {
       case 'great':
         return {
-          color: colors.success,
+          color: colors.successDeep,
           icon: '✓',
           text: 'Great Fit!',
         };
       case 'moderate':
         return {
-          color: colors.warning,
+          color: colors.warningDeep,
           icon: '⚠',
           text: 'Some Concerns',
         };
       case 'poor':
         return {
-          color: colors.error,
+          color: colors.errorDeep,
           icon: '✕',
           text: 'May Not Fit Well',
         };
@@ -458,6 +478,14 @@ export default function FitResultScreen() {
       : null;
 
   return (
+    // Sift gesture wraps the ENTIRE screen so horizontal swipes on the
+    // product-image area (above the docked card) also trigger product-
+    // to-product sifting. Previously sift was scoped to the card, which
+    // only covers the bottom 200px when collapsed — mid-screen swipes
+    // hit the image and did nothing. Drag-to-collapse still lives on the
+    // inner GestureDetector so small vertical nudges go to the ScrollView
+    // instead of collapsing the overlay.
+    <GestureDetector gesture={siftGesture}>
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
@@ -548,29 +576,44 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Drag handle — vertical pan toggles collapse. Bigger hit target
-            than the thin bar so it's easy to grab. */}
+        {/* Inner GestureDetector — drag-only. Sift was hoisted to the
+            root view (see top of component) so horizontal swipes on the
+            product-image area above the collapsed dock also sift. Drag
+            stays scoped to the card so its activeOffsetY threshold only
+            competes with the ScrollView's native vertical gesture, not
+            the whole screen (which would eat all vertical taps). */}
         <GestureDetector gesture={dragGesture}>
-          <View style={styles.handleHit}>
-            <View style={styles.handle} />
-          </View>
-        </GestureDetector>
-
-        <GestureDetector gesture={siftGesture}>
           <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+            {/* Visual drag handle — no longer a gesture target itself,
+                since the whole card receives drag. Purely decorative. */}
+            <View style={styles.handleHit} pointerEvents="none">
+              <View style={styles.handle} />
+            </View>
             <ScrollView
               style={styles.cardScroll}
               contentContainerStyle={styles.cardContent}
               showsVerticalScrollIndicator={false}
             >
 
-          {/* H1: Fit verdict — biggest element in the card. Sets the answer
-              the user came here for before anything else. */}
+          {/* H1: Fit verdict — biggest element in the card. Uses the
+              TAN Nightingale SVG for the score label; styled-text
+              fallback kicks in if the asset is missing. */}
           <View style={styles.verdictRow}>
             <View style={styles.verdictMain}>
-              <Text testID="fit-score-label" style={[styles.verdictText, { color: scoreConfig.color }]}>
-                {scoreConfig.text}
-              </Text>
+              <HeadingImage
+                testID="fit-score-label"
+                slot={
+                  fitScore === 'great'
+                    ? 'great-fit'
+                    : fitScore === 'moderate'
+                    ? 'some-concerns'
+                    : 'may-not-fit'
+                }
+                fallback={scoreConfig.text}
+                height={42}
+                color={scoreConfig.color}
+                textStyle={[styles.verdictText, { color: scoreConfig.color }]}
+              />
               <Text style={styles.verdictSub}>
                 {warnings.length === 0
                   ? 'No fit concerns'
@@ -586,29 +629,29 @@ export default function FitResultScreen() {
 
           <View style={styles.divider} />
 
-          {/* H2: Stats row — size badge + confidence bar + fit icon. Labels
-              dropped because they overflowed the circular chips ("Me…")
-              and stacked labels underneath; each element is now self-
-              descriptive (letter / progress segments / semantic icon). */}
+          {/* H2: Stats row — three centred, evenly-spaced elements with
+              SIZE / CONFIDENCE / FIT labels underneath. Per Claude Design
+              handoff: the trio reads left-to-right, labels anchor meaning,
+              no 4th in-stock icon (removed as visually confusing). */}
           <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
-              <StatBadge value={sizeRec.size} testID="recommended-size-value" />
-            )}
-            <ConfidenceDonut level={sizeRec?.confidence ?? null} />
-            <View style={styles.fitBadge}>
-              <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
-                {scoreConfig.icon}
-              </Text>
-            </View>
-            {inStock !== null && (
-              <View style={styles.fitBadge}>
-                <Feather
-                  name={inStock ? 'check' : 'alert-circle'}
-                  size={18}
-                  color={inStock ? colors.success : colors.warning}
-                />
+              <View style={styles.statCol}>
+                <StatBadge value={sizeRec.size} testID="recommended-size-value" />
+                <Text style={styles.statLabel}>SIZE</Text>
               </View>
             )}
+            <View style={styles.statCol}>
+              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
+              <Text style={styles.statLabel}>CONFIDENCE</Text>
+            </View>
+            <View style={styles.statCol}>
+              <View style={styles.fitBadge}>
+                <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
+                  {scoreConfig.icon}
+                </Text>
+              </View>
+              <Text style={styles.statLabel}>FIT</Text>
+            </View>
           </View>
 
           {/* Re-eval banners */}
@@ -756,6 +799,7 @@ export default function FitResultScreen() {
         </GestureDetector>
       </Animated.View>
     </View>
+    </GestureDetector>
   );
 }
 
@@ -785,13 +829,16 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
   const stroke = 6;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const percent = level === 'high' ? 0.92 : level === 'medium' ? 0.6 : 0.28;
+  // Arc lengths per level. `high` stops just shy of 100% (0.98) — a
+  // fully-closed ring reads as "complete" which is wrong for confidence;
+  // the tiny gap signals "strong but not absolute".
+  const percent = level === 'high' ? 0.98 : level === 'medium' ? 0.6 : 0.28;
   const colour =
     level === 'high'
-      ? 'rgba(90, 67, 119, 1)'
+      ? 'rgba(106, 95, 117, 1)'
       : level === 'medium'
-      ? 'rgba(90, 67, 119, 0.72)'
-      : 'rgba(90, 67, 119, 0.45)';
+      ? 'rgba(106, 95, 117, 0.72)'
+      : 'rgba(106, 95, 117, 0.45)';
   const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
   return (
     <View style={styles.confidenceDonut}>
@@ -801,7 +848,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke="rgba(90, 67, 119, 0.14)"
+          stroke="rgba(106, 95, 117, 0.14)"
           strokeWidth={stroke}
           fill="transparent"
         />
@@ -850,13 +897,16 @@ const styles = StyleSheet.create({
   },
 
   // --- Back chevron ---
+  //   Deep brand-purple tint (colors.text @ 0.55) instead of black @ 0.32 —
+  //   the old grey-black fill fought the grey-purple palette. Matches the
+  //   history trash + every other circular affordance now.
   backBtn: {
     position: 'absolute',
     left: spacing.lg,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -868,7 +918,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.32)',
+    backgroundColor: 'rgba(47, 41, 55, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -909,7 +959,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xxxl,
     overflow: 'hidden',
     // Deep purple-tinted drop shadow — grounds the card over the image.
-    shadowColor: '#1a0f28',
+    shadowColor: '#1a1118',
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.48,
     shadowRadius: 28,
@@ -917,12 +967,13 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Lighter now that QmBlurView (via @sbaiahmed1/react-native-blur)
-    // does real blur on mid-range Android. Hairline inner border catches
-    // "light" on the edge for the frosted-glass feel.
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    // Bumped 0.28 → 0.62 so body text (sizing note, concerns, tag
+    // labels, meta rows) passes WCAG AA contrast against the busy
+    // product-image backdrop. The image-through-glass feel is still
+    // there, just with a firmer frost tint so text reads clearly.
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderColor: 'rgba(255, 255, 255, 0.65)',
     borderTopLeftRadius: borderRadius.xxxl,
     borderTopRightRadius: borderRadius.xxxl,
   },
@@ -952,7 +1003,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(63, 43, 84, 0.22)',
+    backgroundColor: 'rgba(76, 67, 86, 0.22)',
   },
 
   // --- Verdict row (H1) ---
@@ -974,13 +1025,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pricePill: {
-    backgroundColor: 'rgba(90, 67, 119, 0.14)',
+    backgroundColor: 'rgba(106, 95, 117, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
     marginLeft: spacing.sm,
   },
   priceText: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '800',
     color: colors.primary,
@@ -990,25 +1042,39 @@ const styles = StyleSheet.create({
   // --- Divider ---
   divider: {
     height: 1,
-    backgroundColor: 'rgba(63, 43, 84, 0.12)',
+    backgroundColor: 'rgba(76, 67, 86, 0.12)',
     marginBottom: spacing.md,
   },
 
-  // --- Stats row (H2) — labels removed; each element is self-descriptive ---
+  // --- Stats row (H2) — 3 centred columns, each with a tiny caps label
+  //     underneath per Claude Design handoff ---
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: spacing.lg,
     marginBottom: spacing.md,
+  },
+  statCol: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  statLabel: {
+    fontFamily: 'serif',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
   },
   // Size badge — circle with the size letter/number
   statBadge: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    backgroundColor: 'rgba(106, 95, 117, 0.1)',
     borderWidth: 1.25,
-    borderColor: 'rgba(90, 67, 119, 0.22)',
+    borderColor: 'rgba(106, 95, 117, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1017,17 +1083,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    backgroundColor: 'rgba(106, 95, 117, 0.06)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
+    fontFamily: 'serif',
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
+    fontFamily: 'serif',
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1042,6 +1110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   confidenceDonutLabel: {
+    fontFamily: 'serif',
     position: 'absolute',
     fontSize: 13,
     fontWeight: '800',
@@ -1056,7 +1125,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    backgroundColor: 'rgba(106, 95, 117, 0.08)',
     borderRadius: borderRadius.md,
   },
   bannerSuccess: {
@@ -1070,7 +1139,7 @@ const styles = StyleSheet.create({
 
   // --- Sizing note ---
   noteBlock: {
-    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    backgroundColor: 'rgba(106, 95, 117, 0.08)',
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1113,6 +1182,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   concernSeverity: {
+    fontFamily: 'serif',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -1131,12 +1201,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tag: {
-    backgroundColor: 'rgba(90, 67, 119, 0.12)',
+    backgroundColor: 'rgba(106, 95, 117, 0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
   },
   tagText: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
@@ -1146,7 +1217,7 @@ const styles = StyleSheet.create({
   // --- Meta ---
   metaSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(63, 43, 84, 0.1)',
+    borderTopColor: 'rgba(76, 67, 86, 0.1)',
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
@@ -1182,19 +1253,21 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
+    fontFamily: 'serif',
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   secondaryButton: {
-    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    backgroundColor: 'rgba(106, 95, 117, 0.1)',
     borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
+    fontFamily: 'serif',
     fontSize: 14,
     color: colors.primary,
     fontWeight: '700',

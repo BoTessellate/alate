@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -24,11 +25,12 @@ import {
 } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import { scrapeProduct } from '../services/api';
-// Swapped from BodyFigurine → BodyCroquis. Same prop API (see
-// project_body_croquis_plan.md memory). BodyFigurine is kept in the
-// repo as the fallback; revert this one import to roll back.
-import BodyCroquis from '../components/BodyCroquis';
+// Croquis figurine was retired per Claude Design handoff (user: "fashion
+// croquis is inaccurate and really bad looking"). BodyCroquis.tsx +
+// BodyFigurine.tsx remain in the repo as dead code for a future v3
+// rebuild — see `project_body_croquis_plan.md` memory.
 import { BodyFocusArea } from '../components/bodyFigurineModel';
+import HeadingImage from '../components/HeadingImage';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
 
@@ -262,22 +264,25 @@ export default function AvatarSetupScreen() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      <View style={styles.row}>
-        {/* Left pane — BodyFigurine, sticky */}
-        <View style={styles.figurePane}>
-          <BodyCroquis
-            heightCm={height}
-            shoulders={shoulders}
-            bust={bust}
-            waist={waist}
-            hips={hips}
-            thighs={thighs}
-            torsoLength={torso}
-            activePart={activePart}
-          />
-        </View>
+      {/* Back chevron — native stack header is hidden so the TAN
+          Nightingale "body profile" title below is the sole page
+          heading (no duplicate "Body Profile" next to a chevron). */}
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={[styles.backChev, { top: insets.top + spacing.sm }]}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+      >
+        <Feather name="chevron-left" size={22} color={colors.text} />
+      </TouchableOpacity>
 
-        {/* Right pane — scrollable form */}
+      {/* Claude Design handoff direction: body croquis removed from the
+          onboarding flow ("inaccurate and really bad looking" — user
+          words). Full-width chip flow is what the design landed on.
+          BodyCroquis.tsx + BodyFigurine.tsx stay in the repo as dead
+          components for now so the v3 rebuild has the same starting
+          point; see `project_body_croquis_plan.md` memory. */}
+      <View style={styles.row}>
         <ScrollView
           style={styles.formPane}
           contentContainerStyle={styles.formContent}
@@ -285,9 +290,16 @@ export default function AvatarSetupScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text testID="avatar-setup-title" style={styles.title}>Body profile</Text>
+            <HeadingImage
+              testID="avatar-setup-title"
+              slot="body-profile"
+              fallback="body profile"
+              height={48}
+              color={colors.text}
+              textStyle={styles.title}
+            />
             <Text style={styles.subtitle}>
-              Select each measurement — your figurine updates live
+              Select each measurement to build your fit model
             </Text>
           </View>
 
@@ -474,33 +486,49 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
-  figurePane: {
-    width: '42%',
+  // Croquis pane retired — form now takes full width.
+  formPane: {
+    width: '100%',
+  },
+  // Back chevron — floats top-left with safe-area offset applied inline.
+  // Primary @ 0.18 (instead of colors.text @ 0.06) so the chip carries a
+  // subtle lavender warmth on the solid #e6e4e9 background — the old fill
+  // was a near-transparent neutral that read as grey, not theme-aware.
+  backChev: {
+    position: 'absolute',
+    left: spacing.md,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(106, 95, 117, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(90, 67, 119, 0.08)',
-  },
-  formPane: {
-    width: '58%',
+    zIndex: 10,
   },
   formContent: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
+  // Header — italic serif "body profile" + subtle 12px sub copy per
+  // Claude Design ScreenOnboarding.
   header: {
     marginBottom: spacing.md,
   },
   title: {
-    ...typography.headingL,
+    // displayMedium already renders DM Serif Italic lowercase from the
+    // theme token, but at 36px it's too heavy for this pane — dial down
+    // to 30px while keeping the serif italic voice.
+    ...typography.displayMedium,
+    fontSize: 30,
+    lineHeight: 34,
     color: colors.text,
-    marginBottom: spacing.xs,
+    marginBottom: 6,
   },
   subtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 18,
+    fontFamily: 'serif',
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
   },
   progressContainer: {
     flexDirection: 'row',

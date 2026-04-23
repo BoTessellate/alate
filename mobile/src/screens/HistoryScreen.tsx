@@ -18,6 +18,7 @@ import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
+import HeadingImage from '../components/HeadingImage';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'History'>,
@@ -82,6 +83,10 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+  // Count of entries scored 'great' — surfaced in the header meta so the
+  // subtitle carries real signal ("3 good fits") instead of the redundant
+  // "swipe through to revisit" instruction the coverflow already implies.
+  const goodFits = entries.filter((e) => e.fitScore === 'great').length;
 
   // Delete a single history card. Confirms first, then removes from the
   // store. Cover flow re-renders automatically because the store drives
@@ -169,15 +174,18 @@ export default function HistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       <View testID="history-screen" style={styles.container}>
-        {/* Page title + slim stats pill under it */}
+        {/* Page title + slim stats pill under it. TAN Nightingale SVG
+            via HeadingImage falls back to styled text if missing. */}
         <View style={styles.header}>
-          <Text style={styles.pageTitle}>History</Text>
+          <HeadingImage
+            slot="history"
+            fallback="your history"
+            height={60}
+            color={colors.text}
+            textStyle={styles.pageTitle}
+          />
           <Text style={styles.headerMeta}>
-            {entries.length} checked
-            {entries.filter((e) => e.fitScore === 'great').length > 0 &&
-              ` · ${entries.filter((e) => e.fitScore === 'great').length} great fit${
-                entries.filter((e) => e.fitScore === 'great').length > 1 ? 's' : ''
-              }`}
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}
           </Text>
         </View>
 
@@ -233,22 +241,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Header — left-aligned per Claude Design mockup. Title is DM Serif
+  // italic lowercase via displayMedium; subtitle sits tight under it
+  // (marginTop 4) in plain body 13px, textMuted, no letter-spacing.
   header: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
-    alignItems: 'center',
   },
   pageTitle: {
     ...typography.displayMedium,
     color: colors.text,
-    textAlign: 'center',
   },
   headerMeta: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontFamily: 'serif',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textMuted,
     marginTop: 4,
-    letterSpacing: 1,
   },
   list: {
     padding: spacing.md,
@@ -437,12 +447,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Floating footer overlay (pill + clear link on top of deck) ---
+  // --- Floating footer overlay (pill + clear link above the floating
+  //     tab bar). Dropped 100 → 72 so the detail pill isn't directly
+  //     touching the bottom of the product card — there's a visible gap
+  //     between the cover-flow card edge and the pill now, per user
+  //     feedback. Still sits clearly above the tab pill (which starts
+  //     at insets.bottom + 24 + 64 ≈ 88 from the bottom). ---
   floatingFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
+    bottom: 72,
     alignItems: 'center',
   },
   detailBarWrap: {

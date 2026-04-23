@@ -79,6 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   icon: {
+    fontFamily: 'serif',
     fontSize: 48,
     fontWeight: '700',
     color: colors.error,

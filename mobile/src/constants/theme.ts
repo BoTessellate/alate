@@ -4,20 +4,26 @@
  */
 
 // =============================================================================
-// FONT FAMILIES - Using system fonts for cross-platform consistency
+// FONT FAMILIES
 // =============================================================================
+// The display face is TAN Nightingale (rendered as SVGs by HeadingImage).
+// Body copy now runs on a system serif so it pairs with Nightingale's
+// art-deco serif character — mixing sans body with a display serif made
+// the headings feel like stickers dropped onto sans-serif chrome.
+// Platform-specific serifs: 'Times New Roman' (iOS Western default),
+// 'serif' (Android → Noto Serif, which ships on every Android device).
 export const fontFamily = {
-  // Primary UI font - clean, professional sans-serif
-  primary: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  // Accent/Display font - elegant serif for headings
-  accent: 'Georgia, "Times New Roman", serif',
+  // Primary UI font — system serif that pairs with TAN Nightingale.
+  primary: 'serif',
+  // Legacy alias for the editorial body face
+  accent: 'Georgia',
   // Display font loaded via expo-font (see App.tsx). Stand-in for TAN Nightingale
-  // until we buy the real thing. Rendered lowercase on all heading tokens.
+  // when the SVG slot falls back to text (i.e. missing asset).
   display: 'DMSerifDisplay-Italic',
   // Monospace for code/data
   mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
   // Fallback
-  fallback: 'system-ui, sans-serif',
+  fallback: 'serif',
 };
 
 // Shared heading trait: every display/heading token mixes this in so the
@@ -28,77 +34,82 @@ const headingSerif = {
 };
 
 // =============================================================================
-// COLOR PALETTE - Gray-Purple system (matches website tonal scale)
-// Background:     #e4e2e9  (solid, lightest stop of the website's tonal scale)
-// Primary brand:  #5a4377  (used for buttons + bold text)
+// COLOR PALETTE - Grey-Purple system (per Claude Design handoff)
+// Background:     #e6e4e9  (solid, lightest stop of the tonal scale)
+// Primary brand:  #6a5f75  (grey-purple — quieter than the old saturated purple)
+// Semantic:       dusty sage / terracotta / clay red / slate blue (all muted)
+// Source:         alate-design-system/project/colors_and_type.css
 // =============================================================================
 export const colors = {
-  // Primary - Gray-purple brand colour (buttons, bold text)
-  primary: '#5a4377',
-  primaryLight: '#7d6699',
-  primaryDark: '#3f2b54',
+  // Primary - Grey-purple brand colour
+  primary: '#6a5f75',
+  primaryLight: '#8a7e94',
+  primaryDark: '#4c4356',
 
-  // CTA - Same as primary (the main interactive colour everywhere)
-  cta: '#5a4377',
+  // CTA - Same as primary
+  cta: '#6a5f75',
 
-  // Secondary - Slightly darker brand purple for emphasis (price, callouts)
-  secondary: '#3f2b54',
-  secondaryLight: '#5a4377',
-  secondaryDark: '#2a1c3a',
+  // Secondary - Slightly darker brand grey-purple for emphasis
+  secondary: '#4c4356',
+  secondaryLight: '#6a5f75',
+  secondaryDark: '#2f2937',
 
-  // Accent - Mid-tone gray-purple (pills, subtle surfaces)
-  accent: '#9a92ac',
-  accentLight: '#c5c0d2',
-  accentDark: '#5a4377',
+  // Accent - Mid-tone grey-purple (pills, subtle surfaces)
+  accent: '#97919f',
+  accentLight: '#c7c2cd',
+  accentDark: '#6a5f75',
 
-  // Highlight - Brand purple family
-  highlight: '#5a4377',
-  highlightLight: '#7d6699',
-  highlightDark: '#3f2b54',
+  // Highlight - Brand grey-purple family
+  highlight: '#6a5f75',
+  highlightLight: '#8a7e94',
+  highlightDark: '#4c4356',
 
-  // Background — solid, matches website canvas (lightest stop of tonal scale)
-  background: '#e4e2e9',
-  backgroundSecondary: '#d8d4de',
-  backgroundTertiary: '#c5c0d2',
-  backgroundDark: '#9a92ac',
+  // Background — solid canvas (never a gradient)
+  background: '#e6e4e9',
+  backgroundSecondary: '#d9d6dd',
+  backgroundTertiary: '#c7c2cd',
+  backgroundDark: '#97919f',
 
   // Surface - Elevated containers (white cards)
   surface: '#FFFFFF',
   surfaceLight: '#FBFAFD',
   surfaceElevated: '#FFFFFF',
 
-  // Text - Deep brand purple-black for readability on the light end of the gradient
-  text: '#2a1c3a',
-  textSecondary: '#5a4377',   // brand purple as secondary text
-  textMuted: '#7d6699',       // lighter brand purple, still WCAG AA on #e4e2e9
+  // Text - Deepest grey-purple for readability on the light canvas
+  text: '#2f2937',
+  textSecondary: '#4c4356',   // primary-dark as secondary text
+  textMuted: '#8a7e94',
   textOnPrimary: '#FFFFFF',
   textOnSecondary: '#FFFFFF',
   white: '#FFFFFF',
 
-  // Status colors (semantic — tuned to feel harmonious with gray-purple)
-  success: '#2E7D5B',
-  successLight: '#4AA37F',
-  warning: '#C2410C',
-  warningLight: '#E06E1C',
-  error: '#B91C1C',
-  errorLight: '#DC2626',
-  info: '#0E7490',            // teal-blue — distinct from primary purple, still harmonious
-  infoLight: '#0891B2',
+  // Status colours — muted, earthy, harmonious with grey-purple
+  success: '#5a7a68',         // dusty sage
+  successLight: '#7a9a88',
+  successDeep: '#4a6a58',     // verdict text on white glass (higher contrast)
+  warning: '#a8724a',         // terracotta
+  warningLight: '#c28a62',
+  warningDeep: '#8a5a3a',
+  error: '#9a4a4a',           // clay red
+  errorLight: '#b46868',
+  errorDeep: '#7a3a3a',
+  info: '#5a7585',            // slate blue
+  infoLight: '#7a95a5',
 
   // Border colors
-  border: '#c5c0d2',
-  borderLight: '#d8d4de',
-  borderAccent: '#5a4377',
+  border: '#c7c2cd',
+  borderLight: '#d9d6dd',
+  borderAccent: '#6a5f75',
 
   // Overlay
-  overlay: 'rgba(42, 28, 58, 0.8)',
-  overlayLight: 'rgba(42, 28, 58, 0.5)',
+  overlay: 'rgba(47, 41, 55, 0.8)',
+  overlayLight: 'rgba(47, 41, 55, 0.5)',
 
-  // Gradient endpoints
-  gradientPrimary: ['#5a4377', '#3f2b54'],
-  gradientAccent: ['#7d6699', '#5a4377'],
-  gradientWarm: ['#9a92ac', '#5a4377'],
-  gradientCool: ['#b5afc4', '#5a4377'],
+  // Gradient endpoints — grey-purple scale
+  gradientPrimary: ['#6a5f75', '#4c4356'],
+  gradientAccent: ['#8a7e94', '#6a5f75'],
+  gradientWarm: ['#97919f', '#6a5f75'],
+  gradientCool: ['#b4afbb', '#6a5f75'],
 };
 
 // =============================================================================
@@ -173,42 +184,49 @@ export const typography = {
     lineHeight: 28,
   },
   headingS: {
+    fontFamily: 'serif',
     fontSize: 16,
     fontWeight: '600' as const,
     lineHeight: 24,
   },
 
-  // Body text
+  // Body text — now on system serif to pair with TAN Nightingale
   bodyLarge: {
+    fontFamily: 'serif',
     fontSize: 18,
     fontWeight: '400' as const,
     lineHeight: 28,
   },
   body: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '400' as const,
     lineHeight: 22,
   },
   bodySmall: {
+    fontFamily: 'serif',
     fontSize: 13,
     fontWeight: '400' as const,
     lineHeight: 18,
   },
 
-  // Labels & Buttons
+  // Labels & Buttons — serif so small copy matches the editorial voice
   labelLarge: {
+    fontFamily: 'serif',
     fontSize: 15,
     fontWeight: '500' as const,
     lineHeight: 22,
     letterSpacing: 0.1,
   },
   label: {
+    fontFamily: 'serif',
     fontSize: 13,
     fontWeight: '500' as const,
     lineHeight: 18,
     letterSpacing: 0.1,
   },
   labelSmall: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '500' as const,
     lineHeight: 16,
@@ -217,11 +235,13 @@ export const typography = {
 
   // Caption & Overline
   caption: {
+    fontFamily: 'serif',
     fontSize: 12,
     fontWeight: '400' as const,
     lineHeight: 16,
   },
   overline: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '600' as const,
     lineHeight: 14,
@@ -230,10 +250,10 @@ export const typography = {
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: 'serif', fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: 'serif', fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: 'serif', fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: 'serif', fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
 };
 
 // =============================================================================

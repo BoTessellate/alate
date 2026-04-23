@@ -27,7 +27,10 @@ import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
 import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
+import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
+import HeadingImage from '../components/HeadingImage';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -46,6 +49,9 @@ export default function HomeScreen() {
   const [nudgeSent, setNudgeSent] = useState(false);
   const [nudging, setNudging] = useState(false);
   const { avatar } = useAvatarStore();
+  const { entries: historyEntries } = useFitHistoryStore();
+  // Most recent 3 for the "Recent" list per Claude Design mockup
+  const recent = historyEntries.slice(0, 3);
   // Preserves URL across navigation to AvatarSetup so it auto-triggers on return
   const pendingUrlRef = useRef<string | null>(null);
   // Auto-trigger debounce on paste
@@ -125,7 +131,17 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      {/* Full-bleed gradient backdrop — same visual as fit-analysis hero
+          screens per user direction. Radial-style angle from the top-left
+          light edge through brand purple to the deep purple base. */}
+      <LinearGradient
+        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+        locations={[0, 0.3, 0.6, 0.9]}
+        start={{ x: 0.15, y: 0.1 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -136,29 +152,32 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero Section */}
-          <View style={styles.heroSection}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/icon.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>Will it fit?</Text>
-            <Text style={styles.subtitle}>
-              Paste any product URL to instantly check{'\n'}if it'll fit your body perfectly
+          {/* Hero — per Claude Design mockup.
+              Eyebrow wordmark + 3-line italic serif verse + plain tagline. */}
+          <View style={styles.hero}>
+            <Text style={styles.eyebrow}>ALATE</Text>
+            <HeadingImage
+              slot="home-verse"
+              fallback={"paste anything.\nwe'll tell you\nif it fits."}
+              height={200}
+              color="#fff"
+              style={styles.heroVerseWrap}
+              textStyle={styles.heroVerse}
+            />
+            <Text style={styles.heroTagline}>
+              from any store. dresses, denim, knitwear — we read the brand's size chart against your body.
             </Text>
           </View>
 
-          {/* Input Card */}
-          <GlassCard style={styles.inputCard}>
-            <Text style={styles.inputLabel}>Product URL</Text>
-            <View style={styles.inputWrapper}>
+          {/* Glass pill input + Check fit button — matches the design's
+              single-line input (no wrapping card) + pill CTA + share hint. */}
+          <View style={styles.inputSection}>
+            <GlassCard style={styles.inputPill}>
+              <Feather name="link-2" size={18} color={colors.primary} style={styles.inputIcon} />
               <TextInput
                 testID="url-input"
-                style={styles.input}
-                placeholder="Paste ASOS, Zara, or any product URL..."
+                style={styles.inputField}
+                placeholder="paste a product url…"
                 placeholderTextColor={colors.textMuted}
                 value={url}
                 onChangeText={handleUrlChange}
@@ -166,7 +185,7 @@ export default function HomeScreen() {
                 autoCorrect={false}
                 keyboardType="url"
               />
-            </View>
+            </GlassCard>
 
             {error && !failedBrand && (
               <View style={styles.errorContainer}>
@@ -179,17 +198,20 @@ export default function HomeScreen() {
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleCheckFit}
               disabled={loading}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               {loading ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.buttonText}>Check Fit</Text>
+                <Text style={styles.buttonText}>Check fit</Text>
               )}
             </TouchableOpacity>
-          </GlassCard>
 
-          {/* Brand Nudge Card */}
+            <Text style={styles.shareHint}>or use the share extension from your browser</Text>
+          </View>
+
+          {/* Brand Nudge Card — unchanged functionally, just re-housed
+              below the input so the hero composition stays clean. */}
           {failedBrand && (
             <GlassCard testID="brand-nudge-card" style={styles.nudgeCard}>
               <View style={styles.nudgeHeader}>
@@ -239,11 +261,15 @@ export default function HomeScreen() {
             </GlassCard>
           )}
 
-          {/* Profile Setup Prompt */}
+          {/* Profile Setup Prompt — shown only when the user hasn't built a
+              body profile yet. Not in the design mockup (which assumes a
+              completed onboarding), but functionally required for new
+              users; kept here as a gentle glass nudge. */}
           {!avatar && (
             <TouchableOpacity
               onPress={() => navigation.navigate('AvatarSetup')}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
+              style={styles.setupWrap}
             >
               <GlassCard style={styles.setupCard}>
                 <View style={styles.setupIconContainer}>
@@ -260,24 +286,114 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Feature Highlights */}
-          <View style={styles.featuresSection}>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureDot, { backgroundColor: colors.primary }]} />
-              <Text style={styles.featureText}>Works with 100+ fashion sites</Text>
+          {/* Recent — glass-card list of the last 3 fit checks. Tapping a
+              row opens the FitResult for that entry in history mode.
+              Replaces the old "feature highlights" section entirely. */}
+          {recent.length > 0 && (
+            <View style={styles.recentSection}>
+              <Text style={styles.recentLabel}>RECENT</Text>
+              <View style={styles.recentList}>
+                {recent.map((entry) => (
+                  <RecentCard
+                    key={entry.id}
+                    entry={entry}
+                    onPress={() => {
+                      const idx = historyEntries.findIndex((e) => e.id === entry.id);
+                      navigation.navigate('FitResult', {
+                        historyEntries,
+                        currentIndex: idx >= 0 ? idx : 0,
+                        product: {
+                          name: entry.productName,
+                          image: entry.productImage,
+                          price: entry.price,
+                          brand: entry.brand,
+                        },
+                        url: entry.url,
+                        historyEntryId: entry.id,
+                        precomputed: {
+                          fitScore: entry.fitScore,
+                          warnings: entry.warnings,
+                          sizeRecommendation: entry.sizeRecommendation,
+                          enrichedProduct: {
+                            category: entry.category,
+                            material: entry.material,
+                            tags: entry.tags,
+                          },
+                          checkedAt: entry.checkedAt,
+                        },
+                      });
+                    }}
+                  />
+                ))}
+              </View>
             </View>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureDot, { backgroundColor: colors.secondary }]} />
-              <Text style={styles.featureText}>Instant AI-powered fit analysis</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <View style={[styles.featureDot, { backgroundColor: colors.accentDark }]} />
-              <Text style={styles.featureText}>Save to your fit history</Text>
-            </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Bottom-edge fade — content "disappears into the darkness" where
+          it meets the floating tab bar. Makes the glass tab bar read as
+          a true floating element instead of a translucent pane with the
+          RECENT list bleeding through from behind. Gradient fades from
+          transparent at the top to the page backdrop's deepest stop
+          (matching #4c4356) over the height the tab pill occupies.
+          pointerEvents="none" so the fade doesn't eat taps on cards
+          above it. */}
+      <LinearGradient
+        // Heavier ramp — Recent cards need to wash OUT much earlier so
+        // the floating nav pill reads as a true floating element, not a
+        // glass pane with card artefacts bleeding behind/around it. User
+        // direction: "a lot more faded than it is right now". Dark stop
+        // reaches 90% opacity by the halfway mark, and the gradient is
+        // ~60% taller than the previous 200px version.
+        colors={[
+          'rgba(76, 67, 86, 0)',
+          'rgba(76, 67, 86, 0.7)',
+          'rgba(76, 67, 86, 0.97)',
+          '#4c4356',
+        ]}
+        locations={[0, 0.22, 0.5, 1]}
+        style={styles.bottomFade}
+        pointerEvents="none"
+      />
     </View>
+  );
+}
+
+// Recent-fit row. Thumbnail + brand eyebrow + name + size + verdict chip.
+function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () => void }) {
+  const { bg, fg, label } =
+    entry.fitScore === 'great'
+      ? { bg: 'rgba(90, 122, 104, 0.18)', fg: '#4a6a58', label: 'Fits' }
+      : entry.fitScore === 'moderate'
+      ? { bg: 'rgba(168, 114, 74, 0.18)', fg: '#8a5a3a', label: 'Check' }
+      : { bg: 'rgba(154, 74, 74, 0.18)', fg: '#7a3a3a', label: 'Concerns' };
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+      <GlassCard style={styles.recentCard}>
+        {entry.productImage ? (
+          <Image source={{ uri: entry.productImage }} style={styles.recentThumb} />
+        ) : (
+          <View style={[styles.recentThumb, styles.recentThumbPlaceholder]}>
+            <Feather name="shopping-bag" size={18} color="rgba(255,255,255,0.7)" />
+          </View>
+        )}
+        <View style={styles.recentMeta}>
+          <Text style={styles.recentBrand} numberOfLines={1}>
+            {(entry.brand || 'UNKNOWN').toUpperCase()}
+          </Text>
+          <Text style={styles.recentName} numberOfLines={1}>
+            {entry.productName || 'Product'}
+          </Text>
+          {entry.sizeRecommendation?.size && (
+            <Text style={styles.recentSize}>Size {entry.sizeRecommendation.size}</Text>
+          )}
+        </View>
+        <View style={[styles.recentChip, { backgroundColor: bg }]}>
+          <Text style={[styles.recentChipLabel, { color: fg }]}>{label}</Text>
+        </View>
+      </GlassCard>
+    </TouchableOpacity>
   );
 }
 
@@ -293,58 +409,73 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    // Extra clearance so the RECENT list is visibly dying into the fade
+    // before it reaches the floating pill. Paired with the heavier fade
+    // gradient (height 320 below), the last RECENT row ends deep inside
+    // the dark zone — cards never show up cleanly near the nav pill.
+    paddingBottom: 280,
   },
-  heroSection: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-    ...shadows.md,
-  },
-  logoImage: {
-    width: 80,
-    height: 80,
-  },
-  title: {
-    ...typography.displayMedium,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  inputCard: {
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
+  // --- Hero — Claude Design mockup layout, inverted for dark gradient
+  //     backdrop. Text reads as light on the hero; glass cards below
+  //     keep their white tint + dark text.
+  hero: {
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  inputLabel: {
+  eyebrow: {
     ...typography.overline,
-    color: colors.primary,
-    marginBottom: spacing.sm,
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 2.2,
   },
-  inputWrapper: {
-    marginBottom: spacing.md,
+  heroVerseWrap: {
+    marginTop: 14,
   },
-  input: {
-    backgroundColor: 'transparent',
-    paddingVertical: 10,
-    paddingHorizontal: 0,
+  heroVerse: {
+    ...typography.displayLarge,
+    fontSize: 40,
+    lineHeight: 44,
+    color: '#fff',
+    marginTop: 14,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  heroTagline: {
+    ...typography.body,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 14,
+    maxWidth: 300,
+    lineHeight: 21,
+  },
+
+  // --- Input section — glass pill + CTA + share hint ---
+  inputSection: {
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  inputPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    gap: 10,
+    borderRadius: borderRadius.xl,
+  },
+  inputIcon: {
+    flexShrink: 0,
+  },
+  inputField: {
+    flex: 1,
     ...typography.body,
     color: colors.text,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.15)',
+    paddingVertical: 0,
+  },
+  shareHint: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginTop: spacing.xs,
   },
   errorContainer: {
     backgroundColor: colors.errorLight + '20',
@@ -404,6 +535,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   setupArrow: {
+    fontFamily: 'serif',
     fontSize: 22,
     color: colors.primary,
     fontWeight: '300',
@@ -446,22 +578,100 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
   },
-  featuresSection: {
-    paddingTop: spacing.md,
+  // --- Recent — glass-card list of last N fit checks (Claude Design) ---
+  recentSection: {
+    marginTop: spacing.xl,
   },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  recentLabel: {
+    ...typography.overline,
+    color: 'rgba(255,255,255,0.75)',
     marginBottom: spacing.sm,
   },
-  featureDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing.sm,
+  recentList: {
+    gap: spacing.sm,
   },
-  featureText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+  recentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 10,
+    borderRadius: borderRadius.xl,
+    // White frost opaque enough for dark text to pass WCAG AA against
+    // the dark-gradient backdrop. At 0.38 the card was mid-tone, so
+    // neither white nor dark text read well. 0.78 reads as frosted
+    // glass (gradient still perceptible at the edges) but carries the
+    // dark ink cleanly.
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+  },
+  recentThumb: {
+    width: 44,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundTertiary,
+  },
+  recentThumbPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+  },
+  recentMeta: {
+    flex: 1,
+    gap: 1,
+  },
+  recentBrand: {
+    fontFamily: 'serif',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    // Dark text on the frosted card — WCAG AA passes on the 0.78
+    // white-tint bg. Light text was failing contrast on the mid-
+    // tone cards.
+    color: colors.textMuted,
+  },
+  recentName: {
+    fontFamily: 'serif',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    lineHeight: 18,
+  },
+  recentSize: {
+    fontFamily: 'serif',
+    fontSize: 11,
+    color: colors.textMuted,
+    lineHeight: 13,
+    marginTop: 1,
+  },
+  recentChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.pill,
+  },
+  recentChipLabel: {
+    fontFamily: 'serif',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+
+  // Setup prompt wrapper (glass card for users without avatar)
+  setupWrap: {
+    marginBottom: spacing.md,
+  },
+
+  // Bottom-edge fade — sits over the ScrollView, under the floating
+  // tab bar. Bumped to 320px so the dark zone reaches further up the
+  // viewport and Recent cards wash into the darkness well before they
+  // get anywhere near the floating nav pill.
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 320,
+    zIndex: 1,
   },
 });

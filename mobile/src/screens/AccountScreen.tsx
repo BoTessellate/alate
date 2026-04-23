@@ -25,6 +25,8 @@ import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator
 import { captureError } from '../utils/sentry';
 import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
+import HeadingImage from '../components/HeadingImage';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -215,55 +217,61 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      {/* Full-bleed gradient backdrop — same treatment as Home, matches
+          the fit-analysis hero screens. */}
+      <LinearGradient
+        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+        locations={[0, 0.3, 0.6, 0.9]}
+        start={{ x: 0.15, y: 0.1 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header */}
+        {/* Header — TAN Nightingale "profile" SVG with styled text
+            fallback if the asset is missing. */}
         <View style={styles.header}>
-          <Text style={styles.title}>Account</Text>
+          <HeadingImage
+            slot="profile"
+            fallback="profile"
+            height={60}
+            color="#fff"
+            textStyle={styles.title}
+          />
         </View>
 
         {/* Google account card — isolated so a hook crash here can't blank the page */}
         <GoogleSignInCard />
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>{entries.length}</Text>
-            <Text style={styles.statLabel}>Checked</Text>
-          </GlassCard>
-          <GlassCard style={styles.statCard}>
-            <Text style={styles.statNumber}>{greatFits}</Text>
-            <Text style={styles.statLabel}>Great Fits</Text>
-          </GlassCard>
-        </View>
-
-        {/* Body Profile */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Body Profile</Text>
+        {/* Body profile — section header with Edit pill on the right.
+            Per Claude Design ScreenProfile mockup. */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionLabel}>BODY PROFILE</Text>
           <TouchableOpacity
-            style={styles.editButton}
+            style={styles.editPill}
             onPress={() => navigation.navigate('AvatarSetup')}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <Feather name="edit-2" size={14} color={colors.accentDark} />
-            <Text style={styles.editButtonText}>{avatar ? 'Edit' : 'Set up'}</Text>
+            <Feather name="edit-2" size={11} color={colors.primary} />
+            <Text style={styles.editPillText}>{avatar ? 'Edit' : 'Set up'}</Text>
           </TouchableOpacity>
         </View>
 
         {avatar ? (
           <GlassCard style={styles.profileCard}>
-            {/* Height row */}
             <View style={styles.profileRow}>
               <Text style={styles.profileLabel}>Height</Text>
               <Text style={styles.profileValue}>
-                {avatar.height_cm} cm ({Math.floor(avatar.height_cm / 30.48)}′
-                {Math.round((avatar.height_cm / 2.54) % 12)}″)
+                {Math.floor(avatar.height_cm / 30.48)}′{Math.round((avatar.height_cm / 2.54) % 12)}″
               </Text>
             </View>
             {(
               ['shoulders', 'bust', 'waist', 'hips', 'thighs', 'torso_length'] as const
-            ).map((key) => (
-              <View key={key} style={styles.profileRow}>
+            ).map((key, i, arr) => (
+              <View
+                key={key}
+                style={[styles.profileRow, i === arr.length - 1 && styles.profileRowLast]}
+              >
                 <Text style={styles.profileLabel}>{MEASUREMENT_LABELS[key]}</Text>
                 <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
               </View>
@@ -272,13 +280,12 @@ export default function AccountScreen() {
         ) : (
           <TouchableOpacity
             onPress={() => navigation.navigate('AvatarSetup')}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <GlassCard style={styles.emptyProfileCard}>
-              <Text style={styles.emptyProfileIcon}>📏</Text>
               <Text style={styles.emptyProfileTitle}>Set up your body profile</Text>
               <Text style={styles.emptyProfileSubtitle}>
-                Add your measurements to get accurate fit predictions and size recommendations
+                Add measurements for accurate fit predictions
               </Text>
               <View style={styles.emptyProfileCta}>
                 <Text style={styles.emptyProfileCtaText}>Get started →</Text>
@@ -287,30 +294,40 @@ export default function AccountScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Fit Calibration — Zalando "user's normal size" anchor */}
-        {avatar && <FitCalibrationCard />}
+        {/* Preferences section removed — the Fit preference / Notifications
+            rows were mockup placeholders that weren't wired to any store.
+            When real preferences land (toggle component, persisted in
+            zustand), reintroduce this section backed by real state. */}
 
-        {/* Tip */}
-        {avatar && (
-          <GlassCard style={styles.tipCard}>
-            <Feather name="info" size={16} color={colors.accentDark} style={styles.tipIcon} />
-            <Text style={styles.tipText}>
-              Size accuracy improves the more you check products. Your fit history helps calibrate predictions over time.
-            </Text>
-          </GlassCard>
-        )}
-
-        {/* Reset Profile */}
+        {/* Reset — quiet link at the bottom. Calibration + Tip cards
+            removed from Account per design mockup (they may return as
+            their own screen later). */}
         {avatar && (
           <TouchableOpacity
             style={styles.resetButton}
             onPress={clearAvatar}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetText}>Reset Profile</Text>
+            <Text style={styles.resetText}>Reset profile</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Bottom-edge fade — same pattern as Home. Content melts into
+          the backdrop gradient's dark stop so the floating tab bar
+          reads as a true floating element, not a glass pane over
+          scrollable list rows. */}
+      <LinearGradient
+        colors={[
+          'rgba(76, 67, 86, 0)',
+          'rgba(76, 67, 86, 0.55)',
+          'rgba(76, 67, 86, 0.95)',
+          '#4c4356',
+        ]}
+        locations={[0, 0.22, 0.55, 1]}
+        style={styles.bottomFade}
+        pointerEvents="none"
+      />
     </View>
   );
 }
@@ -325,16 +342,21 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    // Clears the fade ramp + tab-bar footprint so Reset stays above
+    // the dense fade region.
+    paddingBottom: 260,
   },
+  // Header — left-aligned italic serif title, white on the dark
+  // gradient backdrop per Claude Design ScreenProfile + user direction.
   header: {
     marginBottom: spacing.lg,
-    alignItems: 'center',
   },
   title: {
     ...typography.displayMedium,
-    color: colors.text,
-    textAlign: 'center',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   // Google account card
   accountCard: {
@@ -397,7 +419,7 @@ const styles = StyleSheet.create({
     // Muted purple chip instead of the red-tinted destructive pill.
     // The action is still destructive, but the confirm dialog gates the
     // actual sign-out — the chip doesn't need to shout.
-    backgroundColor: 'rgba(90, 67, 119, 0.12)',
+    backgroundColor: 'rgba(106, 95, 117, 0.12)',
   },
   signOutText: {
     ...typography.label,
@@ -426,44 +448,66 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-  // Section header
-  sectionHeader: {
+  // Section label + pill — per Claude Design ScreenProfile: small
+  // uppercase label on the left, compact Edit pill on the right.
+  sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    paddingHorizontal: 4,
+    marginTop: spacing.lg,
   },
-  sectionTitle: {
-    ...typography.headingS,
-    color: colors.text,
+  sectionRowSpaced: {
+    marginTop: spacing.xl,
   },
-  editButton: {
+  sectionLabel: {
+    fontFamily: 'serif',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    // Light on dark gradient bg.
+    color: 'rgba(255,255,255,0.8)',
+  },
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.pill,
+    // White-tinted pill on the dark bg.
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  editPillText: {
+    fontFamily: 'serif',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  prefValue: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: borderRadius.pill,
-    backgroundColor: colors.accentDark + '18',
   },
-  editButtonText: {
-    ...typography.label,
-    color: colors.accentDark,
-    fontWeight: '600',
-  },
-  // Profile card
+  // Glass list card for body profile + preferences — inner rows are
+  // divided by hairlines except the last row.
   profileCard: {
     borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+    padding: 4,
   },
   profileRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.1)',
+    borderBottomColor: 'rgba(47, 41, 55, 0.08)',
+  },
+  profileRowLast: {
+    borderBottomWidth: 0,
   },
   profileLabel: {
     ...typography.label,
@@ -530,11 +574,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: borderRadius.pill,
-    backgroundColor: colors.error + '10',
+    // Subdued on dark gradient — quieter text link feel, not a bright red button.
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginTop: spacing.lg,
   },
   resetText: {
     ...typography.label,
-    color: colors.error,
+    color: 'rgba(255,255,255,0.75)',
     fontWeight: '600',
+  },
+
+  // Bottom-edge fade — 280px tall for a heavier horizon effect.
+  // Content padding bumped in parallel so the Reset button still
+  // lives above the dense part of the fade.
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 280,
+    zIndex: 1,
   },
 });

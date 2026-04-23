@@ -410,6 +410,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   accentLabel: {
+    fontFamily: 'serif',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,
