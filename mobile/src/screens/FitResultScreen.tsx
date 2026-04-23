@@ -204,13 +204,24 @@ export default function FitResultScreen() {
     ),
   }));
 
-  // Vertical drag toggles collapse. Lives on the outer card so the user
-  // can drag from anywhere on the overlay (per user direction "from any
-  // place on the upper half"). `activeOffsetY([-10, 10])` means small
-  // nudges still go to the inner ScrollView; only deliberate vertical
-  // swipes trigger the collapse. 300px of drag = full transition.
+  // Vertical drag toggles collapse. Scoped to the HANDLE zone only —
+  // the previous "drag from anywhere on the card" UX fought the
+  // ScrollView's scroll intent: any 10px+ downward pull to scroll fit
+  // concerns accidentally minimised the overlay. Standard bottom-sheet
+  // pattern (iOS Sheets, Google Maps pull-up) is a dedicated handle
+  // grip — unambiguous drag target, rest of the card is pure scroll.
+  //
+  //   - No activeOffsetY threshold: the handle is a dedicated grip, any
+  //     vertical motion on it is drag intent.
+  //   - Spring: damping 28 / stiffness 200 is slightly overdamped
+  //     (ratio ≈ 1.0), eliminates overshoot that was reading as a
+  //     "too-bouncy" spring + also preventing the mid-animation content
+  //     reflow that rendered as a blink at the bottom of the card.
+  //   - `runOnJS(setIsExpanded)` fires ONLY on spring completion (was
+  //     firing at drag-end, which flipped isExpanded immediately and
+  //     caused the concerns section to appear/disappear mid-animation —
+  //     that was the "render blinking" users were seeing).
   const dragGesture = Gesture.Pan()
-    .activeOffsetY([-10, 10])
     .onBegin(() => {
       startProgress.value = collapseProgress.value;
     })
@@ -223,8 +234,19 @@ export default function FitResultScreen() {
     })
     .onEnd(() => {
       const target = collapseProgress.value > 0.5 ? 1 : 0;
-      collapseProgress.value = withSpring(target, { damping: 18, stiffness: 160 });
-      runOnJS(setIsExpanded)(target === 1);
+      collapseProgress.value = withSpring(
+        target,
+        { damping: 28, stiffness: 200 },
+        (finished) => {
+          // Defer the React state flip until the spring lands. This
+          // stops the concerns section from appearing/disappearing
+          // mid-animation, which was the render blink at the card's
+          // bottom edge.
+          if (finished) {
+            runOnJS(setIsExpanded)(target === 1);
+          }
+        }
+      );
     });
 
   // Horizontal drag sifts to the next/prev entry. HOISTED to the root
@@ -255,7 +277,9 @@ export default function FitResultScreen() {
       } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
         runOnJS(setLocalIndex)(localIndex - 1);
       }
-      swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
+      // Toned-down sift-release: damping bumped 20 → 26 so the card
+      // eases back to center instead of bouncing past it.
+      swipeX.value = withSpring(0, { damping: 26, stiffness: 200 });
     });
 
   const siftStyle = useAnimatedStyle(() => ({
@@ -576,24 +600,23 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Inner GestureDetector — drag-only. Sift was hoisted to the
-            root view (see top of component) so horizontal swipes on the
-            product-image area above the collapsed dock also sift. Drag
-            stays scoped to the card so its activeOffsetY threshold only
-            competes with the ScrollView's native vertical gesture, not
-            the whole screen (which would eat all vertical taps). */}
-        <GestureDetector gesture={dragGesture}>
-          <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
-            {/* Visual drag handle — no longer a gesture target itself,
-                since the whole card receives drag. Purely decorative. */}
-            <View style={styles.handleHit} pointerEvents="none">
+        {/* Drag now lives on the HANDLE ZONE only, not the whole card.
+            This fixes the scroll/minimise ambiguity: any vertical pull
+            on the card body was firing drag-to-collapse past 10px,
+            which stole scroll intent. Now body = pure ScrollView,
+            handle grip at the top = drag target. Standard iOS sheet /
+            Google Maps pull-up pattern. */}
+        <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+          <GestureDetector gesture={dragGesture}>
+            <View style={styles.handleHit}>
               <View style={styles.handle} />
             </View>
-            <ScrollView
-              style={styles.cardScroll}
-              contentContainerStyle={styles.cardContent}
-              showsVerticalScrollIndicator={false}
-            >
+          </GestureDetector>
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.cardContent}
+            showsVerticalScrollIndicator={false}
+          >
 
           {/* H1: Fit verdict — biggest element in the card. Uses the
               TAN Nightingale SVG for the score label; styled-text
@@ -794,9 +817,8 @@ export default function FitResultScreen() {
               </>
             )}
           </View>
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
+          </ScrollView>
+        </Animated.View>
       </Animated.View>
     </View>
     </GestureDetector>
@@ -991,19 +1013,24 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
-  // Bigger hit target around the handle bar so the drag gesture is easy
-  // to grab without hitting the thin visual bar exactly.
+  // Handle grip — dedicated drag zone (the only place that triggers
+  // collapse/expand). 56px tall so it's an obvious tap-and-drag target;
+  // the visual handle bar sits ~14px from the top inside this area so
+  // users see "grip here" affordance. ScrollView starts immediately
+  // below, no gesture competition.
   handleHit: {
     width: '100%',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    height: 56,
+    paddingTop: 14,
     alignItems: 'center',
   },
+  // Slightly thicker, darker handle so it reads as a deliberate
+  // affordance — not a decorative hairline.
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(76, 67, 86, 0.22)',
+    width: 52,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(76, 67, 86, 0.34)',
   },
 
   // --- Verdict row (H1) ---
