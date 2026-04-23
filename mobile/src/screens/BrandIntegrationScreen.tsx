@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
 
@@ -183,11 +183,14 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface,
+    // Frosted glass surface — matches GlassCard look without the BlurView
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     padding: spacing.md,
     alignItems: 'center',
-    ...shadows.sm,
+    ...shadows.glass,
   },
   statValue: {
     ...typography.headingM,
@@ -208,11 +211,13 @@ const styles = StyleSheet.create({
   },
   stepCard: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     padding: spacing.md,
     marginBottom: spacing.sm,
-    ...shadows.sm,
+    ...shadows.glass,
   },
   stepIconContainer: {
     width: 44,
@@ -238,12 +243,14 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   listCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     padding: spacing.md,
     marginBottom: spacing.xl,
     gap: spacing.md,
-    ...shadows.sm,
+    ...shadows.glass,
   },
   listItem: {
     flexDirection: 'row',
@@ -286,7 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     paddingVertical: 12,
     paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     ...shadows.sm,
   },
   ctaButtonText: {

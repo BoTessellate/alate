@@ -13,6 +13,7 @@ import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography } from '../constants/theme';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
+import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
@@ -47,6 +48,11 @@ export type RootStackParamList = {
       enrichedProduct?: { category?: string; material?: string; tags?: string[] };
       checkedAt?: string;
     };
+    // When navigating from History, pass the full entries list + the
+    // starting index so the user can horizontally swipe to sift through
+    // the rest from inside fit analysis — no fetch, it's all local.
+    historyEntries?: FitHistoryEntry[];
+    currentIndex?: number;
   };
 };
 
@@ -72,12 +78,11 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const iconName = TAB_ICONS[name] || 'circle';
 
   return (
-    <View style={styles.tabIconContainer}>
+    <View style={[styles.tabIconPill, focused && styles.tabIconPillFocused]}>
       <Feather
         name={iconName}
         size={22}
-        color={focused ? colors.primary : colors.textSecondary}
-        style={focused ? styles.tabIconFocused : undefined}
+        color={focused ? colors.primary : colors.textMuted}
       />
     </View>
   );
@@ -96,8 +101,8 @@ function MainTabs() {
           borderTopColor: colors.border,
           borderTopWidth: 1,
           paddingBottom: insets.bottom,
-          paddingTop: spacing.sm,
-          height: 70 + insets.bottom,
+          paddingTop: 4,
+          height: 48 + insets.bottom,
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
@@ -218,6 +223,7 @@ export default function AppNavigator() {
           headerStyle: {
             backgroundColor: colors.background,
           },
+          headerShadowVisible: false,
           headerTintColor: colors.text,
           headerTitleStyle: {
             fontWeight: '600',
@@ -244,8 +250,12 @@ export default function AppNavigator() {
           name="FitResult"
           component={SafeFitResult}
           options={{
-            title: 'Fit Analysis',
-            headerBackTitle: 'Back',
+            // Hide the native stack header entirely — the screen paints its
+            // product image edge-to-edge as the page background, with its
+            // own in-card brand/name hero and a floating back chevron. The
+            // native 'Fit Analysis' header would otherwise (a) cover the
+            // top of the image and (b) add a second redundant back arrow.
+            headerShown: false,
           }}
         />
       </Stack.Navigator>
@@ -254,14 +264,15 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  tabIconContainer: {
+  tabIconPill: {
     alignItems: 'center',
     justifyContent: 'center',
     width: 44,
-    height: 44,
+    height: 28,
+    borderRadius: 14,
   },
-  tabIconFocused: {
-    transform: [{ scale: 1.1 }],
+  tabIconPillFocused: {
+    backgroundColor: 'rgba(90, 67, 119, 0.14)',
   },
   loadingOverlay: {
     flex: 1,

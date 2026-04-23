@@ -40,3 +40,12 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Jest transform cache (build artifact — should never be committed)
+.jest-cache/
+
+# Firebase config — contains API key; treat as sensitive until verified
+# that key restrictions (package name + SHA-1) are configured in GCP Console.
+# Each dev / CI should provide its own copy.
+google-services.json
+GoogleService-Info.plist

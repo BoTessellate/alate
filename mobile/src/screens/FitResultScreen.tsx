@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -11,64 +12,239 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  interpolate,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+// @sbaiahmed1/react-native-blur — Fabric/new-arch-ready Turbo Module.
+// Android backend is QmBlurView (com.qmdeve.blurview) which wraps
+// RenderEffect (12+) / RenderScript (10–11) / overlay fallback with
+// better quality than expo-blur on mid-range Android. iOS path uses
+// UIVisualEffectView. We tried @react-native-community/blur first and
+// it crashed on Fabric with a NoSuchMethodError (Dimezis v2 signature
+// mismatch) — this library avoids that whole class of issue.
+import { BlurView } from '@sbaiahmed1/react-native-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius, glass } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
-import GlassCard from '../components/GlassCard';
 import { captureError } from '../utils/sentry';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const HERO_HEIGHT = 360;
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+// Expanded card occupies 70% of screen with symmetric side + bottom
+// padding. Collapsed card docks at the screen bottom (full width, no
+// padding, rounded top corners only) and is short enough to show just
+// the verdict + price + stats row; fit concerns are hidden at that
+// point. The user drags the handle up/down to switch.
+const EXPANDED_H = Math.round(SCREEN_H * 0.7);
+// Collapsed dock height — tight enough to feel like a dock, wide enough
+// to keep the verdict + stats row + tags readable without scrolling.
+const COLLAPSED_H = 200;
+const SIDE_PAD = spacing.lg;
+const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
-/** Glass card style constant */
-const GLASS = {
-  ...glass,
-  ...shadows.glass,
+const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
+const formatPrice = (price?: { amount: number; currency: string }) => {
+  if (!price) return null;
+  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
+  const sym = CURRENCY_SYMBOLS[price.currency] || `${price.currency} `;
+  return `${sym}${price.amount}`;
 };
 
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
   const navigation = useNavigation<NavProp>();
   const insets = useSafeAreaInsets();
-  const { product, url, historyEntryId, precomputed } = route.params;
+  const {
+    product: routeProduct,
+    url: routeUrl,
+    historyEntryId: routeHistoryId,
+    precomputed,
+    historyEntries,
+    currentIndex = 0,
+  } = route.params;
   const { avatar } = useAvatarStore();
-  const { addEntry, updateEntry } = useFitHistoryStore();
+  const { addEntry, updateEntry, removeEntry } = useFitHistoryStore();
   const { garments: calibrationGarments } = useCalibrationStore();
 
-  const isHistoryMode = !!historyEntryId && !!precomputed;
+  // When we navigated in from History with a siblings list, the user can
+  // swipe horizontally to sift through products without going back.
+  const canSift = !!historyEntries && historyEntries.length > 1;
+  const [localIndex, setLocalIndex] = useState(currentIndex);
+  const activeEntry = canSift ? historyEntries![localIndex] : null;
 
+  // Effective route-derived values. Either come from the swiped-to entry
+  // (history+sift mode) or direct route params (live mode).
+  const product = activeEntry
+    ? {
+        name: activeEntry.productName,
+        image: activeEntry.productImage,
+        price: activeEntry.price,
+        brand: activeEntry.brand,
+      }
+    : routeProduct;
+  const url = activeEntry ? activeEntry.url : routeUrl;
+  const historyEntryId = activeEntry ? activeEntry.id : routeHistoryId;
+  const isHistoryMode = !!historyEntryId && (!!activeEntry || !!precomputed);
+
+  // Lazy state init — from activeEntry when available, else precomputed.
   const [loading, setLoading] = useState(!isHistoryMode);
-  const [warnings, setWarnings] = useState<FitWarning[]>(precomputed?.warnings ?? []);
-  const [fitScore, setFitScore] = useState<'great' | 'moderate' | 'poor'>(precomputed?.fitScore ?? 'great');
+  const [warnings, setWarnings] = useState<FitWarning[]>(() =>
+    activeEntry?.warnings ?? precomputed?.warnings ?? []
+  );
+  const [fitScore, setFitScore] = useState<'great' | 'moderate' | 'poor'>(() =>
+    activeEntry?.fitScore ?? precomputed?.fitScore ?? 'great'
+  );
   const [enrichedProduct, setEnrichedProduct] = useState<{
     category?: string;
     material?: string;
     tags?: string[];
-  } | null>(precomputed?.enrichedProduct ?? null);
+  } | null>(() =>
+    activeEntry
+      ? {
+          category: activeEntry.category,
+          material: activeEntry.material,
+          tags: activeEntry.tags,
+        }
+      : precomputed?.enrichedProduct ?? null
+  );
   const [sizeRec, setSizeRec] = useState<{
     size: string;
     confidence: 'high' | 'medium' | 'low';
     note?: string;
-  } | null>(precomputed?.sizeRecommendation ?? null);
+  } | null>(() => activeEntry?.sizeRecommendation ?? precomputed?.sizeRecommendation ?? null);
   const [reevaluating, setReevaluating] = useState(false);
   const [reevaluated, setReevaluated] = useState(false);
 
+  // Collapse/expand state + progress. 1 = expanded (default), 0 = collapsed.
+  const [isExpanded, setIsExpanded] = useState(true);
+  const collapseProgress = useSharedValue(1);
+  const startProgress = useSharedValue(1);
+
   const wentToAvatarSetup = useRef(false);
   const prevAvatarRef = useRef(avatar);
+
+  // Sync local fit-result state whenever the sift index changes. Skip on
+  // first mount — the lazy useState initialisers already handled that.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (!activeEntry) return;
+    setWarnings(activeEntry.warnings);
+    setFitScore(activeEntry.fitScore);
+    setSizeRec(activeEntry.sizeRecommendation ?? null);
+    setEnrichedProduct({
+      category: activeEntry.category,
+      material: activeEntry.material,
+      tags: activeEntry.tags,
+    });
+    setReevaluated(false);
+  }, [localIndex]);
+
+  // Enter animation — the card rises from below and scales up, approximating
+  // the history "fit pill" morphing into the full analysis box. Separate
+  // from the collapse progress so both can compose on the same view.
+  const enterProgress = useSharedValue(0);
+  useEffect(() => {
+    enterProgress.value = withTiming(1, { duration: 420 });
+  }, []);
+  const cardEnterStyle = useAnimatedStyle(() => ({
+    opacity: enterProgress.value,
+    transform: [
+      { translateY: interpolate(enterProgress.value, [0, 1], [80, 0]) },
+    ],
+  }));
+
+  // Animated layout: height + side + bottom padding + border radii all
+  // interpolate off collapseProgress so the card smoothly docks to the
+  // screen edge on collapse and lifts back to its 70% floating state on
+  // expand.
+  const cardLayoutStyle = useAnimatedStyle(() => ({
+    height: interpolate(collapseProgress.value, [0, 1], [COLLAPSED_H, EXPANDED_H]),
+    left: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
+    right: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
+    bottom: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, insets.bottom + SIDE_PAD]
+    ),
+    borderBottomLeftRadius: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, borderRadius.xxxl]
+    ),
+    borderBottomRightRadius: interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [0, borderRadius.xxxl]
+    ),
+  }));
+
+  // Vertical drag on the handle toggles collapse. 300px of drag = full
+  // transition; snap to 0 or 1 on release based on the midpoint.
+  const dragGesture = Gesture.Pan()
+    .onBegin(() => {
+      startProgress.value = collapseProgress.value;
+    })
+    .onUpdate((e) => {
+      const delta = -e.translationY / 300;
+      collapseProgress.value = Math.max(
+        0,
+        Math.min(1, startProgress.value + delta)
+      );
+    })
+    .onEnd(() => {
+      const target = collapseProgress.value > 0.5 ? 1 : 0;
+      collapseProgress.value = withSpring(target, { damping: 18, stiffness: 160 });
+      runOnJS(setIsExpanded)(target === 1);
+    });
+
+  // Horizontal drag on the content sifts to the next/prev entry. Uses
+  // activeOffsetX so vertical motion still goes to the ScrollView inside
+  // (otherwise pan would swallow scroll gestures).
+  const swipeX = useSharedValue(0);
+  const siftGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-20, 20])
+    .onUpdate((e) => {
+      // Dampened follow so the user feels the drag but doesn't overshoot.
+      swipeX.value = e.translationX * 0.4;
+    })
+    .onEnd((e) => {
+      const entriesLen = historyEntries?.length ?? 0;
+      if (e.translationX < -SWIPE_THRESHOLD && localIndex < entriesLen - 1) {
+        runOnJS(setLocalIndex)(localIndex + 1);
+      } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
+        runOnJS(setLocalIndex)(localIndex - 1);
+      }
+      swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
+    });
+  const siftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: swipeX.value }],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -221,29 +397,20 @@ export default function FitResultScreen() {
       case 'great':
         return {
           color: colors.success,
-          bgColor: colors.success + '20',
-          border: colors.success + '50',
           icon: '✓',
           text: 'Great Fit!',
-          description: 'This item should fit you well',
         };
       case 'moderate':
         return {
           color: colors.warning,
-          bgColor: colors.warning + '20',
-          border: colors.warning + '50',
           icon: '⚠',
           text: 'Some Concerns',
-          description: 'Review the notes below',
         };
       case 'poor':
         return {
           color: colors.error,
-          bgColor: colors.error + '20',
-          border: colors.error + '50',
           icon: '✕',
           text: 'May Not Fit Well',
-          description: 'Consider these carefully',
         };
     }
   };
@@ -251,18 +418,13 @@ export default function FitResultScreen() {
   const getSeverityConfig = (severity: string) => {
     switch (severity) {
       case 'major':
-        return { color: colors.error, label: 'Major', bgColor: colors.error + '15' };
+        return { color: colors.error, label: 'Major' };
       case 'moderate':
-        return { color: colors.warning, label: 'Moderate', bgColor: colors.warning + '15' };
+        return { color: colors.warning, label: 'Moderate' };
       default:
-        return { color: colors.info, label: 'Minor', bgColor: colors.info + '15' };
+        return { color: colors.info, label: 'Minor' };
     }
   };
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    });
 
   if (loading) {
     return (
@@ -276,257 +438,389 @@ export default function FitResultScreen() {
   const scoreConfig = getScoreConfig();
   const safeBrand = sanitize(product.brand);
   const safeName = sanitize(product.name);
+  const priceDisplay = formatPrice(product.price);
 
   const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
   const showMaterial = !!enrichedProduct?.material;
   const showTags = !!(enrichedProduct?.tags?.length);
 
+  const confidenceLabel = sizeRec
+    ? sizeRec.confidence === 'high'
+      ? 'High'
+      : sizeRec.confidence === 'medium'
+      ? 'Medium'
+      : 'Low'
+    : null;
+
+  const inStock =
+    sizeRec && product.availableSizes && product.availableSizes.length > 0
+      ? product.availableSizes.includes(sizeRec.size)
+      : null;
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Fixed hero image — stays behind scroll */}
-      <View style={styles.heroFixed}>
-        {product.image ? (
-          <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.heroImage, styles.heroPlaceholder]} />
-        )}
-        <LinearGradient
-          colors={['transparent', colors.background] as readonly [string, string]}
-          style={styles.heroGradient}
-        />
+      {/* Full-bleed product image behind everything */}
+      {product.image ? (
+        <Image source={{ uri: product.image }} style={styles.bgImage} resizeMode="cover" />
+      ) : (
+        <View style={[styles.bgImage, styles.bgPlaceholder]}>
+          <Feather name="shopping-bag" size={96} color="rgba(255,255,255,0.25)" />
+        </View>
+      )}
+
+      {/* Subtle dim — helps the white back chevron + brand/name read */}
+      <LinearGradient
+        colors={['rgba(20,10,40,0.15)', 'rgba(20,10,40,0.05)', 'rgba(20,10,40,0.35)']}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* Back chevron */}
+      <TouchableOpacity
+        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
+        onPress={() => navigation.goBack()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+      >
+        <Feather name="chevron-left" size={22} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Remove-from-history trash — mirrors the back chevron on the
+          right. Only shown in history mode (live mode just saved the
+          entry; removing it here would feel adversarial). Acts on the
+          CURRENTLY displayed entry (which may differ from the entered
+          entry when the user has sifted). */}
+      {isHistoryMode && historyEntryId && (
+        <TouchableOpacity
+          testID="remove-from-history-button"
+          style={[styles.deleteBtn, { top: insets.top + spacing.sm }]}
+          onPress={() => {
+            Alert.alert(
+              'Remove from history',
+              `Remove "${safeName || 'this item'}" from your history?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Remove',
+                  style: 'destructive',
+                  onPress: () => {
+                    removeEntry(historyEntryId);
+                    navigation.goBack();
+                  },
+                },
+              ]
+            );
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.75}
+        >
+          <Feather name="trash-2" size={18} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      {/* Brand + product name centred near the top of the image */}
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
+        {safeBrand ? <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text> : null}
+        <Text style={styles.heroName} numberOfLines={2}>
+          {safeName || 'Product'}
+        </Text>
       </View>
 
-      {/* Scrollable content — slides up over hero */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
-        showsVerticalScrollIndicator={false}
+      {/* Glass info card — expanded = 70% screen + symmetric side/bottom
+          padding, collapsed = screen-wide dock anchored to the bottom.
+          Layout interpolates from collapseProgress; enter anim composes
+          on top. ScrollView inside scrolls the analysis content; the
+          horizontal sift gesture wraps it. */}
+      <Animated.View
+        style={[styles.cardWrap, cardLayoutStyle, cardEnterStyle]}
       >
-        {/* Spacer so first card starts below hero; badge sits here and scrolls away naturally */}
-        <View style={{ height: HERO_HEIGHT - 80 }}>
-          <View style={[styles.scoreBadgeWrapper, { top: insets.top + 8 }]}>
-            <View style={[styles.scoreBadge, { backgroundColor: scoreConfig.bgColor, borderColor: scoreConfig.border }]}>
-              <Text style={[styles.scoreBadgeIcon, { color: scoreConfig.color }]}>{scoreConfig.icon}</Text>
-              <Text style={[styles.scoreBadgeText, { color: scoreConfig.color }]}>{scoreConfig.text}</Text>
+        <BlurView
+          style={StyleSheet.absoluteFill}
+          blurType="light"
+          blurAmount={22}
+          reducedTransparencyFallbackColor="rgba(255,255,255,0.75)"
+        />
+        {/* Tint is lighter now that the QmBlurView backend does a real
+            blur on mid-range Android. Inner border catches "light" on
+            the edge for a frosted-glass feel. */}
+        <View style={styles.cardTint} pointerEvents="none" />
+
+        {/* Drag handle — vertical pan toggles collapse. Bigger hit target
+            than the thin bar so it's easy to grab. */}
+        <GestureDetector gesture={dragGesture}>
+          <View style={styles.handleHit}>
+            <View style={styles.handle} />
+          </View>
+        </GestureDetector>
+
+        <GestureDetector gesture={siftGesture}>
+          <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+            <ScrollView
+              style={styles.cardScroll}
+              contentContainerStyle={styles.cardContent}
+              showsVerticalScrollIndicator={false}
+            >
+
+          {/* H1: Fit verdict — biggest element in the card. Sets the answer
+              the user came here for before anything else. */}
+          <View style={styles.verdictRow}>
+            <View style={styles.verdictMain}>
+              <Text testID="fit-score-label" style={[styles.verdictText, { color: scoreConfig.color }]}>
+                {scoreConfig.text}
+              </Text>
+              <Text style={styles.verdictSub}>
+                {warnings.length === 0
+                  ? 'No fit concerns'
+                  : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
+              </Text>
             </View>
-          </View>
-        </View>
-
-        {/* Product info card */}
-        <GlassCard style={[styles.card, styles.productCard]}>
-          {safeBrand && <Text style={styles.brandText}>{safeBrand}</Text>}
-          <Text style={styles.productName}>{safeName || 'Product'}</Text>
-          {product.price && (
-            <Text style={styles.price}>
-              {product.price.currency} {product.price.amount}
-            </Text>
-          )}
-          {isHistoryMode && precomputed?.checkedAt && !reevaluated && (
-            <Text style={styles.checkedAt}>Checked {formatDate(precomputed.checkedAt)}</Text>
-          )}
-          {reevaluated && (
-            <Text style={styles.checkedAt}>Re-evaluated today</Text>
-          )}
-        </GlassCard>
-
-        {/* Score card */}
-        <GlassCard testID="fit-score-display" style={[styles.card, styles.scoreCard, { borderColor: scoreConfig.border }]}>
-          <View style={[styles.scoreIconContainer, { backgroundColor: scoreConfig.color }]}>
-            <Text style={styles.scoreIcon}>{scoreConfig.icon}</Text>
-          </View>
-          <View style={styles.scoreTextContainer}>
-            <Text testID="fit-score-label" style={[styles.scoreTitle, { color: scoreConfig.color }]}>
-              {scoreConfig.text}
-            </Text>
-            <Text style={styles.scoreDescription}>
-              {warnings.length === 0
-                ? 'No fit concerns detected'
-                : `${warnings.length} potential concern${warnings.length > 1 ? 's' : ''} found`}
-            </Text>
-          </View>
-        </GlassCard>
-
-        {/* Re-evaluation banners */}
-        {reevaluating && (
-          <GlassCard style={[styles.card, styles.reevalBanner]}>
-            <ActivityIndicator size="small" color={colors.accentDark} />
-            <Text style={styles.reevalBannerText}>Re-evaluating fit with updated profile…</Text>
-          </GlassCard>
-        )}
-        {reevaluated && !reevaluating && (
-          <GlassCard style={[styles.card, styles.reevalSuccessBanner]}>
-            <Text style={styles.reevalSuccessText}>✓ Fit re-evaluated with your updated profile</Text>
-          </GlassCard>
-        )}
-
-        {/* Size Recommendation */}
-        {sizeRec && (
-          <GlassCard testID="size-recommendation" style={[styles.card, styles.sizeCard]}>
-            <View style={styles.sizeCardLeft}>
-              <Text style={styles.sizeCardLabel}>Recommended Size</Text>
-              <Text testID="recommended-size-value" style={styles.sizeCardValue}>{sizeRec.size}</Text>
-              {sizeRec.note && (
-                <Text style={styles.sizeCardNote}>{sizeRec.note}</Text>
-              )}
-            </View>
-            <View style={styles.sizeCardRight}>
-              <View style={[
-                styles.confidenceBadge,
-                {
-                  backgroundColor:
-                    sizeRec.confidence === 'high' ? colors.primary + '18'
-                    : sizeRec.confidence === 'medium' ? colors.primaryLight + '20'
-                    : colors.accentDark + '22',
-                },
-              ]}>
-                <View style={[
-                  styles.confidenceDot,
-                  {
-                    backgroundColor:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
-                  },
-                ]} />
-                <Text style={[
-                  styles.confidenceText,
-                  {
-                    color:
-                      sizeRec.confidence === 'high' ? colors.primary
-                      : sizeRec.confidence === 'medium' ? colors.primaryLight
-                      : colors.accentDark,
-                  },
-                ]}>
-                  {sizeRec.confidence === 'high' ? 'High confidence'
-                    : sizeRec.confidence === 'medium' ? 'Medium confidence'
-                    : 'Low confidence'}
-                </Text>
+            {priceDisplay && (
+              <View style={styles.pricePill}>
+                <Text style={styles.priceText}>{priceDisplay}</Text>
               </View>
-              {product.availableSizes && product.availableSizes.length > 0 && (
-                <View style={styles.availabilityRow}>
-                  {product.availableSizes.includes(sizeRec.size) ? (
-                    <Text style={styles.availableText}>✓ In stock on site</Text>
-                  ) : (
-                    <Text style={styles.unavailableText}>⚠ Size may be unavailable</Text>
-                  )}
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* H2: Stats row — size badge + confidence bar + fit icon. Labels
+              dropped because they overflowed the circular chips ("Me…")
+              and stacked labels underneath; each element is now self-
+              descriptive (letter / progress segments / semantic icon). */}
+          <View testID="fit-score-display" style={styles.statsRow}>
+            {sizeRec && (
+              <StatBadge value={sizeRec.size} testID="recommended-size-value" />
+            )}
+            <ConfidenceDonut level={sizeRec?.confidence ?? null} />
+            <View style={styles.fitBadge}>
+              <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
+                {scoreConfig.icon}
+              </Text>
+            </View>
+            {inStock !== null && (
+              <View style={styles.fitBadge}>
+                <Feather
+                  name={inStock ? 'check' : 'alert-circle'}
+                  size={18}
+                  color={inStock ? colors.success : colors.warning}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Re-eval banners */}
+          {reevaluating && (
+            <View style={styles.banner}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.bannerText}>Re-evaluating with updated profile…</Text>
+            </View>
+          )}
+          {reevaluated && !reevaluating && (
+            <View style={[styles.banner, styles.bannerSuccess]}>
+              <Feather name="check-circle" size={14} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>
+                Re-evaluated with your updated profile
+              </Text>
+            </View>
+          )}
+
+          {/* Sizing note */}
+          {sizeRec?.note && (
+            <View style={styles.noteBlock}>
+              <Text style={styles.noteLabel}>SIZING NOTE</Text>
+              <Text style={styles.noteText}>{sizeRec.note}</Text>
+            </View>
+          )}
+
+          {/* Concerns — only render when the card is expanded. When the user
+              drags the handle down to collapse, this section disappears and
+              the card shrinks to show just the verdict + stats + meta/tags.
+              Re-expanding brings it back. */}
+          {isExpanded && warnings.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
+              {warnings.map((warning, index) => {
+                const config = getSeverityConfig(warning.severity);
+                return (
+                  <View key={index} style={styles.concernRow}>
+                    <View style={[styles.concernDot, { backgroundColor: config.color }]} />
+                    <View style={styles.concernBody}>
+                      <Text style={[styles.concernSeverity, { color: config.color }]}>
+                        {config.label.toUpperCase()}
+                      </Text>
+                      <Text style={styles.concernText}>{warning.message}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Tags */}
+          {showTags && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>TAGS</Text>
+              <View style={styles.tagsContainer}>
+                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
+                  <View key={i} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Meta rows — Material first, then Category (swapped per UX ask) */}
+          {(showCategory || showMaterial) && (
+            <View style={styles.metaSection}>
+              {showMaterial && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Material</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
+                </View>
+              )}
+              {showCategory && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Category</Text>
+                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
                 </View>
               )}
             </View>
-          </GlassCard>
-        )}
-
-        {/* Concerns */}
-        {warnings.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Fit Concerns</Text>
-            {warnings.map((warning, index) => {
-              const config = getSeverityConfig(warning.severity);
-              return (
-                <GlassCard key={index} style={[styles.card, styles.warningCard]}>
-                  <View style={[styles.severityBadge, { backgroundColor: config.bgColor }]}>
-                    <Text style={[styles.severityText, { color: config.color }]}>
-                      {config.label}
-                    </Text>
-                  </View>
-                  <Text style={styles.warningText}>{warning.message}</Text>
-                </GlassCard>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Product Details — only render if at least one row is visible */}
-        {(showCategory || showMaterial || showTags) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Product Details</Text>
-            <GlassCard style={[styles.card, styles.detailsCard]}>
-              {showCategory && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Category</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct!.category}</Text>
-                </View>
-              )}
-              {showMaterial && (
-                <View style={[styles.detailRow, styles.detailRowLast]}>
-                  <Text style={styles.detailLabel}>Material</Text>
-                  <Text style={styles.detailValue}>{enrichedProduct!.material}</Text>
-                </View>
-              )}
-              {showTags && (
-                <View style={[styles.tagsRow]}>
-                  <Text style={styles.detailLabel}>Tags</Text>
-                  <View style={styles.tagsContainer}>
-                    {enrichedProduct!.tags!.slice(0, 5).map((tag: string, i: number) => (
-                      <View key={i} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </GlassCard>
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionsSection}>
-          {isHistoryMode ? (
-            <>
-              <TouchableOpacity
-                testID="reevaluate-button"
-                style={styles.primaryButton}
-                onPress={() => {
-                  wentToAvatarSetup.current = true;
-                  navigation.navigate('AvatarSetup');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>Re-evaluate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="change-measurements-button"
-                style={styles.secondaryButton}
-                onPress={() => {
-                  wentToAvatarSetup.current = true;
-                  navigation.navigate('AvatarSetup');
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>Change your measurements</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="view-on-store-button"
-                style={styles.ghostButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.ghostButtonText}>View on Store</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                testID="view-on-store-button"
-                style={styles.primaryButton}
-                onPress={openProductPage}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>View on Store</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="check-another-button"
-                style={styles.secondaryButton}
-                onPress={() => navigation.goBack()}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.secondaryButtonText}>Check Another Product</Text>
-              </TouchableOpacity>
-            </>
           )}
-        </View>
-      </ScrollView>
+
+          {/* Action buttons */}
+          <View style={styles.actionsSection}>
+            {isHistoryMode ? (
+              <>
+                <TouchableOpacity
+                  testID="reevaluate-button"
+                  style={styles.primaryButton}
+                  onPress={() => {
+                    wentToAvatarSetup.current = true;
+                    navigation.navigate('AvatarSetup');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                </TouchableOpacity>
+                {/* Swapped order: View on Store above Change measurements
+                    so the shopping-intent action sits closer to the
+                    primary Re-evaluate CTA, and the profile-editing
+                    action takes the deeper slot. */}
+                <TouchableOpacity
+                  testID="view-on-store-button"
+                  style={styles.secondaryButton}
+                  onPress={openProductPage}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryButtonText}>View on Store</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="change-measurements-button"
+                  style={styles.ghostButton}
+                  onPress={() => {
+                    wentToAvatarSetup.current = true;
+                    navigation.navigate('AvatarSetup');
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.ghostButtonText}>Change your measurements</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  testID="view-on-store-button"
+                  style={styles.primaryButton}
+                  onPress={openProductPage}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.primaryButtonText}>View on Store</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  testID="check-another-button"
+                  style={styles.secondaryButton}
+                  onPress={() => navigation.goBack()}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.secondaryButtonText}>Check Another Product</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+            </ScrollView>
+          </Animated.View>
+        </GestureDetector>
+      </Animated.View>
+    </View>
+  );
+}
+
+// Simple badge — circle with the size letter/number, no label below.
+function StatBadge({ value, testID }: { value: string; testID?: string }) {
+  return (
+    <View style={styles.statBadge}>
+      <Text testID={testID} style={styles.statValue} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// Confidence as a 3-segment progress bar with increasing purple saturation.
+// Low  → first segment filled at light purple (0.3 alpha)
+// Med  → first + second at mid alpha
+// High → all three at full brand purple
+// Unfilled segments sit at a very light purple tint so the track is
+// always visible. Replaces the circular "Me…"-truncating chip.
+function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null }) {
+  if (!level) return null;
+  // Arc length grows with confidence (28% / 60% / 92% of circumference) and
+  // the stroke colour saturates with it (light → mid → full brand purple).
+  // Rotated -90° so the fill starts from 12 o'clock and sweeps clockwise.
+  const size = 48;
+  const stroke = 6;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const percent = level === 'high' ? 0.92 : level === 'medium' ? 0.6 : 0.28;
+  const colour =
+    level === 'high'
+      ? 'rgba(90, 67, 119, 1)'
+      : level === 'medium'
+      ? 'rgba(90, 67, 119, 0.72)'
+      : 'rgba(90, 67, 119, 0.45)';
+  const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
+  return (
+    <View style={styles.confidenceDonut}>
+      <Svg width={size} height={size}>
+        {/* Track ring — always a full circle at very low alpha */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="rgba(90, 67, 119, 0.14)"
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        {/* Filled arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colour}
+          strokeWidth={stroke}
+          strokeDasharray={`${c * percent} ${c}`}
+          strokeLinecap="round"
+          fill="transparent"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      {/* Single-letter centre glyph keeps the donut readable without a
+          separate label — the H/M/L maps directly to the arc length. */}
+      <Text style={styles.confidenceDonutLabel}>{label}</Text>
     </View>
   );
 }
@@ -534,322 +828,384 @@ export default function FitResultScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primaryDark,
   },
   loadingContainer: {
     flex: 1,
     backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  // --- Hero ---
-  heroFixed: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: HERO_HEIGHT,
-    overflow: 'hidden',
+
+  // --- Background product image (full-bleed) ---
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.primaryDark,
   },
-  heroImage: {
-    width: SCREEN_WIDTH,
-    height: HERO_HEIGHT,
-    backgroundColor: colors.backgroundSecondary,
+  bgPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  heroPlaceholder: {
-    backgroundColor: colors.backgroundSecondary,
-  },
-  heroGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 140,
-  },
-  scoreBadgeWrapper: {
+
+  // --- Back chevron ---
+  backBtn: {
     position: 'absolute',
     left: spacing.lg,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
-  scoreBadge: {
+  // --- Remove-from-history trash (mirror of backBtn, right side) ---
+  deleteBtn: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.32)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+
+  // --- Hero (brand + product name over image) ---
+  hero: {
+    position: 'absolute',
+    top: 0,
+    left: SIDE_PAD,
+    right: SIDE_PAD,
+    alignItems: 'center',
+  },
+  heroBrand: {
+    ...typography.overline,
+    color: 'rgba(255,255,255,0.92)',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  heroName: {
+    ...typography.headingXL, // DM Serif Italic lowercase, 28px, from token
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+
+  // --- Glass card ---
+  // Layout props (height / left / right / bottom / bottom-radii) are all
+  // driven by `cardLayoutStyle` — animated from collapseProgress. We keep
+  // the top radii + shadow static here; the animated style composes on top.
+  cardWrap: {
+    position: 'absolute',
+    borderTopLeftRadius: borderRadius.xxxl,
+    borderTopRightRadius: borderRadius.xxxl,
+    overflow: 'hidden',
+    // Deep purple-tinted drop shadow — grounds the card over the image.
+    shadowColor: '#1a0f28',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.48,
+    shadowRadius: 28,
+    elevation: 18,
+  },
+  cardTint: {
+    ...StyleSheet.absoluteFillObject,
+    // Lighter now that QmBlurView (via @sbaiahmed1/react-native-blur)
+    // does real blur on mid-range Android. Hairline inner border catches
+    // "light" on the edge for the frosted-glass feel.
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    borderTopLeftRadius: borderRadius.xxxl,
+    borderTopRightRadius: borderRadius.xxxl,
+  },
+  // Wrapper around the ScrollView that receives the horizontal sift pan.
+  // `flex: 1` under the card (after the handle) so the scrollable area
+  // fills the remaining height.
+  cardScrollWrap: {
+    flex: 1,
+  },
+  cardScroll: {
+    flex: 1,
+  },
+  cardContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xl,
+  },
+  // Bigger hit target around the handle bar so the drag gesture is easy
+  // to grab without hitting the thin visual bar exactly.
+  handleHit: {
+    width: '100%',
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(63, 43, 84, 0.22)',
+  },
+
+  // --- Verdict row (H1) ---
+  verdictRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  verdictMain: {
+    flex: 1,
+  },
+  verdictText: {
+    ...typography.headingL, // 24px DM Serif Italic lowercase
+  },
+  verdictSub: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  pricePill: {
+    backgroundColor: 'rgba(90, 67, 119, 0.14)',
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
-    borderWidth: 1.5,
+    marginLeft: spacing.sm,
   },
-  scoreBadgeIcon: {
-    fontSize: 14,
-    fontWeight: '700',
+  priceText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.3,
   },
-  scoreBadgeText: {
-    ...typography.label,
-    fontWeight: '700',
-  },
-  // --- Scroll ---
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-  },
-  // --- Glass card base (GlassCard provides the frost; this only sets layout) ---
-  card: {
-    borderRadius: borderRadius.xl,
+
+  // --- Divider ---
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(63, 43, 84, 0.12)',
     marginBottom: spacing.md,
   },
-  // --- Product card ---
-  productCard: {
-    padding: spacing.lg,
-  },
-  brandText: {
-    ...typography.labelSmall,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  productName: {
-    ...typography.headingL,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  price: {
-    ...typography.headingM,
-    color: colors.secondary,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  checkedAt: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  // --- Score card ---
-  scoreCard: {
-    padding: spacing.lg,
+
+  // --- Stats row (H2) — labels removed; each element is self-descriptive ---
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  scoreIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  // Size badge — circle with the size letter/number
+  statBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    borderWidth: 1.25,
+    borderColor: 'rgba(90, 67, 119, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
-  scoreIcon: {
-    fontSize: 24,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  scoreTextContainer: {
-    flex: 1,
-  },
-  scoreTitle: {
-    ...typography.headingM,
-    marginBottom: 2,
-  },
-  scoreDescription: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  // --- Reeval banners ---
-  reevalBanner: {
-    flexDirection: 'row',
+  // Smaller circle for the fit + stock icons (purely visual)
+  fitBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(90, 67, 119, 0.06)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
   },
-  reevalBannerText: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  reevalSuccessBanner: {
-    padding: spacing.md,
-    backgroundColor: colors.success + '20',
-  },
-  reevalSuccessText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  // --- Size card ---
-  sizeCard: {
-    padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  sizeCardLeft: {
-    flex: 1,
-  },
-  sizeCardLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  sizeCardValue: {
-    fontSize: 42,
+  statValue: {
+    fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
-    lineHeight: 48,
+    letterSpacing: -0.2,
+  },
+  statIconText: {
+    fontSize: 18,
+    fontWeight: '900',
+  },
+
+  // --- Confidence donut — circular arc, purple saturation + arc length
+  //     both grow with confidence. Centre letter (H/M/L) is the legible
+  //     label without stealing space. ---
+  confidenceDonut: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confidenceDonutLabel: {
+    position: 'absolute',
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.3,
+  },
+
+  // --- Banners ---
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    borderRadius: borderRadius.md,
+  },
+  bannerSuccess: {
+    backgroundColor: 'rgba(46, 125, 91, 0.1)',
+  },
+  bannerText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    flex: 1,
+  },
+
+  // --- Sizing note ---
+  noteBlock: {
+    backgroundColor: 'rgba(90, 67, 119, 0.08)',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  noteLabel: {
+    ...typography.overline,
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  noteText: {
+    ...typography.bodySmall,
+    color: colors.text,
+    lineHeight: 20,
+  },
+
+  // --- Generic section ---
+  section: {
+    marginBottom: spacing.md,
+  },
+  sectionLabel: {
+    ...typography.overline,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+
+  // --- Concerns ---
+  concernRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  concernDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginTop: 6,
+  },
+  concernBody: {
+    flex: 1,
+  },
+  concernSeverity: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
     marginBottom: 2,
   },
-  sizeCardNote: {
+  concernText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    maxWidth: 160,
-  },
-  sizeCardRight: {
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-  },
-  confidenceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: borderRadius.pill,
-  },
-  confidenceDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  confidenceText: {
-    ...typography.labelSmall,
-    fontWeight: '600',
-  },
-  availabilityRow: {
-    marginTop: spacing.xs,
-  },
-  availableText: {
-    ...typography.bodySmall,
-    color: colors.success,
-    fontWeight: '500',
-  },
-  unavailableText: {
-    ...typography.bodySmall,
-    color: colors.warning,
-    fontWeight: '500',
-  },
-  // --- Sections ---
-  section: {
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.headingS,
     color: colors.text,
-    marginBottom: spacing.sm,
+    lineHeight: 19,
   },
-  warningCard: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  severityBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.sm,
-  },
-  severityText: {
-    ...typography.labelSmall,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  warningText: {
-    ...typography.body,
-    color: colors.text,
-  },
-  detailsCard: {
-    padding: spacing.md,
-    overflow: 'hidden',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(90, 67, 119, 0.1)',
-  },
-  detailRowLast: {
-    borderBottomWidth: 0,
-  },
-  detailLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  detailValue: {
-    ...typography.body,
-    color: colors.text,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  tagsRow: {
-    paddingVertical: spacing.sm,
-  },
+
+  // --- Tags ---
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: spacing.sm,
-    gap: spacing.xs,
+    gap: 6,
   },
   tag: {
-    backgroundColor: colors.primaryLight + '30',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(90, 67, 119, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: borderRadius.pill,
   },
   tagText: {
-    ...typography.caption,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
     color: colors.primary,
-    fontWeight: '500',
   },
-  // --- Buttons ---
+
+  // --- Meta ---
+  metaSection: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(63, 43, 84, 0.1)',
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  metaLabel: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  metaValue: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.text,
+    textTransform: 'capitalize',
+  },
+
+  // --- Actions ---
   actionsSection: {
-    gap: spacing.md,
-    marginTop: spacing.sm,
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    borderRadius: borderRadius.pill,
+    paddingVertical: 13,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    ...shadows.sm,
+    ...shadows.md,
   },
   primaryButtonText: {
-    ...typography.label,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.white,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   secondaryButton: {
-    ...GLASS,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    backgroundColor: 'rgba(90, 67, 119, 0.1)',
+    borderRadius: borderRadius.pill,
+    paddingVertical: 13,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    ...typography.label,
-    fontSize: 15,
+    fontSize: 14,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   ghostButton: {
-    padding: spacing.md,
+    padding: spacing.sm,
     alignItems: 'center',
   },
   ghostButtonText: {
-    ...typography.label,
+    ...typography.bodySmall,
     color: colors.textSecondary,
     fontWeight: '500',
   },
