@@ -50,6 +50,7 @@ backend/sdk/productEnrichment/generated-images/
 
 # Claude Code working files (not committed)
 .claude/working directory/
+.claude/worktrees/
 .claude/settings.local.json
 notion-specs.md
 TML_BACKEND_COMPLETE_SUMMARY.md
@@ -59,3 +60,13 @@ tmpclaude-*-cwd
 
 .vercel
 .env*.local
+
+# Scheduled task runtime lockfile
+.claude/scheduled_tasks.lock
+
+# Root-level dev screenshots + adb UI dumps — debug artifacts, not project data.
+# Legit image assets live under mobile/assets/ and aren't affected by this.
+/*.png
+/*.jpg
+/*.jpeg
+/ui.xml

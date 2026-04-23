@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   cancelBtn: {
     flex: 1,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   saveBtn: {
     flex: 2,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     alignItems: 'center',
     backgroundColor: colors.cta,
     ...shadows.sm,

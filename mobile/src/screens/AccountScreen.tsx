@@ -232,7 +232,7 @@ export default function AccountScreen() {
             <Text style={styles.statLabel}>Checked</Text>
           </GlassCard>
           <GlassCard style={styles.statCard}>
-            <Text style={[styles.statNumber, { color: colors.success }]}>{greatFits}</Text>
+            <Text style={styles.statNumber}>{greatFits}</Text>
             <Text style={styles.statLabel}>Great Fits</Text>
           </GlassCard>
         </View>
@@ -329,10 +329,12 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.lg,
+    alignItems: 'center',
   },
   title: {
-    ...typography.headingXL,
+    ...typography.displayMedium,
     color: colors.text,
+    textAlign: 'center',
   },
   // Google account card
   accountCard: {
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
@@ -392,11 +394,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
     borderRadius: borderRadius.pill,
-    backgroundColor: colors.error + '12',
+    // Muted purple chip instead of the red-tinted destructive pill.
+    // The action is still destructive, but the confirm dialog gates the
+    // actual sign-out — the chip doesn't need to shout.
+    backgroundColor: 'rgba(90, 67, 119, 0.12)',
   },
   signOutText: {
     ...typography.label,
-    color: colors.error,
+    color: colors.textSecondary,
     fontWeight: '600',
     fontSize: 12,
   },
@@ -495,7 +500,7 @@ const styles = StyleSheet.create({
   },
   emptyProfileCta: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
@@ -524,7 +529,7 @@ const styles = StyleSheet.create({
   resetButton: {
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     backgroundColor: colors.error + '10',
   },
   resetText: {

@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,7 +24,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
 import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import GlassCard from '../components/GlassCard';
@@ -129,7 +130,12 @@ export default function HomeScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Hero Section */}
           <View style={styles.heroSection}>
             <View style={styles.logoContainer}>
@@ -265,11 +271,11 @@ export default function HomeScreen() {
               <Text style={styles.featureText}>Instant AI-powered fit analysis</Text>
             </View>
             <View style={styles.featureItem}>
-              <View style={[styles.featureDot, { backgroundColor: colors.success }]} />
+              <View style={[styles.featureDot, { backgroundColor: colors.accentDark }]} />
               <Text style={styles.featureText}>Save to your fit history</Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -284,9 +290,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   heroSection: {
     alignItems: 'center',
@@ -323,23 +330,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   inputLabel: {
-    ...typography.label,
-    color: colors.textSecondary,
+    ...typography.overline,
+    color: colors.primary,
     marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   inputWrapper: {
     marginBottom: spacing.md,
   },
   input: {
     backgroundColor: 'transparent',
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
     paddingHorizontal: 0,
     ...typography.body,
     color: colors.text,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.08)',
+    borderBottomColor: 'rgba(90, 67, 119, 0.15)',
   },
   errorContainer: {
     backgroundColor: colors.errorLight + '20',
@@ -354,10 +359,12 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    borderRadius: borderRadius.pill,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
     alignItems: 'center',
-    ...shadows.sm,
+    // Soft lift, not a halo — matches History's restrained shadow palette.
+    ...shadows.md,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -366,10 +373,11 @@ const styles = StyleSheet.create({
     ...typography.button,
     color: colors.white,
     fontWeight: '700',
+    fontSize: 17,
   },
   setupCard: {
     borderRadius: borderRadius.xxl,
-    padding: spacing.md,
+    padding: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.lg,
@@ -396,13 +404,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   setupArrow: {
-    fontSize: 20,
+    fontSize: 22,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '300',
   },
   nudgeCard: {
     borderRadius: borderRadius.xxl,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.lg,
   },
   nudgeHeader: {
@@ -428,7 +436,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.cta,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.pill,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
     ...shadows.sm,
