@@ -20,6 +20,13 @@ export interface ScrapedProduct {
   };
   brand?: string;
   availableSizes?: string[];
+  // Populated when the backend's Shopify direct-fetch layer succeeds.
+  // Lets FitResultScreen skip the Claude-based enrichment round-trip
+  // when the storefront already gave us structured data.
+  category?: string;
+  tags?: string[];
+  material?: string;
+  compareAtPrice?: { amount: number; currency: string };
 }
 
 export interface FitWarning {
@@ -122,10 +129,15 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
         image?: string;
         imageUrl?: string;
         description?: string;
-        price?: { amount: number; currency: string };
+        price?: { amount: number; currency: string } | string;
+        currency?: string;
+        compareAtPrice?: string;
         brand?: string;
         brandName?: string;
         availableSizes?: string[];
+        category?: string;
+        tags?: string[];
+        material?: string;
       };
       error?: string;
     }>('scrape', { url });
@@ -134,15 +146,42 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
       return { success: false, error: result.error || 'Failed to scrape product' };
     }
 
+    // Price shape reconciliation: the Shopify direct-fetch path returns
+    // price as a bare string (the raw `"5931.00"` from the storefront
+    // variant) + a separate `currency`, while HTML extraction returns
+    // the already-parsed `{ amount, currency }` object. Normalise both
+    // shapes into the app's canonical `{ amount, currency }`.
+    let price: { amount: number; currency: string } | undefined;
+    if (result.data.price && typeof result.data.price === 'object') {
+      price = result.data.price;
+    } else if (result.data.price && typeof result.data.price === 'string') {
+      const amount = parseFloat(result.data.price.replace(/,/g, ''));
+      if (Number.isFinite(amount) && result.data.currency) {
+        price = { amount, currency: result.data.currency };
+      }
+    }
+
+    let compareAtPrice: { amount: number; currency: string } | undefined;
+    if (result.data.compareAtPrice && result.data.currency) {
+      const amount = parseFloat(result.data.compareAtPrice.replace(/,/g, ''));
+      if (Number.isFinite(amount)) {
+        compareAtPrice = { amount, currency: result.data.currency };
+      }
+    }
+
     return {
       success: true,
       data: {
         name: result.data.title || result.data.name,
         image: result.data.image || result.data.imageUrl,
         description: result.data.description,
-        price: result.data.price,
+        price,
+        compareAtPrice,
         brand: result.data.brand || result.data.brandName,
         availableSizes: result.data.availableSizes,
+        category: result.data.category,
+        tags: result.data.tags,
+        material: result.data.material,
       },
     };
   } catch (error) {

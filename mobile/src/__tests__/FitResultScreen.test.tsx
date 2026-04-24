@@ -349,4 +349,109 @@ describe('FitResultScreen', () => {
       expect(useFitHistoryStore.getState().entries.length).toBe(0);
     });
   });
+
+  // ------------------------------------------------------------------
+  // Delete-from-fit-analysis — regression guard.
+  //
+  // User reported: deleting the current item via the top-right trash
+  // icon should NOT bounce you back to History when there are sibling
+  // entries to show. Previously we called navigation.goBack() after
+  // every deletion; now we filter the local siblings list and stay on
+  // the screen if any remain, only going back when we deleted the
+  // last one.
+  // ------------------------------------------------------------------
+  describe('delete from fit analysis', () => {
+    const SIBLING_ENTRIES = [
+      {
+        id: 'h-1', url: 'https://asos.com/p/1', productName: 'Linen shirt',
+        productImage: 'https://cdn.example.com/a.jpg', brand: 'Asos',
+        fitScore: 'great' as const, warnings: [], checkedAt: '2026-01-15T10:00:00Z',
+        sizeRecommendation: { size: 'M', confidence: 'high' as const },
+      },
+      {
+        id: 'h-2', url: 'https://zara.com/p/2', productName: 'Denim jacket',
+        productImage: 'https://cdn.example.com/b.jpg', brand: 'Zara',
+        fitScore: 'moderate' as const, warnings: [], checkedAt: '2026-01-15T11:00:00Z',
+        sizeRecommendation: { size: 'S', confidence: 'medium' as const },
+      },
+    ];
+
+    it('stays on the screen and moves to the next sibling when siblings remain', async () => {
+      // History mode with 2 siblings — delete the first → second should
+      // still render, no goBack call.
+      mockRouteParams = {
+        product: {
+          name: SIBLING_ENTRIES[0].productName,
+          image: SIBLING_ENTRIES[0].productImage,
+          brand: SIBLING_ENTRIES[0].brand,
+        },
+        url: SIBLING_ENTRIES[0].url,
+        historyEntryId: SIBLING_ENTRIES[0].id,
+        precomputed: {
+          fitScore: 'great',
+          warnings: [],
+          sizeRecommendation: SIBLING_ENTRIES[0].sizeRecommendation,
+        },
+        historyEntries: SIBLING_ENTRIES,
+        currentIndex: 0,
+      };
+      useFitHistoryStore.setState({ entries: SIBLING_ENTRIES });
+
+      // Stub Alert.alert to auto-invoke the destructive button so we
+      // don't need to drive the native prompt.
+      const { Alert } = require('react-native');
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
+        ((...args: unknown[]) => {
+          const buttons = args[2] as Array<{ text: string; onPress?: () => void }> | undefined;
+          const remove = buttons?.find((b) => b.text === 'Remove');
+          remove?.onPress?.();
+        }) as (...args: unknown[]) => void
+      );
+
+      const { findByTestId } = render(<FitResultScreen />);
+      const trash = await findByTestId('remove-from-history-button');
+      fireEvent.press(trash);
+
+      // Deleted from the store + stayed on screen (no goBack).
+      expect(useFitHistoryStore.getState().entries.find((e) => e.id === 'h-1')).toBeUndefined();
+      expect(mockGoBack).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+
+    it('goes back when the deleted item was the only sibling', async () => {
+      const SOLO = [SIBLING_ENTRIES[0]];
+      mockRouteParams = {
+        product: {
+          name: SOLO[0].productName,
+          image: SOLO[0].productImage,
+          brand: SOLO[0].brand,
+        },
+        url: SOLO[0].url,
+        historyEntryId: SOLO[0].id,
+        precomputed: {
+          fitScore: 'great',
+          warnings: [],
+          sizeRecommendation: SOLO[0].sizeRecommendation,
+        },
+        historyEntries: SOLO,
+        currentIndex: 0,
+      };
+      useFitHistoryStore.setState({ entries: SOLO });
+
+      const { Alert } = require('react-native');
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
+        ((...args: unknown[]) => {
+          const buttons = args[2] as Array<{ text: string; onPress?: () => void }> | undefined;
+          buttons?.find((b) => b.text === 'Remove')?.onPress?.();
+        }) as (...args: unknown[]) => void
+      );
+
+      const { findByTestId } = render(<FitResultScreen />);
+      const trash = await findByTestId('remove-from-history-button');
+      fireEvent.press(trash);
+
+      expect(mockGoBack).toHaveBeenCalled();
+      alertSpy.mockRestore();
+    });
+  });
 });
