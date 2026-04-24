@@ -1,0 +1,58 @@
+name: Dependabot auto-merge
+
+# Automatically merges Dependabot PRs for patch and minor version bumps
+# once CI passes. Major bumps (breaking change potential) still go
+# through manual review — we explicitly check the update-type metadata
+# and bail out for `version-update:semver-major`.
+#
+# This addresses the "too many GitHub Actions running" problem caused
+# by Dependabot opening 5-10 PRs per week, each firing a full CI run
+# cycle that a human then has to click through to merge. With this
+# workflow, the 80% case (small bumps) resolves itself.
+
+on: pull_request_target
+
+# Least-privilege token: only the pull-request + contents:write scopes
+# needed to approve + merge. No repo admin, no secrets.
+permissions:
+  pull-requests: write
+  contents: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve + enable auto-merge (patch + minor only)
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Update type: ${{ steps.meta.outputs.update-type }}"
+          echo "Dependency names: ${{ steps.meta.outputs.dependency-names }}"
+          # Approve on the bot's behalf, then mark for auto-merge once
+          # required checks pass. `--auto` is a no-op if required checks
+          # are not configured — falls back to leaving the PR approved
+          # and ready for the human to click Merge.
+          gh pr review --approve "$PR_URL" -b "Auto-approved: $(echo ${{ steps.meta.outputs.update-type }})."
+          gh pr merge --auto --squash "$PR_URL"
+
+      - name: Flag major bumps for human review
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Major bump detected — leaving for manual review."
+          gh pr comment "$PR_URL" --body "⚠️ Major version bump detected — auto-merge skipped. Please review breaking changes before merging."

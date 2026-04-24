@@ -14,12 +14,14 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { Linking } from 'react-native';
 
-// Privacy-policy repo hosted on GitHub Pages. Kept as a single source
-// of truth for Alate (and Badige) policies; see the privacy repo for
-// content. Update these if the policy URL scheme changes.
-const PRIVACY_POLICY_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/privacy-policy.html';
-const DELETE_ACCOUNT_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/delete-account.html';
-const BRAND_OPTOUT_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/brand-optout.html';
+// Privacy-policy repo hosted on GitHub Pages at the BoTessellate org
+// (confirmed via `gh api repos/BoTessellate/app_privacy_policy/pages`).
+// The repo publishes to `botessellate.github.io/<repo>/` — NOT any
+// individual user's github.io namespace. If the Pages source ever
+// moves (e.g. to a custom domain), update these constants.
+const PRIVACY_POLICY_URL = 'https://botessellate.github.io/app_privacy_policy/alate/privacy-policy.html';
+const DELETE_ACCOUNT_URL = 'https://botessellate.github.io/app_privacy_policy/alate/delete-account.html';
+const BRAND_OPTOUT_URL = 'https://botessellate.github.io/app_privacy_policy/alate/brand-optout.html';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
