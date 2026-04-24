@@ -9,6 +9,7 @@
 
 import { API_BASE_URL } from '../constants/api';
 import { Avatar } from '../store/avatarStore';
+import { useDeviceStore } from '../store/deviceStore';
 
 export interface ScrapedProduct {
   name?: string;
@@ -38,6 +39,12 @@ export interface ScrapeResult {
   success: boolean;
   data?: ScrapedProduct;
   error?: string;
+  /** True when the origin is on the brand opt-out list or robots.txt
+   *  disallows the path. App should show an opt-out card, not an error. */
+  blocked?: boolean;
+  blockedReason?: 'brand-optout' | 'robots-disallow';
+  blockedOrigin?: string;
+  blockedMessage?: string;
 }
 
 export interface EnrichResult {
@@ -89,11 +96,18 @@ async function apiRequest<T>(
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
 
   try {
+    // Stable per-install device ID, used for server-side rate-limiting
+    // (keys per-install instead of per-IP so users behind shared NAT
+    // don't share a bucket). Generated on first launch, persisted via
+    // AsyncStorage. Not PII — random UUID.
+    const deviceId = useDeviceStore.getState().ensureDeviceId();
+
     const response = await fetch(`${API_BASE_URL}/api/ai?action=${action}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Client': 'Alate/1.0',
+        'X-Device-Id': deviceId,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -140,7 +154,24 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
         material?: string;
       };
       error?: string;
+      blocked?: boolean;
+      reason?: 'brand-optout' | 'robots-disallow';
+      origin?: string;
+      message?: string;
     }>('scrape', { url });
+
+    // Brand opt-out / robots.txt disallow comes back as `success:false`
+    // + `blocked:true`. Surface it as a non-error result so the app can
+    // render a distinct "this brand has opted out" card.
+    if (result.blocked) {
+      return {
+        success: false,
+        blocked: true,
+        blockedReason: result.reason,
+        blockedOrigin: result.origin,
+        blockedMessage: result.message,
+      };
+    }
 
     if (!result.success || !result.data) {
       return { success: false, error: result.error || 'Failed to scrape product' };

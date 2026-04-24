@@ -12,6 +12,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { Linking } from 'react-native';
+
+// Privacy-policy repo hosted on GitHub Pages. Kept as a single source
+// of truth for Alate (and Badige) policies; see the privacy repo for
+// content. Update these if the policy URL scheme changes.
+const PRIVACY_POLICY_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/privacy-policy.html';
+const DELETE_ACCOUNT_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/delete-account.html';
+const BRAND_OPTOUT_URL = 'https://ramsaptami.github.io/app_privacy_policy/alate/brand-optout.html';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -105,10 +113,15 @@ function AccountCardView({
           </TouchableOpacity>
         </View>
       ) : (
-        <TouchableOpacity style={styles.googleButton} onPress={onSignIn} activeOpacity={0.8}>
-          <Feather name="log-in" size={18} color={colors.white} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
+        <View style={styles.signedOutWrap}>
+          <TouchableOpacity style={styles.googleButton} onPress={onSignIn} activeOpacity={0.8}>
+            <Feather name="log-in" size={18} color={colors.white} />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+          <Text style={styles.signInOptionalNote}>
+            Optional — your body profile and fit history work without signing in.
+          </Text>
+        </View>
       )}
     </GlassCard>
   );
@@ -299,18 +312,61 @@ export default function AccountScreen() {
             When real preferences land (toggle component, persisted in
             zustand), reintroduce this section backed by real state. */}
 
-        {/* Reset — quiet link at the bottom. Calibration + Tip cards
-            removed from Account per design mockup (they may return as
-            their own screen later). */}
+        {/* Delete body profile — quiet link at the bottom. Explicit
+            "Delete my body profile" wording per GDPR/DPDPA guidance:
+            users should know exactly what the button does BEFORE the
+            confirmation dialog. Measurements are sensitive data; the
+            deletion action should be discoverable and unambiguous. */}
         {avatar && (
           <TouchableOpacity
+            testID="delete-body-profile-button"
             style={styles.resetButton}
-            onPress={clearAvatar}
+            onPress={() => {
+              Alert.alert(
+                'Delete body profile?',
+                'Your height, measurements and fit preferences will be erased from this device. This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: clearAvatar },
+                ]
+              );
+            }}
             activeOpacity={0.7}
           >
-            <Text style={styles.resetText}>Reset profile</Text>
+            <Text style={styles.resetText}>Delete my body profile</Text>
           </TouchableOpacity>
         )}
+
+        {/* Legal / policy links — small footer row at the very bottom
+            of the screen. Required for App Store + Play Store listings
+            and GDPR/DPDPA transparency. Light-on-dark tap targets,
+            generous spacing; each opens the hosted page in the device
+            browser via Linking.openURL. */}
+        <View style={styles.legalFooter}>
+          <TouchableOpacity
+            testID="privacy-policy-link"
+            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalDivider}>·</Text>
+          <TouchableOpacity
+            testID="delete-account-link"
+            onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.legalLinkText}>Delete Account</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalDivider}>·</Text>
+          <TouchableOpacity
+            testID="brand-optout-link"
+            onPress={() => Linking.openURL(BRAND_OPTOUT_URL)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.legalLinkText}>Brand opt-out</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* Bottom-edge fade — same pattern as Home. Content melts into
@@ -363,6 +419,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing.md,
     marginBottom: spacing.lg,
+  },
+  signedOutWrap: {
+    gap: spacing.sm,
+  },
+  signInOptionalNote: {
+    fontFamily: 'serif',
+    fontSize: 11,
+    lineHeight: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    opacity: 0.85,
+    paddingHorizontal: spacing.sm,
   },
   googleButton: {
     flexDirection: 'row',
@@ -582,6 +650,31 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: 'rgba(255,255,255,0.75)',
     fontWeight: '600',
+  },
+
+  // Legal/policy links — small row at the bottom of the Account page.
+  // Centred, dot-separated, low-contrast (these are reference links,
+  // not primary actions).
+  legalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: spacing.lg,
+  },
+  legalLinkText: {
+    fontFamily: 'serif',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.65)',
+    textDecorationLine: 'underline',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  legalDivider: {
+    fontFamily: 'serif',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.5)',
   },
 
   // Bottom-edge fade — 280px tall for a heavier horizon effect.

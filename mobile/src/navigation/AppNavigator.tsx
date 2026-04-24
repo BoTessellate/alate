@@ -17,7 +17,9 @@ import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
+import { useAgeGateStore } from '../store/ageGateStore';
 import ScreenErrorBoundary from '../components/ScreenErrorBoundary';
+import AgeGateOverlay from '../components/AgeGateOverlay';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -197,9 +199,20 @@ export default function AppNavigator() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
   const { avatar } = useAvatarStore();
   const { setPendingUrl } = usePendingShareStore();
+  const ageConfirmedAt = useAgeGateStore((s) => s.confirmedAt);
   const [isProcessingShare, setIsProcessingShare] = useState(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const processingRef = useRef(false);
+
+  // First-launch age gate — blocks everything until the user confirms
+  // they're 16+. Measurements are GDPR Article 8 / DPDPA-sensitive data,
+  // so we gate collection behind an explicit confirmation. The store
+  // persists the confirmation timestamp, so this only shows on first
+  // install (or after body-profile deletion if we later wire that to
+  // reset the gate).
+  if (!ageConfirmedAt) {
+    return <AgeGateOverlay />;
+  }
 
   useEffect(() => {
     if (!hasShareIntent || processingRef.current) return;

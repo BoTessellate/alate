@@ -69,6 +69,17 @@ jest.mock('@expo/vector-icons', () => ({
   Feather: 'Feather',
 }));
 
+// FitLoader instantiates a Reanimated withRepeat → Easing.linear, which
+// isn't fully mocked in the jest harness. HomeScreen now renders the
+// loader full-screen while a scrape is in flight (per UX change in
+// April 2026). Stub the component out so these tests can render the
+// pre-loading state without pulling reanimated internals.
+jest.mock('../components/FitLoader', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return () => React.createElement(Text, { testID: 'fit-loader-stub' }, 'Loading…');
+});
+
 // --- Helpers -------------------------------------------------------------
 
 const AVATAR = {

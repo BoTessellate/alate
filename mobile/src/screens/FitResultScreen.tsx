@@ -45,6 +45,7 @@ import { useCalibrationStore, averageCalibration } from '../store/calibrationSto
 import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
 import { captureError } from '../utils/sentry';
+import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -833,6 +834,27 @@ export default function FitResultScreen() {
               </>
             )}
           </View>
+
+          {/* Attribution footer — small citation-style line at the very
+              bottom of the card. Combined with the existing "View on
+              Store" CTA (the functional backlink), this reinforces the
+              scrape's posture as a referral tool, not a republisher.
+              Timestamp answers "how fresh is this?" — critical for the
+              inventory + price fields which can go stale fast. */}
+          {url && (
+            <View style={styles.attributionFooter}>
+              <Text
+                testID="attribution-footer"
+                style={styles.attributionText}
+                numberOfLines={1}
+              >
+                Data from {displayHostname(url)} · checked{' '}
+                {formatRelativeTime(
+                  activeEntry?.checkedAt ?? precomputed?.checkedAt ?? new Date().toISOString()
+                )}
+              </Text>
+            </View>
+          )}
             </ScrollView>
           </Animated.View>
         </GestureDetector>
@@ -1320,5 +1342,26 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+
+  // Attribution footer — small, centred, muted. Intentionally quiet so
+  // it reads as a citation, not a CTA. The big "View on Store" button
+  // above is the loud referral path; this is the credit line.
+  attributionFooter: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 4,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(76, 67, 86, 0.08)',
+  },
+  attributionText: {
+    fontFamily: 'serif',
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: 0.2,
+    color: colors.textMuted,
+    textAlign: 'center',
+    opacity: 0.8,
   },
 });

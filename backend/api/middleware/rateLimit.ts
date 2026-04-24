@@ -65,18 +65,35 @@ export interface RateLimitOptions {
 }
 
 /**
- * Get client identifier (IP address by default)
+ * Get client identifier — prefer a stable per-device ID sent by the
+ * mobile client (`X-Device-Id` header), falling back to IP address.
+ *
+ * Why prefer device-id: multiple users behind a shared NAT (coffee shop
+ * wifi, campus wifi, carrier CGNAT) share a single IP. IP-only rate
+ * limits either unfairly penalise a cohort OR have to be set so high
+ * they're useless against single-actor abuse. Device IDs sidestep that:
+ * each install gets its own bucket. We still fall back to IP for
+ * web/partner traffic that doesn't send the header, preserving the
+ * existing protection.
  */
 function getDefaultIdentifier(req: VercelRequest): string {
+  // Prefer stable client-supplied device ID (the mobile app generates
+  // one on first launch and persists via AsyncStorage).
+  const deviceId = req.headers['x-device-id'];
+  if (typeof deviceId === 'string' && deviceId.length >= 8) {
+    // Namespace to avoid collision with raw IPs.
+    return `dev:${deviceId}`;
+  }
+
   // Try various headers for real IP (Vercel sets x-forwarded-for)
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim();
+    return `ip:${forwarded.split(',')[0].trim()}`;
   }
 
   const realIp = req.headers['x-real-ip'];
   if (typeof realIp === 'string') {
-    return realIp;
+    return `ip:${realIp}`;
   }
 
   // Fallback to 'unknown' (shouldn't happen on Vercel)

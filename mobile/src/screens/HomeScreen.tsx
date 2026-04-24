@@ -31,6 +31,7 @@ import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
+import FitLoader from '../components/FitLoader';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -48,6 +49,15 @@ export default function HomeScreen() {
   const [failedBrand, setFailedBrand] = useState<{ brandName: string; brandDomain: string } | null>(null);
   const [nudgeSent, setNudgeSent] = useState(false);
   const [nudging, setNudging] = useState(false);
+  // When the backend returns `blocked:true` (brand opted out or robots
+  // disallow), show a distinct card instead of the generic "unable to
+  // fetch" error. Different copy + no nudge CTA — this brand has
+  // explicitly asked to be left alone.
+  const [blockedInfo, setBlockedInfo] = useState<{
+    origin: string;
+    reason: 'brand-optout' | 'robots-disallow' | undefined;
+    message: string;
+  } | null>(null);
   const { avatar } = useAvatarStore();
   const { entries: historyEntries } = useFitHistoryStore();
   // Most recent 3 for the "Recent" list per Claude Design mockup
@@ -86,12 +96,25 @@ export default function HomeScreen() {
     setLoading(true);
     setError(null);
     setFailedBrand(null);
+    setBlockedInfo(null);
     setNudgeSent(false);
 
     try {
       const result = await scrapeProduct(targetUrl);
       if (result.success && result.data) {
         navigation.navigate('FitResult', { product: result.data, url: targetUrl });
+      } else if (result.blocked) {
+        // Brand opt-out / robots.txt disallow — show a distinct card,
+        // no nudge option. We also clear the pasted URL so the user
+        // isn't tempted to retry instantly.
+        setBlockedInfo({
+          origin: result.blockedOrigin || 'This brand',
+          reason: result.blockedReason,
+          message:
+            result.blockedMessage ||
+            'This brand has asked not to be scraped. Please visit their store directly.',
+        });
+        setUrl('');
       } else {
         const brand = extractBrandFromUrl(targetUrl);
         setFailedBrand(brand);
@@ -128,6 +151,21 @@ export default function HomeScreen() {
       debounceTimer.current = setTimeout(() => runCheck(trimmed), 700);
     }
   };
+
+  // As soon as a URL is detected (and we're loading the scrape), show
+  // the full-screen FitLoader — not a tiny button spinner. User feedback:
+  // the interstitial "check fit button spinner → reading size chart"
+  // transition was two waits stacked; collapsing it into one makes the
+  // flow feel instant. FitLoader renders a URL pill at the top so the
+  // user retains context while the scrape + fit-check complete.
+  if (loading) {
+    return (
+      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <FitLoader url={url || undefined} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
@@ -258,6 +296,22 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 </>
               )}
+            </GlassCard>
+          )}
+
+          {/* Brand opt-out card — shown when the backend returns
+              blocked:true. Distinct from the nudge card (no CTA, no
+              pitch) because this brand has explicitly asked not to be
+              scraped. We respect that. */}
+          {blockedInfo && (
+            <GlassCard testID="brand-blocked-card" style={styles.nudgeCard}>
+              <View style={styles.nudgeHeader}>
+                <Feather name="shield" size={18} color={colors.textSecondary} />
+                <Text style={styles.nudgeTitle}>
+                  {blockedInfo.origin} has opted out
+                </Text>
+              </View>
+              <Text style={styles.nudgeDescription}>{blockedInfo.message}</Text>
             </GlassCard>
           )}
 
