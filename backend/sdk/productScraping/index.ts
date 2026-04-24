@@ -7,6 +7,7 @@ import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { validateUrl } from '../shared/middleware';
 import { createModuleLogger } from '../shared/logger';
+import { tryShopifyJSON } from './shopifyFetch';
 
 // TODO: [AFFILIATE-APIS] Integrate affiliate APIs for large brands (Gucci, Zara, H&M, etc.)
 // Current simple fetch + Puppeteer fails for bot-protected sites (504 timeouts).
@@ -24,6 +25,13 @@ export interface ScrapedData {
   imageUrl?: string;
   description?: string;
   availableSizes?: string[];
+  // Fields populated by the Shopify direct-fetch layer when the URL is
+  // a Shopify storefront. Optional on every other path so we don't
+  // break callers that don't need them.
+  category?: string;
+  tags?: string[];
+  material?: string;
+  compareAtPrice?: string;
 }
 
 interface ProductData {
@@ -108,10 +116,16 @@ class ProductExtractor {
     const twitterSite = this.extractMeta('name', 'twitter:site');
     result.brandName = ogSiteName || twitterSite || '';
 
-    // Image
+    // Image — prefer og:image:secure_url over og:image. Many Shopify
+    // and WordPress stores serve og:image as http:// but also provide
+    // an https:// secure variant. React Native Android blocks
+    // cleartext http images by default, so using the secure URL fixes
+    // "blank image card" bugs on any misconfigured storefront — not
+    // just Shopify. Fallback chain: secure_url → og:image → twitter.
+    const ogImageSecure = this.extractMeta('property', 'og:image:secure_url');
     const ogImage = this.extractMeta('property', 'og:image');
     const twitterImage = this.extractMeta('name', 'twitter:image');
-    result.imageUrl = ogImage || twitterImage || '';
+    result.imageUrl = ogImageSecure || ogImage || twitterImage || '';
 
     // Description
     const ogDescription = this.extractMeta('property', 'og:description');
@@ -486,6 +500,48 @@ export async function scrapeProduct(url: string): Promise<{
   const urlValidation = validateUrl(url);
   if (!urlValidation.valid) {
     throw new Error(urlValidation.error || 'Invalid URL');
+  }
+
+  // Priority 0: Shopify direct-fetch. Every Shopify storefront exposes
+  // its product JSON at `/products/<handle>.json`. If that endpoint
+  // returns a well-formed payload, we get authoritative category /
+  // tags / material / images / sizes without touching puppeteer or
+  // Claude-based enrichment. Silently returns null for non-Shopify
+  // sites; we fall through to HTML extraction below.
+  try {
+    const shopifyResult = await tryShopifyJSON(new URL(url));
+    if (shopifyResult && shopifyResult.title) {
+      log.info({ url }, 'Using Shopify direct-fetch result (skipping HTML extraction)');
+      return {
+        data: {
+          title: shopifyResult.title,
+          brandName: shopifyResult.brandName,
+          price: shopifyResult.price,
+          currency: shopifyResult.currency,
+          imageUrl: shopifyResult.imageUrl,
+          description: shopifyResult.description,
+          availableSizes: shopifyResult.availableSizes,
+          category: shopifyResult.category,
+          tags: shopifyResult.tags,
+          material: shopifyResult.material,
+          compareAtPrice: shopifyResult.compareAtPrice,
+        },
+        debug: {
+          requestedUrl: url,
+          finalUrl: url,
+          htmlLength: 0,
+          hasPriceAmount: !!shopifyResult.price,
+          hasPriceCurrency: !!shopifyResult.currency,
+          usedPuppeteer: false,
+          htmlPreview: '[Shopify direct-fetch — no HTML processed]',
+        },
+      };
+    }
+  } catch (error) {
+    // Shopify helper never throws itself, but defend against unexpected
+    // exceptions (e.g. URL parse failures slipping past validateUrl) so
+    // the HTML path still runs.
+    log.warn({ url, error: (error as Error).message }, 'Shopify direct-fetch threw unexpectedly');
   }
 
   let html: string;

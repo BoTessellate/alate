@@ -88,11 +88,15 @@ export default function FitResultScreen() {
   const { addEntry, updateEntry, removeEntry } = useFitHistoryStore();
   const { garments: calibrationGarments } = useCalibrationStore();
 
-  // When we navigated in from History with a siblings list, the user can
-  // swipe horizontally to sift through products without going back.
-  const canSift = !!historyEntries && historyEntries.length > 1;
+  // When we navigated in from History with a siblings list, the user
+  // can sift horizontally AND delete without leaving the screen. The
+  // siblings list lives in component state (NOT route params directly)
+  // so we can mutate it on delete — filtering the removed entry and
+  // clamping the index — without forcing a navigation back.
+  const [siblings, setSiblings] = useState(historyEntries ?? []);
+  const canSift = siblings.length > 1;
   const [localIndex, setLocalIndex] = useState(currentIndex);
-  const activeEntry = canSift ? historyEntries![localIndex] : null;
+  const activeEntry = siblings.length > 0 ? siblings[Math.min(localIndex, siblings.length - 1)] : null;
 
   // Effective route-derived values. Either come from the swiped-to entry
   // (history+sift mode) or direct route params (live mode).
@@ -249,7 +253,7 @@ export default function FitResultScreen() {
       swipeX.value = e.translationX * 0.4;
     })
     .onEnd((e) => {
-      const entriesLen = historyEntries?.length ?? 0;
+      const entriesLen = siblings.length;
       if (e.translationX < -SWIPE_THRESHOLD && localIndex < entriesLen - 1) {
         runOnJS(setLocalIndex)(localIndex + 1);
       } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
@@ -283,30 +287,52 @@ export default function FitResultScreen() {
 
     try {
       let enrichedData: { id?: string; name?: string; category?: string; material?: string; tags?: string[] } | null = null;
-      try {
-        const enrichResult = await enrichProduct({
-          name: product.name || 'Unknown Product',
-          image_url: product.image,
-          description: product.description,
-          price: product.price?.amount,
-          currency: product.price?.currency,
+
+      // Fast path — the scrape result came with structured data
+      // (Shopify direct-fetch returns category / tags / material from
+      // the storefront's own JSON). Skip Claude enrichment entirely
+      // when all three are present; otherwise fall through and ask
+      // Claude to fill the gaps.
+      const hasShopifyStructured =
+        !!product.category && Array.isArray(product.tags) && product.tags.length > 0;
+      if (hasShopifyStructured) {
+        enrichedData = {
+          name: product.name,
+          category: product.category,
+          material: product.material,
+          tags: product.tags,
+        };
+        setEnrichedProduct({
+          category: product.category,
+          material: product.material,
+          tags: product.tags,
         });
-        if (enrichResult.success && enrichResult.product) {
-          setEnrichedProduct(enrichResult.product);
-          enrichedData = enrichResult.product;
-        } else {
-          captureError(new Error('Enrichment returned success:false'), {
+      } else {
+        try {
+          const enrichResult = await enrichProduct({
+            name: product.name || 'Unknown Product',
+            image_url: product.image,
+            description: product.description,
+            price: product.price?.amount,
+            currency: product.price?.currency,
+          });
+          if (enrichResult.success && enrichResult.product) {
+            setEnrichedProduct(enrichResult.product);
+            enrichedData = enrichResult.product;
+          } else {
+            captureError(new Error('Enrichment returned success:false'), {
+              feature: 'product-enrichment',
+              productName: product.name,
+              url,
+            });
+          }
+        } catch (enrichError) {
+          captureError(enrichError, {
             feature: 'product-enrichment',
             productName: product.name,
             url,
           });
         }
-      } catch (enrichError) {
-        captureError(enrichError, {
-          feature: 'product-enrichment',
-          productName: product.name,
-          url,
-        });
       }
 
       const calibration = averageCalibration(calibrationGarments);
@@ -535,8 +561,21 @@ export default function FitResultScreen() {
                   text: 'Remove',
                   style: 'destructive',
                   onPress: () => {
+                    // Drop from the Zustand store (authoritative list).
                     removeEntry(historyEntryId);
-                    navigation.goBack();
+                    // Also prune our local siblings view so the card
+                    // immediately reflects the deletion. If there's
+                    // another sibling to show, stay on this screen and
+                    // land on it. Only go back when we deleted the
+                    // last remaining sibling — there's nothing left
+                    // to display.
+                    const remaining = siblings.filter((e) => e.id !== historyEntryId);
+                    if (remaining.length > 0) {
+                      setSiblings(remaining);
+                      setLocalIndex((prev) => Math.min(prev, remaining.length - 1));
+                    } else {
+                      navigation.goBack();
+                    }
                   },
                 },
               ]
