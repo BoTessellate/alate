@@ -57,9 +57,20 @@ describe('History Re-evaluation', () => {
   });
 
   describe('History store basics', () => {
+    // April 2026 — addEntry now dedupes by canonical URL. Tests must
+    // use distinct URLs per entry to exercise the "growing list" path
+    // (otherwise the same URL twice merges into one entry).
     it('should add entries in reverse chronological order', () => {
-      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'First' });
-      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'Second' });
+      useFitHistoryStore.getState().addEntry({
+        ...SEED_ENTRY,
+        productName: 'First',
+        url: 'https://asos.com/dress/1',
+      });
+      useFitHistoryStore.getState().addEntry({
+        ...SEED_ENTRY,
+        productName: 'Second',
+        url: 'https://asos.com/dress/2',
+      });
 
       const entries = useFitHistoryStore.getState().entries;
       expect(entries[0].productName).toBe('Second'); // Latest first
@@ -67,11 +78,12 @@ describe('History Re-evaluation', () => {
     });
 
     it('should cap history at 50 entries', () => {
-      // Add 55 entries
+      // Each entry needs a unique URL so dedupe doesn't collapse them.
       for (let i = 0; i < 55; i++) {
         useFitHistoryStore.getState().addEntry({
           ...SEED_ENTRY,
           productName: `Product ${i}`,
+          url: `https://asos.com/dress/${i}`,
         });
       }
 
@@ -162,9 +174,10 @@ describe('History Re-evaluation', () => {
     it('should remove a single entry by id without affecting others added in the same millisecond', () => {
       // addEntry now uses `${base36Timestamp}-${randomSuffix}` so ids stay
       // unique even when multiple entries are added in quick succession.
-      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'A' });
-      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'B' });
-      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'C' });
+      // Distinct URLs needed too — addEntry dedupes on canonical URL.
+      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'A', url: 'https://asos.com/a' });
+      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'B', url: 'https://asos.com/b' });
+      useFitHistoryStore.getState().addEntry({ ...SEED_ENTRY, productName: 'C', url: 'https://asos.com/c' });
 
       const [cEntry, bEntry, aEntry] = useFitHistoryStore.getState().entries;
       // Sanity check: ids must be distinct

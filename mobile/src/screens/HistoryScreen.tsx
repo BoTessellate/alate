@@ -19,6 +19,7 @@ import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
 import HeadingImage from '../components/HeadingImage';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'History'>,
@@ -88,23 +89,23 @@ export default function HistoryScreen() {
   // "swipe through to revisit" instruction the coverflow already implies.
   const goodFits = entries.filter((e) => e.fitScore === 'great').length;
 
-  // Delete a single history card. Confirms first, then removes from the
-  // store. Cover flow re-renders automatically because the store drives
-  // the list; the active-index derived value reclamps to the new range.
+  // Delete confirmation — themed via ConfirmDialog instead of the
+  // native Alert popup, which broke visual continuity with the rest
+  // of the app's grey-purple glass aesthetic. State holds the entry
+  // pending deletion so we can read its name in the dialog message.
+  const [pendingDelete, setPendingDelete] = useState<FitHistoryEntry | null>(null);
+  const [pendingClearAll, setPendingClearAll] = useState(false);
+
   const handleCardDelete = (item: FitHistoryEntry) => {
-    Alert.alert(
-      'Remove from history',
-      `Remove "${item.productName}" from your history?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => removeEntry(item.id),
-        },
-      ]
-    );
+    setPendingDelete(item);
   };
+  const confirmCardDelete = () => {
+    if (pendingDelete) {
+      removeEntry(pendingDelete.id);
+      setPendingDelete(null);
+    }
+  };
+  const cancelCardDelete = () => setPendingDelete(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   const seedDemoData = () => {
@@ -211,16 +212,7 @@ export default function HistoryScreen() {
           {entries.length > 0 && (
             <TouchableOpacity
               style={styles.clearLink}
-              onPress={() => {
-                Alert.alert(
-                  'Clear history',
-                  'This will delete all your fit check history. This cannot be undone.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Clear', style: 'destructive', onPress: clearHistory },
-                  ]
-                );
-              }}
+              onPress={() => setPendingClearAll(true)}
               activeOpacity={0.6}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
@@ -228,6 +220,40 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Themed delete-product confirmation — replaces the native
+            Alert popup so the dialog visually matches the rest of the
+            app's grey-purple glass aesthetic. */}
+        <ConfirmDialog
+          visible={!!pendingDelete}
+          title="Remove from history?"
+          message={
+            pendingDelete
+              ? `"${pendingDelete.productName}" will be removed from your fit history. This can't be undone.`
+              : undefined
+          }
+          confirmLabel="Remove"
+          icon="trash-2"
+          confirmTestID="confirm-delete-history-entry"
+          onConfirm={confirmCardDelete}
+          onCancel={cancelCardDelete}
+        />
+
+        {/* Themed clear-all confirmation — same visual language as the
+            single-entry remove. */}
+        <ConfirmDialog
+          visible={pendingClearAll}
+          title="Clear your fit history?"
+          message="All saved fit checks will be erased. This can't be undone."
+          confirmLabel="Clear all"
+          icon="alert-triangle"
+          confirmTestID="confirm-clear-history"
+          onConfirm={() => {
+            clearHistory();
+            setPendingClearAll(false);
+          }}
+          onCancel={() => setPendingClearAll(false)}
+        />
       </View>
     </SafeAreaView>
   );

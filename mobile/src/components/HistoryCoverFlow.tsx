@@ -11,7 +11,7 @@
  * onActiveIndexChange → lets a sibling detail bar follow the snap.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,13 +67,8 @@ interface HistoryCoverFlowProps {
   onCardDelete?: (entry: FitHistoryEntry) => void;
 }
 
-const formatPrice = (price?: { amount: number; currency: string }) => {
-  if (!price) return null;
-  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  if (!price.currency) return String(price.amount);
-  const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-  return `${symbols[price.currency] || price.currency + ' '}${price.amount}`;
-};
+// Shared formatter — same symbol map as FitResultScreen (incl. ₹ INR).
+import { formatPrice } from '../utils/currency';
 
 /** The card face — product image + top-corner brand/price folio only.
  *  The fit analysis (score, size, product name) lives in the sibling
@@ -275,6 +270,13 @@ export default function HistoryCoverFlow({
   onCardDelete,
 }: HistoryCoverFlowProps) {
   const scrollX = useSharedValue(0);
+  // Ref to the underlying ScrollView so we can programmatically snap
+  // back when the entries list shrinks (e.g. user deletes the last
+  // card while scrolled to it). Without this, scrollX retains the old
+  // offset which lands the viewport on empty space and the detail bar
+  // points at a stale index.
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  const prevLengthRef = useRef(entries.length);
 
   // Scroll handler just mirrors the offset to a SharedValue. zIndex + all
   // transforms derive from this on the UI thread — no JS state re-renders
@@ -310,9 +312,36 @@ export default function HistoryCoverFlow({
     [entries.length]
   );
 
+  // When the entries list shrinks (typically because the user just
+  // deleted a card), the ScrollView's internal offset can land past
+  // the new content's max snap point — leaving the viewport on empty
+  // space and the detail bar pointing at a stale index. Snap back
+  // to the new last index so the second-last card becomes the active
+  // one, matching the user's mental model of "the deck collapsed
+  // forward".
+  useEffect(() => {
+    const prevLen = prevLengthRef.current;
+    const newLen = entries.length;
+    prevLengthRef.current = newLen;
+
+    if (newLen >= prevLen) return; // grew or unchanged — no snap needed
+    if (newLen === 0) return;       // empty state handled by parent
+
+    const maxValidScrollX = (newLen - 1) * ITEM_GAP;
+    if (scrollX.value > maxValidScrollX) {
+      // Animated snap so the user perceives the next card sliding into
+      // place rather than a hard jump.
+      scrollRef.current?.scrollTo({ x: maxValidScrollX, animated: true });
+      // Mirror the value to the shared so transforms snap in lockstep
+      // (otherwise we'd briefly render at the old offset).
+      scrollX.value = maxValidScrollX;
+    }
+  }, [entries.length, scrollX]);
+
   return (
     <View style={styles.root} testID="history-coverflow">
       <Animated.ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         onScroll={scrollHandler}

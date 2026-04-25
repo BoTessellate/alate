@@ -69,6 +69,17 @@ jest.mock('@expo/vector-icons', () => ({
   Feather: 'Feather',
 }));
 
+// FitLoader instantiates a Reanimated withRepeat → Easing.linear, which
+// isn't fully mocked in the jest harness. HomeScreen now renders the
+// loader full-screen while a scrape is in flight (per UX change in
+// April 2026). Stub the component out so these tests can render the
+// pre-loading state without pulling reanimated internals.
+jest.mock('../components/FitLoader', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return () => React.createElement(Text, { testID: 'fit-loader-stub' }, 'Loading…');
+});
+
 // --- Helpers -------------------------------------------------------------
 
 const AVATAR = {
@@ -113,120 +124,41 @@ describe('HomeScreen', () => {
     expect(queryByText('Set up your body profile')).toBeNull();
   });
 
-  it('shows inline error when user taps Check Fit with empty input', () => {
-    setAvatar(true);
-    const { getByTestId, getByText } = render(<HomeScreen />);
-    fireEvent.press(getByTestId('check-fit-button'));
-    expect(getByText('Please enter a product URL')).toBeTruthy();
-  });
+  // The Check Fit button was removed in favour of the 700ms paste-
+  // debounce auto-trigger. The empty-input validation error is gone
+  // along with it (no submit path to validate anything against).
+  // Navigation tests below exercise the same flow via the auto-trigger.
 
-  it('routes to AvatarSetup if no avatar is configured', () => {
-    const { getByTestId } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-    expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
-  });
-
-  it('scrapes and navigates to FitResult on success', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: true,
-      data: {
-        name: 'Linen shirt',
-        image: 'https://cdn.example.com/a.jpg',
-        price: { amount: 49, currency: 'GBP' },
-        brand: 'Asos',
-      },
-    });
-
+  it('routes to AvatarSetup when avatar missing + URL pasted', async () => {
     const { getByTestId } = render(<HomeScreen />);
     await act(async () => {
       fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
     });
     await act(async () => {
-      fireEvent.press(getByTestId('check-fit-button'));
+      jest.advanceTimersByTime(750);
     });
-    // Drain the scrapeProduct promise microtask chain.
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(api.scrapeProduct).toHaveBeenCalledWith('https://asos.com/p/1');
-    expect(mockNavigate).toHaveBeenCalledWith(
-      'FitResult',
-      expect.objectContaining({
-        url: 'https://asos.com/p/1',
-        product: expect.objectContaining({ name: 'Linen shirt' }),
-      })
-    );
+    expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
   });
 
-  it('renders brand nudge card when scrape fails', async () => {
+  it('auto-triggers navigation after 700ms debounce when user pastes a valid URL', async () => {
     setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: false,
-      error: 'Brand not supported',
-    });
-
-    const { getByTestId, findByTestId, getByText } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://obscurebrand.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    await findByTestId('brand-nudge-card');
-    expect(getByText(/Obscurebrand isn't on our platform yet/i)).toBeTruthy();
-    // Navigation to FitResult must NOT fire on failure.
-    expect(mockNavigate).not.toHaveBeenCalledWith('FitResult', expect.anything());
-  });
-
-  it('sends a brand nudge and swaps to the thank-you copy', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: false,
-      error: 'Brand not supported',
-    });
-    (api.nudgeBrand as jest.Mock).mockResolvedValueOnce({ success: true });
-
-    const { getByTestId, findByTestId, findByText } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://obscurebrand.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    await findByTestId('nudge-brand-button');
-    fireEvent.press(getByTestId('nudge-brand-button'));
-
-    await findByText(/We've reached out to Obscurebrand/i);
-    expect(api.nudgeBrand).toHaveBeenCalledWith('obscurebrand.com', 'Obscurebrand');
-  });
-
-  it('surfaces a generic error if scrapeProduct throws', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockRejectedValueOnce(new Error('boom'));
-
-    const { getByTestId, findByTestId } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    // The nudge card renders because HomeScreen's catch falls back to
-    // extractBrandFromUrl + a brand-nudge CTA.
-    await findByTestId('brand-nudge-card');
-  });
-
-  it('auto-triggers scrape after 700ms debounce when user pastes a valid URL', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: true,
-      data: { name: 'Dress' },
-    });
-
     const { getByTestId } = render(<HomeScreen />);
     fireEvent.changeText(getByTestId('url-input'), 'https://zara.com/p/1');
 
     // Before debounce fires nothing should have happened.
-    expect(api.scrapeProduct).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalledWith('FitResult', expect.anything());
 
     await act(async () => {
       jest.advanceTimersByTime(750);
     });
 
-    await waitFor(() => expect(api.scrapeProduct).toHaveBeenCalledWith('https://zara.com/p/1'));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'FitResult',
+        expect.objectContaining({ url: 'https://zara.com/p/1' })
+      )
+    );
+    // No scrape call from HomeScreen — that lives in FitResult now.
+    expect(api.scrapeProduct).not.toHaveBeenCalled();
   });
 });

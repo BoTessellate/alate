@@ -114,7 +114,30 @@ export default function HeadingImage({
   const renderHeight = height ?? config.height;
   const renderWidth = renderHeight * SVG_ASPECTS[slot];
 
-  if (SvgComponent) {
+  // TEMPORARY COMPONENT — retire for v2.
+  //
+  // This whole SVG-image approach to page headings is a stopgap while
+  // the user evaluates licensing for TAN Nightingale. User plans to
+  // purchase the font for use beyond page headings (body, labels,
+  // marketing site). Once the font is licensed + loaded via
+  // expo-font, swap all <HeadingImage> callsites for plain <Text>
+  // using the font family and retire this component entirely.
+  // See memory/project_font_tan_nightingale.md for the purchase plan.
+  //
+  // Defensive type-guard (ALATE-15 regression guard).
+  //
+  // During hot-reload, react-native-svg-transformer can momentarily
+  // return a module-ID integer instead of the React component while
+  // Metro is mid-transform. React then tries to render `<{number}/>`
+  // and throws `Element type is invalid ... got: number`. This only
+  // happened in development (Sentry issue ALATE-15, 12 events in one
+  // dev session) because prod bundles don't run react-refresh — but
+  // since the fallback path already renders perfectly usable text,
+  // defending against a non-function SvgComponent is strictly safer
+  // and costs nothing at runtime in normal execution.
+  const isValidComponent = typeof SvgComponent === 'function' || typeof SvgComponent === 'object';
+
+  if (SvgComponent && isValidComponent) {
     return (
       <View
         style={[styles.wrap, style]}

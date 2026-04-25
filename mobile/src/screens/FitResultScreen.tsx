@@ -19,6 +19,7 @@ import Animated, {
   withSpring,
   interpolate,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 // @sbaiahmed1/react-native-blur — Fabric/new-arch-ready Turbo Module.
@@ -36,15 +37,28 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
-import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
+import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { captureError } from '../utils/sentry';
+import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
+// Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
+// so the same symbol map (incl. ₹ for INR) drives every price display.
+import { formatPrice } from '../utils/currency';
+// Tag filtering — strip merchandising noise (sale codes, drops, sizes,
+// "best seller" labels, etc.) so users only see tags that describe
+// the actual garment (material, colour, fit, occasion, vibe).
+import { filterUserFacingTags } from '../utils/tagFilter';
+// Availability — computed locally from the storefront's
+// `availableSizes` list (Shopify direct-fetch surfaces this) + the
+// user's recommended size. No separate backend call needed.
+import { computeAvailability, describeAvailability, AvailabilityStatus } from '../utils/availability';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -57,20 +71,23 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // point. The user drags the handle up/down to switch.
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
-// to keep the verdict + stats row + tags readable without scrolling.
-const COLLAPSED_H = 200;
+// to keep the verdict + stats row + material + availability readable
+// without scrolling. Iterative bumps: 200 → 204 (availability row
+// breathing) → 210 (per user feedback after the verdict block moved
+// out of ScrollView; the headerArea + visible dock content needs a
+// touch more vertical room to avoid clipping the stats labels).
+const COLLAPSED_H = 210;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
 
-const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-const formatPrice = (price?: { amount: number; currency: string }) => {
-  if (!price) return null;
-  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  const sym = CURRENCY_SYMBOLS[price.currency] || `${price.currency} `;
-  return `${sym}${price.amount}`;
-};
+// Single source of truth for the four stat-column icon dimensions.
+// Previously the SIZE badge was 44, the donut was 48, the FIT badge
+// was 40 — they read as visually inconsistent because they really
+// were inconsistent. All four icons now use STAT_ICON_SIZE so the
+// row lines up vertically and looks like a coherent set of chips.
+const STAT_ICON_SIZE = 44;
 
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
@@ -98,16 +115,36 @@ export default function FitResultScreen() {
   const [localIndex, setLocalIndex] = useState(currentIndex);
   const activeEntry = siblings.length > 0 ? siblings[Math.min(localIndex, siblings.length - 1)] : null;
 
+  // When no product is passed via route params (HomeScreen URL-paste
+  // flow now navigates immediately, before scraping), FitResult runs
+  // the scrape itself as the first step of analyzeFit and stores the
+  // result here. Three priority order in the derived `product`:
+  //   1. activeEntry (history sift mode)
+  //   2. routeProduct (history-mode direct nav, share-intent post-scrape)
+  //   3. scrapedProduct (live URL-paste flow — set by analyzeFit)
+  const [scrapedProduct, setScrapedProduct] = useState<ScrapedProduct | null>(null);
+
+  // Optional inline error card — shown when the internal scrape fails
+  // (brand we can't read, network error, blocked origin). Replaces the
+  // brand-nudge / blocked-brand UX that used to live on HomeScreen
+  // before the loader-flow restructure.
+  const [scrapeError, setScrapeError] = useState<{
+    kind: 'unsupported' | 'blocked' | 'unknown';
+    origin?: string;
+    message: string;
+  } | null>(null);
+
   // Effective route-derived values. Either come from the swiped-to entry
-  // (history+sift mode) or direct route params (live mode).
-  const product = activeEntry
+  // (history+sift mode) or direct route params (live mode), or the
+  // scrape result we ran internally.
+  const product: ScrapedProduct | undefined = activeEntry
     ? {
         name: activeEntry.productName,
         image: activeEntry.productImage,
         price: activeEntry.price,
         brand: activeEntry.brand,
       }
-    : routeProduct;
+    : routeProduct ?? scrapedProduct ?? undefined;
   const url = activeEntry ? activeEntry.url : routeUrl;
   const historyEntryId = activeEntry ? activeEntry.id : routeHistoryId;
   const isHistoryMode = !!historyEntryId && (!!activeEntry || !!precomputed);
@@ -143,6 +180,9 @@ export default function FitResultScreen() {
 
   // Collapse/expand state + progress. 1 = expanded (default), 0 = collapsed.
   const [isExpanded, setIsExpanded] = useState(true);
+  // Themed delete confirmation — replaces native Alert so the modal
+  // matches the rest of the grey-purple glass aesthetic.
+  const [pendingDelete, setPendingDelete] = useState(false);
   const collapseProgress = useSharedValue(1);
   const startProgress = useSharedValue(1);
 
@@ -227,28 +267,46 @@ export default function FitResultScreen() {
     })
     .onEnd(() => {
       const target = collapseProgress.value > 0.5 ? 1 : 0;
-      collapseProgress.value = withSpring(target, { damping: 18, stiffness: 160 });
-      runOnJS(setIsExpanded)(target === 1);
+      // Switched from withSpring to withTiming + cubic ease — user
+      // flagged the spring bounce as "still too much, very very
+      // subtle". A timing curve has zero overshoot by definition; the
+      // 280ms cubic-out duration keeps the dock change feeling
+      // responsive without ANY perceptible bounce. Defer the React
+      // state flip until the timing completes (same pattern we used
+      // with withSpring) so the concerns section doesn't reflow
+      // mid-animation.
+      collapseProgress.value = withTiming(
+        target,
+        { duration: 280, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) {
+            runOnJS(setIsExpanded)(target === 1);
+          }
+        }
+      );
     });
 
   // Horizontal drag sifts to the next/prev entry. HOISTED to the root
   // view (below) so it works regardless of where the card is — key for
   // the collapsed state, where the card only occupies the bottom 200px
   // and users instinctively swipe at mid-screen (i.e. OVER the product
-  // image, not the dock). Before this was scoped to cardScrollWrap and
-  // mid-screen swipes fell on dead area.
+  // image, not the dock).
   //
-  //   - `activeOffsetX([-15, 15])`: small horizontal nudges pass through
-  //   - `failOffsetY([-25, 25])`: yields to the inner drag gesture on
-  //     clear vertical motion (dragGesture lives on cardScrollWrap, so
-  //     within the card a vertical pan still collapses instead of sifts)
+  //   - `activeOffsetX([-25, 25])`: bumped from 15 → 25 so vertical
+  //     scroll inside the ScrollView wins more decisively. Users were
+  //     reporting "scroll feels wonky" — root cause was sift competing
+  //     with ScrollView for ownership during the first ~15px of
+  //     ambiguous motion.
+  //   - `failOffsetY([-10, 10])`: tightened from 25 → 10 so any clear
+  //     vertical movement immediately yields to scroll. Combined with
+  //     the activeOffsetX bump, vertical scroll has unambiguous priority
+  //     over diagonal-leaning swipes.
   // The onEnd guard (`entriesLen > 0`) handles the non-sift case without
-  // needing `.enabled(canSift)` — keeping this gesture built unconditionally
-  // so the GestureDetector doesn't churn refs when canSift flips.
+  // needing `.enabled(canSift)`.
   const swipeX = useSharedValue(0);
   const siftGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15])
-    .failOffsetY([-25, 25])
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-10, 10])
     .onUpdate((e) => {
       swipeX.value = e.translationX * 0.4;
     })
@@ -259,7 +317,13 @@ export default function FitResultScreen() {
       } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
         runOnJS(setLocalIndex)(localIndex - 1);
       }
-      swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
+      // Same bounce-free treatment as the dock collapse. A 200ms
+      // ease-out brings the card back to centre cleanly without the
+      // subtle overshoot a spring would produce.
+      swipeX.value = withTiming(0, {
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+      });
     });
 
   const siftStyle = useAnimatedStyle(() => ({
@@ -286,6 +350,51 @@ export default function FitResultScreen() {
     if (!avatar) return;
 
     try {
+      // Step 0 — internal scrape (only when HomeScreen passed URL only).
+      // The unified single-loader flow has FitResult run scrape +
+      // enrich + fit-check under one FitLoader instead of HomeScreen
+      // running scrape under its own loader and then handing off.
+      let workingProduct: ScrapedProduct | undefined = product;
+      if (!workingProduct?.name) {
+        if (!routeUrl) {
+          // Should never happen — the navigator type requires `url`.
+          setLoading(false);
+          return;
+        }
+        try {
+          const scrapeResult = await scrapeProduct(routeUrl);
+          if (scrapeResult.blocked) {
+            setScrapeError({
+              kind: 'blocked',
+              origin: scrapeResult.blockedOrigin,
+              message:
+                scrapeResult.blockedMessage ||
+                'This brand has asked not to be scraped. Please visit their store directly.',
+            });
+            setLoading(false);
+            return;
+          }
+          if (!scrapeResult.success || !scrapeResult.data) {
+            setScrapeError({
+              kind: 'unsupported',
+              message: 'Unable to fetch product details. The brand may not be supported yet.',
+            });
+            setLoading(false);
+            return;
+          }
+          setScrapedProduct(scrapeResult.data);
+          workingProduct = scrapeResult.data;
+        } catch (scrapeErr) {
+          captureError(scrapeErr, { feature: 'fit-result-internal-scrape', url: routeUrl });
+          setScrapeError({
+            kind: 'unknown',
+            message: 'Something went wrong. Please try again.',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       let enrichedData: { id?: string; name?: string; category?: string; material?: string; tags?: string[] } | null = null;
 
       // Fast path — the scrape result came with structured data
@@ -294,27 +403,27 @@ export default function FitResultScreen() {
       // when all three are present; otherwise fall through and ask
       // Claude to fill the gaps.
       const hasShopifyStructured =
-        !!product.category && Array.isArray(product.tags) && product.tags.length > 0;
+        !!workingProduct.category && Array.isArray(workingProduct.tags) && workingProduct.tags.length > 0;
       if (hasShopifyStructured) {
         enrichedData = {
-          name: product.name,
-          category: product.category,
-          material: product.material,
-          tags: product.tags,
+          name: workingProduct.name,
+          category: workingProduct.category,
+          material: workingProduct.material,
+          tags: workingProduct.tags,
         };
         setEnrichedProduct({
-          category: product.category,
-          material: product.material,
-          tags: product.tags,
+          category: workingProduct.category,
+          material: workingProduct.material,
+          tags: workingProduct.tags,
         });
       } else {
         try {
           const enrichResult = await enrichProduct({
-            name: product.name || 'Unknown Product',
-            image_url: product.image,
-            description: product.description,
-            price: product.price?.amount,
-            currency: product.price?.currency,
+            name: workingProduct.name || 'Unknown Product',
+            image_url: workingProduct.image,
+            description: workingProduct.description,
+            price: workingProduct.price?.amount,
+            currency: workingProduct.price?.currency,
           });
           if (enrichResult.success && enrichResult.product) {
             setEnrichedProduct(enrichResult.product);
@@ -322,14 +431,14 @@ export default function FitResultScreen() {
           } else {
             captureError(new Error('Enrichment returned success:false'), {
               feature: 'product-enrichment',
-              productName: product.name,
+              productName: workingProduct.name,
               url,
             });
           }
         } catch (enrichError) {
           captureError(enrichError, {
             feature: 'product-enrichment',
-            productName: product.name,
+            productName: workingProduct.name,
             url,
           });
         }
@@ -339,11 +448,11 @@ export default function FitResultScreen() {
       const fitResult = await checkFit(
         {
           id: enrichedData?.id || 'temp',
-          product_name: enrichedData?.name || product.name || 'Unknown Product',
+          product_name: enrichedData?.name || workingProduct.name || 'Unknown Product',
           category: enrichedData?.category || 'clothing',
           material: enrichedData?.material,
           tags: enrichedData?.tags,
-          description: product.description,
+          description: workingProduct.description,
         },
         avatar,
         calibration ?? undefined,
@@ -356,13 +465,22 @@ export default function FitResultScreen() {
         setSizeRec(fitResult.size_recommendation ?? null);
 
         const brandInfo = extractBrandFromUrl(url);
-        const safeBrand = sanitize(product.brand) || brandInfo?.brandName;
-        const safeName = sanitize(product.name) || 'Unknown';
+        const safeBrand = sanitize(workingProduct.brand) || brandInfo?.brandName;
+        const safeName = sanitize(workingProduct.name) || 'Unknown';
+
+        // Availability snapshot at the time of fit-check. Persisted
+        // on the history entry so opening this card later shows the
+        // same answer without a refetch (prices + stock can drift
+        // between visits).
+        const availabilitySnapshot = computeAvailability(
+          fitResult.size_recommendation?.size,
+          workingProduct.availableSizes
+        );
 
         addEntry({
           url,
           productName: safeName,
-          productImage: product.image,
+          productImage: workingProduct.image,
           fitScore: fitResult.fit_score || 'great',
           warnings: fitResult.warnings || [],
           checkedAt: new Date().toISOString(),
@@ -376,15 +494,16 @@ export default function FitResultScreen() {
           category: enrichedData?.category,
           material: enrichedData?.material,
           tags: enrichedData?.tags,
-          price: product.price
-            ? { amount: product.price.amount, currency: product.price.currency }
+          price: workingProduct.price
+            ? { amount: workingProduct.price.amount, currency: workingProduct.price.currency }
             : undefined,
           brand: safeBrand,
+          availability: availabilitySnapshot,
         });
       }
     } catch (error) {
       console.error('Fit analysis failed:', error);
-      captureError(error, { feature: 'fit-analysis', productName: product.name, url });
+      captureError(error, { feature: 'fit-analysis', productName: product?.name, url });
     } finally {
       setLoading(false);
     }
@@ -398,7 +517,7 @@ export default function FitResultScreen() {
       const fitResult = await checkFit(
         {
           id: historyEntryId,
-          product_name: product.name || 'Unknown',
+          product_name: product?.name || 'Unknown',
           category: enrichedProduct?.category || precomputed?.enrichedProduct?.category || 'clothing',
           material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
           tags: enrichedProduct?.tags || precomputed?.enrichedProduct?.tags,
@@ -476,7 +595,65 @@ export default function FitResultScreen() {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <FitLoader />
+        <FitLoader url={routeUrl} />
+      </View>
+    );
+  }
+
+  // Internal-scrape failure path — shown when the URL-paste flow hits
+  // an unsupported brand, a blocked origin, or a network error. Quiet
+  // glass card with a way back. The brand-nudge UX from the previous
+  // architecture (when HomeScreen handled scrape errors) is on the
+  // backlog — this is the minimum-viable "we couldn't read this URL"
+  // state.
+  if (scrapeError) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <View style={styles.errorCardWrap}>
+          <Feather
+            name={scrapeError.kind === 'blocked' ? 'shield' : 'alert-circle'}
+            size={32}
+            color={colors.textSecondary}
+            style={{ marginBottom: spacing.md }}
+          />
+          <Text style={styles.errorCardTitle}>
+            {scrapeError.kind === 'blocked'
+              ? `${scrapeError.origin || 'This brand'} has opted out`
+              : "We couldn't read this product"}
+          </Text>
+          <Text style={styles.errorCardBody}>{scrapeError.message}</Text>
+          <TouchableOpacity
+            testID="fit-result-error-go-back"
+            style={[styles.primaryButton, { marginTop: spacing.lg }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Go back</Text>
+          </TouchableOpacity>
+          {routeUrl ? (
+            <TouchableOpacity
+              testID="fit-result-error-open-store"
+              style={[styles.secondaryButton, { marginTop: spacing.sm }]}
+              onPress={() => Linking.openURL(routeUrl)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.secondaryButtonText}>Visit store directly</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  // Defensive guard — if we somehow reached here without a product
+  // (loading=false, no scrape error, but no product), bail out so the
+  // render below can safely treat product as defined.
+  if (!product) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <FitLoader url={routeUrl} />
       </View>
     );
   }
@@ -486,9 +663,37 @@ export default function FitResultScreen() {
   const safeName = sanitize(product.name);
   const priceDisplay = formatPrice(product.price);
 
+  // Availability for the user's recommended size. Three sources, in
+  // priority order:
+  //   1. The active history entry's persisted snapshot (history mode —
+  //      respects the original "in stock at L?" answer at scrape time).
+  //   2. Live computation against the current product.availableSizes
+  //      and sizeRec (live mode — just-fetched data).
+  //   3. Unknown (no data).
+  // If the user re-evaluates with a fresh avatar, the LIVE computation
+  // wins over the historical snapshot because sizeRec changes.
+  const liveAvailability = computeAvailability(sizeRec?.size, product.availableSizes);
+  const persistedAvailability = activeEntry?.availability;
+  const displayAvailability =
+    sizeRec && product.availableSizes
+      ? liveAvailability
+      : persistedAvailability
+      ? {
+          status: persistedAvailability.status as AvailabilityStatus,
+          size: persistedAvailability.size,
+          checkedAt: persistedAvailability.checkedAt,
+        }
+      : liveAvailability;
+  const showAvailability = displayAvailability.status !== 'unknown' || !!displayAvailability.size;
+
   const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
   const showMaterial = !!enrichedProduct?.material;
-  const showTags = !!(enrichedProduct?.tags?.length);
+  // Tags pass through the noise filter before render — keeps things
+  // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
+  // user-facing chip row. Also strips a tag that duplicates the
+  // category (e.g. "Top" tag when category is already "Top").
+  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, enrichedProduct?.category);
+  const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
     ? sizeRec.confidence === 'high'
@@ -551,36 +756,7 @@ export default function FitResultScreen() {
         <TouchableOpacity
           testID="remove-from-history-button"
           style={[styles.deleteBtn, { top: insets.top + spacing.sm }]}
-          onPress={() => {
-            Alert.alert(
-              'Remove from history',
-              `Remove "${safeName || 'this item'}" from your history?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Remove',
-                  style: 'destructive',
-                  onPress: () => {
-                    // Drop from the Zustand store (authoritative list).
-                    removeEntry(historyEntryId);
-                    // Also prune our local siblings view so the card
-                    // immediately reflects the deletion. If there's
-                    // another sibling to show, stay on this screen and
-                    // land on it. Only go back when we deleted the
-                    // last remaining sibling — there's nothing left
-                    // to display.
-                    const remaining = siblings.filter((e) => e.id !== historyEntryId);
-                    if (remaining.length > 0) {
-                      setSiblings(remaining);
-                      setLocalIndex((prev) => Math.min(prev, remaining.length - 1));
-                    } else {
-                      navigation.goBack();
-                    }
-                  },
-                },
-              ]
-            );
-          }}
+          onPress={() => setPendingDelete(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.75}
         >
@@ -615,63 +791,70 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Inner GestureDetector — drag-only. Sift was hoisted to the
-            root view (see top of component) so horizontal swipes on the
-            product-image area above the collapsed dock also sift. Drag
-            stays scoped to the card so its activeOffsetY threshold only
-            competes with the ScrollView's native vertical gesture, not
-            the whole screen (which would eat all vertical taps). */}
-        <GestureDetector gesture={dragGesture}>
-          <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
-            {/* Visual drag handle — no longer a gesture target itself,
-                since the whole card receives drag. Purely decorative. */}
-            <View style={styles.handleHit} pointerEvents="none">
-              <View style={styles.handle} />
-            </View>
-            <ScrollView
-              style={styles.cardScroll}
-              contentContainerStyle={styles.cardContent}
-              showsVerticalScrollIndicator={false}
-            >
-
-          {/* H1: Fit verdict — biggest element in the card. Uses the
-              TAN Nightingale SVG for the score label; styled-text
-              fallback kicks in if the asset is missing. */}
-          <View style={styles.verdictRow}>
-            <View style={styles.verdictMain}>
-              <HeadingImage
-                testID="fit-score-label"
-                slot={
-                  fitScore === 'great'
-                    ? 'great-fit'
-                    : fitScore === 'moderate'
-                    ? 'some-concerns'
-                    : 'may-not-fit'
-                }
-                fallback={scoreConfig.text}
-                height={42}
-                color={scoreConfig.color}
-                textStyle={[styles.verdictText, { color: scoreConfig.color }]}
-              />
-              <Text style={styles.verdictSub}>
-                {warnings.length === 0
-                  ? 'No fit concerns'
-                  : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
-              </Text>
-            </View>
-            {priceDisplay && (
-              <View style={styles.pricePill}>
-                <Text style={styles.priceText}>{priceDisplay}</Text>
+        {/* Drag covers the WHOLE top of the overlay — handle bar + the
+            verdict header (title, sub-line, price pill). User
+            direction: dragging from anywhere at the top should
+            collapse/expand, not just the small handle. The verdict
+            block is pulled out of the ScrollView and into this
+            gesture-wrapped header so it works as a drag target.
+            ScrollView starts BELOW the divider, owns vertical scroll
+            on the rest of the body. */}
+        <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+          <GestureDetector gesture={dragGesture}>
+            <View style={styles.headerArea}>
+              <View style={styles.handleHit}>
+                <View style={styles.handle} />
               </View>
-            )}
-          </View>
+
+              {/* H1: Fit verdict — biggest element in the card. Uses the
+                  TAN Nightingale SVG for the score label; styled-text
+                  fallback kicks in if the asset is missing. */}
+              <View style={styles.verdictRow}>
+                <View style={styles.verdictMain}>
+                  <HeadingImage
+                    testID="fit-score-label"
+                    slot={
+                      fitScore === 'great'
+                        ? 'great-fit'
+                        : fitScore === 'moderate'
+                        ? 'some-concerns'
+                        : 'may-not-fit'
+                    }
+                    fallback={scoreConfig.text}
+                    height={42}
+                    color={scoreConfig.color}
+                    textStyle={[styles.verdictText, { color: scoreConfig.color }]}
+                  />
+                  <Text style={styles.verdictSub}>
+                    {warnings.length === 0
+                      ? 'No fit concerns'
+                      : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
+                  </Text>
+                </View>
+                {priceDisplay && (
+                  <View style={styles.pricePill}>
+                    <Text style={styles.priceText}>{priceDisplay}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </GestureDetector>
+
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.cardContent}
+            showsVerticalScrollIndicator={false}
+          >
 
           <View style={styles.divider} />
 
-          {/* H2: Stats row — three centred, evenly-spaced elements with
-              SIZE / CONFIDENCE / FIT labels underneath. Per Claude Design
-              handoff: the trio reads left-to-right, labels anchor meaning,
-              no 4th in-stock icon (removed as visually confusing). */}
+          {/* H2: Stats row — four centred, evenly-spaced columns with
+              SIZE / CONFIDENCE / FIT / STOCK labels underneath. The
+              4th column (availability) was added when we shipped the
+              v1 availability feature: it gives shoppers an at-a-glance
+              "is my size obtainable?" answer without forcing them to
+              tap through to the store. Same circular-icon visual
+              language as FIT for consistency. */}
           <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
               <View style={styles.statCol}>
@@ -679,10 +862,12 @@ export default function FitResultScreen() {
                 <Text style={styles.statLabel}>SIZE</Text>
               </View>
             )}
-            <View style={styles.statCol}>
-              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
-              <Text style={styles.statLabel}>CONFIDENCE</Text>
-            </View>
+            {/* Order is intentional: SIZE → FIT → CONFIDENCE → STOCK.
+                Reads as a narrative — "what size? L. Does it fit?
+                great. How sure are we? high. Is it in stock? yes."
+                Earlier order had MATCH (renamed from CONFIDENCE)
+                between SIZE and FIT, but that broke the verdict-then-
+                certainty flow. */}
             <View style={styles.statCol}>
               <View style={styles.fitBadge}>
                 <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
@@ -691,16 +876,63 @@ export default function FitResultScreen() {
               </View>
               <Text style={styles.statLabel}>FIT</Text>
             </View>
+            <View style={styles.statCol}>
+              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
+              <Text style={styles.statLabel}>CONFIDENCE</Text>
+            </View>
+            {showAvailability && (
+              <View style={styles.statCol} testID="fit-availability-stat">
+                <View
+                  style={[
+                    styles.fitBadge,
+                    {
+                      // Token-driven status tint — keeps the green/red/
+                      // muted alphas consistent with chip backgrounds
+                      // elsewhere (statusAlpha tokens in theme.ts).
+                      backgroundColor:
+                        displayAvailability.status === 'in_stock'
+                          ? statusAlpha.successSoft
+                          : displayAvailability.status === 'out_of_stock'
+                          ? statusAlpha.errorSoft
+                          : primaryAlpha.tintXxs,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statIconText,
+                      {
+                        color:
+                          displayAvailability.status === 'in_stock'
+                            ? colors.successDeep
+                            : displayAvailability.status === 'out_of_stock'
+                            ? colors.errorDeep
+                            : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {displayAvailability.status === 'in_stock'
+                      ? '✓'
+                      : displayAvailability.status === 'out_of_stock'
+                      ? '✕'
+                      : '?'}
+                  </Text>
+                </View>
+                <Text style={styles.statLabel}>STOCK</Text>
+              </View>
+            )}
           </View>
 
-          {/* Re-eval banners */}
-          {reevaluating && (
+          {/* Re-eval banners — expanded only. Status indicators belong
+              with the rest of the analysis detail; the dock should
+              stay minimal. */}
+          {isExpanded && reevaluating && (
             <View style={styles.banner}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={styles.bannerText}>Re-evaluating with updated profile…</Text>
             </View>
           )}
-          {reevaluated && !reevaluating && (
+          {isExpanded && reevaluated && !reevaluating && (
             <View style={[styles.banner, styles.bannerSuccess]}>
               <Feather name="check-circle" size={14} color={colors.success} />
               <Text style={[styles.bannerText, { color: colors.success }]}>
@@ -709,8 +941,8 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Sizing note */}
-          {sizeRec?.note && (
+          {/* Sizing note — expanded only. */}
+          {isExpanded && sizeRec?.note && (
             <View style={styles.noteBlock}>
               <Text style={styles.noteLabel}>SIZING NOTE</Text>
               <Text style={styles.noteText}>{sizeRec.note}</Text>
@@ -719,7 +951,7 @@ export default function FitResultScreen() {
 
           {/* Concerns — only render when the card is expanded. When the user
               drags the handle down to collapse, this section disappears and
-              the card shrinks to show just the verdict + stats + meta/tags.
+              the card shrinks to show just the verdict + stats + material.
               Re-expanding brings it back. */}
           {isExpanded && warnings.length > 0 && (
             <View style={styles.section}>
@@ -741,12 +973,12 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Tags */}
-          {showTags && (
+          {/* Tags — expanded only. */}
+          {isExpanded && showTags && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>TAGS</Text>
               <View style={styles.tagsContainer}>
-                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
+                {visibleTags.slice(0, 6).map((tag: string, i: number) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
                   </View>
@@ -755,8 +987,12 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Meta rows — Material first, then Category (swapped per UX ask) */}
-          {(showCategory || showMaterial) && (
+          {/* Meta rows — Material survives the dock's minimum-info
+              treatment. Category appears only when expanded.
+              Availability used to live here as a row; it's now a
+              circular icon in the stats row above for consistency
+              with the rest of the at-a-glance signals. */}
+          {(showMaterial || (isExpanded && showCategory)) && (
             <View style={styles.metaSection}>
               {showMaterial && (
                 <View style={styles.metaRow}>
@@ -764,7 +1000,7 @@ export default function FitResultScreen() {
                   <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
                 </View>
               )}
-              {showCategory && (
+              {isExpanded && showCategory && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category</Text>
                   <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
@@ -773,7 +1009,9 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Action buttons */}
+          {/* Action buttons — expanded only. The dock should stay
+              minimal; CTAs live behind a deliberate drag-up. */}
+          {isExpanded && (
           <View style={styles.actionsSection}>
             {isHistoryMode ? (
               <>
@@ -833,10 +1071,61 @@ export default function FitResultScreen() {
               </>
             )}
           </View>
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
+          )}
+
+          {/* Attribution footer — expanded only. Citation belongs with
+              the rest of the analysis content; the dock just shows the
+              verdict at-a-glance.
+              Combined with "View on Store" above (the loud referral),
+              this is the quiet credit line. Timestamp answers "how
+              fresh is this?" — critical for inventory + price fields
+              which can go stale fast. */}
+          {isExpanded && url && (
+            <View style={styles.attributionFooter}>
+              <Text
+                testID="attribution-footer"
+                style={styles.attributionText}
+                numberOfLines={1}
+              >
+                Data from {displayHostname(url)} · checked{' '}
+                {formatRelativeTime(
+                  activeEntry?.checkedAt ?? precomputed?.checkedAt ?? new Date().toISOString()
+                )}
+              </Text>
+            </View>
+          )}
+          </ScrollView>
+        </Animated.View>
       </Animated.View>
+
+      {/* Themed delete confirmation — same visual language as the
+          rest of the app (replaces the native Alert popup that
+          looked system-generated and broke the glass aesthetic). */}
+      <ConfirmDialog
+        visible={pendingDelete}
+        title="Remove from history?"
+        message={`"${safeName || 'this item'}" will be removed from your fit history. This can't be undone.`}
+        confirmLabel="Remove"
+        icon="trash-2"
+        confirmTestID="confirm-delete-fit-entry"
+        onConfirm={() => {
+          if (historyEntryId) {
+            removeEntry(historyEntryId);
+            // Prune local siblings + clamp index so the next sibling
+            // becomes active. Only go back when we deleted the last
+            // remaining sibling.
+            const remaining = siblings.filter((e) => e.id !== historyEntryId);
+            if (remaining.length > 0) {
+              setSiblings(remaining);
+              setLocalIndex((prev) => Math.min(prev, remaining.length - 1));
+            } else {
+              navigation.goBack();
+            }
+          }
+          setPendingDelete(false);
+        }}
+        onCancel={() => setPendingDelete(false)}
+      />
     </View>
     </GestureDetector>
   );
@@ -853,31 +1142,27 @@ function StatBadge({ value, testID }: { value: string; testID?: string }) {
   );
 }
 
-// Confidence as a 3-segment progress bar with increasing purple saturation.
-// Low  → first segment filled at light purple (0.3 alpha)
-// Med  → first + second at mid alpha
-// High → all three at full brand purple
-// Unfilled segments sit at a very light purple tint so the track is
-// always visible. Replaces the circular "Me…"-truncating chip.
+// MATCH donut — circular arc whose length grows with the system's
+// certainty in the size recommendation. Rendered at the same 44px
+// circle dimension as the SIZE / FIT / STOCK badges so all four stat
+// columns line up vertically. `high` stops just shy of 100% (0.98) —
+// a fully-closed ring reads as "complete" which is wrong for
+// confidence; the tiny gap signals "strong but not absolute".
 function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null }) {
   if (!level) return null;
-  // Arc length grows with confidence (28% / 60% / 92% of circumference) and
-  // the stroke colour saturates with it (light → mid → full brand purple).
-  // Rotated -90° so the fill starts from 12 o'clock and sweeps clockwise.
-  const size = 48;
-  const stroke = 6;
+  const size = STAT_ICON_SIZE;
+  const stroke = 5;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  // Arc lengths per level. `high` stops just shy of 100% (0.98) — a
-  // fully-closed ring reads as "complete" which is wrong for confidence;
-  // the tiny gap signals "strong but not absolute".
   const percent = level === 'high' ? 0.98 : level === 'medium' ? 0.6 : 0.28;
+  // Tap into the primary-alpha tokens so the saturation ramp is
+  // adjustable in one place (theme.ts) instead of three inline values.
   const colour =
     level === 'high'
-      ? 'rgba(106, 95, 117, 1)'
+      ? colors.primary
       : level === 'medium'
-      ? 'rgba(106, 95, 117, 0.72)'
-      : 'rgba(106, 95, 117, 0.45)';
+      ? primaryAlpha.tintLg
+      : primaryAlpha.tintMd;
   const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
   return (
     <View style={styles.confidenceDonut}>
@@ -887,7 +1172,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke="rgba(106, 95, 117, 0.14)"
+          stroke={primaryAlpha.tintSm}
           strokeWidth={stroke}
           fill="transparent"
         />
@@ -905,7 +1190,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
         />
       </Svg>
       {/* Single-letter centre glyph keeps the donut readable without a
-          separate label — the H/M/L maps directly to the arc length. */}
+          separate label — H/M/L maps directly to the arc length. */}
       <Text style={styles.confidenceDonutLabel}>{label}</Text>
     </View>
   );
@@ -921,6 +1206,33 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // --- Internal-scrape error card (used in URL-paste flow when the
+  //     scrape fails after FitResult-internal scrape kicked off) ---
+  errorCardWrap: {
+    width: '85%',
+    maxWidth: 360,
+    padding: spacing.xl,
+    borderRadius: borderRadius.xxl,
+    // Slightly more opaque than the standard glass token because it
+    // sits on the loadingContainer's plain background — needs to read
+    // as a definite card rather than a translucent overlay.
+    backgroundColor: glass.backgroundColor,
+    alignItems: 'center',
+    ...shadows.glass,
+  },
+  errorCardTitle: {
+    ...typography.headingM,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  errorCardBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 
   // --- Background product image (full-bleed) ---
@@ -945,7 +1257,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -957,7 +1269,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1006,13 +1318,14 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Bumped 0.28 → 0.62 so body text (sizing note, concerns, tag
-    // labels, meta rows) passes WCAG AA contrast against the busy
-    // product-image backdrop. The image-through-glass feel is still
-    // there, just with a firmer frost tint so text reads clearly.
-    backgroundColor: 'rgba(255, 255, 255, 0.62)',
+    // Glass tokens (theme.ts → glass.dock*) drive the dock's frosted
+    // look. dockBackgroundColor (rgba 0.65) sits over the BlurView
+    // for legibility on busy product images; dockBorderColor (rgba
+    // 0.9) is a brighter inner edge that catches "light" and makes
+    // the surface read as glass rather than a solid wash.
+    backgroundColor: glass.dockBackgroundColor,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.65)',
+    borderColor: glass.dockBorderColor,
     borderTopLeftRadius: borderRadius.xxxl,
     borderTopRightRadius: borderRadius.xxxl,
   },
@@ -1022,6 +1335,15 @@ const styles = StyleSheet.create({
   cardScrollWrap: {
     flex: 1,
   },
+  // Header area — wraps the handle + verdict block in the drag
+  // gesture. The whole rectangle is a drag target ("anywhere at the
+  // top of the overlay" per user direction). Padding mirrors
+  // cardContent's horizontal padding so the verdict aligns with the
+  // ScrollView content below.
+  headerArea: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   cardScroll: {
     flex: 1,
   },
@@ -1030,8 +1352,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
-  // Bigger hit target around the handle bar so the drag gesture is easy
-  // to grab without hitting the thin visual bar exactly.
+  // Visible-handle hit zone — sits inside headerArea. No separate
+  // gesture (the parent headerArea catches the drag). alignItems:
+  // 'center' centres the small grip bar horizontally.
   handleHit: {
     width: '100%',
     paddingTop: spacing.sm,
@@ -1042,7 +1365,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(76, 67, 86, 0.22)',
+    backgroundColor: textAlpha.tintMd,
   },
 
   // --- Verdict row (H1) ---
@@ -1064,14 +1387,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pricePill: {
-    backgroundColor: 'rgba(106, 95, 117, 0.14)',
+    backgroundColor: primaryAlpha.tintSm,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
     marginLeft: spacing.sm,
   },
   priceText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     fontWeight: '800',
     color: colors.primary,
@@ -1081,7 +1404,7 @@ const styles = StyleSheet.create({
   // --- Divider ---
   divider: {
     height: 1,
-    backgroundColor: 'rgba(76, 67, 86, 0.12)',
+    backgroundColor: textAlpha.tintSm,
     marginBottom: spacing.md,
   },
 
@@ -1099,7 +1422,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.3,
@@ -1107,34 +1430,40 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   // Size badge — circle with the size letter/number
+  // SIZE / FIT / STOCK badges — all use the same STAT_ICON_SIZE so
+  // they line up vertically with the MATCH donut. statBadge has a
+  // visible border (it carries letter glyphs and benefits from the
+  // sharper edge); fitBadge is borderless (it carries icon glyphs
+  // ✓ / ⚠ / ✕ that have their own visual weight). Both fills come
+  // from primaryAlpha tokens so the saturation ramp is adjustable
+  // in one place.
   statBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
+    borderRadius: STAT_ICON_SIZE / 2,
+    backgroundColor: primaryAlpha.tintSm,
     borderWidth: 1.25,
-    borderColor: 'rgba(106, 95, 117, 0.22)',
+    borderColor: primaryAlpha.tintMd,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Smaller circle for the fit + stock icons (purely visual)
   fitBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(106, 95, 117, 0.06)',
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
+    borderRadius: STAT_ICON_SIZE / 2,
+    backgroundColor: primaryAlpha.tintXxs,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1143,13 +1472,13 @@ const styles = StyleSheet.create({
   //     both grow with confidence. Centre letter (H/M/L) is the legible
   //     label without stealing space. ---
   confidenceDonut: {
-    width: 48,
-    height: 48,
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   confidenceDonutLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     position: 'absolute',
     fontSize: 13,
     fontWeight: '800',
@@ -1164,11 +1493,11 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    backgroundColor: 'rgba(106, 95, 117, 0.08)',
+    backgroundColor: primaryAlpha.tintXs,
     borderRadius: borderRadius.md,
   },
   bannerSuccess: {
-    backgroundColor: 'rgba(46, 125, 91, 0.1)',
+    backgroundColor: statusAlpha.successSoft,
   },
   bannerText: {
     ...typography.bodySmall,
@@ -1178,7 +1507,7 @@ const styles = StyleSheet.create({
 
   // --- Sizing note ---
   noteBlock: {
-    backgroundColor: 'rgba(106, 95, 117, 0.08)',
+    backgroundColor: primaryAlpha.tintXs,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1221,7 +1550,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   concernSeverity: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -1240,13 +1569,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tag: {
-    backgroundColor: 'rgba(106, 95, 117, 0.12)',
+    backgroundColor: primaryAlpha.tintSm,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
   },
   tagText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
@@ -1256,7 +1585,7 @@ const styles = StyleSheet.create({
   // --- Meta ---
   metaSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(76, 67, 86, 0.1)',
+    borderTopColor: textAlpha.tintSm,
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
@@ -1277,6 +1606,20 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
 
+  // Availability row — colored dot + status text. Right-aligned to
+  // match the existing metaValue placement so it lines up vertically
+  // with Material + Category rows.
+  availabilityValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  availabilityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+
   // --- Actions ---
   actionsSection: {
     gap: spacing.sm,
@@ -1292,21 +1635,21 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   secondaryButton: {
-    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+    backgroundColor: primaryAlpha.tintSm,
     borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 14,
     color: colors.primary,
     fontWeight: '700',
@@ -1320,5 +1663,26 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     fontWeight: '500',
+  },
+
+  // Attribution footer — small, centred, muted. Intentionally quiet so
+  // it reads as a citation, not a CTA. The big "View on Store" button
+  // above is the loud referral path; this is the credit line.
+  attributionFooter: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 4,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: textAlpha.tintXs,
+  },
+  attributionText: {
+    fontFamily: fontFamily.primary,
+    fontSize: 11,
+    lineHeight: 15,
+    letterSpacing: 0.2,
+    color: colors.textMuted,
+    textAlign: 'center',
+    opacity: 0.8,
   },
 });

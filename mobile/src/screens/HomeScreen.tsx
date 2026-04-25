@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -13,19 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-function isValidUrl(text: string): boolean {
-  try {
-    const url = new URL(text);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch { return false; }
-}
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
-import { scrapeProduct, nudgeBrand, extractBrandFromUrl } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
@@ -33,6 +24,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+
+function isValidUrl(text: string): boolean {
+  try {
+    const url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch { return false; }
+}
 
 type NavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -43,11 +41,13 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [failedBrand, setFailedBrand] = useState<{ brandName: string; brandDomain: string } | null>(null);
-  const [nudgeSent, setNudgeSent] = useState(false);
-  const [nudging, setNudging] = useState(false);
+  // HomeScreen is now a pure URL-capture surface. Scrape, enrich,
+  // fit-check, brand-nudge, and blocked-brand UX have all moved into
+  // FitResult so the user only ever sees ONE loading screen between
+  // "I pasted a URL" and "here's the verdict". The Check Fit button
+  // has been removed too — the 700ms paste-debounce is the only
+  // trigger now. No validation state is needed because invalid URLs
+  // simply don't fire the auto-trigger.
   const { avatar } = useAvatarStore();
   const { entries: historyEntries } = useFitHistoryStore();
   // Most recent 3 for the "Recent" list per Claude Design mockup
@@ -67,15 +67,13 @@ export default function HomeScreen() {
         runCheck(saved);
         return;
       }
-      // Normal focus — reset state
+      // Normal focus — reset URL so a stale paste doesn't auto-trigger
+      // a fresh fit-check the moment the screen mounts.
       setUrl('');
-      setError(null);
-      setFailedBrand(null);
-      setNudgeSent(false);
     }, [avatar])
   );
 
-  const runCheck = useCallback(async (targetUrl: string) => {
+  const runCheck = useCallback((targetUrl: string) => {
     if (!avatar) {
       // Save URL before leaving so we can restore it on return
       pendingUrlRef.current = targetUrl;
@@ -83,51 +81,35 @@ export default function HomeScreen() {
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setFailedBrand(null);
-    setNudgeSent(false);
-
-    try {
-      const result = await scrapeProduct(targetUrl);
-      if (result.success && result.data) {
-        navigation.navigate('FitResult', { product: result.data, url: targetUrl });
-      } else {
-        const brand = extractBrandFromUrl(targetUrl);
-        setFailedBrand(brand);
-        setError('Unable to fetch product details.');
-      }
-    } catch (err) {
-      const brand = extractBrandFromUrl(targetUrl);
-      setFailedBrand(brand);
-      setError('Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
+    // Navigate to FitResult immediately. FitResult runs the full
+    // scrape → enrich → fit-check pipeline under a single FitLoader.
+    // Brand-nudge / blocked-brand cards have moved into FitResult's
+    // error-card state. This collapses two sequential loading screens
+    // (HomeScreen scrape spinner + FitResult fit-loader) into one.
+    navigation.navigate('FitResult', { url: targetUrl });
   }, [avatar, navigation]);
-
-  const handleCheckFit = () => {
-    if (!url.trim()) {
-      setError('Please enter a product URL');
-      return;
-    }
-    runCheck(url.trim());
-  };
 
   const handleUrlChange = (text: string) => {
     setUrl(text);
-    if (error) {
-      setError(null);
-      setFailedBrand(null);
-      setNudgeSent(false);
-    }
-    // Auto-trigger on valid URL paste (debounced 700ms)
+    // Auto-trigger on valid URL paste (debounced 700ms). Invalid /
+    // empty inputs simply don't fire — there's no submit button to
+    // gate against.
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     const trimmed = text.trim();
     if (trimmed && isValidUrl(trimmed)) {
       debounceTimer.current = setTimeout(() => runCheck(trimmed), 700);
     }
   };
+
+  // NOTE — earlier iteration showed a full-screen FitLoader on
+  // HomeScreen during the scrape. That created a duplicate-loader
+  // regression: HomeScreen's FitLoader during scrape, then FitResult's
+  // FitLoader during enrich+fit-check, back-to-back. Reverted to a
+  // button-only spinner here. The single full-screen FitLoader now
+  // only renders inside FitResult. If we want to collapse those two
+  // loaders into one, the path is to navigate to FitResult immediately
+  // and let it own the entire scrape→enrich→check pipeline (a bigger
+  // architectural change tracked in BACKLOG.md).
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
@@ -187,79 +169,19 @@ export default function HomeScreen() {
               />
             </GlassCard>
 
-            {error && !failedBrand && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.error}>{error}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              testID="check-fit-button"
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleCheckFit}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>Check fit</Text>
-              )}
-            </TouchableOpacity>
-
+            {/* Check Fit button intentionally removed. The 700ms paste-
+                debounce auto-triggers fit-check on any valid URL — a
+                button to "submit" duplicates that interaction. The
+                share-extension hint below stays as the alternative
+                entry point. */}
             <Text style={styles.shareHint}>or use the share extension from your browser</Text>
           </View>
 
-          {/* Brand Nudge Card — unchanged functionally, just re-housed
-              below the input so the hero composition stays clean. */}
-          {failedBrand && (
-            <GlassCard testID="brand-nudge-card" style={styles.nudgeCard}>
-              <View style={styles.nudgeHeader}>
-                <Feather name="send" size={18} color={colors.secondary} />
-                <Text style={styles.nudgeTitle}>
-                  {nudgeSent
-                    ? `We've reached out to ${failedBrand.brandName}!`
-                    : `${failedBrand.brandName} isn't on our platform yet`}
-                </Text>
-              </View>
-              {nudgeSent ? (
-                <Text style={styles.nudgeDescription}>
-                  Thanks for nudging {failedBrand.brandName}. We've sent them an email
-                  explaining how they can help their customers check fit before buying.
-                </Text>
-              ) : (
-                <>
-                  <Text style={styles.nudgeDescription}>
-                    Nudge your favourite brand to get on our platform so you can check fit
-                    before making the final purchase.
-                  </Text>
-                  <TouchableOpacity
-                    testID="nudge-brand-button"
-                    style={styles.nudgeButton}
-                    onPress={async () => {
-                      setNudging(true);
-                      await nudgeBrand(failedBrand.brandDomain, failedBrand.brandName);
-                      setNudging(false);
-                      setNudgeSent(true);
-                    }}
-                    disabled={nudging}
-                    activeOpacity={0.8}
-                  >
-                    {nudging ? (
-                      <ActivityIndicator color={colors.white} size="small" />
-                    ) : (
-                      <>
-                        <Feather name="mail" size={16} color={colors.white} />
-                        <Text style={styles.nudgeButtonText}>
-                          Nudge {failedBrand.brandName}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )}
-            </GlassCard>
-          )}
+          {/* Brand-nudge + brand-opt-out cards have moved into FitResult's
+              error-card state as part of the single-loader cleanup. They
+              fire when FitResult's internal scrape fails (unsupported
+              brand, blocked origin, network error). Backlog: re-add a
+              fully-styled brand-nudge card with email send. */}
 
           {/* Profile Setup Prompt — shown only when the user hasn't built a
               body profile yet. Not in the design mockup (which assumes a
@@ -420,7 +342,10 @@ const styles = StyleSheet.create({
   //     keep their white tint + dark text.
   hero: {
     marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    // Bumped lg → xxl so the verse reads more like a hero block
+    // sitting clearly apart from the URL input below it. Pairs with
+    // the tighter ALATE↔verse spacing below.
+    marginBottom: spacing.xxl,
   },
   eyebrow: {
     ...typography.overline,
@@ -428,14 +353,20 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
   },
   heroVerseWrap: {
-    marginTop: 14,
+    // Tightened 14 → 4 so ALATE and the verse read as a single
+    // hero unit. Verse is the dominant element; the eyebrow is just
+    // a tag above it.
+    marginTop: 4,
   },
   heroVerse: {
     ...typography.displayLarge,
     fontSize: 40,
     lineHeight: 44,
     color: '#fff',
-    marginTop: 14,
+    // Same tightening for the styled-text fallback path (when the SVG
+    // heading isn't loaded). Keeps the two render paths visually
+    // identical.
+    marginTop: 4,
     textShadowColor: 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,

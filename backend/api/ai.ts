@@ -42,8 +42,17 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
       demoMode: DEMO_MODE
     });
 
-    const savedProduct = await saveEnrichedProduct(enrichedProduct as EnricherEnrichedProduct);
-
+    // NOTE — user-paste enrichments are ephemeral by design. We do NOT
+    // persist them to the shared `enriched_products` table. That table
+    // is reserved for opted-in Shopify merchant-plugin syncs (which set
+    // `platform='shopify'` + `shop_domain`). Writing user-scraped rows
+    // into the same catalog was an aggregation anti-pattern that risked
+    // reshaping the app from "personal fit assistant" into "scraped
+    // product index" — see anti-patterns memory for full context.
+    //
+    // If the future Shopify plugin or another opt-in partner surface
+    // needs to save enrichments here, do it from that dedicated handler
+    // — not from the generic user-paste path.
     let extractedColors = null;
     let colorMethod = 'ai-fallback';
     if (product.image_url) {
@@ -62,11 +71,14 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       success: true,
-      product: { ...enrichedProduct, id: savedProduct?.id },
+      // No database id — user-paste enrichments are ephemeral (see note
+      // above). Downstream callers fall back to `'temp'` when id is
+      // missing, so this is non-breaking.
+      product: enrichedProduct,
       model_used: DEMO_MODE ? 'demo-mode' : 'gemini-chain',
       color_extraction: colorMethod,
       color_hex_codes: extractedColors?.hexCodes || [],
-      saved_to_db: !!savedProduct,
+      saved_to_db: false,
       _demo: DEMO_MODE,
     });
   } catch (error) {
@@ -117,15 +129,29 @@ async function handleScrape(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    log.info({ url }, 'Scraping product from URL...');
-
+    // Do NOT log the full URL up-front. If this URL is on the brand
+    // opt-out list, we don't want the URL flowing into structured logs
+    // or downstream error reporters. We log only the origin inside
+    // `scrapeProduct` after the blocklist check passes.
     const result = await scrapeProduct(url);
 
+    // Blocklist / robots.txt opt-out → return a structured response.
+    // Surface as HTTP 200 with `blocked: true` so the app can render a
+    // clean "brand-opted-out" card instead of treating it as an error.
+    if (result.blocked) {
+      return res.status(200).json({
+        success: false,
+        blocked: true,
+        reason: result.blocked.reason,
+        origin: result.blocked.origin,
+        message: result.blocked.message,
+      });
+    }
+
     log.info({
-      url: result.debug.requestedUrl,
       finalUrl: result.debug.finalUrl,
       hasPrice: result.debug.hasPriceAmount,
-      usedPuppeteer: result.debug.usedPuppeteer
+      usedPuppeteer: result.debug.usedPuppeteer,
     }, 'Product scraping complete');
 
     return res.status(200).json({
@@ -135,8 +161,10 @@ async function handleScrape(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (error) {
-    log.error({ error, url }, 'Product scraping failed');
-    captureServerError(error, { feature: 'product-scraping', url });
+    // Intentionally do NOT include `url` in error logs — keeps blocked
+    // origins out of Sentry breadcrumbs and structured error streams.
+    log.error({ error }, 'Product scraping failed');
+    captureServerError(error, { feature: 'product-scraping' });
     return res.status(500).json({
       error: 'Scraping failed',
       message: 'An internal error occurred. Please try again.',

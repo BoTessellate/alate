@@ -1,36 +1,72 @@
 version: 2
+
+# Dependabot configuration — rewritten April 2026 to reduce PR noise.
+#
+# Changes from the previous config:
+#   - Schedule: weekly → monthly for all ecosystems. Dependabot still
+#     bypasses this cadence for security advisories, so urgent patches
+#     still fire immediately.
+#   - Grouping: aggressive — one PR per ecosystem per update-type tier
+#     (minor/patch grouped together; major bumps kept separate so they
+#     get proper review).
+#   - open-pull-requests-limit: 3 per ecosystem so a quiet month
+#     doesn't suddenly dump 15 PRs on the queue.
+#
+# Auto-merge for patch + minor is handled by
+# `.github/workflows/dependabot-auto-merge.yml`. Major bumps always
+# require human review.
+
 updates:
-  # Mobile (Expo / React Native)
+  # --- Mobile (Expo / React Native) ------------------------------------
   - package-ecosystem: "npm"
     directory: "/mobile"
     schedule:
-      interval: "weekly"
-    # Only alert on production dependencies — dev tooling (appium, jest, wdio) is noisy
+      interval: "monthly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 3
     allow:
       - dependency-type: "production"
     groups:
-      expo:
-        patterns:
-          - "expo*"
-          - "@expo/*"
-      react-navigation:
-        patterns:
-          - "@react-navigation/*"
+      # All non-major bumps go into ONE grouped PR per month.
+      mobile-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      # Major bumps stay separate so each can be reviewed individually.
+      # Auto-merge skips these (see workflow).
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
 
-  # Backend (Node / Vercel)
+  # --- Backend (Node / Vercel) -----------------------------------------
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 3
     allow:
       - dependency-type: "production"
     groups:
-      anthropic:
-        patterns:
-          - "@anthropic-ai/*"
+      backend-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
 
-  # GitHub Actions
+  # --- GitHub Actions --------------------------------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 2
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"

@@ -397,25 +397,19 @@ describe('FitResultScreen', () => {
       };
       useFitHistoryStore.setState({ entries: SIBLING_ENTRIES });
 
-      // Stub Alert.alert to auto-invoke the destructive button so we
-      // don't need to drive the native prompt.
-      const { Alert } = require('react-native');
-      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
-        ((...args: unknown[]) => {
-          const buttons = args[2] as Array<{ text: string; onPress?: () => void }> | undefined;
-          const remove = buttons?.find((b) => b.text === 'Remove');
-          remove?.onPress?.();
-        }) as (...args: unknown[]) => void
-      );
-
       const { findByTestId } = render(<FitResultScreen />);
+      // Tap the trash icon — opens the themed ConfirmDialog modal
+      // (replaced the native Alert popup in April 2026).
       const trash = await findByTestId('remove-from-history-button');
       fireEvent.press(trash);
+
+      // Then tap the modal's Remove button to confirm.
+      const confirmBtn = await findByTestId('confirm-delete-fit-entry');
+      fireEvent.press(confirmBtn);
 
       // Deleted from the store + stayed on screen (no goBack).
       expect(useFitHistoryStore.getState().entries.find((e) => e.id === 'h-1')).toBeUndefined();
       expect(mockGoBack).not.toHaveBeenCalled();
-      alertSpy.mockRestore();
     });
 
     it('goes back when the deleted item was the only sibling', async () => {
@@ -438,20 +432,14 @@ describe('FitResultScreen', () => {
       };
       useFitHistoryStore.setState({ entries: SOLO });
 
-      const { Alert } = require('react-native');
-      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
-        ((...args: unknown[]) => {
-          const buttons = args[2] as Array<{ text: string; onPress?: () => void }> | undefined;
-          buttons?.find((b) => b.text === 'Remove')?.onPress?.();
-        }) as (...args: unknown[]) => void
-      );
-
       const { findByTestId } = render(<FitResultScreen />);
       const trash = await findByTestId('remove-from-history-button');
       fireEvent.press(trash);
 
+      const confirmBtn = await findByTestId('confirm-delete-fit-entry');
+      fireEvent.press(confirmBtn);
+
       expect(mockGoBack).toHaveBeenCalled();
-      alertSpy.mockRestore();
     });
   });
 });

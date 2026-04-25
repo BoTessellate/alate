@@ -8,6 +8,8 @@ import chromium from '@sparticuz/chromium';
 import { validateUrl } from '../shared/middleware';
 import { createModuleLogger } from '../shared/logger';
 import { tryShopifyJSON } from './shopifyFetch';
+import { isOriginBlocked, normaliseOrigin } from './blocklist';
+import { isDisallowedByRobots } from './robotsTxt';
 
 // TODO: [AFFILIATE-APIS] Integrate affiliate APIs for large brands (Gucci, Zara, H&M, etc.)
 // Current simple fetch + Puppeteer fails for bot-protected sites (504 timeouts).
@@ -484,8 +486,17 @@ async function fetchWithPuppeteer(url: string): Promise<string> {
  * @param url - Product URL to scrape
  * @returns Scraped product data with debug info
  */
+export interface ScrapeBlockedResponse {
+  blocked: true;
+  reason: 'brand-optout' | 'robots-disallow';
+  origin: string;
+  /** User-facing message — safe to surface in the app. */
+  message: string;
+}
+
 export async function scrapeProduct(url: string): Promise<{
-  data: ScrapedData;
+  data?: ScrapedData;
+  blocked?: ScrapeBlockedResponse;
   debug: {
     requestedUrl: string;
     finalUrl: string;
@@ -500,6 +511,77 @@ export async function scrapeProduct(url: string): Promise<{
   const urlValidation = validateUrl(url);
   if (!urlValidation.valid) {
     throw new Error(urlValidation.error || 'Invalid URL');
+  }
+
+  // --- Brand opt-out check (priority -1) ---
+  // Before ANY fetch or caching, see if this origin is on the opt-out
+  // list. Return a structured blocked response — the frontend renders a
+  // distinct "this brand has asked not to be scraped" card. We log only
+  // the origin (not the full URL) so blocked URLs don't end up in
+  // structured logs. Fail-open: any error treats the origin as allowed.
+  let urlObj: URL;
+  try {
+    urlObj = new URL(url);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+  const normalisedOrigin = normaliseOrigin(urlObj.hostname);
+
+  try {
+    if (await isOriginBlocked(urlObj.hostname)) {
+      log.info({ origin: normalisedOrigin, reason: 'brand-optout' }, 'Scrape blocked');
+      return {
+        blocked: {
+          blocked: true,
+          reason: 'brand-optout',
+          origin: normalisedOrigin,
+          message: `${normalisedOrigin} has asked not to be scraped. Please visit their store directly.`,
+        },
+        debug: {
+          requestedUrl: url,
+          finalUrl: url,
+          htmlLength: 0,
+          hasPriceAmount: false,
+          hasPriceCurrency: false,
+          usedPuppeteer: false,
+          htmlPreview: '[blocked by brand opt-out]',
+        },
+      };
+    }
+  } catch (err) {
+    log.warn({ error: (err as Error).message }, 'Blocklist check failed — allowing');
+  }
+
+  // --- robots.txt check (priority -0.5) ---
+  // Most storefronts either lack robots.txt or permit product paths.
+  // We only bail when we see an explicit Disallow matching the path.
+  // Cache hit is ~zero-cost; miss takes at most one 5s HTTP round-trip.
+  try {
+    if (await isDisallowedByRobots(urlObj)) {
+      log.info(
+        { origin: normalisedOrigin, path: urlObj.pathname, reason: 'robots-disallow' },
+        'Scrape blocked by robots.txt'
+      );
+      return {
+        blocked: {
+          blocked: true,
+          reason: 'robots-disallow',
+          origin: normalisedOrigin,
+          message: `${normalisedOrigin}'s robots.txt disallows automated access to this page. Please visit their store directly.`,
+        },
+        debug: {
+          requestedUrl: url,
+          finalUrl: url,
+          htmlLength: 0,
+          hasPriceAmount: false,
+          hasPriceCurrency: false,
+          usedPuppeteer: false,
+          htmlPreview: '[blocked by robots.txt]',
+        },
+      };
+    }
+  } catch (err) {
+    log.warn({ error: (err as Error).message }, 'robots.txt check failed — allowing');
   }
 
   // Priority 0: Shopify direct-fetch. Every Shopify storefront exposes
@@ -576,8 +658,9 @@ export async function scrapeProduct(url: string): Promise<{
 
   html = await response.text();
 
-  // Check if we got redirected to a different page (bot detection)
-  const urlObj = new URL(url);
+  // Check if we got redirected to a different page (bot detection).
+  // `urlObj` was already parsed above for the blocklist / robots check;
+  // reuse it here instead of re-declaring (TS would flag as duplicate).
   const responseUrlObj = new URL(response.url);
 
   // Normalize URLs for comparison (remove trailing slashes, compare paths)

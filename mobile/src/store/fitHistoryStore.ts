@@ -13,6 +13,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const generateEntryId = (): string =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 
+/**
+ * Canonical product key — used to dedupe history entries when the same
+ * product is fit-checked again. Compares origin + path while stripping
+ * tracking query params (Shopify's `pr_*`, generic `utm_*`, etc.) that
+ * vary per visit but point at the same product.
+ *
+ * Returns the original URL on parse failure so we always have *some*
+ * key to compare on; equality of two unparseable URLs is then exact-
+ * string comparison, which is the safest fallback.
+ */
+const canonicalProductKey = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.hostname.replace(/^www\./, '')}${parsed.pathname.replace(/\/$/, '')}`;
+  } catch {
+    return rawUrl;
+  }
+};
+
 export interface FitWarning {
   severity: 'minor' | 'moderate' | 'major';
   message: string;
@@ -27,6 +46,19 @@ export interface HistorySizeRecommendation {
 export interface HistoryPrice {
   amount: number;
   currency: string;
+}
+
+/** Per-size availability snapshot at the time of fit-check.
+ *  Persisted on the history entry so cards opened later still show
+ *  the original "in stock at L?" answer; the user can re-check by
+ *  re-running the fit-check (Re-evaluate button). */
+export interface HistoryAvailability {
+  status: 'in_stock' | 'out_of_stock' | 'unknown';
+  /** The size we checked against — usually `sizeRecommendation.size`
+   *  at the moment availability was computed. */
+  size?: string;
+  /** When this snapshot was taken (ISO timestamp). */
+  checkedAt: string;
 }
 
 export interface FitHistoryEntry {
@@ -44,6 +76,10 @@ export interface FitHistoryEntry {
   tags?: string[];
   price?: HistoryPrice;
   brand?: string;
+  /** Availability of the recommended size at scrape time. Optional
+   *  because pre-availability history entries don't have this field;
+   *  components should treat missing as "unknown". */
+  availability?: HistoryAvailability;
 }
 
 interface FitHistoryStore {
@@ -63,12 +99,36 @@ export const useFitHistoryStore = create<FitHistoryStore>()(
     (set) => ({
       entries: [],
       addEntry: (entry) =>
-        set((state) => ({
-          entries: [
-            { ...entry, id: generateEntryId() },
-            ...state.entries,
-          ].slice(0, 50), // Keep last 50 entries
-        })),
+        set((state) => {
+          // Dedupe by canonical product URL — re-checking the same item
+          // updates the existing entry's fit score / availability /
+          // timestamp instead of stacking up duplicate cards.
+          const key = canonicalProductKey(entry.url);
+          const existingIdx = state.entries.findIndex(
+            (e) => canonicalProductKey(e.url) === key
+          );
+
+          if (existingIdx !== -1) {
+            const existing = state.entries[existingIdx];
+            const merged: FitHistoryEntry = {
+              ...existing,
+              ...entry,
+              // Keep the original id so anything referencing it
+              // (e.g. an open FitResult screen) still resolves.
+              id: existing.id,
+            };
+            // Move to the front (most recent re-check) and dedupe.
+            const rest = state.entries.filter((_, i) => i !== existingIdx);
+            return { entries: [merged, ...rest].slice(0, 50) };
+          }
+
+          return {
+            entries: [
+              { ...entry, id: generateEntryId() },
+              ...state.entries,
+            ].slice(0, 50), // Keep last 50 entries
+          };
+        }),
       updateEntry: (id, patch) =>
         set((state) => ({
           entries: state.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
