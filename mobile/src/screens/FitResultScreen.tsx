@@ -72,9 +72,11 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
 // to keep the verdict + stats row + material + availability readable
-// without scrolling. Bumped 200 → 204 to give the new availability row
-// a comfortable breathing margin without changing visual weight.
-const COLLAPSED_H = 204;
+// without scrolling. Iterative bumps: 200 → 204 (availability row
+// breathing) → 210 (per user feedback after the verdict block moved
+// out of ScrollView; the headerArea + visible dock content needs a
+// touch more vertical room to avoid clipping the stats labels).
+const COLLAPSED_H = 210;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
