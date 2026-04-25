@@ -24,6 +24,13 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   AED: 'د.إ',
 };
 
+/** Thin space (Unicode U+2009, ~1/6 em wide) used between currency
+ *  symbol and amount. Tighter than a regular space (which reads ~5-6px
+ *  wide at fontSize 15 serif with letterSpacing 0.3) but enough to
+ *  keep "₹" from crowding the digit. Same convention as Apple's
+ *  NumberFormatter and most editorial fonts. */
+const THIN_SPACE = ' ';
+
 export interface MoneyAmount {
   amount: number;
   currency: string;
@@ -39,9 +46,5 @@ export function formatPrice(price?: MoneyAmount | null): string | null {
     return null;
   }
   const sym = CURRENCY_SYMBOLS[price.currency] ?? '';
-  // Always pad with a space so symbols don't crowd the amount visually
-  // ("£ 49" reads cleaner than "£49" in our serif body stack). When the
-  // currency is unknown and we drop the symbol entirely, no leading
-  // space is rendered.
-  return sym ? `${sym} ${price.amount}` : `${price.amount}`;
+  return sym ? `${sym}${THIN_SPACE}${price.amount}` : `${price.amount}`;
 }
