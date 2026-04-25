@@ -53,6 +53,10 @@ import { formatPrice } from '../utils/currency';
 // "best seller" labels, etc.) so users only see tags that describe
 // the actual garment (material, colour, fit, occasion, vibe).
 import { filterUserFacingTags } from '../utils/tagFilter';
+// Availability — computed locally from the storefront's
+// `availableSizes` list (Shopify direct-fetch surfaces this) + the
+// user's recommended size. No separate backend call needed.
+import { computeAvailability, describeAvailability, AvailabilityStatus } from '../utils/availability';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -65,8 +69,10 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // point. The user drags the handle up/down to switch.
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
-// to keep the verdict + stats row + tags readable without scrolling.
-const COLLAPSED_H = 200;
+// to keep the verdict + stats row + material + availability readable
+// without scrolling. Bumped 200 → 204 to give the new availability row
+// a comfortable breathing margin without changing visual weight.
+const COLLAPSED_H = 204;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -424,6 +430,15 @@ export default function FitResultScreen() {
         const safeBrand = sanitize(workingProduct.brand) || brandInfo?.brandName;
         const safeName = sanitize(workingProduct.name) || 'Unknown';
 
+        // Availability snapshot at the time of fit-check. Persisted
+        // on the history entry so opening this card later shows the
+        // same answer without a refetch (prices + stock can drift
+        // between visits).
+        const availabilitySnapshot = computeAvailability(
+          fitResult.size_recommendation?.size,
+          workingProduct.availableSizes
+        );
+
         addEntry({
           url,
           productName: safeName,
@@ -445,6 +460,7 @@ export default function FitResultScreen() {
             ? { amount: workingProduct.price.amount, currency: workingProduct.price.currency }
             : undefined,
           brand: safeBrand,
+          availability: availabilitySnapshot,
         });
       }
     } catch (error) {
@@ -608,6 +624,29 @@ export default function FitResultScreen() {
   const safeBrand = sanitize(product.brand);
   const safeName = sanitize(product.name);
   const priceDisplay = formatPrice(product.price);
+
+  // Availability for the user's recommended size. Three sources, in
+  // priority order:
+  //   1. The active history entry's persisted snapshot (history mode —
+  //      respects the original "in stock at L?" answer at scrape time).
+  //   2. Live computation against the current product.availableSizes
+  //      and sizeRec (live mode — just-fetched data).
+  //   3. Unknown (no data).
+  // If the user re-evaluates with a fresh avatar, the LIVE computation
+  // wins over the historical snapshot because sizeRec changes.
+  const liveAvailability = computeAvailability(sizeRec?.size, product.availableSizes);
+  const persistedAvailability = activeEntry?.availability;
+  const displayAvailability =
+    sizeRec && product.availableSizes
+      ? liveAvailability
+      : persistedAvailability
+      ? {
+          status: persistedAvailability.status as AvailabilityStatus,
+          size: persistedAvailability.size,
+          checkedAt: persistedAvailability.checkedAt,
+        }
+      : liveAvailability;
+  const showAvailability = displayAvailability.status !== 'unknown' || !!displayAvailability.size;
 
   const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
   const showMaterial = !!enrichedProduct?.material;
@@ -885,17 +924,57 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Meta rows — Material is the only meta row that survives the
-              dock's minimum-info treatment. Category lives here too but
-              only when expanded. The user-spec for the dock is:
-              verdict + price + stats (size/confidence/fit) + material.
-              Everything else gets hidden behind the drag-up. */}
-          {(showMaterial || (isExpanded && showCategory)) && (
+          {/* Meta rows — Material + Availability survive the dock's
+              minimum-info treatment. Category and category-like fields
+              only appear when expanded. Per the user spec: dock shows
+              verdict + price + stats + material, plus availability so
+              shoppers know if their size is actually obtainable
+              without tapping View on Store. */}
+          {(showMaterial || showAvailability || (isExpanded && showCategory)) && (
             <View style={styles.metaSection}>
               {showMaterial && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Material</Text>
                   <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
+                </View>
+              )}
+              {showAvailability && (
+                <View style={styles.metaRow}>
+                  <Text style={styles.metaLabel}>Availability</Text>
+                  <View style={styles.availabilityValueWrap}>
+                    <View
+                      style={[
+                        styles.availabilityDot,
+                        {
+                          backgroundColor:
+                            displayAvailability.status === 'in_stock'
+                              ? colors.successDeep
+                              : displayAvailability.status === 'out_of_stock'
+                              ? colors.errorDeep
+                              : colors.textMuted,
+                        },
+                      ]}
+                    />
+                    <Text
+                      testID="fit-availability-text"
+                      style={[
+                        styles.metaValue,
+                        {
+                          color:
+                            displayAvailability.status === 'in_stock'
+                              ? colors.successDeep
+                              : displayAvailability.status === 'out_of_stock'
+                              ? colors.errorDeep
+                              : colors.textMuted,
+                        },
+                      ]}
+                    >
+                      {describeAvailability(
+                        displayAvailability.status,
+                        displayAvailability.size
+                      )}
+                    </Text>
+                  </View>
                 </View>
               )}
               {isExpanded && showCategory && (
@@ -1462,6 +1541,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     textTransform: 'capitalize',
+  },
+
+  // Availability row — colored dot + status text. Right-aligned to
+  // match the existing metaValue placement so it lines up vertically
+  // with Material + Category rows.
+  availabilityValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  availabilityDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
 
   // --- Actions ---

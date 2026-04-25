@@ -63,33 +63,29 @@ blocker (the UI already shows confirmation copy optimistically).
 
 ## P2 — features planned for v2
 
-### Shopify availability section on the fit card
-Surface in-stock / out-of-stock status on the fit-analysis overlay,
-fed by the (future) Shopify merchant plugin, with a "last checked
-Nm ago" timestamp shown succinctly.
+### ~~Shopify availability section on the fit card~~ — SHIPPED v1.1
 
-**Scope:**
-- Availability pill next to SIZE / CONFIDENCE / FIT — states:
-  `In stock` (green), `Low stock ≤5` (warn), `Out of stock` (error),
-  `Availability unknown` (muted grey-purple fallback)
-- Relative-time formatter already exists at
-  `mobile/src/utils/relativeTime.ts` — reuse it
-- Extend `FitHistoryEntry` (in `mobile/src/store/fitHistoryStore.ts`):
-  ```
-  availability?: {
-    status: 'in_stock' | 'low_stock' | 'out_of_stock' | 'unknown';
-    checkedAt: string;
-    count?: number;
-  }
-  ```
-- New API: `checkAvailability(productUrl, shopifyHandle)` →
-  `POST /api/availability/check` (backend TBD)
-- Until the backend exists: stub always returns `unknown` so the UI
-  renders cleanly
+Done — `mobile/src/utils/availability.ts` + persisted on
+`FitHistoryEntry.availability`. Renders as a row in the meta section
+of the FitResult overlay (visible when docked).
 
-**TDD-first per CLAUDE.md:** unit tests for the relative-time utility
-(already in place), store action `updateAvailability`, and
-FitResultScreen smoke tests for all four states.
+States: `in_stock` (green) / `out_of_stock` (red) / `unknown`. We
+intentionally skipped `low_stock` because Shopify's public JSON
+endpoint doesn't expose inventory counts — only whether
+`inventory_management` is set. The merchant-plugin v2 will expose
+real counts via webhook; revisit `low_stock` then.
+
+No new backend endpoint was needed: Shopify direct-fetch already
+returns `availableSizes` filtered to variants with shopify-managed
+inventory, so the same scrape that produces the verdict also
+answers "is your size stocked?". Source-of-truth comparison is the
+recommended size from `sizeRec` against that list.
+
+**Future iteration ideas (not blocking launch):**
+- Real-time inventory counts via Shopify merchant-plugin webhook
+- "Notify me when back in stock" CTA on the out-of-stock state
+- Background refresh of availability on history entries older than
+  24h (currently the snapshot is frozen at scrape time)
 
 ### Story-compose feature: image + now-playing + text overlay
 Instagram-story-esque: user picks an image, the app auto-fetches

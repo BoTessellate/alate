@@ -29,6 +29,19 @@ export interface HistoryPrice {
   currency: string;
 }
 
+/** Per-size availability snapshot at the time of fit-check.
+ *  Persisted on the history entry so cards opened later still show
+ *  the original "in stock at L?" answer; the user can re-check by
+ *  re-running the fit-check (Re-evaluate button). */
+export interface HistoryAvailability {
+  status: 'in_stock' | 'out_of_stock' | 'unknown';
+  /** The size we checked against — usually `sizeRecommendation.size`
+   *  at the moment availability was computed. */
+  size?: string;
+  /** When this snapshot was taken (ISO timestamp). */
+  checkedAt: string;
+}
+
 export interface FitHistoryEntry {
   id: string;
   url: string;
@@ -44,6 +57,10 @@ export interface FitHistoryEntry {
   tags?: string[];
   price?: HistoryPrice;
   brand?: string;
+  /** Availability of the recommended size at scrape time. Optional
+   *  because pre-availability history entries don't have this field;
+   *  components should treat missing as "unknown". */
+  availability?: HistoryAvailability;
 }
 
 interface FitHistoryStore {
