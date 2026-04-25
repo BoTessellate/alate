@@ -27,7 +27,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, fontFamily } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useAccountStore, GoogleUser } from '../store/accountStore';
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   signInOptionalNote: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     lineHeight: 15,
     color: colors.textMuted,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   sectionLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1.8,
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   editPillText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '600',
     color: '#fff',
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   legalLinkText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     color: 'rgba(255,255,255,0.65)',
     textDecorationLine: 'underline',
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   legalDivider: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     color: 'rgba(255,255,255,0.5)',
   },

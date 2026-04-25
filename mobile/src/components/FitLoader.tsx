@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../constants/theme';
+import { colors, spacing, typography, fontFamily } from '../constants/theme';
 import GlassCard from './GlassCard';
 
 interface FitLoaderProps {
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   urlText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     flex: 1,
     fontSize: 12,
     lineHeight: 16,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   subtitle: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 13,
     lineHeight: 20,
     color: colors.textMuted,

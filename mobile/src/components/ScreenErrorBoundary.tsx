@@ -15,7 +15,7 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { captureError } from '../utils/sentry';
-import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, fontFamily } from '../constants/theme';
 
 interface Props {
   children: ReactNode;
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   icon: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 48,
     fontWeight: '700',
     color: colors.error,

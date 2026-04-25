@@ -37,7 +37,7 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows, typography, ms } from '../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography, ms, fontFamily } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   accentLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,

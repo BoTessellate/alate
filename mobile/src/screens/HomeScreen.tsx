@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   setupArrow: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 22,
     color: colors.primary,
     fontWeight: '300',
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   recentBrand: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -562,14 +562,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   recentName: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
     lineHeight: 18,
   },
   recentSize: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 13,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   recentChipLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,

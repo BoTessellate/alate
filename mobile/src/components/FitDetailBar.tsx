@@ -8,7 +8,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { spacing, borderRadius, typography } from '../constants/theme';
+import { spacing, borderRadius, typography, fontFamily } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   label: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.22)',
   },
   sizeLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
