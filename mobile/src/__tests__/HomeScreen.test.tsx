@@ -124,40 +124,20 @@ describe('HomeScreen', () => {
     expect(queryByText('Set up your body profile')).toBeNull();
   });
 
-  it('shows inline error when user taps Check Fit with empty input', () => {
-    setAvatar(true);
-    const { getByTestId, getByText } = render(<HomeScreen />);
-    fireEvent.press(getByTestId('check-fit-button'));
-    expect(getByText('Please enter a product URL')).toBeTruthy();
-  });
+  // The Check Fit button was removed in favour of the 700ms paste-
+  // debounce auto-trigger. The empty-input validation error is gone
+  // along with it (no submit path to validate anything against).
+  // Navigation tests below exercise the same flow via the auto-trigger.
 
-  it('routes to AvatarSetup if no avatar is configured', () => {
-    const { getByTestId } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-    expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
-  });
-
-  it('navigates to FitResult with the URL on Check Fit tap', async () => {
-    // The unified loader flow has HomeScreen navigate immediately
-    // (no scrape on this screen). FitResult runs scrape + enrich +
-    // fit-check under one loading state. Brand-nudge / blocked-brand
-    // cards have moved into FitResult; this test only asserts the
-    // navigation call now.
-    setAvatar(true);
+  it('routes to AvatarSetup when avatar missing + URL pasted', async () => {
     const { getByTestId } = render(<HomeScreen />);
     await act(async () => {
       fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
     });
     await act(async () => {
-      fireEvent.press(getByTestId('check-fit-button'));
+      jest.advanceTimersByTime(750);
     });
-
-    expect(api.scrapeProduct).not.toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledWith(
-      'FitResult',
-      expect.objectContaining({ url: 'https://asos.com/p/1' })
-    );
+    expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
   });
 
   it('auto-triggers navigation after 700ms debounce when user pastes a valid URL', async () => {

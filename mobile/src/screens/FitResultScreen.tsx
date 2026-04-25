@@ -44,6 +44,7 @@ import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
 // Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
@@ -169,6 +170,9 @@ export default function FitResultScreen() {
 
   // Collapse/expand state + progress. 1 = expanded (default), 0 = collapsed.
   const [isExpanded, setIsExpanded] = useState(true);
+  // Themed delete confirmation — replaces native Alert so the modal
+  // matches the rest of the grey-purple glass aesthetic.
+  const [pendingDelete, setPendingDelete] = useState(false);
   const collapseProgress = useSharedValue(1);
   const startProgress = useSharedValue(1);
 
@@ -261,20 +265,23 @@ export default function FitResultScreen() {
   // view (below) so it works regardless of where the card is — key for
   // the collapsed state, where the card only occupies the bottom 200px
   // and users instinctively swipe at mid-screen (i.e. OVER the product
-  // image, not the dock). Before this was scoped to cardScrollWrap and
-  // mid-screen swipes fell on dead area.
+  // image, not the dock).
   //
-  //   - `activeOffsetX([-15, 15])`: small horizontal nudges pass through
-  //   - `failOffsetY([-25, 25])`: yields to the inner drag gesture on
-  //     clear vertical motion (dragGesture lives on cardScrollWrap, so
-  //     within the card a vertical pan still collapses instead of sifts)
+  //   - `activeOffsetX([-25, 25])`: bumped from 15 → 25 so vertical
+  //     scroll inside the ScrollView wins more decisively. Users were
+  //     reporting "scroll feels wonky" — root cause was sift competing
+  //     with ScrollView for ownership during the first ~15px of
+  //     ambiguous motion.
+  //   - `failOffsetY([-10, 10])`: tightened from 25 → 10 so any clear
+  //     vertical movement immediately yields to scroll. Combined with
+  //     the activeOffsetX bump, vertical scroll has unambiguous priority
+  //     over diagonal-leaning swipes.
   // The onEnd guard (`entriesLen > 0`) handles the non-sift case without
-  // needing `.enabled(canSift)` — keeping this gesture built unconditionally
-  // so the GestureDetector doesn't churn refs when canSift flips.
+  // needing `.enabled(canSift)`.
   const swipeX = useSharedValue(0);
   const siftGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15])
-    .failOffsetY([-25, 25])
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-10, 10])
     .onUpdate((e) => {
       swipeX.value = e.translationX * 0.4;
     })
@@ -718,36 +725,7 @@ export default function FitResultScreen() {
         <TouchableOpacity
           testID="remove-from-history-button"
           style={[styles.deleteBtn, { top: insets.top + spacing.sm }]}
-          onPress={() => {
-            Alert.alert(
-              'Remove from history',
-              `Remove "${safeName || 'this item'}" from your history?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Remove',
-                  style: 'destructive',
-                  onPress: () => {
-                    // Drop from the Zustand store (authoritative list).
-                    removeEntry(historyEntryId);
-                    // Also prune our local siblings view so the card
-                    // immediately reflects the deletion. If there's
-                    // another sibling to show, stay on this screen and
-                    // land on it. Only go back when we deleted the
-                    // last remaining sibling — there's nothing left
-                    // to display.
-                    const remaining = siblings.filter((e) => e.id !== historyEntryId);
-                    if (remaining.length > 0) {
-                      setSiblings(remaining);
-                      setLocalIndex((prev) => Math.min(prev, remaining.length - 1));
-                    } else {
-                      navigation.goBack();
-                    }
-                  },
-                },
-              ]
-            );
-          }}
+          onPress={() => setPendingDelete(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.75}
         >
@@ -782,24 +760,24 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Inner GestureDetector — drag-only. Sift was hoisted to the
-            root view (see top of component) so horizontal swipes on the
-            product-image area above the collapsed dock also sift. Drag
-            stays scoped to the card so its activeOffsetY threshold only
-            competes with the ScrollView's native vertical gesture, not
-            the whole screen (which would eat all vertical taps). */}
-        <GestureDetector gesture={dragGesture}>
-          <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
-            {/* Visual drag handle — no longer a gesture target itself,
-                since the whole card receives drag. Purely decorative. */}
-            <View style={styles.handleHit} pointerEvents="none">
+        {/* Drag is scoped to the HANDLE zone only — wrapping the whole
+            card body in a Pan gesture made the inner ScrollView fight
+            for ownership on every vertical scroll. Handle gets the
+            drag, body gets pure scroll. The handle is a 56px tall
+            zone at the top of the card with a visible grip bar at the
+            centre — large enough to grab without aiming, small
+            enough that 90% of the card is uncontested scroll. */}
+        <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
+          <GestureDetector gesture={dragGesture}>
+            <View style={styles.handleHit}>
               <View style={styles.handle} />
             </View>
-            <ScrollView
-              style={styles.cardScroll}
-              contentContainerStyle={styles.cardContent}
-              showsVerticalScrollIndicator={false}
-            >
+          </GestureDetector>
+          <ScrollView
+            style={styles.cardScroll}
+            contentContainerStyle={styles.cardContent}
+            showsVerticalScrollIndicator={false}
+          >
 
           {/* H1: Fit verdict — biggest element in the card. Uses the
               TAN Nightingale SVG for the score label; styled-text
@@ -835,10 +813,13 @@ export default function FitResultScreen() {
 
           <View style={styles.divider} />
 
-          {/* H2: Stats row — three centred, evenly-spaced elements with
-              SIZE / CONFIDENCE / FIT labels underneath. Per Claude Design
-              handoff: the trio reads left-to-right, labels anchor meaning,
-              no 4th in-stock icon (removed as visually confusing). */}
+          {/* H2: Stats row — four centred, evenly-spaced columns with
+              SIZE / CONFIDENCE / FIT / STOCK labels underneath. The
+              4th column (availability) was added when we shipped the
+              v1 availability feature: it gives shoppers an at-a-glance
+              "is my size obtainable?" answer without forcing them to
+              tap through to the store. Same circular-icon visual
+              language as FIT for consistency. */}
           <View testID="fit-score-display" style={styles.statsRow}>
             {sizeRec && (
               <View style={styles.statCol}>
@@ -858,6 +839,44 @@ export default function FitResultScreen() {
               </View>
               <Text style={styles.statLabel}>FIT</Text>
             </View>
+            {showAvailability && (
+              <View style={styles.statCol} testID="fit-availability-stat">
+                <View
+                  style={[
+                    styles.fitBadge,
+                    {
+                      backgroundColor:
+                        displayAvailability.status === 'in_stock'
+                          ? 'rgba(90, 122, 104, 0.14)'
+                          : displayAvailability.status === 'out_of_stock'
+                          ? 'rgba(154, 74, 74, 0.14)'
+                          : 'rgba(106, 95, 117, 0.06)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statIconText,
+                      {
+                        color:
+                          displayAvailability.status === 'in_stock'
+                            ? colors.successDeep
+                            : displayAvailability.status === 'out_of_stock'
+                            ? colors.errorDeep
+                            : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {displayAvailability.status === 'in_stock'
+                      ? '✓'
+                      : displayAvailability.status === 'out_of_stock'
+                      ? '✕'
+                      : '?'}
+                  </Text>
+                </View>
+                <Text style={styles.statLabel}>STOCK</Text>
+              </View>
+            )}
           </View>
 
           {/* Re-eval banners — expanded only. Status indicators belong
@@ -924,57 +943,17 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Meta rows — Material + Availability survive the dock's
-              minimum-info treatment. Category and category-like fields
-              only appear when expanded. Per the user spec: dock shows
-              verdict + price + stats + material, plus availability so
-              shoppers know if their size is actually obtainable
-              without tapping View on Store. */}
-          {(showMaterial || showAvailability || (isExpanded && showCategory)) && (
+          {/* Meta rows — Material survives the dock's minimum-info
+              treatment. Category appears only when expanded.
+              Availability used to live here as a row; it's now a
+              circular icon in the stats row above for consistency
+              with the rest of the at-a-glance signals. */}
+          {(showMaterial || (isExpanded && showCategory)) && (
             <View style={styles.metaSection}>
               {showMaterial && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Material</Text>
                   <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
-                </View>
-              )}
-              {showAvailability && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Availability</Text>
-                  <View style={styles.availabilityValueWrap}>
-                    <View
-                      style={[
-                        styles.availabilityDot,
-                        {
-                          backgroundColor:
-                            displayAvailability.status === 'in_stock'
-                              ? colors.successDeep
-                              : displayAvailability.status === 'out_of_stock'
-                              ? colors.errorDeep
-                              : colors.textMuted,
-                        },
-                      ]}
-                    />
-                    <Text
-                      testID="fit-availability-text"
-                      style={[
-                        styles.metaValue,
-                        {
-                          color:
-                            displayAvailability.status === 'in_stock'
-                              ? colors.successDeep
-                              : displayAvailability.status === 'out_of_stock'
-                              ? colors.errorDeep
-                              : colors.textMuted,
-                        },
-                      ]}
-                    >
-                      {describeAvailability(
-                        displayAvailability.status,
-                        displayAvailability.size
-                      )}
-                    </Text>
-                  </View>
                 </View>
               )}
               {isExpanded && showCategory && (
@@ -1071,10 +1050,38 @@ export default function FitResultScreen() {
               </Text>
             </View>
           )}
-            </ScrollView>
-          </Animated.View>
-        </GestureDetector>
+          </ScrollView>
+        </Animated.View>
       </Animated.View>
+
+      {/* Themed delete confirmation — same visual language as the
+          rest of the app (replaces the native Alert popup that
+          looked system-generated and broke the glass aesthetic). */}
+      <ConfirmDialog
+        visible={pendingDelete}
+        title="Remove from history?"
+        message={`"${safeName || 'this item'}" will be removed from your fit history. This can't be undone.`}
+        confirmLabel="Remove"
+        icon="trash-2"
+        confirmTestID="confirm-delete-fit-entry"
+        onConfirm={() => {
+          if (historyEntryId) {
+            removeEntry(historyEntryId);
+            // Prune local siblings + clamp index so the next sibling
+            // becomes active. Only go back when we deleted the last
+            // remaining sibling.
+            const remaining = siblings.filter((e) => e.id !== historyEntryId);
+            if (remaining.length > 0) {
+              setSiblings(remaining);
+              setLocalIndex((prev) => Math.min(prev, remaining.length - 1));
+            } else {
+              navigation.goBack();
+            }
+          }
+          setPendingDelete(false);
+        }}
+        onCancel={() => setPendingDelete(false)}
+      />
     </View>
     </GestureDetector>
   );

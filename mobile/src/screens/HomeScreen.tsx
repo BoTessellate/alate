@@ -44,9 +44,10 @@ export default function HomeScreen() {
   // HomeScreen is now a pure URL-capture surface. Scrape, enrich,
   // fit-check, brand-nudge, and blocked-brand UX have all moved into
   // FitResult so the user only ever sees ONE loading screen between
-  // "I pasted a URL" and "here's the verdict". Validation errors are
-  // the only state HomeScreen retains (empty input on Check Fit tap).
-  const [error, setError] = useState<string | null>(null);
+  // "I pasted a URL" and "here's the verdict". The Check Fit button
+  // has been removed too — the 700ms paste-debounce is the only
+  // trigger now. No validation state is needed because invalid URLs
+  // simply don't fire the auto-trigger.
   const { avatar } = useAvatarStore();
   const { entries: historyEntries } = useFitHistoryStore();
   // Most recent 3 for the "Recent" list per Claude Design mockup
@@ -66,9 +67,9 @@ export default function HomeScreen() {
         runCheck(saved);
         return;
       }
-      // Normal focus — reset state
+      // Normal focus — reset URL so a stale paste doesn't auto-trigger
+      // a fresh fit-check the moment the screen mounts.
       setUrl('');
-      setError(null);
     }, [avatar])
   );
 
@@ -88,18 +89,11 @@ export default function HomeScreen() {
     navigation.navigate('FitResult', { url: targetUrl });
   }, [avatar, navigation]);
 
-  const handleCheckFit = () => {
-    if (!url.trim()) {
-      setError('Please enter a product URL');
-      return;
-    }
-    runCheck(url.trim());
-  };
-
   const handleUrlChange = (text: string) => {
     setUrl(text);
-    if (error) setError(null);
-    // Auto-trigger on valid URL paste (debounced 700ms)
+    // Auto-trigger on valid URL paste (debounced 700ms). Invalid /
+    // empty inputs simply don't fire — there's no submit button to
+    // gate against.
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     const trimmed = text.trim();
     if (trimmed && isValidUrl(trimmed)) {
@@ -175,21 +169,11 @@ export default function HomeScreen() {
               />
             </GlassCard>
 
-            {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.error}>{error}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              testID="check-fit-button"
-              style={styles.button}
-              onPress={handleCheckFit}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.buttonText}>Check fit</Text>
-            </TouchableOpacity>
-
+            {/* Check Fit button intentionally removed. The 700ms paste-
+                debounce auto-triggers fit-check on any valid URL — a
+                button to "submit" duplicates that interaction. The
+                share-extension hint below stays as the alternative
+                entry point. */}
             <Text style={styles.shareHint}>or use the share extension from your browser</Text>
           </View>
 
@@ -358,7 +342,10 @@ const styles = StyleSheet.create({
   //     keep their white tint + dark text.
   hero: {
     marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    // Bumped lg → xxl so the verse reads more like a hero block
+    // sitting clearly apart from the URL input below it. Pairs with
+    // the tighter ALATE↔verse spacing below.
+    marginBottom: spacing.xxl,
   },
   eyebrow: {
     ...typography.overline,
@@ -366,14 +353,20 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
   },
   heroVerseWrap: {
-    marginTop: 14,
+    // Tightened 14 → 4 so ALATE and the verse read as a single
+    // hero unit. Verse is the dominant element; the eyebrow is just
+    // a tag above it.
+    marginTop: 4,
   },
   heroVerse: {
     ...typography.displayLarge,
     fontSize: 40,
     lineHeight: 44,
     color: '#fff',
-    marginTop: 14,
+    // Same tightening for the styled-text fallback path (when the SVG
+    // heading isn't loaded). Keeps the two render paths visually
+    // identical.
+    marginTop: 4,
     textShadowColor: 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,

@@ -39,5 +39,9 @@ export function formatPrice(price?: MoneyAmount | null): string | null {
     return null;
   }
   const sym = CURRENCY_SYMBOLS[price.currency] ?? '';
-  return `${sym}${price.amount}`;
+  // Always pad with a space so symbols don't crowd the amount visually
+  // ("£ 49" reads cleaner than "£49" in our serif body stack). When the
+  // currency is unknown and we drop the symbol entirely, no leading
+  // space is rendered.
+  return sym ? `${sym} ${price.amount}` : `${price.amount}`;
 }
