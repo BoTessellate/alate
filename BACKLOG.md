@@ -27,6 +27,26 @@ returns 500 and the scraper's blocklist check fails open (no-op). Not
 a blocker — safe default is "nothing gets blocked" — but needed
 before the opt-out feature is real.
 
+### Collapse the two-step loader into one (FitResult owns the pipeline)
+**Files:** `mobile/src/screens/HomeScreen.tsx`, `mobile/src/screens/FitResultScreen.tsx`, `mobile/src/navigation/AppNavigator.tsx`
+
+Today: HomeScreen scrapes (button spinner) → navigates to FitResult →
+FitResult enriches + fit-checks (full-screen FitLoader). Two loading
+states across two screens. The April 2026 attempt to make HomeScreen
+also show a full-screen FitLoader produced a duplicate-loader regression
+and was reverted.
+
+Target: navigate to FitResult immediately on URL detection (no scrape
+on HomeScreen). FitResult accepts `product?: ScrapedProduct` as
+optional and runs scrape → enrich → fit-check under one loading state.
+Brand-nudge + blocked-brand cards move into FitResult.
+
+**Test impact:** existing HomeScreen tests assert `api.scrapeProduct`
+is called from HomeScreen; those need updating to assert
+`navigation.navigate('FitResult', {url})` instead. New FitResult tests
+need to cover the scrape-first path + brand-nudge / blocked failure
+modes inside the screen.
+
 ### Wire up real email sending for `/api/brand-nudge`
 **Path:** `backend/api/brand-nudge.ts`
 

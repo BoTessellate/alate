@@ -31,7 +31,6 @@ import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
-import FitLoader from '../components/FitLoader';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -104,9 +103,7 @@ export default function HomeScreen() {
       if (result.success && result.data) {
         navigation.navigate('FitResult', { product: result.data, url: targetUrl });
       } else if (result.blocked) {
-        // Brand opt-out / robots.txt disallow — show a distinct card,
-        // no nudge option. We also clear the pasted URL so the user
-        // isn't tempted to retry instantly.
+        // Brand opt-out / robots.txt disallow — distinct card, no nudge.
         setBlockedInfo({
           origin: result.blockedOrigin || 'This brand',
           reason: result.blockedReason,
@@ -152,20 +149,15 @@ export default function HomeScreen() {
     }
   };
 
-  // As soon as a URL is detected (and we're loading the scrape), show
-  // the full-screen FitLoader — not a tiny button spinner. User feedback:
-  // the interstitial "check fit button spinner → reading size chart"
-  // transition was two waits stacked; collapsing it into one makes the
-  // flow feel instant. FitLoader renders a URL pill at the top so the
-  // user retains context while the scrape + fit-check complete.
-  if (loading) {
-    return (
-      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <FitLoader url={url || undefined} />
-      </View>
-    );
-  }
+  // NOTE — earlier iteration showed a full-screen FitLoader on
+  // HomeScreen during the scrape. That created a duplicate-loader
+  // regression: HomeScreen's FitLoader during scrape, then FitResult's
+  // FitLoader during enrich+fit-check, back-to-back. Reverted to a
+  // button-only spinner here. The single full-screen FitLoader now
+  // only renders inside FitResult. If we want to collapse those two
+  // loaders into one, the path is to navigate to FitResult immediately
+  // and let it own the entire scrape→enrich→check pipeline (a bigger
+  // architectural change tracked in BACKLOG.md).
 
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
