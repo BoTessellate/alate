@@ -19,7 +19,7 @@ import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, fontFamily } from '../constants/theme';
 import { useAgeGateStore } from '../store/ageGateStore';
 import GlassCard from './GlassCard';
 import HeadingImage from './HeadingImage';
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   subtle: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 12,
     lineHeight: 17,
     color: colors.textMuted,
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   primaryBtnText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryBtnText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 13,
     color: colors.textSecondary,
     textDecorationLine: 'underline',

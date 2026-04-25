@@ -248,43 +248,72 @@ export default function FitResultScreen() {
     ),
   }));
 
-  // Vertical drag toggles collapse. Lives on the outer card so the user
-  // can drag from anywhere on the overlay (per user direction "from any
-  // place on the upper half"). `activeOffsetY([-10, 10])` means small
-  // nudges still go to the inner ScrollView; only deliberate vertical
-  // swipes trigger the collapse. 300px of drag = full transition.
-  const dragGesture = Gesture.Pan()
-    .activeOffsetY([-10, 10])
-    .onBegin(() => {
-      startProgress.value = collapseProgress.value;
-    })
-    .onUpdate((e) => {
-      const delta = -e.translationY / 300;
-      collapseProgress.value = Math.max(
-        0,
-        Math.min(1, startProgress.value + delta)
-      );
-    })
-    .onEnd(() => {
-      const target = collapseProgress.value > 0.5 ? 1 : 0;
-      // Switched from withSpring to withTiming + cubic ease — user
-      // flagged the spring bounce as "still too much, very very
-      // subtle". A timing curve has zero overshoot by definition; the
-      // 280ms cubic-out duration keeps the dock change feeling
-      // responsive without ANY perceptible bounce. Defer the React
-      // state flip until the timing completes (same pattern we used
-      // with withSpring) so the concerns section doesn't reflow
-      // mid-animation.
-      collapseProgress.value = withTiming(
-        target,
-        { duration: 280, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished) {
-            runOnJS(setIsExpanded)(target === 1);
-          }
+  // Factory: every drag-target on the overlay (top header, tags region)
+  // gets its own Pan instance built from the same recipe so they all
+  // toggle the dock with identical thresholds + easing. Pulled into a
+  // function because RNGH's `Gesture.Pan()` instance can only be bound
+  // to ONE GestureDetector — we need two (one for the headerArea, one
+  // for the tags View further down the dock).
+  //
+  // `activeOffsetY([-10, 10])` means small nudges still go to the
+  // inner ScrollView; only deliberate vertical swipes trigger the
+  // collapse. 300px of drag = full transition.
+  //
+  // Latency note: previously `setIsExpanded(true)` was deferred until
+  // the withTiming completion callback. That added a ~280ms gap
+  // between the user lifting their finger and the analysis content
+  // (concerns, banners, tags, actions, attribution) appearing — felt
+  // like "the data is loading". Now we flip the React state right
+  // after committing on the expand path, so content mounts in
+  // parallel with the height animation. The collapse path keeps the
+  // deferred flip so content doesn't unmount mid-shrink.
+  const makeCollapseGesture = () =>
+    Gesture.Pan()
+      .activeOffsetY([-10, 10])
+      .onBegin(() => {
+        startProgress.value = collapseProgress.value;
+      })
+      .onUpdate((e) => {
+        const delta = -e.translationY / 300;
+        collapseProgress.value = Math.max(
+          0,
+          Math.min(1, startProgress.value + delta)
+        );
+      })
+      .onEnd(() => {
+        const target = collapseProgress.value > 0.5 ? 1 : 0;
+        // Expand path: mount content immediately so React's render +
+        // layout passes overlap with the dock height animation.
+        if (target === 1) {
+          runOnJS(setIsExpanded)(true);
         }
-      );
-    });
+        // Switched from withSpring to withTiming + cubic ease — user
+        // flagged the spring bounce as "still too much, very very
+        // subtle". A timing curve has zero overshoot by definition;
+        // the 280ms cubic-out duration keeps the dock change feeling
+        // responsive without ANY perceptible bounce.
+        collapseProgress.value = withTiming(
+          target,
+          { duration: 280, easing: Easing.out(Easing.cubic) },
+          (finished) => {
+            // Collapse path: defer the unmount until the dock has
+            // finished shrinking, so content doesn't reflow as it
+            // disappears.
+            if (finished && target === 0) {
+              runOnJS(setIsExpanded)(false);
+            }
+          }
+        );
+      });
+
+  const dragGesture = makeCollapseGesture();
+  // Second drag target — wraps the tags chip row inside the
+  // ScrollView. Same recipe as `dragGesture` so the user gets the
+  // identical "10px deliberate vertical swipe" feel from both ends of
+  // the dock (top header + tags region near the bottom of the
+  // analysis content). Per user feedback: "make the overlay
+  // collapsible from around the tags region of the overlay".
+  const tagsDragGesture = makeCollapseGesture();
 
   // Horizontal drag sifts to the next/prev entry. HOISTED to the root
   // view (below) so it works regardless of where the card is — key for
@@ -973,18 +1002,26 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Tags — expanded only. */}
+          {/* Tags — expanded only. The whole tags section (label +
+              chip row) is a drag target so the user can collapse the
+              overlay from around the tags region without scrolling
+              back to the handle. The activeOffsetY([-10, 10]) on the
+              Pan gesture means small touches still pass through to
+              the ScrollView's vertical scroll; only deliberate
+              vertical swipes trigger the collapse. */}
           {isExpanded && showTags && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>TAGS</Text>
-              <View style={styles.tagsContainer}>
-                {visibleTags.slice(0, 6).map((tag: string, i: number) => (
-                  <View key={i} style={styles.tag}>
-                    <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
-                  </View>
-                ))}
+            <GestureDetector gesture={tagsDragGesture}>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>TAGS</Text>
+                <View style={styles.tagsContainer}>
+                  {visibleTags.slice(0, 6).map((tag: string, i: number) => (
+                    <View key={i} style={styles.tag}>
+                      <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
+            </GestureDetector>
           )}
 
           {/* Meta rows — Material survives the dock's minimum-info
@@ -1104,7 +1141,6 @@ export default function FitResultScreen() {
       <ConfirmDialog
         visible={pendingDelete}
         title="Remove from history?"
-        message={`"${safeName || 'this item'}" will be removed from your fit history. This can't be undone.`}
         confirmLabel="Remove"
         icon="trash-2"
         confirmTestID="confirm-delete-fit-entry"

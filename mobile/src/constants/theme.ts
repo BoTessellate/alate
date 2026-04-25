@@ -184,7 +184,7 @@ export const typography = {
     lineHeight: 28,
   },
   headingS: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 16,
     fontWeight: '600' as const,
     lineHeight: 24,
@@ -192,19 +192,19 @@ export const typography = {
 
   // Body text — now on system serif to pair with TAN Nightingale
   bodyLarge: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 18,
     fontWeight: '400' as const,
     lineHeight: 28,
   },
   body: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     fontWeight: '400' as const,
     lineHeight: 22,
   },
   bodySmall: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 13,
     fontWeight: '400' as const,
     lineHeight: 18,
@@ -212,21 +212,21 @@ export const typography = {
 
   // Labels & Buttons — serif so small copy matches the editorial voice
   labelLarge: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     fontWeight: '500' as const,
     lineHeight: 22,
     letterSpacing: 0.1,
   },
   label: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 13,
     fontWeight: '500' as const,
     lineHeight: 18,
     letterSpacing: 0.1,
   },
   labelSmall: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     fontWeight: '500' as const,
     lineHeight: 16,
@@ -235,13 +235,13 @@ export const typography = {
 
   // Caption & Overline
   caption: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 12,
     fontWeight: '400' as const,
     lineHeight: 16,
   },
   overline: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     fontWeight: '600' as const,
     lineHeight: 14,
@@ -250,10 +250,10 @@ export const typography = {
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontFamily: 'serif', fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontFamily: 'serif', fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontFamily: 'serif', fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontFamily: 'serif', fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
 };
 
 // =============================================================================
