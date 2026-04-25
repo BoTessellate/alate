@@ -67,13 +67,8 @@ interface HistoryCoverFlowProps {
   onCardDelete?: (entry: FitHistoryEntry) => void;
 }
 
-const formatPrice = (price?: { amount: number; currency: string }) => {
-  if (!price) return null;
-  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  if (!price.currency) return String(price.amount);
-  const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-  return `${symbols[price.currency] || price.currency + ' '}${price.amount}`;
-};
+// Shared formatter — same symbol map as FitResultScreen (incl. ₹ INR).
+import { formatPrice } from '../utils/currency';
 
 /** The card face — product image + top-corner brand/price folio only.
  *  The fit analysis (score, size, product name) lives in the sibling

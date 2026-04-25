@@ -78,13 +78,8 @@ const formatDate = (iso: string) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const formatPrice = (price?: { amount: number; currency: string }) => {
-  if (!price) return null;
-  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  if (!price.currency) return String(price.amount);
-  const symbols: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-  return `${symbols[price.currency] || price.currency + ' '}${price.amount}`;
-};
+// Shared formatter — same symbol map as FitResultScreen (incl. ₹ INR).
+import { formatPrice } from '../utils/currency';
 
 /** Non-top card (2nd / 3rd in the stack) — peeks behind the active card. */
 function BehindCard({ entry, depth }: { entry: FitHistoryEntry; depth: number }) {

@@ -38,7 +38,7 @@ import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
-import { checkFit, enrichProduct, extractBrandFromUrl, FitWarning } from '../services/api';
+import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
@@ -46,6 +46,13 @@ import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
+// Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
+// so the same symbol map (incl. ₹ for INR) drives every price display.
+import { formatPrice } from '../utils/currency';
+// Tag filtering — strip merchandising noise (sale codes, drops, sizes,
+// "best seller" labels, etc.) so users only see tags that describe
+// the actual garment (material, colour, fit, occasion, vibe).
+import { filterUserFacingTags } from '../utils/tagFilter';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -64,14 +71,6 @@ const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
-
-const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' };
-const formatPrice = (price?: { amount: number; currency: string }) => {
-  if (!price) return null;
-  if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  const sym = CURRENCY_SYMBOLS[price.currency] || `${price.currency} `;
-  return `${sym}${price.amount}`;
-};
 
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
@@ -99,16 +98,36 @@ export default function FitResultScreen() {
   const [localIndex, setLocalIndex] = useState(currentIndex);
   const activeEntry = siblings.length > 0 ? siblings[Math.min(localIndex, siblings.length - 1)] : null;
 
+  // When no product is passed via route params (HomeScreen URL-paste
+  // flow now navigates immediately, before scraping), FitResult runs
+  // the scrape itself as the first step of analyzeFit and stores the
+  // result here. Three priority order in the derived `product`:
+  //   1. activeEntry (history sift mode)
+  //   2. routeProduct (history-mode direct nav, share-intent post-scrape)
+  //   3. scrapedProduct (live URL-paste flow — set by analyzeFit)
+  const [scrapedProduct, setScrapedProduct] = useState<ScrapedProduct | null>(null);
+
+  // Optional inline error card — shown when the internal scrape fails
+  // (brand we can't read, network error, blocked origin). Replaces the
+  // brand-nudge / blocked-brand UX that used to live on HomeScreen
+  // before the loader-flow restructure.
+  const [scrapeError, setScrapeError] = useState<{
+    kind: 'unsupported' | 'blocked' | 'unknown';
+    origin?: string;
+    message: string;
+  } | null>(null);
+
   // Effective route-derived values. Either come from the swiped-to entry
-  // (history+sift mode) or direct route params (live mode).
-  const product = activeEntry
+  // (history+sift mode) or direct route params (live mode), or the
+  // scrape result we ran internally.
+  const product: ScrapedProduct | undefined = activeEntry
     ? {
         name: activeEntry.productName,
         image: activeEntry.productImage,
         price: activeEntry.price,
         brand: activeEntry.brand,
       }
-    : routeProduct;
+    : routeProduct ?? scrapedProduct ?? undefined;
   const url = activeEntry ? activeEntry.url : routeUrl;
   const historyEntryId = activeEntry ? activeEntry.id : routeHistoryId;
   const isHistoryMode = !!historyEntryId && (!!activeEntry || !!precomputed);
@@ -287,6 +306,51 @@ export default function FitResultScreen() {
     if (!avatar) return;
 
     try {
+      // Step 0 — internal scrape (only when HomeScreen passed URL only).
+      // The unified single-loader flow has FitResult run scrape +
+      // enrich + fit-check under one FitLoader instead of HomeScreen
+      // running scrape under its own loader and then handing off.
+      let workingProduct: ScrapedProduct | undefined = product;
+      if (!workingProduct?.name) {
+        if (!routeUrl) {
+          // Should never happen — the navigator type requires `url`.
+          setLoading(false);
+          return;
+        }
+        try {
+          const scrapeResult = await scrapeProduct(routeUrl);
+          if (scrapeResult.blocked) {
+            setScrapeError({
+              kind: 'blocked',
+              origin: scrapeResult.blockedOrigin,
+              message:
+                scrapeResult.blockedMessage ||
+                'This brand has asked not to be scraped. Please visit their store directly.',
+            });
+            setLoading(false);
+            return;
+          }
+          if (!scrapeResult.success || !scrapeResult.data) {
+            setScrapeError({
+              kind: 'unsupported',
+              message: 'Unable to fetch product details. The brand may not be supported yet.',
+            });
+            setLoading(false);
+            return;
+          }
+          setScrapedProduct(scrapeResult.data);
+          workingProduct = scrapeResult.data;
+        } catch (scrapeErr) {
+          captureError(scrapeErr, { feature: 'fit-result-internal-scrape', url: routeUrl });
+          setScrapeError({
+            kind: 'unknown',
+            message: 'Something went wrong. Please try again.',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       let enrichedData: { id?: string; name?: string; category?: string; material?: string; tags?: string[] } | null = null;
 
       // Fast path — the scrape result came with structured data
@@ -295,27 +359,27 @@ export default function FitResultScreen() {
       // when all three are present; otherwise fall through and ask
       // Claude to fill the gaps.
       const hasShopifyStructured =
-        !!product.category && Array.isArray(product.tags) && product.tags.length > 0;
+        !!workingProduct.category && Array.isArray(workingProduct.tags) && workingProduct.tags.length > 0;
       if (hasShopifyStructured) {
         enrichedData = {
-          name: product.name,
-          category: product.category,
-          material: product.material,
-          tags: product.tags,
+          name: workingProduct.name,
+          category: workingProduct.category,
+          material: workingProduct.material,
+          tags: workingProduct.tags,
         };
         setEnrichedProduct({
-          category: product.category,
-          material: product.material,
-          tags: product.tags,
+          category: workingProduct.category,
+          material: workingProduct.material,
+          tags: workingProduct.tags,
         });
       } else {
         try {
           const enrichResult = await enrichProduct({
-            name: product.name || 'Unknown Product',
-            image_url: product.image,
-            description: product.description,
-            price: product.price?.amount,
-            currency: product.price?.currency,
+            name: workingProduct.name || 'Unknown Product',
+            image_url: workingProduct.image,
+            description: workingProduct.description,
+            price: workingProduct.price?.amount,
+            currency: workingProduct.price?.currency,
           });
           if (enrichResult.success && enrichResult.product) {
             setEnrichedProduct(enrichResult.product);
@@ -323,14 +387,14 @@ export default function FitResultScreen() {
           } else {
             captureError(new Error('Enrichment returned success:false'), {
               feature: 'product-enrichment',
-              productName: product.name,
+              productName: workingProduct.name,
               url,
             });
           }
         } catch (enrichError) {
           captureError(enrichError, {
             feature: 'product-enrichment',
-            productName: product.name,
+            productName: workingProduct.name,
             url,
           });
         }
@@ -340,11 +404,11 @@ export default function FitResultScreen() {
       const fitResult = await checkFit(
         {
           id: enrichedData?.id || 'temp',
-          product_name: enrichedData?.name || product.name || 'Unknown Product',
+          product_name: enrichedData?.name || workingProduct.name || 'Unknown Product',
           category: enrichedData?.category || 'clothing',
           material: enrichedData?.material,
           tags: enrichedData?.tags,
-          description: product.description,
+          description: workingProduct.description,
         },
         avatar,
         calibration ?? undefined,
@@ -357,13 +421,13 @@ export default function FitResultScreen() {
         setSizeRec(fitResult.size_recommendation ?? null);
 
         const brandInfo = extractBrandFromUrl(url);
-        const safeBrand = sanitize(product.brand) || brandInfo?.brandName;
-        const safeName = sanitize(product.name) || 'Unknown';
+        const safeBrand = sanitize(workingProduct.brand) || brandInfo?.brandName;
+        const safeName = sanitize(workingProduct.name) || 'Unknown';
 
         addEntry({
           url,
           productName: safeName,
-          productImage: product.image,
+          productImage: workingProduct.image,
           fitScore: fitResult.fit_score || 'great',
           warnings: fitResult.warnings || [],
           checkedAt: new Date().toISOString(),
@@ -377,15 +441,15 @@ export default function FitResultScreen() {
           category: enrichedData?.category,
           material: enrichedData?.material,
           tags: enrichedData?.tags,
-          price: product.price
-            ? { amount: product.price.amount, currency: product.price.currency }
+          price: workingProduct.price
+            ? { amount: workingProduct.price.amount, currency: workingProduct.price.currency }
             : undefined,
           brand: safeBrand,
         });
       }
     } catch (error) {
       console.error('Fit analysis failed:', error);
-      captureError(error, { feature: 'fit-analysis', productName: product.name, url });
+      captureError(error, { feature: 'fit-analysis', productName: product?.name, url });
     } finally {
       setLoading(false);
     }
@@ -399,7 +463,7 @@ export default function FitResultScreen() {
       const fitResult = await checkFit(
         {
           id: historyEntryId,
-          product_name: product.name || 'Unknown',
+          product_name: product?.name || 'Unknown',
           category: enrichedProduct?.category || precomputed?.enrichedProduct?.category || 'clothing',
           material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
           tags: enrichedProduct?.tags || precomputed?.enrichedProduct?.tags,
@@ -477,7 +541,65 @@ export default function FitResultScreen() {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <FitLoader />
+        <FitLoader url={routeUrl} />
+      </View>
+    );
+  }
+
+  // Internal-scrape failure path — shown when the URL-paste flow hits
+  // an unsupported brand, a blocked origin, or a network error. Quiet
+  // glass card with a way back. The brand-nudge UX from the previous
+  // architecture (when HomeScreen handled scrape errors) is on the
+  // backlog — this is the minimum-viable "we couldn't read this URL"
+  // state.
+  if (scrapeError) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <View style={styles.errorCardWrap}>
+          <Feather
+            name={scrapeError.kind === 'blocked' ? 'shield' : 'alert-circle'}
+            size={32}
+            color={colors.textSecondary}
+            style={{ marginBottom: spacing.md }}
+          />
+          <Text style={styles.errorCardTitle}>
+            {scrapeError.kind === 'blocked'
+              ? `${scrapeError.origin || 'This brand'} has opted out`
+              : "We couldn't read this product"}
+          </Text>
+          <Text style={styles.errorCardBody}>{scrapeError.message}</Text>
+          <TouchableOpacity
+            testID="fit-result-error-go-back"
+            style={[styles.primaryButton, { marginTop: spacing.lg }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Go back</Text>
+          </TouchableOpacity>
+          {routeUrl ? (
+            <TouchableOpacity
+              testID="fit-result-error-open-store"
+              style={[styles.secondaryButton, { marginTop: spacing.sm }]}
+              onPress={() => Linking.openURL(routeUrl)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.secondaryButtonText}>Visit store directly</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  // Defensive guard — if we somehow reached here without a product
+  // (loading=false, no scrape error, but no product), bail out so the
+  // render below can safely treat product as defined.
+  if (!product) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <FitLoader url={routeUrl} />
       </View>
     );
   }
@@ -489,7 +611,12 @@ export default function FitResultScreen() {
 
   const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
   const showMaterial = !!enrichedProduct?.material;
-  const showTags = !!(enrichedProduct?.tags?.length);
+  // Tags pass through the noise filter before render — keeps things
+  // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
+  // user-facing chip row. Also strips a tag that duplicates the
+  // category (e.g. "Top" tag when category is already "Top").
+  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, enrichedProduct?.category);
+  const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
     ? sizeRec.confidence === 'high'
@@ -694,14 +821,16 @@ export default function FitResultScreen() {
             </View>
           </View>
 
-          {/* Re-eval banners */}
-          {reevaluating && (
+          {/* Re-eval banners — expanded only. Status indicators belong
+              with the rest of the analysis detail; the dock should
+              stay minimal. */}
+          {isExpanded && reevaluating && (
             <View style={styles.banner}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={styles.bannerText}>Re-evaluating with updated profile…</Text>
             </View>
           )}
-          {reevaluated && !reevaluating && (
+          {isExpanded && reevaluated && !reevaluating && (
             <View style={[styles.banner, styles.bannerSuccess]}>
               <Feather name="check-circle" size={14} color={colors.success} />
               <Text style={[styles.bannerText, { color: colors.success }]}>
@@ -710,8 +839,8 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Sizing note */}
-          {sizeRec?.note && (
+          {/* Sizing note — expanded only. */}
+          {isExpanded && sizeRec?.note && (
             <View style={styles.noteBlock}>
               <Text style={styles.noteLabel}>SIZING NOTE</Text>
               <Text style={styles.noteText}>{sizeRec.note}</Text>
@@ -720,7 +849,7 @@ export default function FitResultScreen() {
 
           {/* Concerns — only render when the card is expanded. When the user
               drags the handle down to collapse, this section disappears and
-              the card shrinks to show just the verdict + stats + meta/tags.
+              the card shrinks to show just the verdict + stats + material.
               Re-expanding brings it back. */}
           {isExpanded && warnings.length > 0 && (
             <View style={styles.section}>
@@ -742,12 +871,12 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Tags */}
-          {showTags && (
+          {/* Tags — expanded only. */}
+          {isExpanded && showTags && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>TAGS</Text>
               <View style={styles.tagsContainer}>
-                {enrichedProduct!.tags!.slice(0, 6).map((tag: string, i: number) => (
+                {visibleTags.slice(0, 6).map((tag: string, i: number) => (
                   <View key={i} style={styles.tag}>
                     <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
                   </View>
@@ -756,8 +885,12 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Meta rows — Material first, then Category (swapped per UX ask) */}
-          {(showCategory || showMaterial) && (
+          {/* Meta rows — Material is the only meta row that survives the
+              dock's minimum-info treatment. Category lives here too but
+              only when expanded. The user-spec for the dock is:
+              verdict + price + stats (size/confidence/fit) + material.
+              Everything else gets hidden behind the drag-up. */}
+          {(showMaterial || (isExpanded && showCategory)) && (
             <View style={styles.metaSection}>
               {showMaterial && (
                 <View style={styles.metaRow}>
@@ -765,7 +898,7 @@ export default function FitResultScreen() {
                   <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
                 </View>
               )}
-              {showCategory && (
+              {isExpanded && showCategory && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category</Text>
                   <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
@@ -774,7 +907,9 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Action buttons */}
+          {/* Action buttons — expanded only. The dock should stay
+              minimal; CTAs live behind a deliberate drag-up. */}
+          {isExpanded && (
           <View style={styles.actionsSection}>
             {isHistoryMode ? (
               <>
@@ -834,14 +969,16 @@ export default function FitResultScreen() {
               </>
             )}
           </View>
+          )}
 
-          {/* Attribution footer — small citation-style line at the very
-              bottom of the card. Combined with the existing "View on
-              Store" CTA (the functional backlink), this reinforces the
-              scrape's posture as a referral tool, not a republisher.
-              Timestamp answers "how fresh is this?" — critical for the
-              inventory + price fields which can go stale fast. */}
-          {url && (
+          {/* Attribution footer — expanded only. Citation belongs with
+              the rest of the analysis content; the dock just shows the
+              verdict at-a-glance.
+              Combined with "View on Store" above (the loud referral),
+              this is the quiet credit line. Timestamp answers "how
+              fresh is this?" — critical for inventory + price fields
+              which can go stale fast. */}
+          {isExpanded && url && (
             <View style={styles.attributionFooter}>
               <Text
                 testID="attribution-footer"
@@ -943,6 +1080,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // --- Internal-scrape error card (used in URL-paste flow when the
+  //     scrape fails after FitResult-internal scrape kicked off) ---
+  errorCardWrap: {
+    width: '85%',
+    maxWidth: 360,
+    padding: spacing.xl,
+    borderRadius: borderRadius.xxl,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    alignItems: 'center',
+    shadowColor: '#1a1118',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  errorCardTitle: {
+    ...typography.headingM,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  errorCardBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 
   // --- Background product image (full-bleed) ---

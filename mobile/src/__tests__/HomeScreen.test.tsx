@@ -138,18 +138,13 @@ describe('HomeScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
   });
 
-  it('scrapes and navigates to FitResult on success', async () => {
+  it('navigates to FitResult with the URL on Check Fit tap', async () => {
+    // The unified loader flow has HomeScreen navigate immediately
+    // (no scrape on this screen). FitResult runs scrape + enrich +
+    // fit-check under one loading state. Brand-nudge / blocked-brand
+    // cards have moved into FitResult; this test only asserts the
+    // navigation call now.
     setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: true,
-      data: {
-        name: 'Linen shirt',
-        image: 'https://cdn.example.com/a.jpg',
-        price: { amount: 49, currency: 'GBP' },
-        brand: 'Asos',
-      },
-    });
-
     const { getByTestId } = render(<HomeScreen />);
     await act(async () => {
       fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
@@ -157,87 +152,33 @@ describe('HomeScreen', () => {
     await act(async () => {
       fireEvent.press(getByTestId('check-fit-button'));
     });
-    // Drain the scrapeProduct promise microtask chain.
-    await act(async () => {
-      await Promise.resolve();
-    });
 
-    expect(api.scrapeProduct).toHaveBeenCalledWith('https://asos.com/p/1');
+    expect(api.scrapeProduct).not.toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith(
       'FitResult',
-      expect.objectContaining({
-        url: 'https://asos.com/p/1',
-        product: expect.objectContaining({ name: 'Linen shirt' }),
-      })
+      expect.objectContaining({ url: 'https://asos.com/p/1' })
     );
   });
 
-  it('renders brand nudge card when scrape fails', async () => {
+  it('auto-triggers navigation after 700ms debounce when user pastes a valid URL', async () => {
     setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: false,
-      error: 'Brand not supported',
-    });
-
-    const { getByTestId, findByTestId, getByText } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://obscurebrand.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    await findByTestId('brand-nudge-card');
-    expect(getByText(/Obscurebrand isn't on our platform yet/i)).toBeTruthy();
-    // Navigation to FitResult must NOT fire on failure.
-    expect(mockNavigate).not.toHaveBeenCalledWith('FitResult', expect.anything());
-  });
-
-  it('sends a brand nudge and swaps to the thank-you copy', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: false,
-      error: 'Brand not supported',
-    });
-    (api.nudgeBrand as jest.Mock).mockResolvedValueOnce({ success: true });
-
-    const { getByTestId, findByTestId, findByText } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://obscurebrand.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    await findByTestId('nudge-brand-button');
-    fireEvent.press(getByTestId('nudge-brand-button'));
-
-    await findByText(/We've reached out to Obscurebrand/i);
-    expect(api.nudgeBrand).toHaveBeenCalledWith('obscurebrand.com', 'Obscurebrand');
-  });
-
-  it('surfaces a generic error if scrapeProduct throws', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockRejectedValueOnce(new Error('boom'));
-
-    const { getByTestId, findByTestId } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
-    fireEvent.press(getByTestId('check-fit-button'));
-
-    // The nudge card renders because HomeScreen's catch falls back to
-    // extractBrandFromUrl + a brand-nudge CTA.
-    await findByTestId('brand-nudge-card');
-  });
-
-  it('auto-triggers scrape after 700ms debounce when user pastes a valid URL', async () => {
-    setAvatar(true);
-    (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
-      success: true,
-      data: { name: 'Dress' },
-    });
-
     const { getByTestId } = render(<HomeScreen />);
     fireEvent.changeText(getByTestId('url-input'), 'https://zara.com/p/1');
 
     // Before debounce fires nothing should have happened.
-    expect(api.scrapeProduct).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalledWith('FitResult', expect.anything());
 
     await act(async () => {
       jest.advanceTimersByTime(750);
     });
 
-    await waitFor(() => expect(api.scrapeProduct).toHaveBeenCalledWith('https://zara.com/p/1'));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'FitResult',
+        expect.objectContaining({ url: 'https://zara.com/p/1' })
+      )
+    );
+    // No scrape call from HomeScreen — that lives in FitResult now.
+    expect(api.scrapeProduct).not.toHaveBeenCalled();
   });
 });

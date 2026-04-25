@@ -41,7 +41,14 @@ export type RootStackParamList = {
   Main: undefined;
   AvatarSetup: undefined;
   FitResult: {
-    product: ScrapedProduct;
+    /** Optional — when present, FitResult skips its internal scrape
+     *  step and goes straight to enrichment + fit-check. Sources that
+     *  already have product data (history mode, share-intent post-
+     *  scrape) pass it. The HomeScreen URL-paste flow does NOT pass
+     *  this — FitResult does the scrape itself, eliminating the
+     *  double-loader regression where users saw HomeScreen's loader
+     *  followed by FitResult's loader back-to-back. */
+    product?: ScrapedProduct;
     url: string;
     historyEntryId?: string;
     precomputed?: {
