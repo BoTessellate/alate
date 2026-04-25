@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
-import { colors, spacing, typography } from '../constants/theme';
+import { colors, spacing, typography, fontFamily } from '../constants/theme';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
@@ -149,7 +149,7 @@ function MainTabs() {
         },
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontFamily: 'serif',
+          fontFamily: fontFamily.primary,
           fontSize: 10,
           fontWeight: '600',
           letterSpacing: 0.3,

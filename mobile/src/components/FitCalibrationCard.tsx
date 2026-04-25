@@ -32,6 +32,7 @@ import {
   typography,
   shadows,
   borderRadius,
+  fontFamily,
 } from '../constants/theme';
 import GlassCard from './GlassCard';
 import {
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   typicalValue: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 38,
     fontWeight: '700',
     color: colors.primary,

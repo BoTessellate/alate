@@ -13,7 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, ms } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, ms, fontFamily } from '../constants/theme';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
@@ -227,11 +227,6 @@ export default function HistoryScreen() {
         <ConfirmDialog
           visible={!!pendingDelete}
           title="Remove from history?"
-          message={
-            pendingDelete
-              ? `"${pendingDelete.productName}" will be removed from your fit history. This can't be undone.`
-              : undefined
-          }
           confirmLabel="Remove"
           icon="trash-2"
           confirmTestID="confirm-delete-history-entry"
@@ -243,8 +238,7 @@ export default function HistoryScreen() {
             single-entry remove. */}
         <ConfirmDialog
           visible={pendingClearAll}
-          title="Clear your fit history?"
-          message="All saved fit checks will be erased. This can't be undone."
+          title="Clear all fit history?"
           confirmLabel="Clear all"
           icon="alert-triangle"
           confirmTestID="confirm-clear-history"
@@ -280,7 +274,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   headerMeta: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 13,
     lineHeight: 19,
     color: colors.textMuted,

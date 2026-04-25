@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
 import {
   useAvatarStore,
   ShoulderType,
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   subtitle: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 12,
     lineHeight: 17,
     color: colors.textMuted,
