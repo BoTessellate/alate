@@ -24,7 +24,12 @@ param(
 
 $Org      = 'bot-h0'
 $Project  = 'alate'
-$ApiBase  = 'https://de.sentry.io/api/0'   # regional URL for bot-h0
+# Sentry bot-h0 lives in the EU region. Personal tokens with narrow
+# scopes (event:read + event:admin) only authorise org-scoped paths
+# like /organizations/{slug}/issues/{id}/ — NOT the bare /issues/{id}/
+# shortcut. Verified empirically: bare returns 404, org-scoped returns
+# 200 with the same token.
+$ApiBase  = 'https://de.sentry.io/api/0'
 
 # Issues to resolve. Each entry has the short ID + a one-line reason
 # (purely cosmetic — used in console output for clarity). The Sentry
@@ -101,14 +106,38 @@ $Headers = @{
     'Content-Type'  = 'application/json'
 }
 
-# --- Sanity check: hit /api/0/ with auth, fail loud on bad token ----
+# --- Auth probe: confirm we can read at least one issue first ------
+# Personal tokens with narrow scopes (e.g. `event:admin` only) can't
+# hit `/organizations/` (needs `org:read`) but CAN hit issue endpoints.
+# Probe the cheapest possible authenticated read — fetching one issue
+# we know exists by its short ID.
 
+$probeUrl = "$ApiBase/organizations/$Org/issues/$($NoiseIssues[0].Id)/"
+$probeOk = $false
+$probeStatus = $null
+$probeMessage = $null
 try {
-    $whoami = Invoke-RestMethod -Method GET -Uri "$ApiBase/" -Headers $Headers -ErrorAction Stop
-    Write-Host "Authenticated against $ApiBase/" -ForegroundColor Green
+    $probe = Invoke-RestMethod -Method GET -Uri $probeUrl -Headers $Headers -ErrorAction Stop
+    $probeOk = $true
 } catch {
-    Write-Error "Auth probe failed: $($_.Exception.Message)"
-    Write-Error 'Verify your token has event:admin and that the regional URL matches your org.'
+    if ($_.Exception.Response) { $probeStatus = [int]$_.Exception.Response.StatusCode }
+    $probeMessage = $_.Exception.Message
+}
+
+if ($probeOk) {
+    Write-Host "Auth probe OK - token can read issues." -ForegroundColor Green
+} else {
+    if ($probeStatus -eq 401) {
+        Write-Error "Auth probe failed: token is invalid or expired."
+    } elseif ($probeStatus -eq 403) {
+        Write-Error "Auth probe failed: token lacks required scopes."
+        Write-Error "Required scopes: event:read AND event:admin (for resolution)."
+        Write-Error "Regenerate at: https://bot-h0.sentry.io/settings/account/api/auth-tokens/"
+    } elseif ($probeStatus -eq 404) {
+        Write-Error "Auth probe failed: regional URL ($ApiBase) wrong for this org. Try sentry.io (global)."
+    } else {
+        Write-Error "Auth probe failed (HTTP $probeStatus): $probeMessage"
+    }
     exit 1
 }
 
@@ -124,7 +153,7 @@ foreach ($issue in $NoiseIssues) {
     $reason = $issue.Reason
     # Per-issue PUT — most reliable. Bulk endpoint exists but is more
     # finicky about ID format.
-    $url = "$ApiBase/issues/$id/"
+    $url = "$ApiBase/organizations/$Org/issues/$id/"
 
     try {
         $resp = Invoke-RestMethod -Method PUT -Uri $url -Headers $Headers -Body $Body -ErrorAction Stop
