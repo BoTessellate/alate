@@ -326,9 +326,71 @@ export const shadows = {
 // separation comes from shadow + slight brightness, no darker bottom to fight.
 // =============================================================================
 export const glass = {
+  // Default glass treatment for cards on the solid light bg.
   backgroundColor: 'rgba(255, 255, 255, 0.75)',
   borderColor: 'rgba(255, 255, 255, 0.85)',
   borderWidth: 0.5,
+  // Variant tuned for the FitResult dock — sits over a (potentially
+  // busy) product image, so the tint is firmer and the inner border
+  // brighter to keep text legible without losing the frosted feel.
+  // Works in tandem with the underlying BlurView.
+  dockBackgroundColor: 'rgba(255, 255, 255, 0.65)',
+  dockBorderColor: 'rgba(255, 255, 255, 0.9)',
+};
+
+// =============================================================================
+// SEMANTIC TOKENS — derived alpha shades of the brand palette so we
+// stop sprinkling rgba(106, 95, 117, 0.X) literals across the codebase.
+// Each helper returns a pre-baked rgba string at the named alpha.
+// =============================================================================
+
+/** Build an rgba() string from a hex colour at a given alpha (0..1). */
+const hexToRgba = (hex: string, alpha: number): string => {
+  const cleaned = hex.replace('#', '');
+  const r = parseInt(cleaned.substring(0, 2), 16);
+  const g = parseInt(cleaned.substring(2, 4), 16);
+  const b = parseInt(cleaned.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/**
+ * Pre-computed alpha variants of the primary brand colour. Use these
+ * instead of inline rgba(106, 95, 117, 0.X) literals so the palette is
+ * adjustable in ONE place.
+ *
+ *   tintXxs (4%)  — barely-there fill (hairline divider)
+ *   tintXs (8%)   — subtle pill / chip background
+ *   tintSm (12%)  — chip background, info banner
+ *   tintMd (18%)  — opted-out / muted chip
+ *   tintLg (32%)  — chevron pill on light bg
+ *   tintXl (55%)  — chevron pill on image (back btn / delete btn)
+ */
+export const primaryAlpha = {
+  tintXxs: hexToRgba(colors.primary, 0.04),
+  tintXs: hexToRgba(colors.primary, 0.08),
+  tintSm: hexToRgba(colors.primary, 0.12),
+  tintMd: hexToRgba(colors.primary, 0.18),
+  tintLg: hexToRgba(colors.primary, 0.32),
+  tintXl: hexToRgba(colors.primary, 0.55),
+};
+
+/** Same idea for `colors.text` (deep grey-purple) — used for circular
+ *  affordances on busy backgrounds (the "shield" colour scheme). */
+export const textAlpha = {
+  tintXs: hexToRgba(colors.text, 0.06),
+  tintSm: hexToRgba(colors.text, 0.12),
+  tintMd: hexToRgba(colors.text, 0.32),
+  tintLg: hexToRgba(colors.text, 0.55),
+};
+
+/** Status colours pre-baked at common chip/badge alphas — keeps the
+ *  green/red/orange tints consistent across availability, fit
+ *  concerns, and verdict pills. */
+export const statusAlpha = {
+  successSoft: hexToRgba(colors.successDeep, 0.14),
+  warningSoft: hexToRgba(colors.warningDeep, 0.14),
+  errorSoft: hexToRgba(colors.errorDeep, 0.14),
+  mutedSoft: hexToRgba(colors.textMuted, 0.10),
 };
 
 // =============================================================================
@@ -343,4 +405,7 @@ export default {
   typography,
   shadows,
   glass,
+  primaryAlpha,
+  textAlpha,
+  statusAlpha,
 };

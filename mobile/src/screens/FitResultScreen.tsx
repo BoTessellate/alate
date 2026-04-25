@@ -36,7 +36,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
@@ -78,6 +78,13 @@ const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
 const FILTERED_CATEGORIES = new Set(['general', 'clothing', 'other', 'unknown', '']);
+
+// Single source of truth for the four stat-column icon dimensions.
+// Previously the SIZE badge was 44, the donut was 48, the FIT badge
+// was 40 — they read as visually inconsistent because they really
+// were inconsistent. All four icons now use STAT_ICON_SIZE so the
+// row lines up vertically and looks like a coherent set of chips.
+const STAT_ICON_SIZE = 44;
 
 export default function FitResultScreen() {
   const route = useRoute<FitResultRouteProp>();
@@ -829,7 +836,7 @@ export default function FitResultScreen() {
             )}
             <View style={styles.statCol}>
               <ConfidenceDonut level={sizeRec?.confidence ?? null} />
-              <Text style={styles.statLabel}>CONFIDENCE</Text>
+              <Text style={styles.statLabel}>MATCH</Text>
             </View>
             <View style={styles.statCol}>
               <View style={styles.fitBadge}>
@@ -845,12 +852,15 @@ export default function FitResultScreen() {
                   style={[
                     styles.fitBadge,
                     {
+                      // Token-driven status tint — keeps the green/red/
+                      // muted alphas consistent with chip backgrounds
+                      // elsewhere (statusAlpha tokens in theme.ts).
                       backgroundColor:
                         displayAvailability.status === 'in_stock'
-                          ? 'rgba(90, 122, 104, 0.14)'
+                          ? statusAlpha.successSoft
                           : displayAvailability.status === 'out_of_stock'
-                          ? 'rgba(154, 74, 74, 0.14)'
-                          : 'rgba(106, 95, 117, 0.06)',
+                          ? statusAlpha.errorSoft
+                          : primaryAlpha.tintXxs,
                     },
                   ]}
                 >
@@ -1098,31 +1108,27 @@ function StatBadge({ value, testID }: { value: string; testID?: string }) {
   );
 }
 
-// Confidence as a 3-segment progress bar with increasing purple saturation.
-// Low  → first segment filled at light purple (0.3 alpha)
-// Med  → first + second at mid alpha
-// High → all three at full brand purple
-// Unfilled segments sit at a very light purple tint so the track is
-// always visible. Replaces the circular "Me…"-truncating chip.
+// MATCH donut — circular arc whose length grows with the system's
+// certainty in the size recommendation. Rendered at the same 44px
+// circle dimension as the SIZE / FIT / STOCK badges so all four stat
+// columns line up vertically. `high` stops just shy of 100% (0.98) —
+// a fully-closed ring reads as "complete" which is wrong for
+// confidence; the tiny gap signals "strong but not absolute".
 function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null }) {
   if (!level) return null;
-  // Arc length grows with confidence (28% / 60% / 92% of circumference) and
-  // the stroke colour saturates with it (light → mid → full brand purple).
-  // Rotated -90° so the fill starts from 12 o'clock and sweeps clockwise.
-  const size = 48;
-  const stroke = 6;
+  const size = STAT_ICON_SIZE;
+  const stroke = 5;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  // Arc lengths per level. `high` stops just shy of 100% (0.98) — a
-  // fully-closed ring reads as "complete" which is wrong for confidence;
-  // the tiny gap signals "strong but not absolute".
   const percent = level === 'high' ? 0.98 : level === 'medium' ? 0.6 : 0.28;
+  // Tap into the primary-alpha tokens so the saturation ramp is
+  // adjustable in one place (theme.ts) instead of three inline values.
   const colour =
     level === 'high'
-      ? 'rgba(106, 95, 117, 1)'
+      ? colors.primary
       : level === 'medium'
-      ? 'rgba(106, 95, 117, 0.72)'
-      : 'rgba(106, 95, 117, 0.45)';
+      ? primaryAlpha.tintLg
+      : primaryAlpha.tintMd;
   const label = level === 'high' ? 'H' : level === 'medium' ? 'M' : 'L';
   return (
     <View style={styles.confidenceDonut}>
@@ -1132,7 +1138,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke="rgba(106, 95, 117, 0.14)"
+          stroke={primaryAlpha.tintSm}
           strokeWidth={stroke}
           fill="transparent"
         />
@@ -1150,7 +1156,7 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
         />
       </Svg>
       {/* Single-letter centre glyph keeps the donut readable without a
-          separate label — the H/M/L maps directly to the arc length. */}
+          separate label — H/M/L maps directly to the arc length. */}
       <Text style={styles.confidenceDonutLabel}>{label}</Text>
     </View>
   );
@@ -1175,13 +1181,12 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     padding: spacing.xl,
     borderRadius: borderRadius.xxl,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    // Slightly more opaque than the standard glass token because it
+    // sits on the loadingContainer's plain background — needs to read
+    // as a definite card rather than a translucent overlay.
+    backgroundColor: glass.backgroundColor,
     alignItems: 'center',
-    shadowColor: '#1a1118',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 6,
+    ...shadows.glass,
   },
   errorCardTitle: {
     ...typography.headingM,
@@ -1218,7 +1223,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1230,7 +1235,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1279,13 +1284,14 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Bumped 0.28 → 0.62 so body text (sizing note, concerns, tag
-    // labels, meta rows) passes WCAG AA contrast against the busy
-    // product-image backdrop. The image-through-glass feel is still
-    // there, just with a firmer frost tint so text reads clearly.
-    backgroundColor: 'rgba(255, 255, 255, 0.62)',
+    // Glass tokens (theme.ts → glass.dock*) drive the dock's frosted
+    // look. dockBackgroundColor (rgba 0.65) sits over the BlurView
+    // for legibility on busy product images; dockBorderColor (rgba
+    // 0.9) is a brighter inner edge that catches "light" and makes
+    // the surface read as glass rather than a solid wash.
+    backgroundColor: glass.dockBackgroundColor,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.65)',
+    borderColor: glass.dockBorderColor,
     borderTopLeftRadius: borderRadius.xxxl,
     borderTopRightRadius: borderRadius.xxxl,
   },
@@ -1315,7 +1321,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(76, 67, 86, 0.22)',
+    backgroundColor: textAlpha.tintMd,
   },
 
   // --- Verdict row (H1) ---
@@ -1337,14 +1343,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pricePill: {
-    backgroundColor: 'rgba(106, 95, 117, 0.14)',
+    backgroundColor: primaryAlpha.tintSm,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
     marginLeft: spacing.sm,
   },
   priceText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     fontWeight: '800',
     color: colors.primary,
@@ -1354,7 +1360,7 @@ const styles = StyleSheet.create({
   // --- Divider ---
   divider: {
     height: 1,
-    backgroundColor: 'rgba(76, 67, 86, 0.12)',
+    backgroundColor: textAlpha.tintSm,
     marginBottom: spacing.md,
   },
 
@@ -1372,7 +1378,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.3,
@@ -1380,34 +1386,40 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   // Size badge — circle with the size letter/number
+  // SIZE / FIT / STOCK badges — all use the same STAT_ICON_SIZE so
+  // they line up vertically with the MATCH donut. statBadge has a
+  // visible border (it carries letter glyphs and benefits from the
+  // sharper edge); fitBadge is borderless (it carries icon glyphs
+  // ✓ / ⚠ / ✕ that have their own visual weight). Both fills come
+  // from primaryAlpha tokens so the saturation ramp is adjustable
+  // in one place.
   statBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
+    borderRadius: STAT_ICON_SIZE / 2,
+    backgroundColor: primaryAlpha.tintSm,
     borderWidth: 1.25,
-    borderColor: 'rgba(106, 95, 117, 0.22)',
+    borderColor: primaryAlpha.tintMd,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Smaller circle for the fit + stock icons (purely visual)
   fitBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(106, 95, 117, 0.06)',
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
+    borderRadius: STAT_ICON_SIZE / 2,
+    backgroundColor: primaryAlpha.tintXxs,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1416,13 +1428,13 @@ const styles = StyleSheet.create({
   //     both grow with confidence. Centre letter (H/M/L) is the legible
   //     label without stealing space. ---
   confidenceDonut: {
-    width: 48,
-    height: 48,
+    width: STAT_ICON_SIZE,
+    height: STAT_ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   confidenceDonutLabel: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     position: 'absolute',
     fontSize: 13,
     fontWeight: '800',
@@ -1437,11 +1449,11 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: spacing.sm,
     marginBottom: spacing.md,
-    backgroundColor: 'rgba(106, 95, 117, 0.08)',
+    backgroundColor: primaryAlpha.tintXs,
     borderRadius: borderRadius.md,
   },
   bannerSuccess: {
-    backgroundColor: 'rgba(46, 125, 91, 0.1)',
+    backgroundColor: statusAlpha.successSoft,
   },
   bannerText: {
     ...typography.bodySmall,
@@ -1451,7 +1463,7 @@ const styles = StyleSheet.create({
 
   // --- Sizing note ---
   noteBlock: {
-    backgroundColor: 'rgba(106, 95, 117, 0.08)',
+    backgroundColor: primaryAlpha.tintXs,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -1494,7 +1506,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   concernSeverity: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -1513,13 +1525,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tag: {
-    backgroundColor: 'rgba(106, 95, 117, 0.12)',
+    backgroundColor: primaryAlpha.tintSm,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
   },
   tagText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
@@ -1529,7 +1541,7 @@ const styles = StyleSheet.create({
   // --- Meta ---
   metaSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(76, 67, 86, 0.1)',
+    borderTopColor: textAlpha.tintSm,
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
@@ -1579,21 +1591,21 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   secondaryButton: {
-    backgroundColor: 'rgba(106, 95, 117, 0.1)',
+    backgroundColor: primaryAlpha.tintSm,
     borderRadius: borderRadius.pill,
     paddingVertical: 13,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 14,
     color: colors.primary,
     fontWeight: '700',
@@ -1618,10 +1630,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(76, 67, 86, 0.08)',
+    borderTopColor: textAlpha.tintXs,
   },
   attributionText: {
-    fontFamily: 'serif',
+    fontFamily: fontFamily.primary,
     fontSize: 11,
     lineHeight: 15,
     letterSpacing: 0.2,
