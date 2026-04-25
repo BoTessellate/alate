@@ -19,6 +19,7 @@ import Animated, {
   withSpring,
   interpolate,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 // @sbaiahmed1/react-native-blur — Fabric/new-arch-ready Turbo Module.
@@ -264,8 +265,23 @@ export default function FitResultScreen() {
     })
     .onEnd(() => {
       const target = collapseProgress.value > 0.5 ? 1 : 0;
-      collapseProgress.value = withSpring(target, { damping: 18, stiffness: 160 });
-      runOnJS(setIsExpanded)(target === 1);
+      // Switched from withSpring to withTiming + cubic ease — user
+      // flagged the spring bounce as "still too much, very very
+      // subtle". A timing curve has zero overshoot by definition; the
+      // 280ms cubic-out duration keeps the dock change feeling
+      // responsive without ANY perceptible bounce. Defer the React
+      // state flip until the timing completes (same pattern we used
+      // with withSpring) so the concerns section doesn't reflow
+      // mid-animation.
+      collapseProgress.value = withTiming(
+        target,
+        { duration: 280, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) {
+            runOnJS(setIsExpanded)(target === 1);
+          }
+        }
+      );
     });
 
   // Horizontal drag sifts to the next/prev entry. HOISTED to the root
@@ -299,7 +315,13 @@ export default function FitResultScreen() {
       } else if (e.translationX > SWIPE_THRESHOLD && localIndex > 0) {
         runOnJS(setLocalIndex)(localIndex - 1);
       }
-      swipeX.value = withSpring(0, { damping: 20, stiffness: 180 });
+      // Same bounce-free treatment as the dock collapse. A 200ms
+      // ease-out brings the card back to centre cleanly without the
+      // subtle overshoot a spring would produce.
+      swipeX.value = withTiming(0, {
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+      });
     });
 
   const siftStyle = useAnimatedStyle(() => ({
