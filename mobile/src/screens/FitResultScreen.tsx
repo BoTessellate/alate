@@ -789,56 +789,60 @@ export default function FitResultScreen() {
             the edge for a frosted-glass feel. */}
         <View style={styles.cardTint} pointerEvents="none" />
 
-        {/* Drag is scoped to the HANDLE zone only — wrapping the whole
-            card body in a Pan gesture made the inner ScrollView fight
-            for ownership on every vertical scroll. Handle gets the
-            drag, body gets pure scroll. The handle is a 56px tall
-            zone at the top of the card with a visible grip bar at the
-            centre — large enough to grab without aiming, small
-            enough that 90% of the card is uncontested scroll. */}
+        {/* Drag covers the WHOLE top of the overlay — handle bar + the
+            verdict header (title, sub-line, price pill). User
+            direction: dragging from anywhere at the top should
+            collapse/expand, not just the small handle. The verdict
+            block is pulled out of the ScrollView and into this
+            gesture-wrapped header so it works as a drag target.
+            ScrollView starts BELOW the divider, owns vertical scroll
+            on the rest of the body. */}
         <Animated.View style={[styles.cardScrollWrap, siftStyle]}>
           <GestureDetector gesture={dragGesture}>
-            <View style={styles.handleHit}>
-              <View style={styles.handle} />
+            <View style={styles.headerArea}>
+              <View style={styles.handleHit}>
+                <View style={styles.handle} />
+              </View>
+
+              {/* H1: Fit verdict — biggest element in the card. Uses the
+                  TAN Nightingale SVG for the score label; styled-text
+                  fallback kicks in if the asset is missing. */}
+              <View style={styles.verdictRow}>
+                <View style={styles.verdictMain}>
+                  <HeadingImage
+                    testID="fit-score-label"
+                    slot={
+                      fitScore === 'great'
+                        ? 'great-fit'
+                        : fitScore === 'moderate'
+                        ? 'some-concerns'
+                        : 'may-not-fit'
+                    }
+                    fallback={scoreConfig.text}
+                    height={42}
+                    color={scoreConfig.color}
+                    textStyle={[styles.verdictText, { color: scoreConfig.color }]}
+                  />
+                  <Text style={styles.verdictSub}>
+                    {warnings.length === 0
+                      ? 'No fit concerns'
+                      : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
+                  </Text>
+                </View>
+                {priceDisplay && (
+                  <View style={styles.pricePill}>
+                    <Text style={styles.priceText}>{priceDisplay}</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </GestureDetector>
+
           <ScrollView
             style={styles.cardScroll}
             contentContainerStyle={styles.cardContent}
             showsVerticalScrollIndicator={false}
           >
-
-          {/* H1: Fit verdict — biggest element in the card. Uses the
-              TAN Nightingale SVG for the score label; styled-text
-              fallback kicks in if the asset is missing. */}
-          <View style={styles.verdictRow}>
-            <View style={styles.verdictMain}>
-              <HeadingImage
-                testID="fit-score-label"
-                slot={
-                  fitScore === 'great'
-                    ? 'great-fit'
-                    : fitScore === 'moderate'
-                    ? 'some-concerns'
-                    : 'may-not-fit'
-                }
-                fallback={scoreConfig.text}
-                height={42}
-                color={scoreConfig.color}
-                textStyle={[styles.verdictText, { color: scoreConfig.color }]}
-              />
-              <Text style={styles.verdictSub}>
-                {warnings.length === 0
-                  ? 'No fit concerns'
-                  : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
-              </Text>
-            </View>
-            {priceDisplay && (
-              <View style={styles.pricePill}>
-                <Text style={styles.priceText}>{priceDisplay}</Text>
-              </View>
-            )}
-          </View>
 
           <View style={styles.divider} />
 
@@ -856,10 +860,12 @@ export default function FitResultScreen() {
                 <Text style={styles.statLabel}>SIZE</Text>
               </View>
             )}
-            <View style={styles.statCol}>
-              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
-              <Text style={styles.statLabel}>MATCH</Text>
-            </View>
+            {/* Order is intentional: SIZE → FIT → CONFIDENCE → STOCK.
+                Reads as a narrative — "what size? L. Does it fit?
+                great. How sure are we? high. Is it in stock? yes."
+                Earlier order had MATCH (renamed from CONFIDENCE)
+                between SIZE and FIT, but that broke the verdict-then-
+                certainty flow. */}
             <View style={styles.statCol}>
               <View style={styles.fitBadge}>
                 <Text style={[styles.statIconText, { color: scoreConfig.color }]}>
@@ -867,6 +873,10 @@ export default function FitResultScreen() {
                 </Text>
               </View>
               <Text style={styles.statLabel}>FIT</Text>
+            </View>
+            <View style={styles.statCol}>
+              <ConfidenceDonut level={sizeRec?.confidence ?? null} />
+              <Text style={styles.statLabel}>CONFIDENCE</Text>
             </View>
             {showAvailability && (
               <View style={styles.statCol} testID="fit-availability-stat">
@@ -1323,6 +1333,15 @@ const styles = StyleSheet.create({
   cardScrollWrap: {
     flex: 1,
   },
+  // Header area — wraps the handle + verdict block in the drag
+  // gesture. The whole rectangle is a drag target ("anywhere at the
+  // top of the overlay" per user direction). Padding mirrors
+  // cardContent's horizontal padding so the verdict aligns with the
+  // ScrollView content below.
+  headerArea: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   cardScroll: {
     flex: 1,
   },
@@ -1331,8 +1350,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.xl,
   },
-  // Bigger hit target around the handle bar so the drag gesture is easy
-  // to grab without hitting the thin visual bar exactly.
+  // Visible-handle hit zone — sits inside headerArea. No separate
+  // gesture (the parent headerArea catches the drag). alignItems:
+  // 'center' centres the small grip bar horizontally.
   handleHit: {
     width: '100%',
     paddingTop: spacing.sm,
