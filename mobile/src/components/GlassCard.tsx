@@ -19,7 +19,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { borderRadius, shadows } from '../constants/theme';
+import { borderRadius, shadows, whiteAlpha } from '../constants/theme';
 
 export interface GlassCardProps {
   children?: React.ReactNode;
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     // transparency here lets the gradient bleed through the card and creates
     // a visible top-light / bottom-purple split within a single tall card.
     // 0.92 keeps it frost-feel (hint of gradient tint) without the 2-tone bug.
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
   },
   tint: {
     // Near-zero — the solid outer already gives the frost read.
@@ -88,6 +88,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     // Hairline edge — keeps card edges crisp on the gradient.
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: whiteAlpha.borderMid,
   },
 });

@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
-import { colors, spacing, typography, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
@@ -133,7 +133,7 @@ function MainTabs() {
           borderRadius: 32,
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.5)',
+          borderColor: whiteAlpha.borderSoft,
           shadowColor: '#2f2937',
           shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.22,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   // tab bar's borderRadius so it clips cleanly inside the capsule.
   tabBarTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.58)',
+    backgroundColor: whiteAlpha.surfaceFrost,
     borderRadius: 32,
   },
   loadingOverlay: {

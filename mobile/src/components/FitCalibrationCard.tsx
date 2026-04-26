@@ -33,6 +33,7 @@ import {
   shadows,
   borderRadius,
   fontFamily,
+  textAlpha,
 } from '../constants/theme';
 import GlassCard from './GlassCard';
 import {
@@ -545,7 +546,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    backgroundColor: textAlpha.tintXs,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     justifyContent: 'flex-end',
   },
   modalSheet: {
