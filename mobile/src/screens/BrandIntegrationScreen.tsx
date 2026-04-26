@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, whiteAlpha } from '../constants/theme';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
@@ -184,10 +184,10 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     // Frosted glass surface — matches GlassCard look without the BlurView
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: whiteAlpha.borderMid,
     padding: spacing.md,
     alignItems: 'center',
     ...shadows.glass,
@@ -211,10 +211,10 @@ const styles = StyleSheet.create({
   },
   stepCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: whiteAlpha.borderMid,
     padding: spacing.md,
     marginBottom: spacing.sm,
     ...shadows.glass,
@@ -243,10 +243,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   listCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: whiteAlpha.borderMid,
     padding: spacing.md,
     marginBottom: spacing.xl,
     gap: spacing.md,

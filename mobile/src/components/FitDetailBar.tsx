@@ -8,7 +8,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { spacing, borderRadius, typography, fontFamily } from '../constants/theme';
+import { spacing, borderRadius, typography, fontFamily, primaryAlpha, whiteAlpha } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     // Medium-shade glass: brand purple at mid opacity. Sits between the
     // light #e4e2e9 canvas and a fully-dark reference bar — reads as a
     // soft tonal pill, not a heavy dark overlay.
-    backgroundColor: 'rgba(106, 95, 117, 0.52)',
+    backgroundColor: primaryAlpha.tintXl,
     borderRadius: borderRadius.pill,
   },
   left: {
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
     // Slightly stronger inner chip — the medium bg needs a nudge to keep
     // the fit-pill readable as a distinct token, not a flat label.
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: whiteAlpha.surfaceSoft,
   },
   dot: {
     width: 7,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: borderRadius.pill,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: whiteAlpha.surfaceStrong,
   },
   sizeLabel: {
     fontFamily: fontFamily.primary,

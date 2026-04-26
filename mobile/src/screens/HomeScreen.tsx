@@ -16,7 +16,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, secondaryAlpha, statusAlpha } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
@@ -269,10 +269,10 @@ export default function HomeScreen() {
         // reaches 90% opacity by the halfway mark, and the gradient is
         // ~60% taller than the previous 200px version.
         colors={[
-          'rgba(76, 67, 86, 0)',
-          'rgba(76, 67, 86, 0.7)',
-          'rgba(76, 67, 86, 0.97)',
-          '#4c4356',
+          secondaryAlpha.zero,
+          secondaryAlpha.strong,
+          secondaryAlpha.deeper,
+          colors.secondary,
         ]}
         locations={[0, 0.22, 0.5, 1]}
         style={styles.bottomFade}
@@ -286,10 +286,10 @@ export default function HomeScreen() {
 function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () => void }) {
   const { bg, fg, label } =
     entry.fitScore === 'great'
-      ? { bg: 'rgba(90, 122, 104, 0.18)', fg: '#4a6a58', label: 'Fits' }
+      ? { bg: statusAlpha.successMed, fg: colors.successDeep, label: 'Fits' }
       : entry.fitScore === 'moderate'
-      ? { bg: 'rgba(168, 114, 74, 0.18)', fg: '#8a5a3a', label: 'Check' }
-      : { bg: 'rgba(154, 74, 74, 0.18)', fg: '#7a3a3a', label: 'Concerns' };
+      ? { bg: statusAlpha.warningMed, fg: colors.warningDeep, label: 'Check' }
+      : { bg: statusAlpha.errorMed, fg: colors.errorDeep, label: 'Concerns' };
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
       <GlassCard style={styles.recentCard}>
@@ -297,7 +297,7 @@ function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () =>
           <Image source={{ uri: entry.productImage }} style={styles.recentThumb} />
         ) : (
           <View style={[styles.recentThumb, styles.recentThumbPlaceholder]}>
-            <Feather name="shopping-bag" size={18} color="rgba(255,255,255,0.7)" />
+            <Feather name="shopping-bag" size={18} color={whiteAlpha.textSecondary} />
           </View>
         )}
         <View style={styles.recentMeta}>
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.overline,
-    color: 'rgba(255,255,255,0.9)',
+    color: whiteAlpha.textBrand,
     letterSpacing: 2.2,
   },
   heroVerseWrap: {
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     ...typography.body,
-    color: 'rgba(255,255,255,0.85)',
+    color: whiteAlpha.textHigh,
     marginTop: 14,
     maxWidth: 300,
     lineHeight: 21,
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   },
   shareHint: {
     ...typography.caption,
-    color: 'rgba(255,255,255,0.7)',
+    color: whiteAlpha.textSecondary,
     textAlign: 'center',
     letterSpacing: 0.3,
     marginTop: spacing.xs,
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   },
   recentLabel: {
     ...typography.overline,
-    color: 'rgba(255,255,255,0.75)',
+    color: whiteAlpha.textBody,
     marginBottom: spacing.sm,
   },
   recentList: {
@@ -532,9 +532,9 @@ const styles = StyleSheet.create({
     // neither white nor dark text read well. 0.78 reads as frosted
     // glass (gradient still perceptible at the edges) but carries the
     // dark ink cleanly.
-    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    backgroundColor: whiteAlpha.surfaceCard,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: whiteAlpha.borderStrong,
   },
   recentThumb: {
     width: 44,

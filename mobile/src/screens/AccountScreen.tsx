@@ -27,7 +27,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, fontFamily, whiteAlpha, primaryAlpha, secondaryAlpha, textAlpha } from '../constants/theme';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useAccountStore, GoogleUser } from '../store/accountStore';
@@ -377,10 +377,10 @@ export default function AccountScreen() {
           scrollable list rows. */}
       <LinearGradient
         colors={[
-          'rgba(76, 67, 86, 0)',
-          'rgba(76, 67, 86, 0.55)',
-          'rgba(76, 67, 86, 0.95)',
-          '#4c4356',
+          secondaryAlpha.zero,
+          secondaryAlpha.mid,
+          secondaryAlpha.deep,
+          colors.secondary,
         ]}
         locations={[0, 0.22, 0.55, 1]}
         style={styles.bottomFade}
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     // Muted purple chip instead of the red-tinted destructive pill.
     // The action is still destructive, but the confirm dialog gates the
     // actual sign-out — the chip doesn't need to shout.
-    backgroundColor: 'rgba(106, 95, 117, 0.12)',
+    backgroundColor: primaryAlpha.tintSm,
   },
   signOutText: {
     ...typography.label,
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     // Light on dark gradient bg.
-    color: 'rgba(255,255,255,0.8)',
+    color: whiteAlpha.textBodyStrong,
   },
   editPill: {
     flexDirection: 'row',
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
     // White-tinted pill on the dark bg.
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: whiteAlpha.surfaceMid,
   },
   editPillText: {
     fontFamily: fontFamily.primary,
@@ -574,7 +574,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(47, 41, 55, 0.08)',
+    borderBottomColor: textAlpha.divider,
   },
   profileRowLast: {
     borderBottomWidth: 0,
@@ -645,12 +645,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.pill,
     // Subdued on dark gradient — quieter text link feel, not a bright red button.
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: whiteAlpha.surfaceFaint,
     marginTop: spacing.lg,
   },
   resetText: {
     ...typography.label,
-    color: 'rgba(255,255,255,0.75)',
+    color: whiteAlpha.textBody,
     fontWeight: '600',
   },
 
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   legalLinkText: {
     fontFamily: fontFamily.primary,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
+    color: whiteAlpha.textMuted,
     textDecorationLine: 'underline',
     paddingVertical: 4,
     paddingHorizontal: 2,
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   legalDivider: {
     fontFamily: fontFamily.primary,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.5)',
+    color: whiteAlpha.textFaint,
   },
 
   // Bottom-edge fade — 280px tall for a heavier horizon effect.

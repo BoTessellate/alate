@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, primaryAlpha } from '../constants/theme';
 import {
   useAvatarStore,
   ShoulderType,
@@ -156,12 +156,12 @@ const chipStyles = StyleSheet.create({
   },
   chip: {
     // Frosted chip — near-opaque so the gradient doesn't bleed through.
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
     borderRadius: borderRadius.pill,
     paddingVertical: 10,
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: whiteAlpha.borderMid,
     minWidth: '30%',
     flexGrow: 1,
     alignItems: 'center',
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(106, 95, 117, 0.18)',
+    backgroundColor: primaryAlpha.tintMd,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,

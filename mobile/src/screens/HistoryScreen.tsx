@@ -13,7 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, ms, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, ms, fontFamily, whiteAlpha, textAlpha } from '../constants/theme';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandPill: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: whiteAlpha.surfaceSoft,
     paddingHorizontal: ms(8),
     paddingVertical: ms(3),
     borderRadius: borderRadius.pill,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   pricePill: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: whiteAlpha.surfaceSoft,
     paddingHorizontal: ms(8),
     paddingVertical: ms(3),
     borderRadius: borderRadius.pill,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     width: ms(28),
     height: ms(28),
     borderRadius: ms(14),
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: textAlpha.tintMd,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: ms(4),
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: whiteAlpha.surfaceMid,
     paddingHorizontal: ms(8),
     paddingVertical: ms(3),
     borderRadius: borderRadius.pill,
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     ...typography.caption,
-    color: 'rgba(255,255,255,0.6)',
+    color: whiteAlpha.textSubtle,
   },
   warningCount: {
     ...typography.caption,

@@ -344,8 +344,11 @@ export const glass = {
 // Each helper returns a pre-baked rgba string at the named alpha.
 // =============================================================================
 
-/** Build an rgba() string from a hex colour at a given alpha (0..1). */
-const hexToRgba = (hex: string, alpha: number): string => {
+/** Build an rgba() string from a hex colour at a given alpha (0..1).
+ *  Exported so consumers can derive ad-hoc tints from existing tokens
+ *  (or component-local hex constants) without inlining `rgba(...)`
+ *  literals — keeps the anti-pattern rule on hardcoded alphas honest. */
+export const hexToRgba = (hex: string, alpha: number): string => {
   const cleaned = hex.replace('#', '');
   const r = parseInt(cleaned.substring(0, 2), 16);
   const g = parseInt(cleaned.substring(2, 4), 16);
@@ -381,6 +384,9 @@ export const textAlpha = {
   tintSm: hexToRgba(colors.text, 0.12),
   tintMd: hexToRgba(colors.text, 0.32),
   tintLg: hexToRgba(colors.text, 0.55),
+  /** Hairline row dividers — text at 8%, used for borderBottomColor
+   *  between rows inside list cards. */
+  divider: hexToRgba(colors.text, 0.08),
 };
 
 /** Status colours pre-baked at common chip/badge alphas — keeps the
@@ -391,6 +397,78 @@ export const statusAlpha = {
   warningSoft: hexToRgba(colors.warningDeep, 0.14),
   errorSoft: hexToRgba(colors.errorDeep, 0.14),
   mutedSoft: hexToRgba(colors.textMuted, 0.10),
+  /** Mid-tone variants — same chip role as *Soft but built on the
+   *  brighter status hues (colors.success/warning/error rather than
+   *  their *Deep counterparts), at a slightly heavier 18% alpha.
+   *  Use these for verdict pills sitting on a frosted/dark backdrop
+   *  where the soft (14% / deep-hue) variant disappears. */
+  successMed: hexToRgba(colors.success, 0.18),
+  warningMed: hexToRgba(colors.warning, 0.18),
+  errorMed: hexToRgba(colors.error, 0.18),
+};
+
+/** White overlays for chrome and text on dark surfaces (gradient
+ *  backdrops, full-bleed product imagery, and the floating tab pill).
+ *  Tier names — surface/border/text — encode the role; the suffix
+ *  encodes the visual weight. Replaces inline `rgba(255,255,255,0.X)`
+ *  literals so all white tints flex from one place. */
+export const whiteAlpha = {
+  // Surfaces — chip / pill / card backgrounds over dark
+  surfaceFaint: hexToRgba('#FFFFFF', 0.08),    // quiet pill on dark (Account reset)
+  surfaceSoft: hexToRgba('#FFFFFF', 0.18),     // standard pill bg
+  surfaceMid: hexToRgba('#FFFFFF', 0.20),      // editPill / sizePill bg
+  surfaceStrong: hexToRgba('#FFFFFF', 0.22),   // emphasis chip
+  surfaceFrost: hexToRgba('#FFFFFF', 0.58),    // floating-tab tint (AppNavigator)
+  surfaceCard: hexToRgba('#FFFFFF', 0.78),     // frosted recent card on dark
+  surfaceSolid: hexToRgba('#FFFFFF', 0.92),    // opaque static card (no BlurView)
+
+  // Borders — paired with surfaces above
+  borderFaint: hexToRgba('#FFFFFF', 0.30),     // FitLoader idle ring
+  borderSoft: hexToRgba('#FFFFFF', 0.50),      // floating-tab edge
+  borderMid: hexToRgba('#FFFFFF', 0.60),       // static-card edge
+  borderStrong: hexToRgba('#FFFFFF', 0.85),    // frosted-card edge
+  borderArc: hexToRgba('#FFFFFF', 0.95),       // FitLoader active arc
+
+  // Text / icon tiers for white-on-dark legibility ladder
+  textFaint: hexToRgba('#FFFFFF', 0.50),       // inactive divider glyph
+  textSubtle: hexToRgba('#FFFFFF', 0.60),      // date stamp on photo
+  textMuted: hexToRgba('#FFFFFF', 0.65),       // legal links
+  textSecondary: hexToRgba('#FFFFFF', 0.70),   // secondary copy / icons on dark
+  textBody: hexToRgba('#FFFFFF', 0.75),        // body on dark / recent label
+  textBodyStrong: hexToRgba('#FFFFFF', 0.80),  // section labels
+  textHigh: hexToRgba('#FFFFFF', 0.85),        // hero tagline
+  textBright: hexToRgba('#FFFFFF', 0.88),      // magazine price
+  textBrand: hexToRgba('#FFFFFF', 0.90),       // eyebrow wordmark
+  textOpaque: hexToRgba('#FFFFFF', 0.92),      // hero body on photo
+
+  // Icon-only — placeholder shopping-bag glyph at 20–25% (tiered)
+  iconLow: hexToRgba('#FFFFFF', 0.20),
+  iconLowest: hexToRgba('#FFFFFF', 0.18),
+};
+
+/** Pre-baked alphas of `colors.secondary` (#4c4356, the dark grey-purple)
+ *  for bottom-edge fade gradients on Home + Account that resolve into
+ *  the page backdrop's deepest stop. */
+export const secondaryAlpha = {
+  zero: hexToRgba(colors.secondary, 0),
+  mid: hexToRgba(colors.secondary, 0.55),
+  strong: hexToRgba(colors.secondary, 0.7),
+  deep: hexToRgba(colors.secondary, 0.95),
+  deeper: hexToRgba(colors.secondary, 0.97),
+};
+
+/** Dim scrim — deep navy-purple overlay used as a gradient stop on
+ *  full-bleed product imagery (history cards). Anchors white text
+ *  legibility without the heaviness of pure black; reads as an
+ *  extension of the brand's deepest neutral, not a generic dim. */
+const SCRIM_HEX = '#1c122a';
+export const scrim = {
+  zero: hexToRgba(SCRIM_HEX, 0),
+  faint: hexToRgba(SCRIM_HEX, 0.05),
+  soft: hexToRgba(SCRIM_HEX, 0.35),
+  mid: hexToRgba(SCRIM_HEX, 0.55),
+  strong: hexToRgba(SCRIM_HEX, 0.88),
+  deep: hexToRgba(SCRIM_HEX, 0.96),
 };
 
 // =============================================================================
@@ -408,4 +486,7 @@ export default {
   primaryAlpha,
   textAlpha,
   statusAlpha,
+  whiteAlpha,
+  secondaryAlpha,
+  scrim,
 };

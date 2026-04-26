@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows, typography } from '../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
@@ -81,7 +81,7 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
   // bottom darkening the old layout needed to seat the fit badge.
   const inner = (
     <LinearGradient
-      colors={['rgba(28,18,42,0.55)', 'rgba(28,18,42,0.0)']}
+      colors={[scrim.mid, scrim.zero]}
       locations={[0, 0.42]}
       style={styles.cardGradient}
     >
@@ -111,7 +111,7 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
       <Feather
         name="shopping-bag"
         size={56}
-        color="rgba(255,255,255,0.2)"
+        color={whiteAlpha.iconLow}
         style={styles.placeholderIcon}
       />
       {inner}
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(47, 41, 55, 0.55)',
+    backgroundColor: textAlpha.tintLg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   },
   folioPrice: {
     ...typography.labelSmall,
-    color: 'rgba(255,255,255,0.88)',
+    color: whiteAlpha.textBright,
     fontWeight: '700',
     marginTop: 2,
     letterSpacing: 1.5,

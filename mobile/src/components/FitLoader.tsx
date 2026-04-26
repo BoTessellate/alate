@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
 import GlassCard from './GlassCard';
 
 interface FitLoaderProps {
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
     // Thinner (1.5px) than the previous 2px — reads more as a glow
     // halo than a mechanical ring. Upper arc lights up as it rotates.
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderTopColor: 'rgba(255,255,255,0.95)',
+    borderColor: whiteAlpha.borderFaint,
+    borderTopColor: whiteAlpha.borderArc,
     backgroundColor: 'transparent',
   },
   title: {
