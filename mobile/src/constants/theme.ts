@@ -344,8 +344,11 @@ export const glass = {
 // Each helper returns a pre-baked rgba string at the named alpha.
 // =============================================================================
 
-/** Build an rgba() string from a hex colour at a given alpha (0..1). */
-const hexToRgba = (hex: string, alpha: number): string => {
+/** Build an rgba() string from a hex colour at a given alpha (0..1).
+ *  Exported so consumers can derive ad-hoc tints from existing tokens
+ *  (or component-local hex constants) without inlining `rgba(...)`
+ *  literals — keeps the anti-pattern rule on hardcoded alphas honest. */
+export const hexToRgba = (hex: string, alpha: number): string => {
   const cleaned = hex.replace('#', '');
   const r = parseInt(cleaned.substring(0, 2), 16);
   const g = parseInt(cleaned.substring(2, 4), 16);

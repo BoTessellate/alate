@@ -37,7 +37,7 @@ import Animated, {
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows, typography, ms, fontFamily } from '../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography, ms, fontFamily, whiteAlpha, textAlpha, primaryAlpha, scrim, hexToRgba } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 
@@ -114,10 +114,10 @@ function CardFace({ entry, compact = false }: { entry: FitHistoryEntry; compact?
   const inner = (
     <LinearGradient
       colors={[
-        'rgba(28,18,42,0.05)',
-        'rgba(28,18,42,0.35)',
-        'rgba(28,18,42,0.88)',
-        'rgba(28,18,42,0.96)',
+        scrim.faint,
+        scrim.soft,
+        scrim.strong,
+        scrim.deep,
       ]}
       locations={[0, 0.35, 0.82, 1]}
       style={styles.cardGradient}
@@ -181,7 +181,7 @@ function CardFace({ entry, compact = false }: { entry: FitHistoryEntry; compact?
       <Feather
         name="shopping-bag"
         size={64}
-        color="rgba(255,255,255,0.18)"
+        color={whiteAlpha.iconLowest}
         style={styles.placeholderIcon}
       />
       {inner}
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
   },
   folioPrice: {
     ...typography.labelLarge,
-    color: 'rgba(255,255,255,0.88)',
+    color: whiteAlpha.textBright,
     fontWeight: '700',
     marginTop: 2,
     letterSpacing: 2,
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
   accentDivider: {
     width: 1,
     height: 10,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    backgroundColor: primaryAlpha.tintMd,
     marginHorizontal: 2,
   },
   productName: {
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   },
   metaDate: {
     ...typography.caption,
-    color: 'rgba(255,255,255,0.7)',
+    color: whiteAlpha.textSecondary,
     fontWeight: '500',
   },
   metaWarning: {
@@ -457,13 +457,16 @@ const styles = StyleSheet.create({
     right: 24,
     transform: [{ rotate: '-10deg' }],
     borderColor: '#2a7a1f',
-    backgroundColor: 'rgba(212,245,208,0.9)',
+    // Same pastel hue as the great-fit accent block (#d4f5d0), pushed
+    // to 90% so the stamp reads cleanly over the product photo.
+    backgroundColor: hexToRgba('#d4f5d0', 0.9),
   },
   stampLeft: {
     left: 24,
     transform: [{ rotate: '10deg' }],
     borderColor: '#a41818',
-    backgroundColor: 'rgba(255,212,212,0.9)',
+    // Same pastel hue as the poor-fit accent block (#ffd4d4), at 90%.
+    backgroundColor: hexToRgba('#ffd4d4', 0.9),
   },
   stampText: {
     fontFamily: SERIF,
@@ -474,7 +477,7 @@ const styles = StyleSheet.create({
 
   // End-of-stack card
   endCard: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: whiteAlpha.surfaceSolid,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
