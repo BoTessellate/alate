@@ -3,6 +3,17 @@
 ## Project
 React Native Android app (Expo 55, RN 0.81.5, React 19). Monorepo: `/mobile` (app) + `/backend` (Vercel API).
 
+## Bug-fix Pre-flight — ALWAYS Reference the Regression Log First
+
+Before writing any code in response to a user-reported bug:
+
+1. **Read `~/.claude/projects/C--Users-mailt-Documents-alate/memory/project_regression_log.md`** end to end (it's short — a few minutes' read at most). Skim for matching symptoms.
+2. **If the symptom matches a logged entry**: link to it in your reply, check whether the prior fix has regressed (run the regression test it references), and patch from that starting point. Don't re-discover.
+3. **If it doesn't match**: proceed to the TDD loop below. Once the fix lands, **add a new entry** to `project_regression_log.md` (symptom → root cause → fix → test → lesson). Even one-liners get logged — institutional memory across sessions is the whole point.
+4. **If you spot a recurring class** (3+ entries on the same theme — hooks bugs, scrape-pricing, native-resource sync, etc.): promote it to its own anti-pattern in `project_anti_patterns.md` and reference the log entries.
+
+This step happens **before any build, before any commit, before writing the first test**. Builds take 3+ minutes; reading the log takes 30 seconds.
+
 ## TDD Rule — Write Tests First
 When implementing any new feature or fixing any bug:
 1. **Write the test first** — describe the expected behavior before writing the implementation
