@@ -155,14 +155,14 @@ export const typography = {
   displayLarge: {
     ...headingSerif,
     fontSize: 48,
-    fontWeight: '400' as const,
+    fontWeight: '700' as const,
     lineHeight: 56,
     letterSpacing: -1,
   },
   displayMedium: {
     ...headingSerif,
     fontSize: 36,
-    fontWeight: '400' as const,
+    fontWeight: '700' as const,
     lineHeight: 44,
     letterSpacing: -0.5,
   },
@@ -171,21 +171,21 @@ export const typography = {
   headingXL: {
     ...headingSerif,
     fontSize: 28,
-    fontWeight: '400' as const,
+    fontWeight: '700' as const,
     lineHeight: 36,
     letterSpacing: -0.5,
   },
   headingL: {
     ...headingSerif,
     fontSize: 24,
-    fontWeight: '400' as const,
+    fontWeight: '700' as const,
     lineHeight: 32,
     letterSpacing: -0.25,
   },
   headingM: {
     ...headingSerif,
     fontSize: 20,
-    fontWeight: '400' as const,
+    fontWeight: '700' as const,
     lineHeight: 28,
   },
   headingS: {

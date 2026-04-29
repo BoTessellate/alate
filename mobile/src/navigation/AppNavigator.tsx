@@ -87,8 +87,12 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Tab icon + label mapping — Claude Design uses a floating glass pill
 // with three tabs: Check / History / Profile (not "Home"/"Account").
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+// The "Check" tab is the paste-a-URL entry point, not a home page —
+// the previous `home` (house) glyph read as a misdirect. `link` mirrors
+// the URL-paste action of the screen and pairs visually with the link
+// icon inside the paste pill on HomeScreen.
 const TAB_ICONS: Record<string, FeatherIconName> = {
-  Home: 'home',
+  Home: 'link',
   History: 'clock',
   Account: 'user',
 };
@@ -224,21 +228,35 @@ export default function AppNavigator() {
   const { avatar } = useAvatarStore();
   const { setPendingUrl } = usePendingShareStore();
   const ageConfirmedAt = useAgeGateStore((s) => s.confirmedAt);
+  // Hard block on share-intent when the user self-declared under 16.
+  // The age gate already keeps them on the deflection screen, but
+  // ShareIntent is OS-level — Android can deliver a URL via the share
+  // sheet to a backgrounded app, which would otherwise navigate them
+  // INTO the avatar / fit flow regardless of the deflection. This
+  // flag short-circuits the handler before any data-collection path
+  // can fire.
+  const declaredUnder16 = useAgeGateStore((s) => s.declaredUnder16);
   const [isProcessingShare, setIsProcessingShare] = useState(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const processingRef = useRef(false);
 
-  // First-launch age gate — blocks everything until the user confirms
-  // they're 16+. Measurements are GDPR Article 8 / DPDPA-sensitive data,
-  // so we gate collection behind an explicit confirmation. The store
-  // persists the confirmation timestamp, so this only shows on first
-  // install (or after body-profile deletion if we later wire that to
-  // reset the gate).
-  if (!ageConfirmedAt) {
-    return <AgeGateOverlay />;
-  }
-
+  // Share-intent handler — runs on every render; bails out internally
+  // when the gate is closed or when there's nothing to process. Stays
+  // ABOVE the early-return below because React requires hooks to be
+  // called in the same order every render, and the AgeGate early-
+  // return would otherwise add/remove this hook between renders (the
+  // exact bug that produced the white screen on April 29 2026 after
+  // confirming the age gate — pre-confirm React saw 7 hooks, post-
+  // confirm it saw 8, and crashed the tree on the count change).
   useEffect(() => {
+    // Drop any incoming share intent without processing when the
+    // user is under 16. The intent is reset so it won't re-fire
+    // when the age state later flips.
+    if (declaredUnder16) {
+      if (hasShareIntent) resetShareIntent();
+      return;
+    }
+    if (!ageConfirmedAt) return;
     if (!hasShareIntent || processingRef.current) return;
 
     const url = shareIntent?.webUrl || shareIntent?.text;
@@ -248,7 +266,17 @@ export default function AppNavigator() {
     }
 
     handleSharedUrl(url);
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, ageConfirmedAt, declaredUnder16]);
+
+  // First-launch age gate — blocks everything until the user confirms
+  // they're 16+. Measurements are GDPR Article 8 / DPDPA-sensitive
+  // data, so we gate collection behind an explicit confirmation. The
+  // store persists the timestamp, so this only shows on first install
+  // (or after body-profile deletion if we later wire that to reset
+  // the gate). Render-level early return — DO NOT add hooks below.
+  if (!ageConfirmedAt) {
+    return <AgeGateOverlay />;
+  }
 
   const handleSharedUrl = async (url: string) => {
     processingRef.current = true;

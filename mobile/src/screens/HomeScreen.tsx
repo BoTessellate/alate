@@ -132,7 +132,15 @@ export default function HomeScreen() {
       >
         <ScrollView
           style={styles.container}
-          contentContainerStyle={styles.content}
+          // Tight bottom padding when the RECENT list is empty —
+          // otherwise the 280px clearance reserved for the fade-out
+          // of recents reads as a dead zone. Per user feedback April
+          // 29 2026: "reduce footer spacing on the home page on
+          // empty history".
+          contentContainerStyle={[
+            styles.content,
+            recent.length === 0 && styles.contentNoRecent,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -149,7 +157,7 @@ export default function HomeScreen() {
               textStyle={styles.heroVerse}
             />
             <Text style={styles.heroTagline}>
-              from any store. dresses, denim, knitwear — we read the brand's size chart against your body.
+              from any store.{'\n'}dresses, denim, knitwear — we read the brand's size chart against your body.
             </Text>
           </View>
 
@@ -367,6 +375,13 @@ const styles = StyleSheet.create({
     // gradient (height 320 below), the last RECENT row ends deep inside
     // the dark zone — cards never show up cleanly near the nav pill.
     paddingBottom: 280,
+  },
+  // Empty-history variant — only enough bottom padding to clear the
+  // floating tab pill (~96px). The big 280px reservation in `content`
+  // exists purely so the RECENT list can fade nicely into the dark
+  // gradient; when there are no recents, it reads as wasted space.
+  contentNoRecent: {
+    paddingBottom: 96,
   },
   // --- Hero — Claude Design mockup layout, inverted for dark gradient
   //     backdrop. Text reads as light on the hero; glass cards below

@@ -227,6 +227,11 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { avatar, clearAvatar } = useAvatarStore();
   const { entries } = useFitHistoryStore();
+  // Gate "Delete Account" on the legal footer — only meaningful when
+  // there's actually a Google account linked. Per user feedback April
+  // 29 2026: showing it without an account read as a misleading CTA
+  // ("delete what?"). Privacy Policy + Brand opt-out always render.
+  const { googleUser } = useAccountStore();
 
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
@@ -352,14 +357,18 @@ export default function AccountScreen() {
           >
             <Text style={styles.legalLinkText}>Privacy Policy</Text>
           </TouchableOpacity>
-          <Text style={styles.legalDivider}>·</Text>
-          <TouchableOpacity
-            testID="delete-account-link"
-            onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.legalLinkText}>Delete Account</Text>
-          </TouchableOpacity>
+          {googleUser && (
+            <>
+              <Text style={styles.legalDivider}>·</Text>
+              <TouchableOpacity
+                testID="delete-account-link"
+                onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.legalLinkText}>Delete Account</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <Text style={styles.legalDivider}>·</Text>
           <TouchableOpacity
             testID="brand-optout-link"
@@ -369,6 +378,25 @@ export default function AccountScreen() {
             <Text style={styles.legalLinkText}>Brand opt-out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Are you a brand? — large bold heading + sub copy + tap
+            target. Sits below the policy footer per user direction
+            April 29 2026: "Add a 'are you a brand' in large bold
+            heading below privacy pages, delete account... keep the
+            current setting for fonts/headings". Routes brands to the
+            opt-out page for now (which is also the contact path).
+            Replaceable with a dedicated /for-brands page later. */}
+        <TouchableOpacity
+          testID="brand-cta"
+          style={styles.brandCta}
+          onPress={() => Linking.openURL(BRAND_OPTOUT_URL)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.brandCtaTitle}>are you a brand?</Text>
+          <Text style={styles.brandCtaSubtitle}>
+            Run a Shopify store? Send us a note → we'll set up consented size-chart access for your catalogue.
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Bottom-edge fade — same pattern as Home. Content melts into
@@ -677,6 +705,32 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primary,
     fontSize: 11,
     color: whiteAlpha.textFaint,
+  },
+
+  // "are you a brand?" CTA — sits below the legal footer. Heading
+  // matches the rest of the heading typography (Viaoda Libre italic
+  // display serif at heading-XL weight) so the brand voice carries.
+  // Sub copy is body-small over the same dark gradient backdrop as
+  // the policy links above.
+  brandCta: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  brandCtaTitle: {
+    ...typography.headingXL,
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  brandCtaSubtitle: {
+    fontFamily: fontFamily.primary,
+    fontSize: 13,
+    lineHeight: 19,
+    color: whiteAlpha.textMuted,
+    textAlign: 'center',
+    maxWidth: 320,
   },
 
   // Bottom-edge fade — 280px tall for a heavier horizon effect.
