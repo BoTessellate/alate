@@ -30,11 +30,22 @@ export const fontFamily = {
 };
 
 // Shared heading trait: every display/heading token mixes this in so
-// the serif display face stays consistent across the app. Earlier
-// versions forced `textTransform: 'lowercase'` for an editorial feel,
-// but the user moved to title-case page headings (April 29 2026 —
-// "Camel case page headings"). Whatever case the source string uses
-// is what renders. Keep page-title strings in title case;
+// the serif display face stays consistent across the app.
+//
+// CRITICAL: heading tokens MUST NOT set `fontWeight: '700'` (or any
+// non-400 weight). Viaoda Libre is shipped as Regular only — when
+// styles request weight 700, Android's font manager fails the lookup
+// (no `ViaodaLibre-Regular_bold.ttf` exists) and silently falls back
+// to the system serif Bold (Noto Serif Bold), which produced the
+// "headings render in plain serif bold, not Viaoda Libre" regression
+// of April 29 2026 (~5 install cycles spent chasing it). Keep all
+// heading tokens at `fontWeight: '400'`. The Viaoda Libre face has
+// enough display character on its own; synthetic bold is a trap.
+//
+// History: earlier versions forced `textTransform: 'lowercase'` for
+// an editorial feel, but the user moved to title-case page headings
+// (April 29 2026 — "Camel case page headings"). Whatever case the
+// source string uses is what renders. Page titles in title case;
 // poetic / phrase headings in sentence case.
 const headingSerif = {
   fontFamily: 'ViaodaLibre-Regular',
@@ -157,14 +168,14 @@ export const typography = {
   displayLarge: {
     ...headingSerif,
     fontSize: 48,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 56,
     letterSpacing: -1,
   },
   displayMedium: {
     ...headingSerif,
     fontSize: 36,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 44,
     letterSpacing: -0.5,
   },
@@ -173,21 +184,21 @@ export const typography = {
   headingXL: {
     ...headingSerif,
     fontSize: 28,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 36,
     letterSpacing: -0.5,
   },
   headingL: {
     ...headingSerif,
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 32,
     letterSpacing: -0.25,
   },
   headingM: {
     ...headingSerif,
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: '400' as const,
     lineHeight: 28,
   },
   headingS: {
