@@ -641,6 +641,25 @@ export default function FitResultScreen() {
           ...(enrichedFromScrape.tags ? { tags: enrichedFromScrape.tags } : {}),
           checkedAt: new Date().toISOString(),
         });
+
+        // Also sync the local `siblings` array. siblings was
+        // initialised from the historyEntries route param at mount
+        // and isn't subscribed to the store, so without this the
+        // sift-away-and-back path would re-populate fitScore /
+        // warnings / sizeRec from the STALE entry in siblings.
+        // Read the just-updated entry back from the store and swap
+        // it into the local list. Keeps the user's "I changed my
+        // measurements, hit Re-evaluate, then sifted to another
+        // card and back" journey consistent (April 29 2026
+        // regression fix).
+        const refreshed = useFitHistoryStore
+          .getState()
+          .entries.find((e) => e.id === historyEntryId);
+        if (refreshed) {
+          setSiblings((prev) =>
+            prev.map((s) => (s.id === historyEntryId ? refreshed : s))
+          );
+        }
       }
     } catch {
       // silently fail — keep showing original result
@@ -1672,9 +1691,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing.md,
   },
+  // Section label — darkest text (`colors.text`) so the small-caps
+  // overline visually OWNS the section above its body. The body
+  // content underneath then drops to textSecondary or textMuted,
+  // creating a three-tier colour ramp. Lean on COLOUR for hierarchy
+  // since Viaoda Libre body weight options are limited and we want
+  // the same hierarchy logic to apply across heading-fonted regions.
   sectionLabel: {
     ...typography.overline,
-    color: colors.textSecondary,
+    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -1701,15 +1726,21 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 2,
   },
+  // Concern body — mid-tier `textSecondary` so it sits CLEARLY
+  // below the section label (which is `colors.text`). Was `colors.text`
+  // before; that put the label and the body at the same colour, which
+  // is what the user flagged as "no visual hierarchy" April 29 2026.
   concernText: {
     ...typography.bodySmall,
-    color: colors.text,
+    color: colors.textSecondary,
     lineHeight: 19,
   },
   // Empty-state line shown inside the FIT CONCERNS section when the
-  // analysis flagged no warnings. Same visual register as concernText
-  // (so the section keeps its layout footprint) but in muted secondary
-  // text — reads as a positive affirmation rather than a fit issue.
+  // analysis flagged no warnings. Same colour tier as concernText
+  // (`textSecondary` — WCAG AA-safe at 15px regular on white;
+  // textMuted would fail 4.5:1) but ITALIC for the affirmative tone,
+  // so it reads as "soft / positive" without dropping below
+  // accessibility floors.
   concernEmptyText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
@@ -1750,8 +1781,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
+  // Meta row tier ramp (April 29 2026 — colour-driven hierarchy):
+  //   metaLabel        textSecondary + 500   (the "Material:" caption)
+  //   metaValue        text + 700 capitalized (the value, most prominent)
+  //   metaPlaceholder  textSecondary + 500 italic (no value present)
+  // textMuted (#8a7e94) is 3.75:1 on white — fails WCAG AA for body
+  // text; reserved for >=18px or decorative-only contexts.
   metaLabel: {
     ...typography.bodySmall,
+    fontWeight: '500',
     color: colors.textSecondary,
   },
   metaValue: {
@@ -1760,15 +1798,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     textTransform: 'capitalize',
   },
-  // Placeholder used in meta rows + empty tags region when the scrape
-  // didn't surface a value. Right-aligned (alongside metaValue) and
-  // muted, so the row reads as "this field exists but isn't known"
-  // rather than "the section is broken". Keeps card layout consistent
-  // across rich and sparse storefronts.
+  // Placeholder for "—" when the scrape didn't surface a value.
+  // Italic + same-tier-as-label colour signals "this field exists
+  // but is empty" without making the row scream for attention.
   metaPlaceholder: {
     ...typography.bodySmall,
     fontWeight: '500',
-    color: colors.textMuted,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
 
   // Availability row — colored dot + status text. Right-aligned to
