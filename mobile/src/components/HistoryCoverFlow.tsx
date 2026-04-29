@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim } from '../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim, fontFamily } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 import BrandHeading from './BrandHeading';
@@ -491,12 +491,20 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
+  // Folio price — Viaoda Libre per user direction April 29 2026.
+  // Display serif on the digit makes the price read as editorial
+  // not utilitarian. Drop fontWeight to 400 (single-weight font;
+  // anything else falls back to system serif bold and we lose the
+  // display character — same trap as headings, see anti-pattern
+  // #12 in project_anti_patterns.md). Slightly larger and tighter
+  // letterSpacing for the heavier glyphs.
   folioPrice: {
-    ...typography.labelSmall,
+    fontFamily: fontFamily.display,
+    fontSize: 16,
     color: whiteAlpha.textBright,
-    fontWeight: '700',
+    fontWeight: '400',
     marginTop: 2,
-    letterSpacing: 1.5,
+    letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

@@ -298,7 +298,13 @@ describe('FitResultScreen', () => {
       (api.checkFit as jest.Mock).mockResolvedValueOnce({
         success: true,
         fit_score: 'moderate',
-        warnings: [{ severity: 'minor', message: 'Check the sleeves' }],
+        // Severity must be 'moderate' so the verdict stays at the
+        // "Some Concerns" tier. April 29 2026 the FIT badge derives
+        // from MAX warning severity (effectiveScore) rather than the
+        // raw fit_score string — a 'moderate' fit_score with only
+        // 'minor' warnings re-tiers to "Great Fit, with a note".
+        // Keeping the test focused on the moderate verdict path.
+        warnings: [{ severity: 'moderate', message: 'Sleeves run long for your shoulders' }],
       });
 
       const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
@@ -306,6 +312,26 @@ describe('FitResultScreen', () => {
       // Verdict label now lives on the HeadingImage wrapper's
       // accessibilityLabel, not a raw Text node.
       expect(getAllByLabelText('Some Concerns').length).toBeGreaterThan(0);
+    });
+
+    it('a `moderate` fit_score with ONLY minor warnings re-tiers to "Great Fit, with a note"', async () => {
+      // Regression: backend marks any non-empty warnings as 'moderate'
+      // but a single minor concern shouldn't trigger the warning
+      // triangle. Mobile derives effectiveScore from max severity.
+      (api.enrichProduct as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        product: { id: 'p-1', name: 'Linen shirt' },
+      });
+      (api.checkFit as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        fit_score: 'moderate',
+        warnings: [{ severity: 'minor', message: 'A-line styles add hip volume' }],
+        size_recommendation: { size: 'M', confidence: 'high' },
+      });
+
+      const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
+      await findByTestId('fit-score-display');
+      expect(getAllByLabelText('Great Fit, with a note').length).toBeGreaterThan(0);
     });
 
     it('renders live-mode action buttons', async () => {

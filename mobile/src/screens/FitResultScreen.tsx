@@ -254,16 +254,16 @@ export default function FitResultScreen() {
     ),
   }));
 
-  // Animated tint alpha: dock background becomes ~20% MORE translucent
+  // Animated tint alpha: dock background becomes more translucent
   // when collapsed so the underlying product image breathes through
-  // the dock strip ("dock" mode is meant to feel pinned to the image,
-  // expanded is the analysis card). Per user direction April 29 2026:
-  // "drop translucency by 20% when the overlay docks". Expanded alpha
-  // matches glass.dockBackgroundColor (0.55); collapsed is 0.55 - 0.20
-  // = 0.35. The BlurView underneath still maintains legibility for
-  // the verdict + stats row at the collapsed height.
+  // the dock strip ("dock" mode feels pinned to the image; expanded
+  // is the analysis card). Iterations:
+  //   0.65 → 0.58 → 0.55 → 0.54 expanded (1% increments per user)
+  //   collapsed pulls a further ~20% (0.34) so the dock-strip mode
+  //   reads as image-first; BlurView keeps legibility for verdict +
+  //   stats at that lower alpha.
   const cardTintStyle = useAnimatedStyle(() => {
-    const alpha = interpolate(collapseProgress.value, [0, 1], [0.35, 0.55]);
+    const alpha = interpolate(collapseProgress.value, [0, 1], [0.34, 0.54]);
     return {
       backgroundColor: `rgba(255, 255, 255, ${alpha})`,
     };
@@ -700,17 +700,55 @@ export default function FitResultScreen() {
     Linking.openURL(url);
   };
 
+  /**
+   * Effective severity for the FIT badge — derived from the actual
+   * warnings list, NOT just the backend `fitScore` label. The backend
+   * marks any non-empty warning list as 'moderate', which made a
+   * single MINOR concern (e.g. "minor: A-line styles add volume at
+   * the hip") render with the full ⚠ warning triangle. Per user
+   * direction April 29 2026: "showing a warning on 1 minor concern
+   * feels excessive". Now we compute four tiers:
+   *
+   *   - great:    no warnings
+   *   - minor:    only minor warnings present
+   *   - moderate: at least one moderate warning
+   *   - poor:     at least one major warning
+   *
+   * `minor` reads as a positive verdict ("Great Fit, with a note") —
+   * same green check, but the verdict line carries the "with notes"
+   * sub-text so the user knows there's something to read in the FIT
+   * CONCERNS section.
+   */
+  const effectiveScore: 'great' | 'minor' | 'moderate' | 'poor' = (() => {
+    if (warnings.some((w) => w.severity === 'major')) return 'poor';
+    if (warnings.some((w) => w.severity === 'moderate')) return 'moderate';
+    if (warnings.length > 0) return 'minor';
+    // No warnings — trust the backend's call, which can still be
+    // 'moderate' or 'poor' from rule-based fit logic that didn't
+    // produce a textual warning. (Rare but possible.)
+    return fitScore === 'great' ? 'great' : fitScore;
+  })();
+
   const getScoreConfig = () => {
     // Use the *Deep text variants per Claude Design — the verdict label
     // reads as hero text on a white-tinted glass card, so it needs more
     // ink than the mid-saturation `success/warning/error` (which are
     // tuned for chip backgrounds). Same hue family, darker shade.
-    switch (fitScore) {
+    switch (effectiveScore) {
       case 'great':
         return {
           color: colors.successDeep,
           icon: '✓',
           text: 'Great Fit!',
+        };
+      case 'minor':
+        // Same icon + colour as 'great' — a single minor note isn't
+        // a fit warning, it's a sizing tip. The note itself appears
+        // below in the FIT CONCERNS section.
+        return {
+          color: colors.successDeep,
+          icon: '✓',
+          text: 'Great Fit, with a note',
         };
       case 'moderate':
         return {
@@ -995,10 +1033,15 @@ export default function FitResultScreen() {
                 <View style={styles.verdictMain}>
                   <HeadingImage
                     testID="fit-score-label"
+                    // Slot follows effectiveScore so the SVG/heading
+                    // matches the visual tier (a 1-minor result reads
+                    // as great-fit, not some-concerns). The text
+                    // fallback (scoreConfig.text) carries the
+                    // "with a note" sub-line for the minor case.
                     slot={
-                      fitScore === 'great'
+                      effectiveScore === 'great' || effectiveScore === 'minor'
                         ? 'great-fit'
-                        : fitScore === 'moderate'
+                        : effectiveScore === 'moderate'
                         ? 'some-concerns'
                         : 'may-not-fit'
                     }
@@ -1010,6 +1053,8 @@ export default function FitResultScreen() {
                   <Text style={styles.verdictSub}>
                     {warnings.length === 0
                       ? 'No fit concerns'
+                      : effectiveScore === 'minor'
+                      ? `${warnings.length} ${warnings.length === 1 ? 'note' : 'notes'}`
                       : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
                   </Text>
                 </View>
