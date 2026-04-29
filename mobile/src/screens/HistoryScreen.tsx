@@ -81,9 +81,39 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
   },
 ];
 
+// Fit-score priority for the history sort. Lower = surfaces first.
+// Order is great → moderate → poor so the cover flow opens on the
+// user's wins (the items they're most likely to act on or revisit)
+// before working through the things that didn't fit.
+const FIT_PRIORITY: Record<'great' | 'moderate' | 'poor', number> = {
+  great: 0,
+  moderate: 1,
+  poor: 2,
+};
+
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+  const { entries: storeEntries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+
+  // Sort the store's entries for display. Primary key is fit-score
+  // priority (great → moderate → poor) so the cover flow groups
+  // similar verdicts together. Secondary key is checkedAt desc so
+  // within each group the most-recent check surfaces first.
+  //
+  // The store keeps insertion order (newest first) — we don't mutate
+  // it, just produce a sorted view here. Per user feedback April 29
+  // 2026: dummy data was inserted in good→concerns→poor order which
+  // happened to look right; real data inserts in time order and
+  // therefore appeared unsorted to the eye.
+  const entries = React.useMemo(() => {
+    return [...storeEntries].sort((a, b) => {
+      const pri = FIT_PRIORITY[a.fitScore] - FIT_PRIORITY[b.fitScore];
+      if (pri !== 0) return pri;
+      // Same fit group → newer first (descending checkedAt).
+      return b.checkedAt.localeCompare(a.checkedAt);
+    });
+  }, [storeEntries]);
+
   // Count of entries scored 'great' — surfaced in the header meta so the
   // subtitle carries real signal ("3 good fits") instead of the redundant
   // "swipe through to revisit" instruction the coverflow already implies.
