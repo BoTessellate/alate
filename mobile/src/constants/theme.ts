@@ -25,12 +25,17 @@
 // not five"). Adding a new face needs an explicit reason — every
 // extra font is one more thing to load, mismatch, or reconcile.
 export const fontFamily = {
-  // EXPERIMENT (April 29 2026 user request): primary swapped from
-  // 'serif' (Noto Serif) to 'ViaodaLibre-Regular' so the WHOLE app
-  // renders in Viaoda Libre. Likely too decorative for body /
-  // labels — git revert this commit if it looks bad. To revert:
-  //   `git revert HEAD` or change `primary` back to 'serif'.
-  primary: 'ViaodaLibre-Regular',
+  // System serif — Noto Serif on Android, Times New Roman on iOS.
+  // Multi-weight, so labels / buttons / chips can lean on bold for
+  // hierarchy without falling back to a different face.
+  //
+  // Briefly experimented with primary: 'ViaodaLibre-Regular' to put
+  // the whole app on the display serif (April 29 2026), but
+  // Viaoda Libre is single-weight — every inline `fontWeight: '500'`
+  // / '600' / '700' across screens silently fell back to system
+  // serif Bold, defeating the point. Reverted same day; multi-
+  // weight reading-serif is on the v2 typography roadmap.
+  primary: 'serif',
   display: 'ViaodaLibre-Regular',
 };
 
@@ -209,9 +214,7 @@ export const typography = {
   headingS: {
     fontFamily: fontFamily.primary,
     fontSize: 16,
-    // 400 — Viaoda Libre is single-weight; non-400 falls back to
-    // system serif bold. See headingSerif comment above.
-    fontWeight: '400' as const,
+    fontWeight: '600' as const,
     lineHeight: 24,
   },
 
@@ -241,25 +244,26 @@ export const typography = {
     lineHeight: 21,
   },
 
-  // Labels & Buttons — same +2pt bump.
+  // Labels & Buttons — Medium weight back; system serif (Noto Serif
+  // on Android) ships multiple weights so this resolves cleanly.
   labelLarge: {
     fontFamily: fontFamily.primary,
     fontSize: 17,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     lineHeight: 25,
     letterSpacing: 0.1,
   },
   label: {
     fontFamily: fontFamily.primary,
     fontSize: 15,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelSmall: {
     fontFamily: fontFamily.primary,
     fontSize: 13,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     lineHeight: 18,
     letterSpacing: 0.2,
   },
@@ -274,17 +278,17 @@ export const typography = {
   overline: {
     fontFamily: fontFamily.primary,
     fontSize: 13,
-    fontWeight: '400' as const,
+    fontWeight: '600' as const,
     lineHeight: 16,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '400' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '400' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '400' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '400' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
 };
 
 // =============================================================================

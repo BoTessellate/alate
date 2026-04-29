@@ -473,10 +473,17 @@ const styles = StyleSheet.create({
   folio: {
     flexDirection: 'column',
   },
+  // Folio brand — text style overrides applied to the BrandHeading
+  // fallback path (the wrap when no SVG is registered for this slug).
+  // Critical: NO `fontFamily` or `fontWeight` here — that would stomp
+  // BrandHeading's Viaoda Libre + 400 weight and force the brand
+  // name into system serif, which is the wrong voice for this
+  // surface. Per April 29 2026 user feedback ("SUMMER AWAY rendered
+  // as bold sans-serif on the History card") — the fix is to keep
+  // visual treatment (size, colour, shadow) here and let BrandHeading
+  // own the typeface.
   folioBrand: {
-    fontFamily: SERIF,
     fontSize: 22,
-    fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.5,
     lineHeight: 26,

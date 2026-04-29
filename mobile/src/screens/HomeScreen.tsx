@@ -597,10 +597,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 1,
   },
+  // Recent-card brand label — DELIBERATELY no fontFamily / fontWeight
+  // overrides: BrandHeading owns the typeface (Viaoda Libre via the
+  // SVG path or styled-text fallback) and 400 weight. We only set the
+  // visual treatment (size, letter-spacing, colour). Same lesson as
+  // HistoryCoverFlow.folioBrand — see comment there.
   recentBrand: {
-    fontFamily: fontFamily.primary,
     fontSize: 10,
-    fontWeight: '600',
     letterSpacing: 0.5,
     // Dark text on the frosted card — WCAG AA passes on the 0.78
     // white-tint bg. Light text was failing contrast on the mid-
