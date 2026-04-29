@@ -28,31 +28,33 @@ import { typography, colors } from '../constants/theme';
 // Metro's `react-native-svg-transformer` (wired in metro.config.js)
 // compiles the default export as a React.FC<SvgProps>.
 
-import HomeVerseSvg from '../../assets/images/headings/home-verse.svg';
-import HistorySvg from '../../assets/images/headings/history.svg';
-import ProfileSvg from '../../assets/images/headings/profile.svg';
-import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
-
-// Verdict-label SVGs (great-fit, some-concerns, may-not-fit) were
-// retired April 29 2026. Those three slots now route through the
-// styled-text fallback path below, rendering in Viaoda Libre via
-// `typography.displayMedium` / `headingL`. Slot enum keeps the
-// values so existing callsites in FitResultScreen continue to
-// compile; the SVG_BY_SLOT registry simply omits them.
+// April 29 2026 — every heading slot is now rendered as styled text in
+// Viaoda Libre, NOT via the Canva-exported SVGs sitting in
+// `mobile/assets/images/headings/`. The SVGs survived a couple of
+// optimisation passes (svgo flatten + viewBox normalize) but Android's
+// react-native-svg / Skia stack still rasterised them with horizontal
+// banding artefacts visible across every slot ("tabbed display" per
+// the user). Bypassing the SVG render path entirely + falling through
+// to the styled-text path below gives clean rendering in the same
+// italic display serif (Viaoda Libre IS the fallback face), so the
+// visual voice is preserved.
+//
+// The SVG files are kept on disk for now so the v2 release (or a
+// future TAN Nightingale licence) can re-enable the SVG path with
+// freshly-exported assets. Re-enabling = put entries back into
+// SVG_BY_SLOT below and verify on a real device.
 type Slot =
   | 'home-verse'     // "paste anything. / we'll tell you / if it fits."
   | 'history'        // "your history"
   | 'profile'        // "profile"
   | 'body-profile'   // "body profile"
-  | 'great-fit'      // text-only (was "great fit!" SVG)
-  | 'some-concerns'  // text-only (was "some concerns" SVG)
-  | 'may-not-fit';   // text-only (was "may not fit well" SVG)
+  | 'great-fit'      // text-only
+  | 'some-concerns'  // text-only
+  | 'may-not-fit';   // text-only
 
 const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: number }>>> = {
-  'home-verse': HomeVerseSvg,
-  history: HistorySvg,
-  profile: ProfileSvg,
-  'body-profile': BodyProfileSvg,
+  // Intentionally empty — see comment above. Every slot falls through
+  // to the styled-text fallback so headings render in Viaoda Libre.
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
