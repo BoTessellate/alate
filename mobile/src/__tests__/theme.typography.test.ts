@@ -52,15 +52,19 @@ describe('theme — heading typography', () => {
     });
   });
 
-  // Body / label tokens now use the system serif (paired with TAN
-  // Nightingale headings) — they should not inherit lowercase.
+  // Body / label tokens — currently routed through fontFamily.primary
+  // (April 29 2026 experiment: primary swapped from 'serif' to
+  // 'ViaodaLibre-Regular' so the whole app reads in Viaoda Libre).
+  // The assertion just ensures the tokens point at whatever
+  // fontFamily.primary resolves to today; if the experiment reverts,
+  // these stay green automatically.
   const nonHeadingKeys = ['body', 'bodyLarge', 'bodySmall', 'label', 'labelLarge', 'caption'] as const;
   nonHeadingKeys.forEach((key) => {
     it(`${key} is not forced into lowercase`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
-    it(`${key} uses the system serif (paired with the display serif)`, () => {
-      expect((typography as any)[key].fontFamily).toBe('serif');
+    it(`${key} uses fontFamily.primary`, () => {
+      expect((typography as any)[key].fontFamily).toBe(fontFamily.primary);
     });
   });
 });

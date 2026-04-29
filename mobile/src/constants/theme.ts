@@ -25,7 +25,12 @@
 // not five"). Adding a new face needs an explicit reason — every
 // extra font is one more thing to load, mismatch, or reconcile.
 export const fontFamily = {
-  primary: 'serif',
+  // EXPERIMENT (April 29 2026 user request): primary swapped from
+  // 'serif' (Noto Serif) to 'ViaodaLibre-Regular' so the WHOLE app
+  // renders in Viaoda Libre. Likely too decorative for body /
+  // labels — git revert this commit if it looks bad. To revert:
+  //   `git revert HEAD` or change `primary` back to 'serif'.
+  primary: 'ViaodaLibre-Regular',
   display: 'ViaodaLibre-Regular',
 };
 
@@ -204,7 +209,9 @@ export const typography = {
   headingS: {
     fontFamily: fontFamily.primary,
     fontSize: 16,
-    fontWeight: '600' as const,
+    // 400 — Viaoda Libre is single-weight; non-400 falls back to
+    // system serif bold. See headingSerif comment above.
+    fontWeight: '400' as const,
     lineHeight: 24,
   },
 
@@ -232,21 +239,21 @@ export const typography = {
   labelLarge: {
     fontFamily: fontFamily.primary,
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 22,
     letterSpacing: 0.1,
   },
   label: {
     fontFamily: fontFamily.primary,
     fontSize: 13,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 18,
     letterSpacing: 0.1,
   },
   labelSmall: {
     fontFamily: fontFamily.primary,
     fontSize: 11,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 16,
     letterSpacing: 0.2,
   },
@@ -261,17 +268,17 @@ export const typography = {
   overline: {
     fontFamily: fontFamily.primary,
     fontSize: 11,
-    fontWeight: '600' as const,
+    fontWeight: '400' as const,
     lineHeight: 14,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '400' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '400' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '400' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '400' as const, lineHeight: 22 },
 };
 
 // =============================================================================
