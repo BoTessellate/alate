@@ -56,6 +56,11 @@ import { formatPrice } from '../utils/currency';
 // "best seller" labels, etc.) so users only see tags that describe
 // the actual garment (material, colour, fit, occasion, vibe).
 import { filterUserFacingTags } from '../utils/tagFilter';
+// Last-ditch deterministic derivation when neither Shopify direct
+// fetch nor Gemini enrichment surfaced a category / material —
+// extracts from URL handle, product title, and tag list. See
+// productInference.ts for the keyword tables.
+import { inferCategory, inferMaterial } from '../utils/productInference';
 // Availability — computed locally from the storefront's
 // `availableSizes` list (Shopify direct-fetch surfaces this) + the
 // user's recommended size. No separate backend call needed.
@@ -813,13 +818,37 @@ export default function FitResultScreen() {
       : liveAvailability;
   const showAvailability = displayAvailability.status !== 'unknown' || !!displayAvailability.size;
 
-  const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
-  const showMaterial = !!enrichedProduct?.material;
+  // Category + Material derivation chain (April 29 2026):
+  //   1. Use enrichedProduct.category if it's specific (not in
+  //      FILTERED_CATEGORIES — guards against AI returning
+  //      "general"/"clothing"/empty).
+  //   2. Otherwise infer from URL handle / title / tags via
+  //      productInference.ts — deterministic regex fallback for
+  //      stores that don't fill product_type / material fields
+  //      (yamayoga and others). No network round-trip.
+  //   3. Otherwise undefined → render "—" placeholder.
+  const enrichedCategory =
+    enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase())
+      ? enrichedProduct.category
+      : undefined;
+  const inferredCategory = enrichedCategory
+    ? undefined
+    : inferCategory({ url, title: product.name, tags: enrichedProduct?.tags });
+  const displayCategory = enrichedCategory ?? inferredCategory;
+  const showCategory = !!displayCategory;
+
+  const enrichedMaterial = enrichedProduct?.material || undefined;
+  const inferredMaterial = enrichedMaterial
+    ? undefined
+    : inferMaterial({ title: product.name, tags: enrichedProduct?.tags });
+  const displayMaterial = enrichedMaterial ?? inferredMaterial;
+  const showMaterial = !!displayMaterial;
+
   // Tags pass through the noise filter before render — keeps things
   // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
   // user-facing chip row. Also strips a tag that duplicates the
   // category (e.g. "Top" tag when category is already "Top").
-  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, enrichedProduct?.category);
+  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, displayCategory);
   const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
@@ -1158,14 +1187,14 @@ export default function FitResultScreen() {
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Material</Text>
                 <Text style={showMaterial ? styles.metaValue : styles.metaPlaceholder}>
-                  {showMaterial ? enrichedProduct!.material : '—'}
+                  {showMaterial ? displayMaterial : '—'}
                 </Text>
               </View>
               {isExpanded && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category</Text>
                   <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
-                    {showCategory ? enrichedProduct!.category : '—'}
+                    {showCategory ? displayCategory : '—'}
                   </Text>
                 </View>
               )}
@@ -1808,7 +1837,10 @@ const styles = StyleSheet.create({
   },
   metaValue: {
     ...typography.labelSmall,
-    fontWeight: '700',
+    // 800 (was 700) — Noto Serif has the variant. Visibly heavier
+    // than the metaLabel (500) so the row reads as label-then-VALUE
+    // even at 13px caps. Per user direction April 29 2026.
+    fontWeight: '800',
     color: colors.text,
     textTransform: 'uppercase',
   },

@@ -43,14 +43,15 @@ Return a JSON object with these fields:
     For decor: statement-piece, accent, functional, decorative
     For florals: fresh, dried, sculptural, romantic, wild, curated
     For fragrance: woody, floral, citrus, oriental, fresh, warm"],
-  "material": "primary material (identify from image if possible - for fabric: 'cupro blend', 'silk charmeuse'; for decor: 'ceramic', 'brass'; for florals: 'fresh orchids', 'dried pampas')",
+  "material": "primary material — IDENTIFY OR INFER, never return null. For fabric: prefer specific fibres ('linen', 'silk charmeuse', 'merino wool', 'cotton blend', 'polyester-spandex'). If the description doesn't disclose fabric, INFER the most likely material from the product type itself ('yoga pants' → 'polyester-spandex blend', 'denim jacket' → 'denim', 'linen midi dress' → 'linen', 'cashmere shawl' → 'cashmere', 'silk camisole' → 'silk', 'flannel shirt' → 'cotton flannel'). For decor: 'ceramic', 'brass'. For florals: 'fresh orchids', 'dried pampas'.",
   "texture": "tactile quality FROM THE IMAGE (e.g., 'smooth', 'textured', 'matte', 'lustrous', 'soft', 'crisp')",
   "tone": "overall mood/atmosphere (e.g., 'luxurious refinement', 'understated elegance', 'modern sophistication', 'relaxed luxury')",
-  "category": "specific category from:
-    Fashion: blazers-jackets, dresses, tops, bottoms, outerwear, accessories, footwear, bags
+  "category": "SPECIFIC category — NEVER return 'general', 'clothing', 'other', 'unknown', or an empty string. Pick the closest fit from:
+    Fashion: blazers-jackets, dresses, tops, bottoms, shorts, skirts, knitwear, outerwear, activewear, swimwear, lingerie, sleepwear, suits, co-ord-sets, accessories, footwear, bags
     Home: furniture, lighting, textiles, tableware, decorative-objects, art
     Lifestyle: floral-arrangements, fragrance, candles, wellness, stationery
-    Beauty: skincare, makeup, haircare",
+    Beauty: skincare, makeup, haircare
+    If the product type is genuinely ambiguous (e.g., truly no signal), pick the closest superset bucket — never the placeholder 'general'.",
   "vibe_layer": "how this fits into a lifestyle mood board (e.g., 'evening-sophistication', 'weekend-retreat', 'power-dressing', 'cozy-evening', 'garden-party')",
   "pairs_with": ["2-3 complementary categories this would pair with in a mood board, e.g., 'neutral-knits', 'statement-jewelry', 'fresh-florals', 'ambient-candles']
 }
