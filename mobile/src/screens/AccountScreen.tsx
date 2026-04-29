@@ -253,7 +253,7 @@ export default function AccountScreen() {
         <View style={styles.header}>
           <HeadingImage
             slot="profile"
-            fallback="profile"
+            fallback="Profile"
             height={60}
             color="#fff"
             textStyle={styles.title}

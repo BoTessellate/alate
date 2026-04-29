@@ -39,8 +39,13 @@ describe('theme — heading typography', () => {
       expect((typography as any)[key].fontFamily).toBe('ViaodaLibre-Regular');
     });
 
-    it(`${key} renders in lowercase`, () => {
-      expect((typography as any)[key].textTransform).toBe('lowercase');
+    it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {
+      // Earlier versions forced textTransform: 'lowercase' on every
+      // heading token for an editorial feel. The user moved to
+      // title-case page titles ("Body Profile", "History", "Profile")
+      // so the lowercase transform was dropped — render whatever case
+      // the source string supplies.
+      expect((typography as any)[key].textTransform).toBeUndefined();
     });
   });
 

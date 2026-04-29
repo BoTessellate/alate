@@ -31,11 +31,15 @@ export const fontFamily = {
   fallback: 'serif',
 };
 
-// Shared heading trait: every display/heading token mixes this in so the
-// serif italic + lowercase transform stays consistent across the app.
+// Shared heading trait: every display/heading token mixes this in so
+// the serif display face stays consistent across the app. Earlier
+// versions forced `textTransform: 'lowercase'` for an editorial feel,
+// but the user moved to title-case page headings (April 29 2026 —
+// "Camel case page headings"). Whatever case the source string uses
+// is what renders. Keep page-title strings in title case;
+// poetic / phrase headings in sentence case.
 const headingSerif = {
   fontFamily: 'ViaodaLibre-Regular',
-  textTransform: 'lowercase' as const,
 };
 
 // =============================================================================

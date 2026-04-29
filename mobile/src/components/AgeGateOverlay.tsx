@@ -79,7 +79,7 @@ export default function AgeGateOverlay() {
         <GlassCard style={styles.card}>
           <HeadingImage
             slot="home-verse"
-            fallback="before we begin"
+            fallback="Before we begin"
             height={72}
             color={colors.text}
             textStyle={styles.title}

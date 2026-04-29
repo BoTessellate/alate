@@ -150,7 +150,7 @@ export default function HomeScreen() {
             <Text style={styles.eyebrow}>ALATE</Text>
             <HeadingImage
               slot="home-verse"
-              fallback={"paste anything.\nwe'll tell you\nif it fits."}
+              fallback={"Paste anything.\nWe'll tell you\nif it fits."}
               height={200}
               color="#fff"
               style={styles.heroVerseWrap}

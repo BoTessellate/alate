@@ -40,10 +40,14 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup
 // deliberately woman → man → nonbinary so the historical default
 // (woman) is the leading affordance, but no chip is pre-selected at
 // mount time so the user has to actively pick.
-const GENDER_OPTIONS: { label: string; value: GenderType; description: string }[] = [
-  { label: 'Woman', value: 'woman', description: 'Womenswear sizing' },
-  { label: 'Man', value: 'man', description: 'Menswear sizing' },
-  { label: 'Non-binary', value: 'nonbinary', description: 'Mix of either' },
+// Gender chips — labels only, no descriptions. The earlier
+// "Womenswear sizing" / "Menswear sizing" / "Mix of either" sub-
+// labels were redundant with the step heading + visually noisy on
+// the chip row. Per user feedback April 29 2026.
+const GENDER_OPTIONS: { label: string; value: GenderType }[] = [
+  { label: 'Woman', value: 'woman' },
+  { label: 'Man', value: 'man' },
+  { label: 'Non-binary', value: 'nonbinary' },
 ];
 
 const HEIGHT_OPTIONS = [
@@ -370,7 +374,7 @@ export default function AvatarSetupScreen() {
             <HeadingImage
               testID="avatar-setup-title"
               slot="body-profile"
-              fallback="body profile"
+              fallback="Body Profile"
               height={48}
               color={colors.text}
               textStyle={styles.title}
