@@ -57,6 +57,12 @@ const NOISE_PATTERNS: RegExp[] = [
   /\bunder\s*[$£€₹]?\s*\d/i,
   /\bbudget\b/i,
   /\bluxury\b/i,
+  // Brand-internal taxonomy slugs. Tags that contain `*`, `::`, or `|`
+  // are signatures of a merchant's PIM / collection-slug system rather
+  // than user-facing copy (e.g. yamayoga emits "yama*santi women" as a
+  // tag). These never read well in a fit card.
+  /[*|]/,
+  /::/,
 ];
 
 /**

@@ -90,4 +90,13 @@ describe('filterUserFacingTags', () => {
   it('preserves order of input tags', () => {
     expect(filterUserFacingTags(['Slim Fit', 'Linen', 'Black'])).toEqual(['Slim Fit', 'Linen', 'Black']);
   });
+
+  it('strips brand-internal slug tags containing punctuation markers', () => {
+    // yamayoga's storefront emits tags like "yama*santi women" — that's
+    // their internal sub-collection slug, not user-facing copy. Tags
+    // with "*" / "::" / "|" are reliable signals of internal taxonomy.
+    expect(filterUserFacingTags(['yama*santi women', 'Linen'])).toEqual(['Linen']);
+    expect(filterUserFacingTags(['collection::summer', 'Slim Fit'])).toEqual(['Slim Fit']);
+    expect(filterUserFacingTags(['brand|core', 'Black'])).toEqual(['Black']);
+  });
 });
