@@ -26,7 +26,7 @@
 // extra font is one more thing to load, mismatch, or reconcile.
 export const fontFamily = {
   primary: 'serif',
-  display: 'Viaoda Libre',
+  display: 'ViaodaLibre-Regular',
 };
 
 // Shared heading trait: every display/heading token mixes this in so
@@ -37,7 +37,7 @@ export const fontFamily = {
 // is what renders. Keep page-title strings in title case;
 // poetic / phrase headings in sentence case.
 const headingSerif = {
-  fontFamily: 'Viaoda Libre',
+  fontFamily: 'ViaodaLibre-Regular',
 };
 
 // =============================================================================

@@ -60,25 +60,21 @@ function App() {
     // Viaoda Libre (Google Fonts, OFL) — display face for all heading
     // tokens. Replaces DM Serif Display Italic.
     //
-    // KEY MUST MATCH THE TTF'S FAMILY NAME (the name table NameID 1),
-    // NOT the PostScript name. Android's typeface lookup matches the
-    // family name; iOS would prefer the PostScript name. Using the
-    // family name here works on both because expo-font registers the
-    // asset under whatever string we use, and Android resolves
-    // `fontFamily` against that string against the family table.
+    // The ttf is bundled in TWO places:
+    //   - `mobile/assets/fonts/ViaodaLibre-Regular.ttf` — read by
+    //     expo-font's `useFonts` for iOS (and as a backup for Android).
+    //   - `mobile/android/app/src/main/assets/fonts/ViaodaLibre-Regular.ttf`
+    //     — read by React Native's Android typeface manager directly.
+    //     RN Android's font lookup checks `assets/fonts/<family>.ttf`
+    //     by file basename, which is the most reliable resolve path
+    //     on Android. Three earlier attempts trying to bind via
+    //     expo-font alone (key as 'ViaodaLibre', then 'Viaoda Libre',
+    //     then 'ViaodaLibre-Regular') all silently fell back to system
+    //     serif on the device — see project_regression_log.md.
     //
-    // The Google Fonts ttf reports:
-    //   - Family: "Viaoda Libre"  (← this is what we register)
-    //   - Subfamily: "Regular"
-    //   - PostScript: "ViaodaLibre-Regular"
-    //
-    // April 29 2026 history (so this isn't repeated):
-    //   1st attempt registered as 'ViaodaLibre' (no space) —
-    //      headings rendered as system Noto Serif
-    //   2nd attempt as 'ViaodaLibre-Regular' (PostScript) —
-    //      same fallback (Android doesn't resolve PostScript names)
-    //   3rd attempt as 'Viaoda Libre' (Family) — works
-    'Viaoda Libre': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
+    // Both paths reference the SAME file basename + key, so JS can
+    // use `fontFamily: 'ViaodaLibre-Regular'` cross-platform.
+    'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {
