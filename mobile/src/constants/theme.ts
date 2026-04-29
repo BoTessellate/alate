@@ -215,61 +215,67 @@ export const typography = {
     lineHeight: 24,
   },
 
-  // Body text — now on system serif to pair with TAN Nightingale
+  // Body text — every size bumped +2pt (April 29 2026) to push back
+  // against the lightness of a single-weight display serif. Without
+  // a Bold variant we lean on size for visual presence; +2pt is the
+  // smallest jump that meaningfully reads as "bigger" without
+  // breaking the existing layout grid (chip rows, dock heights, etc.
+  // were laid out around the prior 11–18pt scale and tolerate a
+  // 2pt expansion). Line heights bumped proportionally.
   bodyLarge: {
     fontFamily: fontFamily.primary,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '400' as const,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   body: {
     fontFamily: fontFamily.primary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '400' as const,
-    lineHeight: 22,
+    lineHeight: 25,
   },
   bodySmall: {
     fontFamily: fontFamily.primary,
-    fontSize: 13,
-    fontWeight: '400' as const,
-    lineHeight: 18,
-  },
-
-  // Labels & Buttons — serif so small copy matches the editorial voice
-  labelLarge: {
-    fontFamily: fontFamily.primary,
     fontSize: 15,
     fontWeight: '400' as const,
-    lineHeight: 22,
+    lineHeight: 21,
+  },
+
+  // Labels & Buttons — same +2pt bump.
+  labelLarge: {
+    fontFamily: fontFamily.primary,
+    fontSize: 17,
+    fontWeight: '400' as const,
+    lineHeight: 25,
     letterSpacing: 0.1,
   },
   label: {
     fontFamily: fontFamily.primary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '400' as const,
-    lineHeight: 18,
+    lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelSmall: {
     fontFamily: fontFamily.primary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '400' as const,
-    lineHeight: 16,
+    lineHeight: 18,
     letterSpacing: 0.2,
   },
 
   // Caption & Overline
   caption: {
     fontFamily: fontFamily.primary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400' as const,
-    lineHeight: 16,
+    lineHeight: 19,
   },
   overline: {
     fontFamily: fontFamily.primary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '400' as const,
-    lineHeight: 14,
+    lineHeight: 16,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
