@@ -4,31 +4,29 @@
  */
 
 // =============================================================================
-// FONT FAMILIES
+// FONT FAMILIES — two faces, full stop.
 // =============================================================================
-// The display face is TAN Nightingale (rendered as SVGs by HeadingImage).
-// Body copy now runs on a system serif so it pairs with Nightingale's
-// art-deco serif character — mixing sans body with a display serif made
-// the headings feel like stickers dropped onto sans-serif chrome.
-// Platform-specific serifs: 'Times New Roman' (iOS Western default),
-// 'serif' (Android → Noto Serif, which ships on every Android device).
+// The app intentionally uses ONLY two faces:
+//   - `primary`: the platform's system serif. Android → Noto Serif
+//     (ships on every device); iOS → Times New Roman. Used for body,
+//     labels, captions, chips, tags, buttons — every non-display
+//     surface.
+//   - `display`: Viaoda Libre (Google Fonts, OFL). Bundled via
+//     `useFonts` in App.tsx. Used for page titles + hero verses.
+//     Family name MUST be the exact string the ttf's name table
+//     reports for NameID 1, including the space — see anti-pattern
+//     #12 in `project_anti_patterns.md`.
+//
+// History: earlier versions also exported `accent` (Georgia), `mono`
+// (system monospace), `fallback` (duplicate of primary), and
+// `displayLegacy` (DM Serif Display Italic — the .ttf was deleted
+// when we moved to Viaoda Libre). None had any callsites; all were
+// dropped April 29 2026 to keep the design system tight ("two fonts,
+// not five"). Adding a new face needs an explicit reason — every
+// extra font is one more thing to load, mismatch, or reconcile.
 export const fontFamily = {
-  // Primary UI font — system serif that pairs with TAN Nightingale.
   primary: 'serif',
-  // Legacy alias for the editorial body face
-  accent: 'Georgia',
-  // Display font — Viaoda Libre (Google Fonts, OFL). Italic-style display
-  // serif used as the live fallback for any heading slot whose TAN
-  // Nightingale SVG hasn't been exported yet, plus dynamic text the
-  // SVG slot list can't cover (brand names, verdicts, product names).
   display: 'Viaoda Libre',
-  // Legacy display face — kept so anything still hard-coded to it
-  // doesn't break. Phase out when no callers reference it directly.
-  displayLegacy: 'DMSerifDisplay-Italic',
-  // Monospace for code/data
-  mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
-  // Fallback
-  fallback: 'serif',
 };
 
 // Shared heading trait: every display/heading token mixes this in so

@@ -1,15 +1,15 @@
 /**
  * Theme typography tests.
  *
- *   - Display + heading tokens use Viaoda Libre as the live fallback
- *     face (Google Fonts, OFL). TAN Nightingale SVGs replace these at
- *     the screen level when present — see HeadingImage.
- *   - Display + heading tokens render in lowercase.
- *   - Body / label / caption tokens run on the SYSTEM SERIF to pair
- *     with the display serif — the whole app now reads as serif-led.
- *   - DM Serif Display Italic stays loaded as `fontFamily.displayLegacy`
- *     so any caller still hard-coded to it doesn't break, but new
- *     tokens point at Viaoda Libre.
+ *   - Display + heading tokens use Viaoda Libre (Google Fonts, OFL)
+ *     bundled via expo-font; family name resolves on Android only
+ *     when set to the ttf's NameID 1 ("Viaoda Libre" with space).
+ *   - Body / label / caption tokens run on the SYSTEM SERIF so the
+ *     whole app reads as serif-led without bundling a second face.
+ *   - The fontFamily registry is intentionally minimal: ONLY
+ *     `primary` (system serif) and `display` (Viaoda Libre). No
+ *     accent, mono, fallback, or legacy aliases. See anti-pattern
+ *     comment in theme.ts.
  *
  * These tokens are the single source of truth — if a heading anywhere
  * drifts off them, that's a bug.
@@ -22,8 +22,11 @@ describe('theme — heading typography', () => {
     expect(fontFamily.display).toBe('Viaoda Libre');
   });
 
-  it('keeps DM Serif Display Italic loaded as the legacy fallback', () => {
-    expect(fontFamily.displayLegacy).toBe('DMSerifDisplay-Italic');
+  it('the fontFamily registry exposes ONLY primary + display (no accent/mono/legacy bloat)', () => {
+    // Regression guard: April 29 2026 we slimmed the registry to two
+    // faces after the user flagged "too many fonts for an app". Don't
+    // add a new key without an explicit reason logged in theme.ts.
+    expect(Object.keys(fontFamily).sort()).toEqual(['display', 'primary']);
   });
 
   const headingKeys = [
