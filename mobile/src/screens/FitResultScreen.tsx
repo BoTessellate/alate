@@ -799,6 +799,20 @@ export default function FitResultScreen() {
         <Text style={styles.heroName} numberOfLines={2}>
           {safeName || 'Product'}
         </Text>
+        {/* Custom-fit brand spotlight — appears when the storefront
+            advertises made-to-measure / bespoke / custom sizing. The
+            badge sits between the product name and the glass card so
+            shoppers who care about tailored service notice it before
+            they read the standard fit verdict. Per anti-pattern #1
+            this is ephemeral per scrape — never persisted into a
+            shared brand catalog. */}
+        {product.customFit?.available && (
+          <View style={styles.customFitBadge} testID="custom-fit-badge">
+            <Text style={styles.customFitBadgeText}>
+              {product.customFit.label ?? 'Custom sizing available'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Glass info card — expanded = 70% screen + symmetric side/bottom
@@ -1334,6 +1348,36 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
+  },
+
+  // --- Custom-fit brand spotlight badge ---
+  // Lavender-tinted pill in italic display serif. Sits below the
+  // product name in the hero so the made-to-measure / bespoke /
+  // custom-sizing service is the first thing a fit-conscious shopper
+  // notices before the standard verdict. Background uses primaryAlpha
+  // tokens so the saturation lines up with chip backgrounds elsewhere
+  // (FIT badge, MATCH donut, price pill). The pill itself is
+  // pointerEvents-passive (the parent hero blocks pointer events) —
+  // it is informational, not a tap target. We can lift this out into
+  // a Pressable later when we have a custom-sizing URL to link to.
+  customFitBadge: {
+    marginTop: 10,
+    backgroundColor: primaryAlpha.tintMd,
+    borderWidth: 1,
+    borderColor: primaryAlpha.tintLg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.pill,
+    alignSelf: 'center',
+  },
+  customFitBadgeText: {
+    fontFamily: 'DMSerifDisplay-Italic',
+    fontSize: 13,
+    color: '#fff',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 
   // --- Glass card ---

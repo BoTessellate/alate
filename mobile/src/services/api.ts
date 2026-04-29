@@ -28,6 +28,11 @@ export interface ScrapedProduct {
   tags?: string[];
   material?: string;
   compareAtPrice?: { amount: number; currency: string };
+  // Surfaced when the storefront advertises made-to-measure / custom
+  // sizing — FitResultScreen renders a brand-spotlight badge near the
+  // hero. Ephemeral per scrape (anti-pattern #1: don't persist scraped
+  // brand metadata into a shared catalog).
+  customFit?: { available: boolean; label?: string };
 }
 
 export interface FitWarning {
@@ -152,6 +157,7 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
         category?: string;
         tags?: string[];
         material?: string;
+        customFit?: { available: boolean; label?: string };
       };
       error?: string;
       blocked?: boolean;
@@ -213,6 +219,7 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
         category: result.data.category,
         tags: result.data.tags,
         material: result.data.material,
+        customFit: result.data.customFit,
       },
     };
   } catch (error) {
