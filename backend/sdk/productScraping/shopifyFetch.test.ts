@@ -63,6 +63,44 @@ const SAMPLE_SUMMERAWAY_RESPONSE = {
   },
 };
 
+// Real-world payload shape reduced from yamayoga.in. The Shopify
+// storefront JSON does NOT include `price_currency` on variants —
+// merchants typically set the shop currency once. Variants in the
+// array can also have very different prices when the merchant uses
+// Shopify variants for distinct SKUs (color + size combo). The URL
+// the user shares pins a specific variant via `?variant=<id>`; we
+// must honor that ID instead of blindly returning variants[0].
+const SAMPLE_YAMAYOGA_RESPONSE = {
+  product: {
+    id: 7755555555555,
+    title: 'aeroyama™ Long Sleeve Thumbhole Top',
+    body_html: 'Soft, breathable long-sleeve top with thumbholes.',
+    vendor: 'Yamayoga',
+    product_type: 'Aero Long Sleeve With Thumb Hole',
+    handle: 'aero-long-sleeve-with-thumb-hole-sand-grey',
+    tags: 'yama*santi women, Activewear, Long Sleeve',
+    variants: [
+      {
+        id: 50674146000000,
+        title: 'XS / Charcoal',
+        price: '4951.44',
+        option1: 'XS',
+        option2: 'Charcoal',
+        inventory_management: 'shopify',
+      },
+      {
+        id: 50674147000598,
+        title: 'XS / Sand Grey',
+        price: '1999.00',
+        option1: 'XS',
+        option2: 'Sand Grey',
+        inventory_management: 'shopify',
+      },
+    ],
+    images: [{ src: 'https://yamayoga.in/cdn/shop/files/aero.jpg' }],
+  },
+};
+
 function mockFetch(response: unknown, status = 200) {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
@@ -176,6 +214,89 @@ describe('tryShopifyJSON', () => {
       fetchFn
     );
     expect(result).toBeNull();
+  });
+
+  it('honors `?variant=<id>` in the URL when picking the primary variant', async () => {
+    // Regression: yamayoga.in serves a multi-color long-sleeve top where
+    // the Sand Grey XS is ₹1,999 and the Charcoal XS is ₹4,951. The
+    // shared URL pins ?variant=50674147000598 (Sand Grey) but the
+    // previous logic always returned variants[0] — so users saw the
+    // Charcoal price on a Sand Grey product page. Honor the URL.
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL(
+        'https://yamayoga.in/products/aero-long-sleeve-with-thumb-hole-sand-grey?variant=50674147000598'
+      ),
+      fetchFn
+    );
+    expect(result).not.toBeNull();
+    expect(result!.price).toBe('1999.00');
+  });
+
+  it('falls back to first variant when `?variant=` is not in the URL', async () => {
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL(
+        'https://yamayoga.in/products/aero-long-sleeve-with-thumb-hole-sand-grey'
+      ),
+      fetchFn
+    );
+    // No variant param → first tracked variant wins.
+    expect(result!.price).toBe('4951.44');
+  });
+
+  it('falls back to first variant when `?variant=` does not match any variant id', async () => {
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL(
+        'https://yamayoga.in/products/aero-long-sleeve-with-thumb-hole-sand-grey?variant=99999999999'
+      ),
+      fetchFn
+    );
+    expect(result!.price).toBe('4951.44');
+  });
+
+  it('infers currency from country TLD when Shopify JSON omits it', async () => {
+    // Shopify storefront `/products/<handle>.json` does NOT include
+    // currency at the variant level. We previously returned `undefined`,
+    // which downstream caused the price object to be dropped entirely
+    // (mobile requires both amount + currency). Fall back to the TLD.
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL(
+        'https://yamayoga.in/products/aero-long-sleeve-with-thumb-hole-sand-grey?variant=50674147000598'
+      ),
+      fetchFn
+    );
+    expect(result!.currency).toBe('INR');
+  });
+
+  it('drops merchant product_type when it is essentially the product title', async () => {
+    // yamayoga sets product_type to "Aero Long Sleeve With Thumb Hole"
+    // which is the product NAME, not a category. Rendering it as a
+    // category in the fit card looks like noise. Better to omit and
+    // let the user see only signal categories like "Top" / "Activewear".
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL(
+        'https://yamayoga.in/products/aero-long-sleeve-with-thumb-hole-sand-grey'
+      ),
+      fetchFn
+    );
+    expect(result!.category).toBeUndefined();
+  });
+
+  it('keeps a real category like "Top" even when title contains the same word', async () => {
+    // Don't over-filter: a generic 1–2 word product_type (e.g. "Top",
+    // "Dress", "Activewear") that just happens to share a word with the
+    // title should still pass through. Only drop when product_type is
+    // long AND mostly a re-statement of the title.
+    const fetchFn = mockFetch(SAMPLE_SUMMERAWAY_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://summeraway.in/products/costa-top'),
+      fetchFn
+    );
+    expect(result!.category).toBe('Top');
   });
 });
 

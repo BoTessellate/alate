@@ -72,6 +72,78 @@ export function extractMaterialFromTags(tags: string[]): string | undefined {
 }
 
 /**
+ * TLD → ISO currency code. Mirrors the table in `productScraping/index.ts`
+ * (HTML extraction layer) so the Shopify direct-fetch path has the same
+ * currency-fallback coverage when the storefront JSON omits per-variant
+ * currency (which is the common case — `presentment_prices` carries it
+ * but the variant root usually does not).
+ */
+const TLD_CURRENCY: Record<string, string> = {
+  in: 'INR', uk: 'GBP', eu: 'EUR', de: 'EUR', fr: 'EUR',
+  it: 'EUR', es: 'EUR', jp: 'JPY', cn: 'CNY', au: 'AUD',
+  ca: 'CAD', br: 'BRL', mx: 'MXN', kr: 'KRW', sg: 'SGD',
+  ae: 'AED', sa: 'SAR', za: 'ZAR', ru: 'RUB', se: 'SEK',
+  no: 'NOK', dk: 'DKK', ch: 'CHF', nz: 'NZD', hk: 'HKD',
+  th: 'THB', my: 'MYR', id: 'IDR', ph: 'PHP', vn: 'VND',
+  pl: 'PLN', tr: 'TRY',
+};
+
+function inferCurrencyFromHostname(hostname: string): string | undefined {
+  const tld = hostname.split('.').pop()?.toLowerCase();
+  return tld ? TLD_CURRENCY[tld] : undefined;
+}
+
+/**
+ * Tokenise a string for category/title overlap comparison. Lowercases,
+ * strips punctuation/trademark glyphs, and drops a small set of stop
+ * words that tend to inflate apparent overlap without carrying meaning
+ * ("with", "and", "the", etc.).
+ */
+const TITLE_STOPWORDS = new Set([
+  'with', 'and', 'the', 'for', 'of', 'a', 'an',
+]);
+
+function tokenise(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !TITLE_STOPWORDS.has(t));
+}
+
+/**
+ * Decide whether a merchant-supplied `product_type` is genuinely a
+ * category or just a re-statement of the product title.
+ *
+ * Heuristic: only consider `product_type`s with ≥ 4 meaningful tokens —
+ * shorter product_types like "Top", "Dress", "Activewear", "Long Sleeve
+ * Top", "Slim Fit Yoga Top" are real categories and always pass. For
+ * longer product_types we drop them when ≥ 75% of their tokens echo
+ * tokens in the title. Token matching is substring-tolerant so that
+ * "thumb" and "hole" in product_type still match "thumbhole" in title
+ * (and "aero" matches "aeroyama"), which is the actual yamayoga case.
+ */
+export function isCategoryLikelyTitleEcho(category: string, title: string): boolean {
+  const catTokens = tokenise(category);
+  if (catTokens.length < 4) return false;
+  const titleTokens = tokenise(title);
+  if (titleTokens.length === 0) return false;
+  const tokenMatches = (cat: string) => {
+    for (const t of titleTokens) {
+      if (cat === t) return true;
+      // Substring match in either direction, ≥ 4 chars to avoid false
+      // positives on short tokens like "top" appearing inside "tropical".
+      if (cat.length >= 4 && t.includes(cat)) return true;
+      if (t.length >= 4 && cat.includes(t)) return true;
+    }
+    return false;
+  };
+  const overlap = catTokens.filter(tokenMatches).length;
+  return overlap / catTokens.length >= 0.75;
+}
+
+/**
  * Try to fetch Shopify's product JSON for a URL. Returns structured
  * data on success, or null on any failure (URL not a Shopify product
  * path, 404, network error, unexpected payload shape).
@@ -128,6 +200,7 @@ export async function tryShopifyJSON(
       product_type?: string;
       tags?: string;
       variants?: Array<{
+        id?: number | string;
         title?: string;
         price?: string;
         compare_at_price?: string | null;
@@ -138,14 +211,29 @@ export async function tryShopifyJSON(
       images?: Array<{ src?: string }>;
     };
 
-    // Pick the canonical variant for price display — first available
-    // variant with Shopify-managed inventory. Falls back to variants[0]
-    // if none have inventory tracking (some stores don't use it).
+    // Pick the canonical variant for price display.
+    //
+    // Priority order (first match wins):
+    //   1. The variant whose id matches the URL's `?variant=<id>` —
+    //      this is what the storefront page itself renders, so it's
+    //      the price the user just saw before sharing the URL. Skipping
+    //      this caused a real bug on multi-variant products where the
+    //      shared URL was a Sand Grey colourway at ₹1,999 but variants[0]
+    //      was a Charcoal colourway at ₹4,951 — we'd display the wrong
+    //      price on the fit card.
+    //   2. First variant with Shopify-managed inventory.
+    //   3. variants[0] (some stores don't use inventory tracking).
     const variants = Array.isArray(product.variants) ? product.variants : [];
     const trackedVariants = variants.filter(
       (v) => v.inventory_management === 'shopify'
     );
-    const primaryVariant = trackedVariants[0] ?? variants[0];
+
+    const variantIdParam = url.searchParams.get('variant');
+    const urlSelectedVariant = variantIdParam
+      ? variants.find((v) => v.id != null && String(v.id) === variantIdParam)
+      : undefined;
+
+    const primaryVariant = urlSelectedVariant ?? trackedVariants[0] ?? variants[0];
 
     const tags = typeof product.tags === 'string'
       ? product.tags.split(',').map((t) => t.trim()).filter(Boolean)
@@ -167,12 +255,27 @@ export async function tryShopifyJSON(
 
     const imageUrl = product.images?.[0]?.src;
 
+    // Drop merchant `product_type` when it's just the product name in
+    // disguise. See `isCategoryLikelyTitleEcho` for the heuristic.
+    const rawCategory = product.product_type?.trim() || undefined;
+    const category =
+      rawCategory && product.title && isCategoryLikelyTitleEcho(rawCategory, product.title)
+        ? undefined
+        : rawCategory;
+
+    // Currency — Shopify storefront JSON does not consistently expose
+    // a per-variant currency. Use the (rare) `price_currency` field if
+    // present, otherwise infer from the country TLD so the mobile
+    // client can render a price symbol instead of dropping the price
+    // object entirely (it requires both amount + currency).
+    const currency = primaryVariant?.price_currency || inferCurrencyFromHostname(url.hostname);
+
     const result: ShopifyScrapedData = {
       title: product.title,
       brandName: product.vendor,
-      category: product.product_type,
+      category,
       price: primaryVariant?.price,
-      currency: primaryVariant?.price_currency,
+      currency,
       compareAtPrice: primaryVariant?.compare_at_price ?? undefined,
       imageUrl,
       description: description || undefined,
