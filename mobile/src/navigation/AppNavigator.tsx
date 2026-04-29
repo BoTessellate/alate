@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
+import { isEnabled } from '../constants/featureFlags';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
@@ -27,6 +28,8 @@ import HistoryScreen from '../screens/HistoryScreen';
 import AvatarSetupScreen from '../screens/AvatarSetupScreen';
 import FitResultScreen from '../screens/FitResultScreen';
 import AccountScreen from '../screens/AccountScreen';
+import PickImageScreen from '../screens/PickImageScreen';
+import OverlayEditorScreen from '../screens/OverlayEditorScreen';
 
 // Wrap each screen with an error boundary so a crash shows a fallback
 // instead of a white screen. The `name` prop tags the Sentry report.
@@ -35,11 +38,17 @@ const SafeHistory = () => <ScreenErrorBoundary name="HistoryScreen"><HistoryScre
 const SafeAccount = () => <ScreenErrorBoundary name="AccountScreen"><AccountScreen /></ScreenErrorBoundary>;
 const SafeAvatarSetup = () => <ScreenErrorBoundary name="AvatarSetupScreen"><AvatarSetupScreen /></ScreenErrorBoundary>;
 const SafeFitResult = () => <ScreenErrorBoundary name="FitResultScreen"><FitResultScreen /></ScreenErrorBoundary>;
+const SafePickImage = () => <ScreenErrorBoundary name="PickImageScreen"><PickImageScreen /></ScreenErrorBoundary>;
+const SafeOverlayEditor = () => <ScreenErrorBoundary name="OverlayEditorScreen"><OverlayEditorScreen /></ScreenErrorBoundary>;
 
 // Navigation types
 export type RootStackParamList = {
   Main: undefined;
   AvatarSetup: undefined;
+  /** v2: Story share — gated by featureFlags.V2 */
+  PickImage: undefined;
+  /** v2: Story share — gated by featureFlags.V2 */
+  OverlayEditor: undefined;
   FitResult: {
     /** Optional — when present, FitResult skips its internal scrape
      *  step and goes straight to enrichment + fit-check. Sources that
@@ -328,6 +337,23 @@ export default function AppNavigator() {
             headerShown: false,
           }}
         />
+        {/* v2: Story share. Routes are only registered when the flag is
+            on so there's no way to reach them in a production build until
+            the feature ships. */}
+        {isEnabled('V2') && (
+          <>
+            <Stack.Screen
+              name="PickImage"
+              component={SafePickImage}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="OverlayEditor"
+              component={SafeOverlayEditor}
+              options={{ headerShown: false }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

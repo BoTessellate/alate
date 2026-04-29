@@ -17,9 +17,14 @@ export const fontFamily = {
   primary: 'serif',
   // Legacy alias for the editorial body face
   accent: 'Georgia',
-  // Display font loaded via expo-font (see App.tsx). Stand-in for TAN Nightingale
-  // when the SVG slot falls back to text (i.e. missing asset).
-  display: 'DMSerifDisplay-Italic',
+  // Display font — Viaoda Libre (Google Fonts, OFL). Italic-style display
+  // serif used as the live fallback for any heading slot whose TAN
+  // Nightingale SVG hasn't been exported yet, plus dynamic text the
+  // SVG slot list can't cover (brand names, verdicts, product names).
+  display: 'ViaodaLibre',
+  // Legacy display face — kept so anything still hard-coded to it
+  // doesn't break. Phase out when no callers reference it directly.
+  displayLegacy: 'DMSerifDisplay-Italic',
   // Monospace for code/data
   mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
   // Fallback
@@ -29,7 +34,7 @@ export const fontFamily = {
 // Shared heading trait: every display/heading token mixes this in so the
 // serif italic + lowercase transform stays consistent across the app.
 const headingSerif = {
-  fontFamily: 'DMSerifDisplay-Italic',
+  fontFamily: 'ViaodaLibre',
   textTransform: 'lowercase' as const,
 };
 

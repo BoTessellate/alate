@@ -52,22 +52,22 @@ jest.mock('react-native-gesture-handler', () => {
   const React = require('react');
   const { View } = require('react-native');
   const passthrough = ({ children }) => children ?? null;
+  const chainable = () => {
+    const proxy = new Proxy(() => proxy, {
+      get: () => () => proxy,
+    });
+    return proxy;
+  };
   return {
     GestureDetector: passthrough,
     GestureHandlerRootView: ({ children, style }) =>
       React.createElement(View, { style }, children),
     Gesture: {
-      Pan: () => ({
-        onUpdate: function () { return this; },
-        onEnd: function () { return this; },
-        onBegin: function () { return this; },
-        onStart: function () { return this; },
-        activeOffsetX: function () { return this; },
-        activeOffsetY: function () { return this; },
-        failOffsetX: function () { return this; },
-        failOffsetY: function () { return this; },
-        minDistance: function () { return this; },
-      }),
+      Pan: chainable,
+      Pinch: chainable,
+      Rotation: chainable,
+      LongPress: chainable,
+      Tap: chainable,
       Simultaneous: (...gestures) => ({ simultaneous: gestures }),
       Race: (...gestures) => ({ race: gestures }),
     },
@@ -107,9 +107,31 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+  getItemAsync: jest.fn(() => Promise.resolve(null)),
+  setItemAsync: jest.fn(() => Promise.resolve()),
+  deleteItemAsync: jest.fn(() => Promise.resolve()),
+}));
+
+// v2 story share — flag-gated editor dependencies. Tests never hit the
+// native image picker / snapshotter / share sheet; they verify the JS
+// glue compiles and the screens render.
+jest.mock('expo-image-picker', () => ({
+  MediaTypeOptions: { Images: 'Images' },
+  requestCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  requestMediaLibraryPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  launchCameraAsync: jest.fn(() => Promise.resolve({ canceled: true, assets: [] })),
+  launchImageLibraryAsync: jest.fn(() => Promise.resolve({ canceled: true, assets: [] })),
+}));
+
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+  shareAsync: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('react-native-view-shot', () => ({
+  __esModule: true,
+  captureRef: jest.fn(() => Promise.resolve('file:///tmp/mock-snapshot.png')),
+  default: { captureRef: jest.fn() },
 }));
 
 // Mock AsyncStorage

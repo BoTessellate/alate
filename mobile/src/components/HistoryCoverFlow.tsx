@@ -37,6 +37,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
+import BrandHeading from './BrandHeading';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Portrait-heavy product cards. Per Claude Design mockup: cards are
@@ -86,9 +87,14 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
       style={styles.cardGradient}
     >
       <View style={styles.folio}>
-        <Text style={styles.folioBrand} numberOfLines={1}>
-          {brand.toUpperCase()}
-        </Text>
+        <BrandHeading
+          brand={brand}
+          height={26}
+          color="#fff"
+          uppercase
+          textStyle={styles.folioBrand}
+          testID={`folio-brand-${entry.id}`}
+        />
         {price && <Text style={styles.folioPrice}>{price}</Text>}
       </View>
     </LinearGradient>

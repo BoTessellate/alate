@@ -1,12 +1,15 @@
 /**
  * Theme typography tests.
  *
- *   - Display + heading tokens use the DM Serif Italic fallback face
- *     (TAN Nightingale SVGs replace these at the screen level when
- *     rendered — see HeadingImage).
+ *   - Display + heading tokens use Viaoda Libre as the live fallback
+ *     face (Google Fonts, OFL). TAN Nightingale SVGs replace these at
+ *     the screen level when present — see HeadingImage.
  *   - Display + heading tokens render in lowercase.
  *   - Body / label / caption tokens run on the SYSTEM SERIF to pair
  *     with the display serif — the whole app now reads as serif-led.
+ *   - DM Serif Display Italic stays loaded as `fontFamily.displayLegacy`
+ *     so any caller still hard-coded to it doesn't break, but new
+ *     tokens point at Viaoda Libre.
  *
  * These tokens are the single source of truth — if a heading anywhere
  * drifts off them, that's a bug.
@@ -15,8 +18,12 @@
 import { typography, fontFamily } from '../constants/theme';
 
 describe('theme — heading typography', () => {
-  it('exposes DMSerifDisplay-Italic as the display font family fallback', () => {
-    expect(fontFamily.display).toBe('DMSerifDisplay-Italic');
+  it('exposes Viaoda Libre as the display font family', () => {
+    expect(fontFamily.display).toBe('ViaodaLibre');
+  });
+
+  it('keeps DM Serif Display Italic loaded as the legacy fallback', () => {
+    expect(fontFamily.displayLegacy).toBe('DMSerifDisplay-Italic');
   });
 
   const headingKeys = [
@@ -28,8 +35,8 @@ describe('theme — heading typography', () => {
   ] as const;
 
   headingKeys.forEach((key) => {
-    it(`${key} uses the display serif font`, () => {
-      expect((typography as any)[key].fontFamily).toBe('DMSerifDisplay-Italic');
+    it(`${key} uses Viaoda Libre`, () => {
+      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre');
     });
 
     it(`${key} renders in lowercase`, () => {

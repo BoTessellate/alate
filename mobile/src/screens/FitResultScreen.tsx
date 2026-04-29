@@ -46,6 +46,7 @@ import { useCalibrationStore, averageCalibration } from '../store/calibrationSto
 import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BrandHeading from '../components/BrandHeading';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
 // Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
@@ -795,7 +796,17 @@ export default function FitResultScreen() {
 
       {/* Brand + product name centred near the top of the image */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
-        {safeBrand ? <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text> : null}
+        {safeBrand ? (
+          <BrandHeading
+            brand={safeBrand}
+            height={20}
+            color="rgba(255,255,255,0.92)"
+            uppercase
+            style={{ alignSelf: 'center', marginBottom: 6 }}
+            textStyle={styles.heroBrand}
+            testID="hero-brand"
+          />
+        ) : null}
         <Text style={styles.heroName} numberOfLines={2}>
           {safeName || 'Product'}
         </Text>

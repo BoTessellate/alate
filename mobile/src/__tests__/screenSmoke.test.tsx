@@ -93,10 +93,13 @@ import HistoryScreen from '../screens/HistoryScreen';
 import AccountScreen from '../screens/AccountScreen';
 import AvatarSetupScreen from '../screens/AvatarSetupScreen';
 import FitResultScreen from '../screens/FitResultScreen';
+import PickImageScreen from '../screens/PickImageScreen';
+import OverlayEditorScreen from '../screens/OverlayEditorScreen';
 
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore } from '../store/calibrationStore';
+import { useEditorStore } from '../store/editorStore';
 
 // --- Tests ---------------------------------------------------------------
 
@@ -106,6 +109,7 @@ describe('Screen Smoke Tests', () => {
     useAvatarStore.setState({ avatar: null });
     useFitHistoryStore.setState({ entries: [] });
     useCalibrationStore.setState({ garments: [] });
+    useEditorStore.getState().reset();
     mockRouteParams = {};
   });
 
@@ -178,6 +182,21 @@ describe('Screen Smoke Tests', () => {
       url: 'https://asos.com/p/1',
     };
     expect(() => render(<FitResultScreen />)).not.toThrow();
+  });
+
+  it('PickImageScreen renders without crashing', () => {
+    expect(() => render(<PickImageScreen />)).not.toThrow();
+  });
+
+  it('OverlayEditorScreen renders empty state without crashing', () => {
+    // No image seeded — screen should render the "no photo picked" fallback.
+    expect(() => render(<OverlayEditorScreen />)).not.toThrow();
+  });
+
+  it('OverlayEditorScreen renders with image seeded without crashing', () => {
+    useEditorStore.getState().setImage('file:///tmp/seed.jpg');
+    useEditorStore.getState().addOverlay('peace');
+    expect(() => render(<OverlayEditorScreen />)).not.toThrow();
   });
 
   it('ScreenErrorBoundary catches render errors and shows fallback', () => {

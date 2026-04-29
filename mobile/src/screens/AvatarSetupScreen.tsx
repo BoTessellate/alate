@@ -16,6 +16,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, primaryAlpha } from '../constants/theme';
 import {
   useAvatarStore,
+  GenderType,
   ShoulderType,
   BustType,
   WaistType,
@@ -33,6 +34,17 @@ import { BodyFocusArea } from '../components/bodyFigurineModel';
 import HeadingImage from '../components/HeadingImage';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AvatarSetup'>;
+
+// Gender chip options. Three values, plain labels — the brand voice
+// stays editorial-neutral, no exclamation marks. The order is
+// deliberately woman → man → nonbinary so the historical default
+// (woman) is the leading affordance, but no chip is pre-selected at
+// mount time so the user has to actively pick.
+const GENDER_OPTIONS: { label: string; value: GenderType; description: string }[] = [
+  { label: 'Woman', value: 'woman', description: 'Womenswear sizing' },
+  { label: 'Man', value: 'man', description: 'Menswear sizing' },
+  { label: 'Non-binary', value: 'nonbinary', description: 'Mix of either' },
+];
 
 const HEIGHT_OPTIONS = [
   { label: "Under 5'3\"", value: 155, metric: '< 160cm' },
@@ -84,7 +96,14 @@ const TORSO_OPTIONS: { label: string; value: TorsoType; description: string }[] 
   { label: 'Long', value: 'long', description: 'Longer torso relative to legs' },
 ];
 
+// STEPS drives the progress bar copy + step-numbering label below
+// each section title. Gender is step 1 — picked first so the rest of
+// the flow can adapt (the chest/bust label is the immediate
+// example). Bust copy is generated dynamically from `genderToBustLabel`
+// at render time so the heading reads "Bust" / "Chest" depending on
+// the gender chip the user just tapped.
 const STEPS = [
+  { key: 'gender', title: 'Gender', subtitle: 'How do you shop?' },
   { key: 'height', title: 'Height', subtitle: 'How tall are you?' },
   { key: 'shoulders', title: 'Shoulders', subtitle: 'How would you describe your shoulders?' },
   { key: 'bust', title: 'Bust', subtitle: 'What best describes your bust size?' },
@@ -93,6 +112,30 @@ const STEPS = [
   { key: 'thighs', title: 'Thighs', subtitle: 'How would you describe your thighs?' },
   { key: 'torso', title: 'Torso Length', subtitle: 'How long is your torso relative to your legs?' },
 ];
+
+/**
+ * Title/subtitle override for the bust/chest step based on gender.
+ * Same chip values (small/medium/large/extra-large) apply to both —
+ * the chips describe overall chest girth at the bust line which is
+ * meaningful for fit regardless of gender. We only swap the label so
+ * the language matches what the user calls it.
+ */
+function bustStepCopy(gender: GenderType | null) {
+  if (gender === 'man') {
+    return {
+      title: 'Chest',
+      subtitle: 'What best describes your chest size?',
+    };
+  }
+  // Woman + non-binary stay on "Bust" — the chip group is bust-coded
+  // (cup-size descriptions in BUST_OPTIONS) and the non-binary path
+  // currently keeps the same UX. If we eventually ship a separate
+  // chest chip group for non-binary, branch here.
+  return {
+    title: 'Bust',
+    subtitle: 'What best describes your bust size?',
+  };
+}
 
 type ChipOption = { label: string; value: string; description?: string };
 
@@ -202,6 +245,11 @@ export default function AvatarSetupScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePart, setActivePart] = useState<BodyFocusArea | null>(null);
 
+  // Gender — read with `?? 'woman'` for legacy avatars persisted
+  // before this field existed (April 2026). New profiles always pick
+  // explicitly via the chip group; nothing is pre-selected on first
+  // mount so the user has to actively answer.
+  const [gender, setGender] = useState<GenderType | null>(avatar?.gender ?? null);
   const [height, setHeight] = useState<number | null>(avatar?.height_cm ?? null);
   const [shoulders, setShoulders] = useState<ShoulderType | null>(avatar?.shoulders ?? null);
   const [bust, setBust] = useState<BustType | null>(avatar?.bust ?? null);
@@ -211,6 +259,7 @@ export default function AvatarSetupScreen() {
   const [torso, setTorso] = useState<TorsoType | null>(avatar?.torso_length ?? null);
 
   const allFieldsFilled =
+    gender !== null &&
     height !== null &&
     shoulders !== null &&
     bust !== null &&
@@ -219,7 +268,7 @@ export default function AvatarSetupScreen() {
     thighs !== null &&
     torso !== null;
 
-  const filledCount = [height, shoulders, bust, waist, hips, thighs, torso].filter(
+  const filledCount = [gender, height, shoulders, bust, waist, hips, thighs, torso].filter(
     (v) => v !== null
   ).length;
 
@@ -229,6 +278,7 @@ export default function AvatarSetupScreen() {
     if (!allFieldsFilled) return;
 
     const avatar = {
+      gender: gender!,
       height_cm: height,
       shoulders: shoulders,
       bust: bust,
@@ -318,13 +368,33 @@ export default function AvatarSetupScreen() {
             </Text>
           </View>
 
-          {/* Step 1: Height */}
+          {/* Step 1: Gender — drives the Bust/Chest copy below.
+              Picked first so the rest of the flow can adapt. The
+              chip group is at columns=3 to fit the three options
+              (woman / man / non-binary) on one row. */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>1</Text>
               <View style={styles.sectionHeaderText}>
                 <Text style={styles.sectionTitle}>{STEPS[0].title}</Text>
                 <Text style={styles.sectionSubtitle}>{STEPS[0].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={GENDER_OPTIONS}
+              selected={gender}
+              onSelect={(v) => { setGender(v as GenderType); }}
+              testIDPrefix="gender"
+            />
+          </View>
+
+          {/* Step 2: Height */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>2</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[1].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[1].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -340,13 +410,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 2: Shoulders */}
+          {/* Step 3: Shoulders */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>2</Text>
+              <Text style={styles.stepNumber}>3</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[1].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[1].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[2].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[2].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -357,13 +427,15 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 3: Bust */}
+          {/* Step 4: Bust / Chest — title flips with gender. Same
+              chips either way (chest girth at the bust line is the
+              fit-relevant dimension for both menswear + womenswear). */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>3</Text>
+              <Text style={styles.stepNumber}>4</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[2].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[2].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{bustStepCopy(gender).title}</Text>
+                <Text style={styles.sectionSubtitle}>{bustStepCopy(gender).subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -375,13 +447,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 4: Waist */}
+          {/* Step 5: Waist */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>4</Text>
+              <Text style={styles.stepNumber}>5</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[3].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[3].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[4].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[4].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -392,13 +464,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 5: Hips */}
+          {/* Step 6: Hips */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>5</Text>
+              <Text style={styles.stepNumber}>6</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[4].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[4].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -410,13 +482,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 6: Thighs */}
+          {/* Step 7: Thighs */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>6</Text>
+              <Text style={styles.stepNumber}>7</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -428,13 +500,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 7: Torso Length */}
+          {/* Step 8: Torso Length */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>7</Text>
+              <Text style={styles.stepNumber}>8</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[7].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[7].subtitle}</Text>
               </View>
             </View>
             <ChipSelector

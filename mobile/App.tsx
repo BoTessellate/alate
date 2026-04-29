@@ -58,6 +58,11 @@ function App() {
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
     'DMSerifDisplay-Italic': require('./assets/fonts/DMSerifDisplay-Italic.ttf'),
+    // Viaoda Libre — Google Fonts, OFL. The italic-style display serif we
+    // use as the live fallback for any heading slot whose TAN Nightingale
+    // SVG is missing (verdicts, brand names, etc.). DM Serif Display
+    // stays loaded for legacy callers; new tokens point at ViaodaLibre.
+    'ViaodaLibre': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

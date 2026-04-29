@@ -17,11 +17,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, secondaryAlpha, statusAlpha } from '../constants/theme';
+import { isEnabled } from '../constants/featureFlags';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
+import BrandHeading from '../components/BrandHeading';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -183,6 +185,30 @@ export default function HomeScreen() {
               brand, blocked origin, network error). Backlog: re-add a
               fully-styled brand-nudge card with email send. */}
 
+          {/* v2: Story share entry. Only rendered when the feature flag
+              is on — production builds never see this tile. */}
+          {isEnabled('V2') && (
+            <TouchableOpacity
+              testID="story-share-entry"
+              onPress={() => navigation.navigate('PickImage')}
+              activeOpacity={0.85}
+              style={styles.setupWrap}
+            >
+              <GlassCard style={styles.setupCard}>
+                <View style={styles.setupIconContainer}>
+                  <Feather name="image" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.setupTextContainer}>
+                  <Text style={styles.setupTitle}>make a story</Text>
+                  <Text style={styles.setupSubtitle}>
+                    drop words + the track you're listening to onto a photo
+                  </Text>
+                </View>
+                <Text style={styles.setupArrow}>→</Text>
+              </GlassCard>
+            </TouchableOpacity>
+          )}
+
           {/* Profile Setup Prompt — shown only when the user hasn't built a
               body profile yet. Not in the design mockup (which assumes a
               completed onboarding), but functionally required for new
@@ -301,9 +327,14 @@ function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () =>
           </View>
         )}
         <View style={styles.recentMeta}>
-          <Text style={styles.recentBrand} numberOfLines={1}>
-            {(entry.brand || 'UNKNOWN').toUpperCase()}
-          </Text>
+          <BrandHeading
+            brand={entry.brand || 'UNKNOWN'}
+            height={14}
+            color={colors.textMuted}
+            uppercase
+            textStyle={styles.recentBrand}
+            testID={`recent-brand-${entry.id}`}
+          />
           <Text style={styles.recentName} numberOfLines={1}>
             {entry.productName || 'Product'}
           </Text>
