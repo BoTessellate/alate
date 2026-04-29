@@ -1737,15 +1737,14 @@ const styles = StyleSheet.create({
   },
   // Empty-state line shown inside the FIT CONCERNS section when the
   // analysis flagged no warnings. Same colour tier as concernText
-  // (`textSecondary` — WCAG AA-safe at 15px regular on white;
-  // textMuted would fail 4.5:1) but ITALIC for the affirmative tone,
-  // so it reads as "soft / positive" without dropping below
-  // accessibility floors.
+  // (`textSecondary` — WCAG AA-safe at 15px regular on white).
+  // Was italic for an affirmative tone but the user flagged it as
+  // unwanted (April 29 2026: "keep this as normal"); plain regular
+  // weight reads as factual not decorative.
   concernEmptyText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     lineHeight: 19,
-    fontStyle: 'italic',
   },
 
   // --- Tags ---
@@ -1781,31 +1780,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
-  // Meta row tier ramp (April 29 2026 — colour-driven hierarchy):
-  //   metaLabel        textSecondary + 500   (the "Material:" caption)
-  //   metaValue        text + 700 capitalized (the value, most prominent)
-  //   metaPlaceholder  textSecondary + 500 italic (no value present)
-  // textMuted (#8a7e94) is 3.75:1 on white — fails WCAG AA for body
-  // text; reserved for >=18px or decorative-only contexts.
+  // Meta row — bumped DOWN to labelSmall (13px) + UPPERCASE per user
+  // direction April 29 2026 ("material and category can be in one
+  // size smaller and all caps"). The smaller-caps treatment reads
+  // as a tight spec-table line rather than body copy, which is the
+  // right register for a value-pair like Material: Cotton.
+  //
+  // Colour ramp stays:
+  //   metaLabel        textSecondary + 500   (caption)
+  //   metaValue        text + 700           (value, most prominent)
+  //   metaPlaceholder  textSecondary + 500   (no value present)
+  // textMuted (#8a7e94) is 3.75:1 on white — fails WCAG AA for
+  // body text; reserved for ≥18px or decorative-only contexts.
   metaLabel: {
-    ...typography.bodySmall,
+    ...typography.labelSmall,
     fontWeight: '500',
     color: colors.textSecondary,
+    textTransform: 'uppercase',
   },
   metaValue: {
-    ...typography.bodySmall,
+    ...typography.labelSmall,
     fontWeight: '700',
     color: colors.text,
-    textTransform: 'capitalize',
+    textTransform: 'uppercase',
   },
   // Placeholder for "—" when the scrape didn't surface a value.
-  // Italic + same-tier-as-label colour signals "this field exists
-  // but is empty" without making the row scream for attention.
+  // Same caps + size as the rest of the row so the empty state
+  // doesn't break vertical rhythm; same colour tier as the label.
   metaPlaceholder: {
-    ...typography.bodySmall,
+    ...typography.labelSmall,
     fontWeight: '500',
     color: colors.textSecondary,
-    fontStyle: 'italic',
+    textTransform: 'uppercase',
   },
 
   // Availability row — colored dot + status text. Right-aligned to

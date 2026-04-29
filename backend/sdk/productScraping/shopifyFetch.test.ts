@@ -381,6 +381,36 @@ describe('tryShopifyJSON', () => {
     expect(result!.availableSizes).toEqual(['XS', 'S']);
   });
 
+  it('strips HTML embedded in vendor / title (yamayoga.in regression)', async () => {
+    // yamayoga.in's Shopify storefront returns the `vendor` field
+    // wrapped in `<span class="custom-fonts">…</span>` markup —
+    // their store uses a CSS class to swap a custom font on the
+    // brand wordmark and that bled into the JSON. Without stripping
+    // at the scrape layer, the raw markup landed on the fit card.
+    const SAMPLE_YAMAYOGA_HTML = {
+      product: {
+        id: 1,
+        title: 'aeroyama<sup>™</sup> Flared Yoga Pants',
+        body_html: '<p>Soft</p>',
+        vendor: '<span class="custom-fonts">YAMA</span>YOGA',
+        product_type: 'Activewear',
+        handle: 'aero-flared-yoga-pants',
+        tags: 'Activewear',
+        variants: [
+          { id: 1, price: '2999.00', option1: 'XS', inventory_management: 'shopify' },
+        ],
+        images: [{ src: 'https://yamayoga.in/cdn/shop/files/x.jpg' }],
+      },
+    };
+    const fetchFn = mockFetch(SAMPLE_YAMAYOGA_HTML);
+    const result = await tryShopifyJSON(
+      new URL('https://yamayoga.in/products/aero-flared-yoga-pants'),
+      fetchFn
+    );
+    expect(result!.brandName).toBe('YAMAYOGA');
+    expect(result!.title).toBe('aeroyama™ Flared Yoga Pants');
+  });
+
   it('still works when product.options is missing (single-dimension store)', async () => {
     // Some Shopify stores expose only sizes (no colour dimension) and
     // omit the `options` array. Falls back to option1. The Summer Away

@@ -47,6 +47,41 @@ describe('sanitize', () => {
     });
   });
 
+  describe('strips HTML tags (April 29 2026 — yamayoga.in regression)', () => {
+    // yamayoga's Shopify storefront returns the vendor field with
+    // literal HTML: '<span class="custom-fonts">YAMA</span>YOGA'.
+    // Their store uses a CSS class for a custom-font swap and it
+    // bled into the Shopify JSON. Without HTML stripping, the brand
+    // pill on the fit card rendered the raw `<span>` markup.
+    it('strips a leading <span> wrapper', () => {
+      expect(
+        sanitize('<span class="custom-fonts">YAMA</span>YOGA')
+      ).toBe('YAMAYOGA');
+    });
+
+    it('strips multiple nested tags', () => {
+      expect(
+        sanitize('<div><b>HOT</b> <i>BRAND</i></div>')
+      ).toBe('HOT BRAND');
+    });
+
+    it('strips self-closing tags (<br/>)', () => {
+      expect(sanitize('Brand<br/>Name')).toBe('Brand Name');
+    });
+
+    it('decodes the most common HTML entities', () => {
+      expect(sanitize('Mark&nbsp;&amp;&nbsp;Spencer')).toBe('Mark & Spencer');
+    });
+
+    it('returns undefined for input that is only HTML', () => {
+      expect(sanitize('<span></span>')).toBeUndefined();
+    });
+
+    it('leaves plain text unchanged', () => {
+      expect(sanitize('Reistor')).toBe('Reistor');
+    });
+  });
+
   describe('nullish / empty input', () => {
     it('returns undefined for undefined', () => {
       expect(sanitize(undefined)).toBeUndefined();

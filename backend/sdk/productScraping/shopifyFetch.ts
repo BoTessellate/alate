@@ -33,6 +33,35 @@ export interface ShopifyScrapedData {
 }
 
 /**
+ * Strip HTML tags + decode entities from a scraped string. Some
+ * Shopify stores (yamayoga.in) embed `<span class="...">…</span>`
+ * inside the `vendor` or `title` field as a CSS-driven font swap;
+ * without stripping, that markup lands on the fit card as raw text.
+ * Mirror of `mobile/src/utils/sanitize.ts` so cleaning happens at
+ * BOTH ends of the pipe — defense in depth.
+ */
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+};
+function stripHtmlAndDecode(s: string | undefined): string | undefined {
+  if (!s) return s;
+  const stripped = s
+    .replace(/<\s*br\s*\/?\s*>/gi, ' ')
+    .replace(/<\s*\/\s*(p|div|h[1-6]|li|tr|td)\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(?:nbsp|amp|lt|gt|quot|#39|apos);/g, (m) => HTML_ENTITY_MAP[m] ?? m)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped || undefined;
+}
+
+/**
  * Common garment materials — used to pluck a `material` string out of
  * the free-form tag list that most Shopify stores populate. Case-
  * insensitive matching, earliest tag wins (merchants usually list the
@@ -306,8 +335,13 @@ export async function tryShopifyJSON(
     const currency = primaryVariant?.price_currency || inferCurrencyFromHostname(url.hostname);
 
     const result: ShopifyScrapedData = {
-      title: product.title,
-      brandName: product.vendor,
+      // title and brandName are run through `stripHtmlAndDecode`
+      // because some merchants (yamayoga.in confirmed April 29 2026)
+      // embed `<span class="...">` inside the Shopify JSON's vendor /
+      // title fields for a CSS font-swap hack. Without stripping,
+      // the markup renders literally on the fit card.
+      title: stripHtmlAndDecode(product.title),
+      brandName: stripHtmlAndDecode(product.vendor),
       category,
       price: primaryVariant?.price,
       currency,

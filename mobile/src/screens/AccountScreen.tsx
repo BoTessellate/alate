@@ -723,6 +723,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     marginBottom: spacing.sm,
+    // Underline at the typeface baseline so the heading reads as
+    // an interactive call-out, not a static label. Per user
+    // direction April 29 2026 ("underline or add a line element
+    // below 'are you a brand?'").
+    textDecorationLine: 'underline',
+    textDecorationColor: 'rgba(255,255,255,0.55)',
   },
   brandCtaSubtitle: {
     fontFamily: fontFamily.primary,
