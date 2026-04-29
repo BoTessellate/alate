@@ -22,6 +22,7 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import HeadingImage from '../components/HeadingImage';
 import BrandHeading from '../components/BrandHeading';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -32,6 +33,34 @@ function isValidUrl(text: string): boolean {
     const url = new URL(text);
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch { return false; }
+}
+
+/**
+ * Quick heuristic for "this URL looks like a product page". Used to
+ * decide whether to auto-fire the scrape from a clipboard URL on
+ * focus — we don't want to scrape every random link the user has on
+ * their clipboard, just shopping URLs.
+ *
+ * Catches the major patterns:
+ *   - Shopify: /products/<handle>
+ *   - Amazon / many SEAsian sites: /dp/<asin>, /gp/product/<id>
+ *   - ASOS / Boohoo / etc.: /prd/<id>
+ *   - Net-a-Porter / Mr Porter: /product/<id>
+ *   - H&M / Zara: /productpage. or trailing -p<digits>
+ *   - Generic fallback: path contains the literal word "product"
+ */
+function looksLikeProductUrl(text: string): boolean {
+  try {
+    const path = new URL(text).pathname.toLowerCase();
+    return (
+      /\/products?\//.test(path) ||
+      /\/(dp|gp\/product|prd)\//.test(path) ||
+      /productpage/.test(path) ||
+      /-p\d{4,}\b/.test(path)
+    );
+  } catch {
+    return false;
+  }
 }
 
 type NavigationProp = CompositeNavigationProp<
@@ -59,6 +88,13 @@ export default function HomeScreen() {
   // Auto-trigger debounce on paste
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Track whether we've already consumed a clipboard URL this session,
+  // so a single product URL on the user's clipboard auto-fires once
+  // (when they open the app) but doesn't keep re-triggering on every
+  // tab focus. The "ref" not "state" pattern keeps the auto-fire path
+  // out of the render cycle.
+  const consumedClipboardUrlRef = useRef<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       // If we just came back from AvatarSetup with a pending URL, auto-trigger
@@ -72,6 +108,37 @@ export default function HomeScreen() {
       // Normal focus — reset URL so a stale paste doesn't auto-trigger
       // a fresh fit-check the moment the screen mounts.
       setUrl('');
+
+      // Auto-detect a product URL on the clipboard and pre-fill the
+      // input. The existing 700ms paste-debounce inside
+      // `handleUrlChange` then runs the scrape automatically — same
+      // path the user takes when manually pasting. Only fires for
+      // URLs that look like product pages (contain `/product` or
+      // `/p/` in the path) to avoid scraping random links the user
+      // copied for unrelated reasons. Once consumed, we remember the
+      // URL so re-focusing the tab doesn't re-fire on the same
+      // clipboard. Per user direction April 29 2026: "auto detect if
+      // it's an ecommerce site on the clipboard and automatically
+      // run the scraper".
+      Clipboard.getStringAsync()
+        .then((clip) => {
+          const trimmed = clip?.trim();
+          if (!trimmed || !isValidUrl(trimmed)) return;
+          if (!looksLikeProductUrl(trimmed)) return;
+          if (consumedClipboardUrlRef.current === trimmed) return;
+          consumedClipboardUrlRef.current = trimmed;
+          // setUrl + the existing handleUrlChange flow — but we
+          // bypass the 700ms debounce by calling runCheck directly,
+          // since the user already paid the "I copied this URL"
+          // intent cost. Faster than waiting on the debounce.
+          setUrl(trimmed);
+          runCheck(trimmed);
+        })
+        .catch(() => {
+          // Clipboard access can fail silently (some devices restrict
+          // background reads on Android 14+). Non-blocking — user can
+          // always paste manually.
+        });
     }, [avatar])
   );
 

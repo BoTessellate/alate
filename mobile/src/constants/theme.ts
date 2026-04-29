@@ -367,11 +367,13 @@ export const glass = {
   borderWidth: 0.5,
   // Variant tuned for the FitResult dock — sits over a (potentially
   // busy) product image. Iterations (April 29 2026):
-  //   0.65 → 0.58 — user wanted ~7% more translucency so the
-  //                 hero image breathes through more clearly.
+  //   0.65 → 0.58 → 0.55 — user wanted progressively more translucency
+  //                         so the hero image breathes through. At
+  //                         0.55 we're close to the floor where the
+  //                         BlurView alone needs to carry legibility.
   // Works in tandem with the underlying BlurView; legibility is
   // still fine because the BlurView softens the imagery underneath.
-  dockBackgroundColor: 'rgba(255, 255, 255, 0.58)',
+  dockBackgroundColor: 'rgba(255, 255, 255, 0.55)',
   dockBorderColor: 'rgba(255, 255, 255, 0.9)',
 };
 

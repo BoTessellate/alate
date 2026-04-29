@@ -63,6 +63,15 @@ const NOISE_PATTERNS: RegExp[] = [
   // tag). These never read well in a fit card.
   /[*|]/,
   /::/,
+  // Status / merchandising flags that read as "internal Shopify" not
+  // "tells the shopper anything about the garment". yamayoga ships
+  // these literally as tags: "new_draft", "new_drop", "out".
+  /^new[_\s-](draft|drop|arrival|in)/i,
+  /^out$/i,
+  /^draft$/i,
+  /^archived?$/i,
+  /^hidden$/i,
+  /^featured$/i,
 ];
 
 /**
@@ -85,5 +94,10 @@ export function filterUserFacingTags(
     .map((t) => (typeof t === 'string' ? t.trim() : ''))
     .filter((t) => t.length > 0)
     .filter((t) => !NOISE_PATTERNS.some((p) => p.test(t)))
-    .filter((t) => t.toLowerCase() !== lowerCategory);
+    .filter((t) => t.toLowerCase() !== lowerCategory)
+    // Snake_case slugs ("yoga_pilates", "working_out") survive the
+    // noise filter but read as "internal label" with the underscores
+    // intact. Normalize to spaces so they render as natural words on
+    // the chip pill (April 29 2026 polish).
+    .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim());
 }
