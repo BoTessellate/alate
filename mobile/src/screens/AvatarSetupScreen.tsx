@@ -63,12 +63,39 @@ const SHOULDER_OPTIONS: { label: string; value: ShoulderType; description: strin
   { label: 'Broad', value: 'broad', description: 'Wider than your hips' },
 ];
 
-const BUST_OPTIONS: { label: string; value: BustType; description: string }[] = [
+// Bust chips for women + non-binary — described in cup-size language
+// since that's the most familiar reference point for womenswear sizing.
+const BUST_OPTIONS_WOMEN: { label: string; value: BustType; description: string }[] = [
   { label: 'Small', value: 'small', description: 'A-B cup' },
   { label: 'Medium', value: 'medium', description: 'C-D cup' },
   { label: 'Large', value: 'large', description: 'DD-E cup' },
   { label: 'Extra Large', value: 'extra-large', description: 'F+ cup' },
 ];
+
+// Chest chips for men — same underlying values feed the avatar store
+// (small/medium/large/extra-large translate to the same chest-girth
+// buckets in checkFit), but the descriptions speak in chest-build
+// language instead of cup sizes. Per user feedback April 29 2026:
+// "Why would a man have 'cup' sizes?"
+const BUST_OPTIONS_MEN: { label: string; value: BustType; description: string }[] = [
+  { label: 'Slim', value: 'small', description: 'Lean chest, narrow build' },
+  { label: 'Average', value: 'medium', description: 'Balanced chest' },
+  { label: 'Broad', value: 'large', description: 'Fuller chest, athletic build' },
+  { label: 'Powerful', value: 'extra-large', description: 'Very developed chest' },
+];
+
+/**
+ * Pick the chip set to render for step 4 based on gender. Falls
+ * back to the women set when gender is null (initial state) so the
+ * UI shows something coherent before the user picks step 1.
+ */
+function bustOptionsFor(gender: GenderType | null) {
+  return gender === 'man' ? BUST_OPTIONS_MEN : BUST_OPTIONS_WOMEN;
+}
+
+// Legacy alias — kept so any third-party import path doesn't break
+// during the v2 rollout. New code should call `bustOptionsFor(gender)`.
+const BUST_OPTIONS = BUST_OPTIONS_WOMEN;
 
 const WAIST_OPTIONS: { label: string; value: WaistType; description: string }[] = [
   { label: 'Defined', value: 'defined', description: 'Noticeably narrower than hips' },
@@ -439,7 +466,7 @@ export default function AvatarSetupScreen() {
               </View>
             </View>
             <ChipSelector
-              options={BUST_OPTIONS}
+              options={bustOptionsFor(gender)}
               selected={bust}
               onSelect={(v) => { setBust(v as BustType); setActivePart('bust'); }}
               columns={2}
@@ -583,7 +610,15 @@ const styles = StyleSheet.create({
   },
   // Header — italic serif "body profile" + subtle 12px sub copy per
   // Claude Design ScreenOnboarding.
+  //
+  // paddingTop pushes the heading below the absolute-positioned back
+  // chevron (38px tall, anchored at insets.top + spacing.sm). Without
+  // it, the chevron's circular fill draws over the leading characters
+  // of the SVG (visible regression in user screenshot, April 29). 40px
+  // = chevron-height (38) + 2px breathing margin so even a slightly-
+  // taller font face stays clear.
   header: {
+    paddingTop: 40,
     marginBottom: spacing.md,
   },
   title: {

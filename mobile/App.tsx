@@ -57,11 +57,13 @@ function App() {
   // fires, so the first visible frame renders in the real face, not a
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
-    'DMSerifDisplay-Italic': require('./assets/fonts/DMSerifDisplay-Italic.ttf'),
-    // Viaoda Libre — Google Fonts, OFL. The italic-style display serif we
-    // use as the live fallback for any heading slot whose TAN Nightingale
-    // SVG is missing (verdicts, brand names, etc.). DM Serif Display
-    // stays loaded for legacy callers; new tokens point at ViaodaLibre.
+    // Viaoda Libre (Google Fonts, OFL) is the display face for all
+    // heading tokens. Replaces DM Serif Display Italic which was
+    // retired April 29, 2026 — the .ttf is no longer bundled. Used
+    // directly (BrandHeading fallback, ConfirmDialog title, verdict
+    // text) and via theme tokens (typography.displayLarge / headingXL
+    // / headingL / headingM). When TAN Nightingale licensing lands
+    // for the v2 release, swap this single line.
     'ViaodaLibre': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 

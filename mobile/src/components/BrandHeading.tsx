@@ -38,13 +38,21 @@ import { isEnabled } from '../constants/featureFlags';
 // Empty registry on day one — every brand falls back to DM Serif Display
 // Italic text. Add entries lazily as Canva exports get committed.
 const BRAND_SVGS: Record<string, React.FC<{ width?: number; height?: number }>> = {
+  // First wave (April 29 2026) — Canva/TAN Nightingale exports the
+  // user committed to the repo. Slug rule:
+  //   "& Other Stories"      → and-other-stories
+  //   "COS"                  → cos
+  //   "Marks and Spencers"   → marks-and-spencers
+  //   "Zara"                 → zara
+  // (See `slugifyBrand` below for the canonical transform.)
+  'and-other-stories': require('../../assets/images/brands/and-other-stories.svg').default,
+  'cos':               require('../../assets/images/brands/cos.svg').default,
+  'marks-and-spencers': require('../../assets/images/brands/marks-and-spencers.svg').default,
+  'zara':              require('../../assets/images/brands/zara.svg').default,
   // EXAMPLES — uncomment + drop matching file to activate.
   // 'asos':              require('../../assets/images/brands/asos.svg').default,
-  // 'cos':               require('../../assets/images/brands/cos.svg').default,
-  // 'and-other-stories': require('../../assets/images/brands/and-other-stories.svg').default,
   // 'h-and-m':           require('../../assets/images/brands/h-and-m.svg').default,
   // 'weekday':           require('../../assets/images/brands/weekday.svg').default,
-  // 'zara':              require('../../assets/images/brands/zara.svg').default,
 };
 
 /**

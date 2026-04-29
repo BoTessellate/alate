@@ -32,8 +32,12 @@ describe('BrandHeading', () => {
   });
 
   it('respects uppercase prop on fallback', () => {
-    const { getByText } = render(<BrandHeading brand="cos" uppercase />);
-    expect(getByText('COS')).toBeTruthy();
+    // Use an un-registered brand so the fallback Text path renders.
+    // ("cos" maps to a real SVG export from April 29 2026 onward —
+    // pick something that isn't in BRAND_SVGS to exercise the
+    // styled-text fallback path here.)
+    const { getByText } = render(<BrandHeading brand="test brand" uppercase />);
+    expect(getByText('TEST BRAND')).toBeTruthy();
   });
 
   it('forwards testID to fallback Text', () => {

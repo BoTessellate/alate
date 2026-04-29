@@ -989,69 +989,87 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Concerns — only render when the card is expanded. When the user
-              drags the handle down to collapse, this section disappears and
-              the card shrinks to show just the verdict + stats + material.
-              Re-expanding brings it back. */}
-          {isExpanded && warnings.length > 0 && (
+          {/* Concerns — always render in expanded state so every fit
+              card shows the same panel structure. When the analysis
+              flagged no concerns we render a quiet positive line in
+              the same visual treatment instead of hiding the section.
+              Per user feedback April 29 2026: "all three [screenshots
+              of real fit checks] have different analyzed information
+              — which makes the app appear unreliable". The fix is
+              consistent layout across cards. */}
+          {isExpanded && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
-              {warnings.map((warning, index) => {
-                const config = getSeverityConfig(warning.severity);
-                return (
-                  <View key={index} style={styles.concernRow}>
-                    <View style={[styles.concernDot, { backgroundColor: config.color }]} />
-                    <View style={styles.concernBody}>
-                      <Text style={[styles.concernSeverity, { color: config.color }]}>
-                        {config.label.toUpperCase()}
-                      </Text>
-                      <Text style={styles.concernText}>{warning.message}</Text>
+              {warnings.length > 0 ? (
+                warnings.map((warning, index) => {
+                  const config = getSeverityConfig(warning.severity);
+                  return (
+                    <View key={index} style={styles.concernRow}>
+                      <View style={[styles.concernDot, { backgroundColor: config.color }]} />
+                      <View style={styles.concernBody}>
+                        <Text style={[styles.concernSeverity, { color: config.color }]}>
+                          {config.label.toUpperCase()}
+                        </Text>
+                        <Text style={styles.concernText}>{warning.message}</Text>
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <Text style={styles.concernEmptyText}>
+                  No concerns flagged for your profile — this should fit comfortably.
+                </Text>
+              )}
             </View>
           )}
 
-          {/* Tags — expanded only. The whole tags section (label +
-              chip row) is a drag target so the user can collapse the
+          {/* Tags — always render in expanded state. The whole tags
+              section is a drag target so the user can collapse the
               overlay from around the tags region without scrolling
-              back to the handle. The activeOffsetY([-10, 10]) on the
-              Pan gesture means small touches still pass through to
-              the ScrollView's vertical scroll; only deliberate
-              vertical swipes trigger the collapse. */}
-          {isExpanded && showTags && (
+              back to the handle. When the scrape didn't surface any
+              user-facing tags (Shopify storefront returned an empty
+              tag array, or every tag was filtered as merchandising
+              noise), we render a single "—" placeholder so the panel
+              keeps the same structure as cards with rich tag data. */}
+          {isExpanded && (
             <GestureDetector gesture={tagsDragGesture}>
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>TAGS</Text>
-                <View style={styles.tagsContainer}>
-                  {visibleTags.slice(0, 6).map((tag: string, i: number) => (
-                    <View key={i} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
-                    </View>
-                  ))}
-                </View>
+                {showTags ? (
+                  <View style={styles.tagsContainer}>
+                    {visibleTags.slice(0, 6).map((tag: string, i: number) => (
+                      <View key={i} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.metaPlaceholder}>—</Text>
+                )}
               </View>
             </GestureDetector>
           )}
 
-          {/* Meta rows — Material survives the dock's minimum-info
-              treatment. Category appears only when expanded.
-              Availability used to live here as a row; it's now a
-              circular icon in the stats row above for consistency
-              with the rest of the at-a-glance signals. */}
-          {(showMaterial || (isExpanded && showCategory)) && (
+          {/* Meta rows — Material always survives the dock's minimum-
+              info treatment (most-asked spec when shopping fabric-
+              first); Category appears only when expanded. Both rows
+              fall back to "—" when the scrape didn't surface the
+              field, so the panel structure stays consistent across
+              cards even when the source storefront is sparse. */}
+          {(showMaterial || isExpanded) && (
             <View style={styles.metaSection}>
-              {showMaterial && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Material</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
-                </View>
-              )}
-              {isExpanded && showCategory && (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Material</Text>
+                <Text style={showMaterial ? styles.metaValue : styles.metaPlaceholder}>
+                  {showMaterial ? enrichedProduct!.material : '—'}
+                </Text>
+              </View>
+              {isExpanded && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
+                  <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
+                    {showCategory ? enrichedProduct!.category : '—'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -1608,6 +1626,16 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 19,
   },
+  // Empty-state line shown inside the FIT CONCERNS section when the
+  // analysis flagged no warnings. Same visual register as concernText
+  // (so the section keeps its layout footprint) but in muted secondary
+  // text — reads as a positive affirmation rather than a fit issue.
+  concernEmptyText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
 
   // --- Tags ---
   tagsContainer: {
@@ -1651,6 +1679,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     textTransform: 'capitalize',
+  },
+  // Placeholder used in meta rows + empty tags region when the scrape
+  // didn't surface a value. Right-aligned (alongside metaValue) and
+  // muted, so the row reads as "this field exists but isn't known"
+  // rather than "the section is broken". Keeps card layout consistent
+  // across rich and sparse storefronts.
+  metaPlaceholder: {
+    ...typography.bodySmall,
+    fontWeight: '500',
+    color: colors.textMuted,
   },
 
   // Availability row — colored dot + status text. Right-aligned to

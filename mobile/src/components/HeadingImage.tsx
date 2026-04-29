@@ -32,27 +32,27 @@ import HomeVerseSvg from '../../assets/images/headings/home-verse.svg';
 import HistorySvg from '../../assets/images/headings/history.svg';
 import ProfileSvg from '../../assets/images/headings/profile.svg';
 import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
-import GreatFitSvg from '../../assets/images/headings/great-fit.svg';
-import SomeConcernsSvg from '../../assets/images/headings/some-concerns.svg';
-import MayNotFitSvg from '../../assets/images/headings/may-not-fit.svg';
 
+// Verdict-label SVGs (great-fit, some-concerns, may-not-fit) were
+// retired April 29 2026. Those three slots now route through the
+// styled-text fallback path below, rendering in Viaoda Libre via
+// `typography.displayMedium` / `headingL`. Slot enum keeps the
+// values so existing callsites in FitResultScreen continue to
+// compile; the SVG_BY_SLOT registry simply omits them.
 type Slot =
   | 'home-verse'     // "paste anything. / we'll tell you / if it fits."
   | 'history'        // "your history"
   | 'profile'        // "profile"
   | 'body-profile'   // "body profile"
-  | 'great-fit'      // "Great Fit!"
-  | 'some-concerns'  // "Some Concerns"
-  | 'may-not-fit';   // "May Not Fit Well"
+  | 'great-fit'      // text-only (was "great fit!" SVG)
+  | 'some-concerns'  // text-only (was "some concerns" SVG)
+  | 'may-not-fit';   // text-only (was "may not fit well" SVG)
 
 const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: number }>>> = {
   'home-verse': HomeVerseSvg,
   history: HistorySvg,
   profile: ProfileSvg,
   'body-profile': BodyProfileSvg,
-  'great-fit': GreatFitSvg,
-  'some-concerns': SomeConcernsSvg,
-  'may-not-fit': MayNotFitSvg,
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
@@ -151,10 +151,16 @@ export default function HeadingImage({
     );
   }
 
-  // Fallback — plain styled text until a file lands.
+  // Fallback — plain styled text until a file lands. We mirror the
+  // accessibilityLabel on the SVG path here so screen readers + the
+  // testing-library `getByLabelText` query find the heading
+  // identically across both render paths (after the verdict-label
+  // SVGs were retired April 29 2026, the FitResult tests rely on
+  // `getAllByLabelText('Great Fit!')` matching the text fallback).
   return (
     <Text
       accessibilityRole="header"
+      accessibilityLabel={fallback}
       style={[config.fallbackStyle, { color }, textStyle]}
       numberOfLines={numberOfLines}
       testID={testID}

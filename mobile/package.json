@@ -13,6 +13,7 @@
     "test:e2e": "echo 'E2E tests moved to guinea-pig repo — see https://github.com/BoTessellate/guinea-pig' && exit 1"
   },
   "dependencies": {
+    "@expo/require-utils": "^55.0.4",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/app": "^24.0.0",

@@ -135,7 +135,15 @@ function MainTabs() {
           // side. 24+insets on bottom.
           left: 40,
           right: 40,
-          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 24,
+          // Bottom offset reduced from +24 → +10 so the pill sits
+          // closer to the device gesture-bar without crowding it.
+          // Per user direction "drop the placement of the floating
+          // nav bar by a few more pixels, it floats a little too
+          // high right now". 10px clears the edge on phones with no
+          // home indicator; on devices with insets.bottom > 0 the
+          // safe-area inset already covers the gesture-bar so the
+          // +10 is pure breathing room.
+          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 10,
           height: 64,
           // Full pill — borderRadius matches the height/2 cap so the
           // shape is unambiguously capsule-shaped at any width.
