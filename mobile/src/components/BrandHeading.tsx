@@ -124,7 +124,7 @@ export default function BrandHeading({
       style={[
         typography.headingS,
         {
-          fontFamily: 'ViaodaLibre-Regular',
+          fontFamily: 'Viaoda Libre',
           fontSize: Math.round(height * 0.72),
           lineHeight: height,
           letterSpacing: 0.4,

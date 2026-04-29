@@ -21,7 +21,7 @@ export const fontFamily = {
   // serif used as the live fallback for any heading slot whose TAN
   // Nightingale SVG hasn't been exported yet, plus dynamic text the
   // SVG slot list can't cover (brand names, verdicts, product names).
-  display: 'ViaodaLibre-Regular',
+  display: 'Viaoda Libre',
   // Legacy display face — kept so anything still hard-coded to it
   // doesn't break. Phase out when no callers reference it directly.
   displayLegacy: 'DMSerifDisplay-Italic',
@@ -39,7 +39,7 @@ export const fontFamily = {
 // is what renders. Keep page-title strings in title case;
 // poetic / phrase headings in sentence case.
 const headingSerif = {
-  fontFamily: 'ViaodaLibre-Regular',
+  fontFamily: 'Viaoda Libre',
 };
 
 // =============================================================================

@@ -19,7 +19,7 @@ import { typography, fontFamily } from '../constants/theme';
 
 describe('theme — heading typography', () => {
   it('exposes Viaoda Libre as the display font family', () => {
-    expect(fontFamily.display).toBe('ViaodaLibre-Regular');
+    expect(fontFamily.display).toBe('Viaoda Libre');
   });
 
   it('keeps DM Serif Display Italic loaded as the legacy fallback', () => {
@@ -36,7 +36,7 @@ describe('theme — heading typography', () => {
 
   headingKeys.forEach((key) => {
     it(`${key} uses Viaoda Libre`, () => {
-      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre-Regular');
+      expect((typography as any)[key].fontFamily).toBe('Viaoda Libre');
     });
 
     it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {

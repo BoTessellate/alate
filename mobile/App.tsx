@@ -60,16 +60,25 @@ function App() {
     // Viaoda Libre (Google Fonts, OFL) — display face for all heading
     // tokens. Replaces DM Serif Display Italic.
     //
-    // KEY MUST MATCH THE TTF'S POSTSCRIPT NAME, not just any alias —
-    // Android's typeface lookup goes via the file's internal name
-    // table, not the JS-side useFonts key. The Google Fonts ttf
-    // ships with PostScript name "ViaodaLibre-Regular", so styles
-    // must reference `fontFamily: 'ViaodaLibre-Regular'` (see
-    // theme.ts headingSerif). Earlier April 29 build registered as
-    // 'ViaodaLibre' alone and headings silently fell back to the
-    // system serif on device — the font was bundled, just not
-    // matched.
-    'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
+    // KEY MUST MATCH THE TTF'S FAMILY NAME (the name table NameID 1),
+    // NOT the PostScript name. Android's typeface lookup matches the
+    // family name; iOS would prefer the PostScript name. Using the
+    // family name here works on both because expo-font registers the
+    // asset under whatever string we use, and Android resolves
+    // `fontFamily` against that string against the family table.
+    //
+    // The Google Fonts ttf reports:
+    //   - Family: "Viaoda Libre"  (← this is what we register)
+    //   - Subfamily: "Regular"
+    //   - PostScript: "ViaodaLibre-Regular"
+    //
+    // April 29 2026 history (so this isn't repeated):
+    //   1st attempt registered as 'ViaodaLibre' (no space) —
+    //      headings rendered as system Noto Serif
+    //   2nd attempt as 'ViaodaLibre-Regular' (PostScript) —
+    //      same fallback (Android doesn't resolve PostScript names)
+    //   3rd attempt as 'Viaoda Libre' (Family) — works
+    'Viaoda Libre': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {
