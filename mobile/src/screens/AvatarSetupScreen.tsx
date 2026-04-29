@@ -20,6 +20,7 @@ import {
   ShoulderType,
   BustType,
   WaistType,
+  TummyType,
   HipType,
   ThighType,
   TorsoType,
@@ -107,6 +108,17 @@ const WAIST_OPTIONS: { label: string; value: WaistType; description: string }[] 
   { label: 'Straight', value: 'undefined', description: 'Minimal curve inward' },
 ];
 
+// Tummy / midsection — distinct from waist (silhouette curve) and
+// hips (lower-body shape). Critical for non-stretch fabric fit.
+// Descriptions are deliberately neutral / observational (mirrors
+// the bust + thighs chip language) — avoids value-laden words.
+const TUMMY_OPTIONS: { label: string; value: TummyType; description: string }[] = [
+  { label: 'Flat', value: 'flat', description: 'Lies flat at the waist' },
+  { label: 'Slight', value: 'slight', description: 'Light softness below the waist' },
+  { label: 'Soft', value: 'soft', description: 'A natural curve at the midsection' },
+  { label: 'Full', value: 'full', description: 'Fuller, rounded midsection' },
+];
+
 const HIP_OPTIONS: { label: string; value: HipType; description: string }[] = [
   { label: 'Narrow', value: 'narrow', description: 'Straighter silhouette' },
   { label: 'Average', value: 'average', description: 'Moderate curve' },
@@ -139,6 +151,11 @@ const STEPS = [
   { key: 'shoulders', title: 'Shoulders', subtitle: 'How would you describe your shoulders?' },
   { key: 'bust', title: 'Bust', subtitle: 'What best describes your bust size?' },
   { key: 'waist', title: 'Waist', subtitle: 'How defined is your waist?' },
+  // Tummy slots between waist (silhouette curve) and hips (lower
+  // body) so the flow reads top-to-bottom on the body.
+  // Critical for non-stretch fabric fit — high-rise trousers,
+  // pencil skirts, fitted shirts. Added beta April 29 2026.
+  { key: 'tummy', title: 'Tummy', subtitle: 'How does your stomach sit when relaxed?' },
   { key: 'hips', title: 'Hips', subtitle: 'How would you describe your hips?' },
   { key: 'thighs', title: 'Thighs', subtitle: 'How would you describe your thighs?' },
   { key: 'torso', title: 'Torso Length', subtitle: 'How long is your torso relative to your legs?' },
@@ -285,6 +302,7 @@ export default function AvatarSetupScreen() {
   const [shoulders, setShoulders] = useState<ShoulderType | null>(avatar?.shoulders ?? null);
   const [bust, setBust] = useState<BustType | null>(avatar?.bust ?? null);
   const [waist, setWaist] = useState<WaistType | null>(avatar?.waist ?? null);
+  const [tummy, setTummy] = useState<TummyType | null>(avatar?.tummy ?? null);
   const [hips, setHips] = useState<HipType | null>(avatar?.hips ?? null);
   const [thighs, setThighs] = useState<ThighType | null>(avatar?.thighs ?? null);
   const [torso, setTorso] = useState<TorsoType | null>(avatar?.torso_length ?? null);
@@ -295,11 +313,12 @@ export default function AvatarSetupScreen() {
     shoulders !== null &&
     bust !== null &&
     waist !== null &&
+    tummy !== null &&
     hips !== null &&
     thighs !== null &&
     torso !== null;
 
-  const filledCount = [gender, height, shoulders, bust, waist, hips, thighs, torso].filter(
+  const filledCount = [gender, height, shoulders, bust, waist, tummy, hips, thighs, torso].filter(
     (v) => v !== null
   ).length;
 
@@ -314,6 +333,7 @@ export default function AvatarSetupScreen() {
       shoulders: shoulders,
       bust: bust,
       waist: waist,
+      tummy: tummy,
       hips: hips,
       thighs: thighs,
       torso_length: torso,
@@ -495,13 +515,35 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 6: Hips */}
+          {/* Step 6: Tummy — added April 29 2026 (beta). Sits between
+              Waist (silhouette curve) and Hips so the chip flow reads
+              top-to-bottom on the body. Critical fit factor for non-
+              stretch fabrics; backend `checkFit` doesn't yet branch
+              on `tummy` but ignores unknown fields gracefully. */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>6</Text>
               <View style={styles.sectionHeaderText}>
                 <Text style={styles.sectionTitle}>{STEPS[5].title}</Text>
                 <Text style={styles.sectionSubtitle}>{STEPS[5].subtitle}</Text>
+              </View>
+            </View>
+            <ChipSelector
+              options={TUMMY_OPTIONS}
+              selected={tummy}
+              onSelect={(v) => { setTummy(v as TummyType); setActivePart('waist'); }}
+              columns={2}
+              testIDPrefix="tummy"
+            />
+          </View>
+
+          {/* Step 7: Hips */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.stepNumber}>7</Text>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -513,13 +555,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 7: Thighs */}
+          {/* Step 8: Thighs */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>7</Text>
+              <Text style={styles.stepNumber}>8</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[6].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[6].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[7].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[7].subtitle}</Text>
               </View>
             </View>
             <ChipSelector
@@ -531,13 +573,13 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Step 8: Torso Length */}
+          {/* Step 9: Torso Length */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.stepNumber}>8</Text>
+              <Text style={styles.stepNumber}>9</Text>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>{STEPS[7].title}</Text>
-                <Text style={styles.sectionSubtitle}>{STEPS[7].subtitle}</Text>
+                <Text style={styles.sectionTitle}>{STEPS[8].title}</Text>
+                <Text style={styles.sectionSubtitle}>{STEPS[8].subtitle}</Text>
               </View>
             </View>
             <ChipSelector

@@ -5,6 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type ShoulderType = 'narrow' | 'average' | 'broad';
 export type BustType = 'small' | 'medium' | 'large' | 'extra-large';
 export type WaistType = 'defined' | 'average' | 'undefined';
+/**
+ * Tummy / midsection projection at and below the natural waist.
+ * Distinct from `WaistType` (which captures silhouette curve, not
+ * depth). Critical for non-stretch garments — high-rise trousers,
+ * fitted shirts, pencil skirts, A-line dresses all need extra room
+ * when the abdomen projects past the waistband. Added April 29 2026
+ * after a user flagged it as a missing fit factor; ships in beta.
+ */
+export type TummyType = 'flat' | 'slight' | 'soft' | 'full';
 export type HipType = 'narrow' | 'average' | 'wide' | 'extra-wide';
 export type ThighType = 'slim' | 'average' | 'muscular' | 'full';
 export type TorsoType = 'short' | 'average' | 'long';
@@ -33,6 +42,11 @@ export interface Avatar {
   shoulders: ShoulderType;
   bust: BustType;
   waist: WaistType;
+  /** Optional for backward-compat with avatars persisted before the
+   *  field was introduced (April 29 2026). New onboarding always
+   *  sets it. Backend `checkFit` ignores unknown fields gracefully
+   *  so passing it is non-breaking even before fit-rule wiring. */
+  tummy?: TummyType;
   hips: HipType;
   thighs: ThighType;
   torso_length: TorsoType;
