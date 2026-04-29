@@ -21,7 +21,7 @@ export const fontFamily = {
   // serif used as the live fallback for any heading slot whose TAN
   // Nightingale SVG hasn't been exported yet, plus dynamic text the
   // SVG slot list can't cover (brand names, verdicts, product names).
-  display: 'ViaodaLibre',
+  display: 'ViaodaLibre-Regular',
   // Legacy display face — kept so anything still hard-coded to it
   // doesn't break. Phase out when no callers reference it directly.
   displayLegacy: 'DMSerifDisplay-Italic',
@@ -34,7 +34,7 @@ export const fontFamily = {
 // Shared heading trait: every display/heading token mixes this in so the
 // serif italic + lowercase transform stays consistent across the app.
 const headingSerif = {
-  fontFamily: 'ViaodaLibre',
+  fontFamily: 'ViaodaLibre-Regular',
   textTransform: 'lowercase' as const,
 };
 

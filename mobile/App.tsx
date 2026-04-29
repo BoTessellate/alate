@@ -57,14 +57,19 @@ function App() {
   // fires, so the first visible frame renders in the real face, not a
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
-    // Viaoda Libre (Google Fonts, OFL) is the display face for all
-    // heading tokens. Replaces DM Serif Display Italic which was
-    // retired April 29, 2026 — the .ttf is no longer bundled. Used
-    // directly (BrandHeading fallback, ConfirmDialog title, verdict
-    // text) and via theme tokens (typography.displayLarge / headingXL
-    // / headingL / headingM). When TAN Nightingale licensing lands
-    // for the v2 release, swap this single line.
-    'ViaodaLibre': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
+    // Viaoda Libre (Google Fonts, OFL) — display face for all heading
+    // tokens. Replaces DM Serif Display Italic.
+    //
+    // KEY MUST MATCH THE TTF'S POSTSCRIPT NAME, not just any alias —
+    // Android's typeface lookup goes via the file's internal name
+    // table, not the JS-side useFonts key. The Google Fonts ttf
+    // ships with PostScript name "ViaodaLibre-Regular", so styles
+    // must reference `fontFamily: 'ViaodaLibre-Regular'` (see
+    // theme.ts headingSerif). Earlier April 29 build registered as
+    // 'ViaodaLibre' alone and headings silently fell back to the
+    // system serif on device — the font was bundled, just not
+    // matched.
+    'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

@@ -19,7 +19,7 @@ import { typography, fontFamily } from '../constants/theme';
 
 describe('theme — heading typography', () => {
   it('exposes Viaoda Libre as the display font family', () => {
-    expect(fontFamily.display).toBe('ViaodaLibre');
+    expect(fontFamily.display).toBe('ViaodaLibre-Regular');
   });
 
   it('keeps DM Serif Display Italic loaded as the legacy fallback', () => {
@@ -36,7 +36,7 @@ describe('theme — heading typography', () => {
 
   headingKeys.forEach((key) => {
     it(`${key} uses Viaoda Libre`, () => {
-      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre');
+      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre-Regular');
     });
 
     it(`${key} renders in lowercase`, () => {
