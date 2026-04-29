@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef, StackActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
@@ -299,10 +299,29 @@ export default function AppNavigator() {
       if (result.success && result.data) {
         resetShareIntent();
         setTimeout(() => {
-          navigationRef.current?.navigate('FitResult', {
-            product: result.data!,
-            url,
-          });
+          // CRITICAL: use `dispatch(StackActions.replace(...))` rather
+          // than `navigate(...)`. If the user is ALREADY on FitResult
+          // (viewing a previously-checked product) and shares another
+          // URL from a browser, react-navigation's `navigate` keeps
+          // the existing FitResult mount and just updates `route.params`.
+          // FitResult's `useState` lazy initialisers fire ONCE per
+          // mount, so the screen kept showing the OLD product's data
+          // (warnings / fitScore / brand / images) while the new
+          // params silently sat under the surface. Three observable
+          // bugs from the same root cause (April 29 2026):
+          //   1. Shared product not saved to history (analyzeFit
+          //      didn't re-run with the new URL).
+          //   2. Wrong scrape details on screen (state from prev mount).
+          //   3. Male profile saw women's-fit results because the
+          //      stale state carried a women's product through.
+          // `replace` forces a remount → fresh state, fresh
+          // analyzeFit, addEntry runs, history saves correctly.
+          navigationRef.current?.dispatch(
+            StackActions.replace('FitResult', {
+              product: result.data!,
+              url,
+            })
+          );
         }, 100);
       } else {
         resetShareIntent();

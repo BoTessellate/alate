@@ -109,36 +109,20 @@ export default function HomeScreen() {
       // a fresh fit-check the moment the screen mounts.
       setUrl('');
 
-      // Auto-detect a product URL on the clipboard and pre-fill the
-      // input. The existing 700ms paste-debounce inside
-      // `handleUrlChange` then runs the scrape automatically — same
-      // path the user takes when manually pasting. Only fires for
-      // URLs that look like product pages (contain `/product` or
-      // `/p/` in the path) to avoid scraping random links the user
-      // copied for unrelated reasons. Once consumed, we remember the
-      // URL so re-focusing the tab doesn't re-fire on the same
-      // clipboard. Per user direction April 29 2026: "auto detect if
-      // it's an ecommerce site on the clipboard and automatically
-      // run the scraper".
-      Clipboard.getStringAsync()
-        .then((clip) => {
-          const trimmed = clip?.trim();
-          if (!trimmed || !isValidUrl(trimmed)) return;
-          if (!looksLikeProductUrl(trimmed)) return;
-          if (consumedClipboardUrlRef.current === trimmed) return;
-          consumedClipboardUrlRef.current = trimmed;
-          // setUrl + the existing handleUrlChange flow — but we
-          // bypass the 700ms debounce by calling runCheck directly,
-          // since the user already paid the "I copied this URL"
-          // intent cost. Faster than waiting on the debounce.
-          setUrl(trimmed);
-          runCheck(trimmed);
-        })
-        .catch(() => {
-          // Clipboard access can fail silently (some devices restrict
-          // background reads on Android 14+). Non-blocking — user can
-          // always paste manually.
-        });
+      // Auto-clipboard-detection on focus was REMOVED April 29 2026.
+      // Earlier behaviour read the clipboard whenever Home regained
+      // focus and auto-fired the scraper if the URL "looked like a
+      // product". Per user feedback: that triggered at odd times —
+      // e.g. a male user setting up his profile while a women's
+      // product URL sat in the clipboard from an earlier session.
+      // The "I want to check this product" intent must be explicit:
+      // the user pastes into the input themselves. Manual paste keeps
+      // the 700ms debounce auto-fire (deliberate paste = deliberate
+      // intent), so the convenience for the active path is preserved
+      // — only the passive clipboard sniff is gone.
+      // (consumedClipboardUrlRef + Clipboard import retained in case
+      // we re-introduce the feature behind a "Check this link?" pill
+      // — see backlog notes on opt-in clipboard prompt.)
     }, [avatar])
   );
 
