@@ -1,4 +1,4 @@
-import React, { useEffect, Component, ReactNode } from 'react';
+import React, { useEffect, useState, Component, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,7 @@ import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -134,8 +135,8 @@ function AccountCardView({
  * always has valid inputs. Still wrapped in an ErrorBoundary at the call site
  * for defence in depth.
  */
-function GoogleSignInCardConfigured() {
-  const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
+function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: () => void }) {
+  const { googleUser, setGoogleUser } = useAccountStore();
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
@@ -165,18 +166,11 @@ function GoogleSignInCardConfigured() {
     }
   }, [response]);
 
-  const handleSignOut = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: clearAccount },
-    ]);
-  };
-
   return (
     <AccountCardView
       googleUser={googleUser}
       onSignIn={() => promptAsync()}
-      onSignOut={handleSignOut}
+      onSignOut={onRequestSignOut}
     />
   );
 }
@@ -187,8 +181,8 @@ function GoogleSignInCardConfigured() {
  * The hook-bearing variant is wrapped in an ErrorBoundary so a throw in
  * useAuthRequest or any child cannot blank the whole Account screen.
  */
-function GoogleSignInCard() {
-  const { googleUser, clearAccount } = useAccountStore();
+function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }) {
+  const { googleUser } = useAccountStore();
 
   const hasGoogleConfig = !!(
     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
@@ -202,12 +196,7 @@ function GoogleSignInCard() {
       onSignIn={() =>
         Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }])
       }
-      onSignOut={() =>
-        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign out', style: 'destructive', onPress: clearAccount },
-        ])
-      }
+      onSignOut={onRequestSignOut}
     />
   );
 
@@ -217,7 +206,7 @@ function GoogleSignInCard() {
 
   return (
     <GoogleSignInErrorBoundary fallback={notConfiguredCard}>
-      <GoogleSignInCardConfigured />
+      <GoogleSignInCardConfigured onRequestSignOut={onRequestSignOut} />
     </GoogleSignInErrorBoundary>
   );
 }
@@ -231,7 +220,14 @@ export default function AccountScreen() {
   // there's actually a Google account linked. Per user feedback April
   // 29 2026: showing it without an account read as a misleading CTA
   // ("delete what?"). Privacy Policy + Brand opt-out always render.
-  const { googleUser } = useAccountStore();
+  const { googleUser, clearAccount } = useAccountStore();
+  // Themed delete + sign-out confirmations. Native Alert.alert pops
+  // a system-styled dialog that ignores the grey-purple glass voice
+  // — replaced with the ConfirmDialog used elsewhere (Clear history
+  // / Remove from history). Per user direction April 29 2026: "make
+  // sure other modals match the clear-history modal's aesthetics."
+  const [pendingDeleteProfile, setPendingDeleteProfile] = useState(false);
+  const [pendingSignOut, setPendingSignOut] = useState(false);
 
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
@@ -261,7 +257,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Google account card — isolated so a hook crash here can't blank the page */}
-        <GoogleSignInCard />
+        <GoogleSignInCard onRequestSignOut={() => setPendingSignOut(true)} />
 
         {/* Body profile — section header with Edit pill on the right.
             Per Claude Design ScreenProfile mockup. */}
@@ -328,16 +324,7 @@ export default function AccountScreen() {
           <TouchableOpacity
             testID="delete-body-profile-button"
             style={styles.resetButton}
-            onPress={() => {
-              Alert.alert(
-                'Delete body profile?',
-                'Your height, measurements and fit preferences will be erased from this device. This cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: clearAvatar },
-                ]
-              );
-            }}
+            onPress={() => setPendingDeleteProfile(true)}
             activeOpacity={0.7}
           >
             <Text style={styles.resetText}>Delete my body profile</Text>
@@ -413,6 +400,38 @@ export default function AccountScreen() {
         locations={[0, 0.22, 0.55, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
+      />
+
+      {/* Themed delete-body-profile confirmation. Replaces the system
+          Alert.alert which broke visual continuity with the rest of
+          the grey-purple glass aesthetic. Uses the same ConfirmDialog
+          shell as Clear history / Remove from history. */}
+      <ConfirmDialog
+        visible={pendingDeleteProfile}
+        title="Delete body profile?"
+        confirmLabel="Delete"
+        icon="trash-2"
+        confirmTestID="confirm-delete-body-profile"
+        onConfirm={() => {
+          clearAvatar();
+          setPendingDeleteProfile(false);
+        }}
+        onCancel={() => setPendingDeleteProfile(false)}
+      />
+
+      {/* Themed sign-out confirmation. Triggered from GoogleSignInCard
+          via the onSignOut callback above. */}
+      <ConfirmDialog
+        visible={pendingSignOut}
+        title="Sign out?"
+        confirmLabel="Sign out"
+        icon="log-out"
+        confirmTestID="confirm-sign-out"
+        onConfirm={() => {
+          clearAccount();
+          setPendingSignOut(false);
+        }}
+        onCancel={() => setPendingSignOut(false)}
       />
     </View>
   );

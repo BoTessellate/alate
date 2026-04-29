@@ -254,6 +254,21 @@ export default function FitResultScreen() {
     ),
   }));
 
+  // Animated tint alpha: dock background becomes ~20% MORE translucent
+  // when collapsed so the underlying product image breathes through
+  // the dock strip ("dock" mode is meant to feel pinned to the image,
+  // expanded is the analysis card). Per user direction April 29 2026:
+  // "drop translucency by 20% when the overlay docks". Expanded alpha
+  // matches glass.dockBackgroundColor (0.55); collapsed is 0.55 - 0.20
+  // = 0.35. The BlurView underneath still maintains legibility for
+  // the verdict + stats row at the collapsed height.
+  const cardTintStyle = useAnimatedStyle(() => {
+    const alpha = interpolate(collapseProgress.value, [0, 1], [0.35, 0.55]);
+    return {
+      backgroundColor: `rgba(255, 255, 255, ${alpha})`,
+    };
+  });
+
   // Factory: every drag-target on the overlay (top header, tags region)
   // gets its own Pan instance built from the same recipe so they all
   // toggle the dock with identical thresholds + easing. Pulled into a
@@ -952,10 +967,11 @@ export default function FitResultScreen() {
           blurAmount={22}
           reducedTransparencyFallbackColor="rgba(255,255,255,0.75)"
         />
-        {/* Tint is lighter now that the QmBlurView backend does a real
-            blur on mid-range Android. Inner border catches "light" on
-            the edge for a frosted-glass feel. */}
-        <View style={styles.cardTint} pointerEvents="none" />
+        {/* Tint alpha animates with collapseProgress (see cardTintStyle
+            above) — collapsed shows the product image through more
+            clearly, expanded firms up for legibility. The static
+            `cardTint` style still carries the border + radii. */}
+        <Animated.View style={[styles.cardTint, cardTintStyle]} pointerEvents="none" />
 
         {/* Drag covers the WHOLE top of the overlay — handle bar + the
             verdict header (title, sub-line, price pill). User
@@ -1519,12 +1535,11 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Glass tokens (theme.ts → glass.dock*) drive the dock's frosted
-    // look. dockBackgroundColor (rgba 0.65) sits over the BlurView
-    // for legibility on busy product images; dockBorderColor (rgba
-    // 0.9) is a brighter inner edge that catches "light" and makes
-    // the surface read as glass rather than a solid wash.
-    backgroundColor: glass.dockBackgroundColor,
+    // Border + radii are static; the backgroundColor is set
+    // dynamically by `cardTintStyle` (interpolated off
+    // collapseProgress so the dock flexes between 0.35 collapsed
+    // and 0.55 expanded). The brighter inner edge catches "light"
+    // and reads as glass rather than a solid wash.
     borderWidth: 1,
     borderColor: glass.dockBorderColor,
     borderTopLeftRadius: borderRadius.xxxl,

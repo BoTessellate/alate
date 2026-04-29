@@ -328,10 +328,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  // Numbers in this header line ("3 items · 3 good fits") render in
+  // Viaoda Libre per user direction April 29 2026 — the digits feel
+  // editorial-deck instead of utilitarian when they're in the
+  // display serif. Slightly larger size + tighter line height to
+  // suit the heavier strokes.
   headerMeta: {
-    fontFamily: fontFamily.primary,
-    fontSize: 13,
-    lineHeight: 19,
+    fontFamily: fontFamily.display,
+    fontSize: 15,
+    lineHeight: 20,
     color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
   },
