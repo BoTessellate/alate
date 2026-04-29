@@ -298,6 +298,101 @@ describe('tryShopifyJSON', () => {
     );
     expect(result!.category).toBe('Top');
   });
+
+  // ── product.options-driven size discovery ────────────────────────
+  // Reistor (and many other multi-dimension Shopify storefronts) put
+  // colour in option1 and size in option2. Storefronts with only ONE
+  // dimension (just sizes) put size in option1. The previous logic
+  // hard-coded `option1` as size — wrong for any multi-dimension store.
+  // Fix: read `product.options[*].name` to find which option index
+  // holds "Size" and use that index for availableSizes.
+  const SAMPLE_REISTOR_RESPONSE = {
+    product: {
+      id: 9464065949973,
+      title: 'Striped Matching Set with Regular Shorts and V-neck Top',
+      body_html: '<p>Vacation set.</p>',
+      vendor: 'Reistor',
+      product_type: 'CO-ORD SETS',
+      handle: 'striped-matching-set-with-regular-shorts-and-v-neck-top',
+      tags: 'CO-ORD SETS, Cotton, organic cotton',
+      // Reistor exposes both dimensions. Position 1 = colour, 2 = size.
+      options: [
+        { name: 'Color', position: 1 },
+        { name: 'Size', position: 2 },
+      ],
+      variants: [
+        { id: 1, title: 'Linear Canvas / XS', price: '4500.00', option1: 'Linear Canvas', option2: 'XS', inventory_management: 'shopify' },
+        { id: 2, title: 'Linear Canvas / S',  price: '4500.00', option1: 'Linear Canvas', option2: 'S',  inventory_management: 'shopify' },
+        { id: 3, title: 'Linear Canvas / M',  price: '4500.00', option1: 'Linear Canvas', option2: 'M',  inventory_management: 'shopify' },
+      ],
+      images: [{ src: 'https://cdn.shopify.com/files/striped.jpg' }],
+    },
+  };
+
+  it('returns the variant price unchanged from the Shopify JSON (regression: Reistor live API returned 19165.30 for a 4500.00 product when running pre-#82 code)', async () => {
+    // Sanity check: the price must come straight off the variant.
+    // No multiplication, no currency conversion, no field swap. Captured
+    // April 29 2026 after a live scrape returned ₹19,165.30 for a
+    // ₹4,500 Reistor product because the deployed backend was running
+    // pre-#82 code AND had the option1 size bug. Once #82 is deployed
+    // the price reads cleanly from variants[0].price = '4500.00'.
+    const fetchFn = mockFetch(SAMPLE_REISTOR_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://reistor.in/products/striped-matching-set-with-regular-shorts-and-v-neck-top'),
+      fetchFn
+    );
+    expect(result!.price).toBe('4500.00');
+    expect(result!.currency).toBe('INR'); // TLD-inferred
+  });
+
+  it('reads availableSizes from the option index named "Size", not from option1 by default', async () => {
+    // Regression: reistor.in puts colour in option1 ("Linear Canvas") and
+    // size in option2 ("XS" / "S" / "M"). The previous logic always used
+    // option1, so the fit card showed `availableSizes: ["Linear Canvas",
+    // "Linear Canvas", ...]` instead of the actual sizes. Fix reads
+    // `product.options` to find which dimension is named "Size".
+    const fetchFn = mockFetch(SAMPLE_REISTOR_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://reistor.in/products/striped-matching-set-with-regular-shorts-and-v-neck-top'),
+      fetchFn
+    );
+    expect(result!.availableSizes).toEqual(['XS', 'S', 'M']);
+  });
+
+  it('dedupes sizes across colour variants when one size exists in many colours', async () => {
+    // Same shape as Reistor but with two colours × two sizes — the size
+    // list should collapse to the unique set, not repeat per colour.
+    const TWO_COLOR_TWO_SIZE = {
+      product: {
+        ...SAMPLE_REISTOR_RESPONSE.product,
+        variants: [
+          { id: 1, price: '4500.00', option1: 'Linear Canvas', option2: 'XS', inventory_management: 'shopify' },
+          { id: 2, price: '4500.00', option1: 'Linear Canvas', option2: 'S',  inventory_management: 'shopify' },
+          { id: 3, price: '4500.00', option1: 'Storm Grey',    option2: 'XS', inventory_management: 'shopify' },
+          { id: 4, price: '4500.00', option1: 'Storm Grey',    option2: 'S',  inventory_management: 'shopify' },
+        ],
+      },
+    };
+    const fetchFn = mockFetch(TWO_COLOR_TWO_SIZE);
+    const result = await tryShopifyJSON(
+      new URL('https://reistor.in/products/striped-matching-set-with-regular-shorts-and-v-neck-top'),
+      fetchFn
+    );
+    expect(result!.availableSizes).toEqual(['XS', 'S']);
+  });
+
+  it('still works when product.options is missing (single-dimension store)', async () => {
+    // Some Shopify stores expose only sizes (no colour dimension) and
+    // omit the `options` array. Falls back to option1. The Summer Away
+    // sample doesn't carry `options` so this is the regression check
+    // that single-dimension stores keep working.
+    const fetchFn = mockFetch(SAMPLE_SUMMERAWAY_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://summeraway.in/products/costa-top'),
+      fetchFn
+    );
+    expect(result!.availableSizes).toEqual(['XS', 'S', 'M']);
+  });
 });
 
 describe('extractMaterialFromTags', () => {

@@ -199,6 +199,12 @@ export async function tryShopifyJSON(
       vendor?: string;
       product_type?: string;
       tags?: string;
+      // Shopify exposes the named dimensions of a multi-variant
+      // product as an ordered array. Position 1 maps to option1,
+      // position 2 → option2, position 3 → option3 on each variant.
+      // We use the names to find which option index is the size
+      // dimension instead of guessing it's always option1.
+      options?: Array<{ name?: string; position?: number }>;
       variants?: Array<{
         id?: number | string;
         title?: string;
@@ -206,6 +212,8 @@ export async function tryShopifyJSON(
         compare_at_price?: string | null;
         price_currency?: string;
         option1?: string | null;
+        option2?: string | null;
+        option3?: string | null;
         inventory_management?: string | null;
       }>;
       images?: Array<{ src?: string }>;
@@ -239,9 +247,36 @@ export async function tryShopifyJSON(
       ? product.tags.split(',').map((t) => t.trim()).filter(Boolean)
       : [];
 
-    const availableSizes = trackedVariants
-      .map((v) => v.option1)
-      .filter((s): s is string => Boolean(s));
+    // Find which option index holds the "Size" dimension. Shopify
+    // stores `product.options` as `[{name:"Color"},{name:"Size"}]` for
+    // multi-dimension products (Reistor, COS, most fashion brands)
+    // where position 1 maps to .option1, position 2 → .option2, etc.
+    // Single-dimension stores (Summer Away — sizes only) often omit
+    // the array entirely; in that case option1 is the size and we
+    // fall back to it. Per April 29 2026 regression: Reistor's
+    // /products/<handle>.json puts colour in option1 ("Linear Canvas")
+    // and size in option2 ("XS" / "S" / "M") — the previous
+    // hard-coded option1 read produced `["Linear Canvas", "Linear
+    // Canvas", ...]` instead of the actual sizes on the fit card.
+    const sizeOptionIndex = (product.options ?? []).findIndex(
+      (o) => typeof o.name === 'string' && /^size$/i.test(o.name.trim())
+    );
+    const sizeKey: 'option1' | 'option2' | 'option3' =
+      sizeOptionIndex === 1 ? 'option2' :
+      sizeOptionIndex === 2 ? 'option3' :
+      'option1';
+
+    // Dedupe across colour variants. A product with 2 colours × 5
+    // sizes would otherwise list every size twice (once per colour);
+    // the fit card just wants the unique set. `Set` preserves
+    // insertion order in JS, so [XS, S, M, XS, S, M] dedupes to
+    // [XS, S, M] in storefront order.
+    const sizeSet = new Set<string>();
+    for (const v of trackedVariants) {
+      const s = v[sizeKey];
+      if (s) sizeSet.add(s);
+    }
+    const availableSizes = Array.from(sizeSet);
 
     // Strip HTML from body_html and trim. Shopify stores often include
     // inline mce editor attributes — strip the full tag, not just <>.

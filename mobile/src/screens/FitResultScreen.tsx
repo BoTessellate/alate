@@ -539,18 +539,77 @@ export default function FitResultScreen() {
     }
   };
 
+  /**
+   * Re-evaluate the current fit in-place. Re-scrapes the product URL
+   * (so price / availability / category / tags refresh against
+   * whatever the storefront says today) and re-runs checkFit against
+   * the user's current avatar. Stays on FitResultScreen.
+   *
+   * Two ways this gets triggered:
+   *   1. Direct user tap on "Re-evaluate" — this function runs.
+   *   2. User taps "Change your measurements", edits in AvatarSetup,
+   *      navigates back. The useFocusEffect detects an avatar change
+   *      and calls this same function — same code path, same UX.
+   *
+   * On scrape failure we keep the existing product data and only
+   * re-run checkFit. The user's intent ("did this still fit?") is
+   * preserved even if the storefront briefly 503'd.
+   */
   const runReevaluation = async () => {
     if (!avatar || !historyEntryId) return;
     setReevaluating(true);
     try {
+      // Step 1 — refresh product data from the URL. Price + sizes +
+      // category/tags can drift between visits (sale ends, item goes
+      // out of stock in your size, merchant retags). This is exactly
+      // what users want when they tap Re-evaluate. If the scrape fails
+      // we silently fall through to the cached data.
+      let workingProduct = product;
+      const enrichedFromScrape: { category?: string; material?: string; tags?: string[] } = {};
+      if (url) {
+        try {
+          const scrapeResult = await scrapeProduct(url);
+          if (scrapeResult.success && scrapeResult.data) {
+            workingProduct = scrapeResult.data;
+            // Surface the freshly-scraped product to the rest of the
+            // screen (price pill, hero image, availability stat) so
+            // the user sees the update immediately.
+            setScrapedProduct(scrapeResult.data);
+            // Refresh enriched fields too if Shopify direct-fetch
+            // returned them (storefronts often retag items between
+            // visits).
+            if (scrapeResult.data.category) enrichedFromScrape.category = scrapeResult.data.category;
+            if (scrapeResult.data.material) enrichedFromScrape.material = scrapeResult.data.material;
+            if (Array.isArray(scrapeResult.data.tags)) enrichedFromScrape.tags = scrapeResult.data.tags;
+            if (Object.keys(enrichedFromScrape).length > 0) {
+              setEnrichedProduct((prev) => ({ ...prev, ...enrichedFromScrape }));
+            }
+          }
+        } catch {
+          // Silent — fall through to checkFit with cached data.
+        }
+      }
+
+      // Step 2 — re-run fit check with the freshest product + the
+      // current avatar.
       const calibration = averageCalibration(calibrationGarments);
       const fitResult = await checkFit(
         {
           id: historyEntryId,
-          product_name: product?.name || 'Unknown',
-          category: enrichedProduct?.category || precomputed?.enrichedProduct?.category || 'clothing',
-          material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
-          tags: enrichedProduct?.tags || precomputed?.enrichedProduct?.tags,
+          product_name: workingProduct?.name || 'Unknown',
+          category:
+            enrichedFromScrape.category ||
+            enrichedProduct?.category ||
+            precomputed?.enrichedProduct?.category ||
+            'clothing',
+          material:
+            enrichedFromScrape.material ||
+            enrichedProduct?.material ||
+            precomputed?.enrichedProduct?.material,
+          tags:
+            enrichedFromScrape.tags ||
+            enrichedProduct?.tags ||
+            precomputed?.enrichedProduct?.tags,
         },
         avatar,
         calibration ?? undefined,
@@ -564,12 +623,23 @@ export default function FitResultScreen() {
         setFitScore(newScore);
         setSizeRec(newSizeRec);
         setReevaluated(true);
+
+        // Persist the refreshed snapshot to the history entry so
+        // re-opening this card later shows the same updated values.
         updateEntry(historyEntryId, {
           warnings: newWarnings,
           fitScore: newScore,
           sizeRecommendation: newSizeRec
             ? { size: newSizeRec.size, confidence: newSizeRec.confidence, note: newSizeRec.note }
             : undefined,
+          // Refresh price + image if the scrape returned them — keeps
+          // the History tab's coverflow card in sync with the dock.
+          ...(workingProduct?.price ? { price: workingProduct.price } : {}),
+          ...(workingProduct?.image ? { productImage: workingProduct.image } : {}),
+          ...(enrichedFromScrape.category ? { category: enrichedFromScrape.category } : {}),
+          ...(enrichedFromScrape.material ? { material: enrichedFromScrape.material } : {}),
+          ...(enrichedFromScrape.tags ? { tags: enrichedFromScrape.tags } : {}),
+          checkedAt: new Date().toISOString(),
         });
       }
     } catch {
@@ -1081,16 +1151,26 @@ export default function FitResultScreen() {
           <View style={styles.actionsSection}>
             {isHistoryMode ? (
               <>
+                {/* Re-evaluate stays on this screen and refreshes
+                    fit data in place. Re-scrapes the product URL +
+                    re-runs checkFit against the current avatar — see
+                    runReevaluation for the flow. The "Change your
+                    measurements" button below is the dedicated path
+                    to AvatarSetup; routing Re-evaluate through there
+                    too felt round-about (per user direction April 29
+                    2026). */}
                 <TouchableOpacity
                   testID="reevaluate-button"
-                  style={styles.primaryButton}
-                  onPress={() => {
-                    wentToAvatarSetup.current = true;
-                    navigation.navigate('AvatarSetup');
-                  }}
+                  style={[styles.primaryButton, reevaluating && styles.primaryButtonDisabled]}
+                  onPress={runReevaluation}
+                  disabled={reevaluating}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                  {reevaluating ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                  )}
                 </TouchableOpacity>
                 {/* Swapped order: View on Store above Change measurements
                     so the shopping-intent action sits closer to the
@@ -1718,6 +1798,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     ...shadows.md,
+  },
+  // Disabled state for Re-evaluate while a re-scrape + checkFit
+  // round-trip is in flight. Same brand-purple background but at
+  // ~70% opacity so the user sees the press registered without an
+  // ambiguous "did anything happen?" gap.
+  primaryButtonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     fontFamily: fontFamily.primary,
