@@ -1,0 +1,46 @@
+# Vercel ignore — keeps the deploy bundle backend-only.
+#
+# Vercel's project rootDirectory is `backend` so the build always
+# runs from inside that folder, but `vercel deploy` from the repo
+# root still uploads EVERYTHING under the worktree to its sandbox
+# before the build runs. Without this file the mobile app (incl.
+# the 105MB release APK) blows past Vercel's 100MB-per-file limit
+# and the deploy fails.
+
+# Mobile app — never needed for backend builds. Exclude the whole
+# tree so the build bundle stays tiny.
+mobile/
+
+# Build artefacts that exist in some worktrees
+android/
+ios/
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+
+# Local Claude / agent caches
+.claude/
+.husky/
+
+# Documentation / archive folders that don't impact the API.
+docs/
+specs/
+designs/
+references/
+old/
+*.md
+
+# Lockfile from the wrong package manager
+yarn.lock
+pnpm-lock.yaml
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Worktrees inside the repo
+.git/worktrees/
