@@ -590,7 +590,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   // Glass list card for body profile + preferences — inner rows are
-  // divided by hairlines except the last row.
+  // Compact body-profile card (April 29 2026): 7 measurement rows
+  // were previously 12px vertical padding × body-sized type, which
+  // made the card feel like its own page. Tightened to 6px padding +
+  // labelSmall / bodySmall so the whole profile fits in a glance
+  // alongside everything else on the Account screen.
   profileCard: {
     borderRadius: borderRadius.xl,
     padding: 4,
@@ -599,7 +603,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: textAlpha.divider,
@@ -608,14 +612,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   profileLabel: {
-    ...typography.label,
+    ...typography.labelSmall,
     color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   profileValue: {
-    ...typography.body,
+    ...typography.bodySmall,
     color: colors.text,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   emptyProfileCard: {
     borderRadius: borderRadius.xl,
@@ -723,12 +727,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     marginBottom: spacing.sm,
-    // Underline at the typeface baseline so the heading reads as
-    // an interactive call-out, not a static label. Per user
-    // direction April 29 2026 ("underline or add a line element
-    // below 'are you a brand?'").
-    textDecorationLine: 'underline',
-    textDecorationColor: 'rgba(255,255,255,0.55)',
+    // No underline on the heading — user reverted that direction
+    // (April 29 2026, two passes apart): the underline at this size
+    // and weight on Viaoda Libre read clunky against the body. The
+    // sub-copy + tap target carry the "interactive" cue instead.
   },
   brandCtaSubtitle: {
     fontFamily: fontFamily.primary,

@@ -157,7 +157,7 @@ export default function HomeScreen() {
               textStyle={styles.heroVerse}
             />
             <Text style={styles.heroTagline}>
-              from any store.{'\n'}dresses, denim, knitwear — we read the brand's size chart against your body.
+              From any store.{'\n'}Dresses, denim, knitwear — we read the brand's size chart against your body.
             </Text>
           </View>
 

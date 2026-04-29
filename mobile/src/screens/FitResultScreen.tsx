@@ -626,6 +626,13 @@ export default function FitResultScreen() {
 
         // Persist the refreshed snapshot to the history entry so
         // re-opening this card later shows the same updated values.
+        // Brand is sanitised here too — yamayoga.in (and any other
+        // store with HTML in `vendor`) ships markup that the new
+        // sanitize() strip-flow cleans. Without including `brand`
+        // in this patch, the Home Recents pill kept showing the
+        // stale (unsanitised) brand even after a successful re-eval
+        // on the History coverflow path. (April 29 2026 fix.)
+        const refreshedBrand = sanitize(workingProduct?.brand);
         updateEntry(historyEntryId, {
           warnings: newWarnings,
           fitScore: newScore,
@@ -636,6 +643,7 @@ export default function FitResultScreen() {
           // the History tab's coverflow card in sync with the dock.
           ...(workingProduct?.price ? { price: workingProduct.price } : {}),
           ...(workingProduct?.image ? { productImage: workingProduct.image } : {}),
+          ...(refreshedBrand ? { brand: refreshedBrand } : {}),
           ...(enrichedFromScrape.category ? { category: enrichedFromScrape.category } : {}),
           ...(enrichedFromScrape.material ? { material: enrichedFromScrape.material } : {}),
           ...(enrichedFromScrape.tags ? { tags: enrichedFromScrape.tags } : {}),
