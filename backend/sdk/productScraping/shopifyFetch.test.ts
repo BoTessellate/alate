@@ -70,39 +70,72 @@ const SAMPLE_SUMMERAWAY_RESPONSE = {
 // Shopify variants for distinct SKUs (color + size combo). The URL
 // the user shares pins a specific variant via `?variant=<id>`; we
 // must honor that ID instead of blindly returning variants[0].
-// Real-world payload shape reduced from oshinsarin.in. The "Felled Seam
-// Set" is a top + bottom co-ord with TWO size axes (Top Size, Bottom
-// Size), each carrying the same XS / S / M / L / XL / XXL ladder plus
-// a "Custom Size" value the merchant uses to surface their made-to-
-// measure service. The previous shopifyFetch only read `option1` which
-// captured "Top Size" but missed every Bottom-Size-only variant when
-// the merchant skipped the Top axis on a custom-size SKU. Downstream,
-// availability.ts saw an incomplete sizes array and reported the user's
-// recommended size as out-of-stock even though the storefront stocked
-// every size in the standard ladder.
+// Real-world payload reduced from a live oshinsarin.in fetch (April 30
+// 2026). Their co-ord sets carry THREE option axes:
+//   1. Body Type (Man/Woman, no "size" in name)
+//   2. Top Size (XS / S / M / L / XL / XXL)
+//   3. Bottom Size (XS / S / M / L / XL / XXL)
+//
+// The previous shopifyFetch only read `option1`, which captured "Body
+// Type" — so the surfaced size ladder was ["Man"] / ["Woman"] and the
+// user's recommended size was always reported as out-of-stock.
+//
+// NOTE: Live Oshin variants do NOT include "Custom Size" as a stocked
+// value. The merchant offers made-to-measure separately via a
+// page-level CTA that the JSON endpoint doesn't expose. The
+// "Custom Size exclusion" test below uses a SYNTHETIC fixture
+// (SAMPLE_CUSTOM_SIZE_RESPONSE) since some merchants DO expose it as
+// a stocked option value.
 const SAMPLE_OSHIN_RESPONSE = {
   product: {
-    id: 9123456789012,
-    title: 'Felled Seam Set',
-    body_html: '<p>Hand-tailored co-ord set in raw silk.</p>',
-    vendor: 'Oshin Sarin',
-    product_type: 'Sets',
-    handle: 'felled-seam-set',
-    tags: 'Made to Measure, Sets, raw silk, co-ord',
+    id: 9108090814717,
+    title: 'HARBOUR SET',
+    body_html: '<p>Single-breasted notched-lapel co-ord set.</p>',
+    vendor: 'Oshin',
+    product_type: '',
+    handle: 'harbour-set',
+    tags: 'interline, men, set-collection',
     options: [
-      { name: 'Top Size', position: 1, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Custom Size'] },
-      { name: 'Bottom Size', position: 2, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Custom Size'] },
+      { name: 'Body Type', position: 1, values: ['Man'] },
+      { name: 'Top Size', position: 2, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
+      { name: 'Bottom Size', position: 3, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
     ],
     variants: [
-      { id: 1, title: 'XS / XS', price: '12000.00', option1: 'XS', option2: 'XS', inventory_management: 'shopify' },
-      { id: 2, title: 'S / S', price: '12000.00', option1: 'S', option2: 'S', inventory_management: 'shopify' },
-      { id: 3, title: 'M / M', price: '12000.00', option1: 'M', option2: 'M', inventory_management: 'shopify' },
-      { id: 4, title: 'L / L', price: '12000.00', option1: 'L', option2: 'L', inventory_management: 'shopify' },
-      { id: 5, title: 'XL / XL', price: '12000.00', option1: 'XL', option2: 'XL', inventory_management: 'shopify' },
-      { id: 6, title: 'XXL / XXL', price: '12000.00', option1: 'XXL', option2: 'XXL', inventory_management: 'shopify' },
-      { id: 7, title: 'Custom Size / Custom Size', price: '14000.00', option1: 'Custom Size', option2: 'Custom Size', inventory_management: 'shopify' },
+      { id: 1, title: 'Man / XS / XS', price: '18000.00', option1: 'Man', option2: 'XS', option3: 'XS', inventory_management: 'shopify' },
+      { id: 2, title: 'Man / S / S',  price: '18000.00', option1: 'Man', option2: 'S',  option3: 'S',  inventory_management: 'shopify' },
+      { id: 3, title: 'Man / M / M',  price: '18000.00', option1: 'Man', option2: 'M',  option3: 'M',  inventory_management: 'shopify' },
+      { id: 4, title: 'Man / L / L',  price: '18000.00', option1: 'Man', option2: 'L',  option3: 'L',  inventory_management: 'shopify' },
+      { id: 5, title: 'Man / XL / XL', price: '18000.00', option1: 'Man', option2: 'XL', option3: 'XL', inventory_management: 'shopify' },
+      { id: 6, title: 'Man / XXL / XXL', price: '18000.00', option1: 'Man', option2: 'XXL', option3: 'XXL', inventory_management: 'shopify' },
     ],
-    images: [{ src: 'https://oshinsarin.in/cdn/shop/files/felled-seam.jpg' }],
+    images: [{ src: 'https://oshinsarin.in/cdn/shop/files/harbour-set.jpg' }],
+  },
+};
+
+// Synthetic fixture that DOES surface "Custom Size" as a stocked
+// option value. We've seen merchants do this in screenshots; live
+// Oshin doesn't. Kept synthetic so the exclusion logic is locked in.
+const SAMPLE_CUSTOM_SIZE_RESPONSE = {
+  product: {
+    id: 9999999999999,
+    title: 'Made-to-Measure Dress',
+    body_html: '<p>Hand-tailored.</p>',
+    vendor: 'Some Bespoke Brand',
+    product_type: 'Dresses',
+    handle: 'mtm-dress',
+    tags: 'made-to-measure, silk',
+    options: [
+      { name: 'Size', position: 1, values: ['XS', 'S', 'M', 'L', 'XL', 'Custom Size'] },
+    ],
+    variants: [
+      { id: 1, price: '20000.00', option1: 'XS', inventory_management: 'shopify' },
+      { id: 2, price: '20000.00', option1: 'S',  inventory_management: 'shopify' },
+      { id: 3, price: '20000.00', option1: 'M',  inventory_management: 'shopify' },
+      { id: 4, price: '20000.00', option1: 'L',  inventory_management: 'shopify' },
+      { id: 5, price: '20000.00', option1: 'XL', inventory_management: 'shopify' },
+      { id: 6, price: '24000.00', option1: 'Custom Size', inventory_management: 'shopify' },
+    ],
+    images: [{ src: 'https://example.com/mtm.jpg' }],
   },
 };
 
@@ -460,24 +493,40 @@ describe('tryShopifyJSON', () => {
     );
   });
 
-  it('excludes "Custom Size" from availableSizes (it is a service, not a stocked size)', async () => {
-    // "Custom Size" is the merchant's made-to-measure offer surfaced as
-    // an option value. It must NOT count as a stocked size — the
-    // recommended-size lookup would never match a real avatar size,
-    // flipping the in_stock state on its head.
+  it('skips a non-size axis like "Body Type" when picking size axes', async () => {
+    // Live Oshin co-ord (harbour-set) has THREE options: Body Type,
+    // Top Size, Bottom Size. Body Type is gender, not a size — must be
+    // skipped. Captured April 30 2026 from a live oshinsarin.in fetch.
     const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
     const result = await tryShopifyJSON(
-      new URL('https://oshinsarin.in/products/felled-seam-set'),
+      new URL('https://oshinsarin.in/products/harbour-set'),
+      fetchFn
+    );
+    expect(result!.availableSizes).not.toContain('Man');
+    expect(result!.availableSizes).not.toContain('Woman');
+  });
+
+  it('excludes "Custom Size" from availableSizes (it is a service, not a stocked size)', async () => {
+    // "Custom Size" surfaced as an option value MUST NOT count as a
+    // stocked size — the recommended-size lookup would never match a
+    // real avatar size, flipping the in_stock state on its head. Uses
+    // a synthetic fixture: live Oshin doesn't put Custom Size in JSON
+    // variants (their MtM is a page-level CTA), but we've seen other
+    // bespoke merchants do.
+    const fetchFn = mockFetch(SAMPLE_CUSTOM_SIZE_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://example.com/products/mtm-dress'),
       fetchFn
     );
     expect(result!.availableSizes).not.toContain('Custom Size');
     expect(result!.availableSizes).not.toContain('custom size');
+    expect(result!.availableSizes).toEqual(['XS', 'S', 'M', 'L', 'XL']);
   });
 
   it('detects custom-fit availability and surfaces a label', async () => {
-    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+    const fetchFn = mockFetch(SAMPLE_CUSTOM_SIZE_RESPONSE);
     const result = await tryShopifyJSON(
-      new URL('https://oshinsarin.in/products/felled-seam-set'),
+      new URL('https://example.com/products/mtm-dress'),
       fetchFn
     );
     expect(result!.customFit?.available).toBe(true);
@@ -488,6 +537,20 @@ describe('tryShopifyJSON', () => {
     const fetchFn = mockFetch(SAMPLE_SUMMERAWAY_RESPONSE);
     const result = await tryShopifyJSON(
       new URL('https://summeraway.in/products/costa-top'),
+      fetchFn
+    );
+    expect(result!.customFit).toBeUndefined();
+  });
+
+  it('does not set customFit on real Oshin co-ord JSON (live shape has no JSON-level signal)', async () => {
+    // Documents the known coverage gap: Oshin offers made-to-measure
+    // via a page-level CTA, but the storefront JSON has no option /
+    // tag / title signal. Detecting it would need HTML scraping or a
+    // brand allowlist (anti-pattern #1). Locked in so a future regex
+    // tweak can't accidentally tag every Oshin co-ord as MtM.
+    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/harbour-set'),
       fetchFn
     );
     expect(result!.customFit).toBeUndefined();
