@@ -268,6 +268,17 @@ export const typography = {
     letterSpacing: 0.2,
   },
 
+  // Status banners — re-eval, "loading", "success", inline notices.
+  // Smaller than body so the banner reads as ambient feedback rather
+  // than primary content. Single source of truth so any future banner
+  // (sync status, offline, undo prompt) inherits the size.
+  banner: {
+    fontFamily: fontFamily.primary,
+    fontSize: 13,
+    fontWeight: '400' as const,
+    lineHeight: 18,
+  },
+
   // Caption & Overline
   caption: {
     fontFamily: fontFamily.primary,

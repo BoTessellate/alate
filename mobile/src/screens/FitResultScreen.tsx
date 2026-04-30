@@ -1805,7 +1805,7 @@ const styles = StyleSheet.create({
     backgroundColor: statusAlpha.successSoft,
   },
   bannerText: {
-    ...typography.bodySmall,
+    ...typography.banner,
     color: colors.text,
     flex: 1,
   },
