@@ -10,6 +10,7 @@ import { createModuleLogger } from '../shared/logger';
 import { tryShopifyJSON } from './shopifyFetch';
 import { isOriginBlocked, normaliseOrigin } from './blocklist';
 import { isDisallowedByRobots } from './robotsTxt';
+import { parseJSONLDProduct } from './jsonLdParser';
 
 // TODO: [AFFILIATE-APIS] Integrate affiliate APIs for large brands (Gucci, Zara, H&M, etc.)
 // Current simple fetch + Puppeteer fails for bot-protected sites (504 timeouts).
@@ -61,50 +62,16 @@ class ProductExtractor {
   }
 
   // Layer 1: JSON-LD structured data (most reliable)
-  private extractFromJSONLD(): Partial<ProductData> {
-    const result: Partial<ProductData> = {};
-    const scriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-    let match;
-
-    while ((match = scriptRegex.exec(this.html)) !== null) {
-      try {
-        const jsonContent = match[1].trim();
-        const data = JSON.parse(jsonContent);
-
-        // Handle both single Product and array of items
-        const product = data['@type'] === 'Product' ? data :
-                       (Array.isArray(data) ? data.find((item: any) => item['@type'] === 'Product') : null);
-
-        if (product) {
-          if (product.name) result.title = product.name;
-          if (product.description) result.description = String(product.description).slice(0, 500);
-          if (product.brand?.name) result.brandName = product.brand.name;
-          if (product.image) {
-            let imageData = Array.isArray(product.image) ? product.image[0] : product.image;
-            // Handle ImageObject vs plain string URL
-            if (typeof imageData === 'object' && imageData !== null) {
-              result.imageUrl = imageData.url || imageData.image || imageData.contentUrl || '';
-            } else if (typeof imageData === 'string') {
-              result.imageUrl = imageData;
-            }
-          }
-
-          // Extract offers
-          if (product.offers) {
-            const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
-            if (offer.price) result.price = String(offer.price);
-            if (offer.priceCurrency) result.currency = offer.priceCurrency;
-          }
-
-          // If we found a complete product, return it
-          if (result.title && result.price) break;
-        }
-      } catch (e) {
-        // Silent fail, try next script tag
-      }
-    }
-
-    return result;
+  //
+  // Delegates to `jsonLdParser.parseJSONLDProduct` — Tier 1 broadened
+  // coverage (April 30 2026) handles @graph wrappers, array @type,
+  // multi-offer payloads (in-stock preferred), AggregateOffer, brand
+  // strings vs Brand objects, ImageObject lists, breadcrumb categories,
+  // and rich attributes (material, color, category). Most modern PIMs
+  // emit one of those shapes; the previous inline parser only matched
+  // a flat single-script-tag Product.
+  private extractFromJSONLD() {
+    return parseJSONLDProduct(this.html);
   }
 
   // Layer 2: Meta tags (Open Graph, Twitter, Schema.org)
@@ -434,6 +401,11 @@ class ProductExtractor {
       imageUrl: jsonLD.imageUrl || metaTags.imageUrl || '',
       description: jsonLD.description || metaTags.description || '',
       availableSizes: sizes.length ? sizes : undefined,
+      // JSON-LD-only fields. Shopify direct-fetch overwrites these for
+      // Shopify storefronts (it has higher-fidelity data); on every
+      // other site these come from the JSON-LD Product node.
+      category: jsonLD.category || undefined,
+      material: jsonLD.material || undefined,
     };
 
     log.info({ merged }, 'Final merged extraction result');
