@@ -27,9 +27,19 @@ import HeadingImage from './HeadingImage';
 export default function AgeGateOverlay() {
   const insets = useSafeAreaInsets();
   const confirm = useAgeGateStore((s) => s.confirm);
-  const [deflected, setDeflected] = useState(false);
+  const declineAsUnder16 = useAgeGateStore((s) => s.declineAsUnder16);
+  const declaredUnder16 = useAgeGateStore((s) => s.declaredUnder16);
 
-  if (deflected) {
+  // Show the deflection screen when the user has actively declined
+  // as under-16 — either right now this session OR on a previous
+  // launch (declaredUnder16 persists). Persistence matters because
+  // ShareIntent gating depends on the same flag, and a fresh launch
+  // by an under-16 user shouldn't see the entry screen again as if
+  // they could change their answer.
+  const [pressedUnder16, setPressedUnder16] = useState(false);
+  const showDeflection = declaredUnder16 || pressedUnder16;
+
+  if (showDeflection) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -69,14 +79,14 @@ export default function AgeGateOverlay() {
         <GlassCard style={styles.card}>
           <HeadingImage
             slot="home-verse"
-            fallback="before we begin"
+            fallback="Before we begin"
             height={72}
             color={colors.text}
             textStyle={styles.title}
           />
           <Text style={styles.body}>
-            Alate predicts garment fit using the height and measurements you share. To
-            keep things safe, we ask all users to confirm they're 16 or older.
+            Alate predicts garment fit using your height and measurements. To keep
+            things safe, we ask all users to confirm they're 16 or older.
           </Text>
           <Text style={styles.subtle}>
             Your body profile stays on this device. We never send it anywhere you haven't
@@ -93,7 +103,10 @@ export default function AgeGateOverlay() {
           <TouchableOpacity
             testID="age-gate-decline"
             style={styles.secondaryBtn}
-            onPress={() => setDeflected(true)}
+            onPress={() => {
+              setPressedUnder16(true);
+              declineAsUnder16();
+            }}
             activeOpacity={0.7}
           >
             <Text style={styles.secondaryBtnText}>I'm under 16</Text>

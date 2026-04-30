@@ -20,7 +20,6 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -36,6 +35,8 @@ import {
   textAlpha,
 } from '../constants/theme';
 import GlassCard from './GlassCard';
+import ConfirmDialog from './ConfirmDialog';
+import ToastNotice from './ToastNotice';
 import {
   useCalibrationStore,
   CalibrationGarment,
@@ -64,23 +65,14 @@ export default function FitCalibrationCard() {
   const { avatar } = useAvatarStore();
   const { garments, addGarment, removeGarment } = useCalibrationStore();
   const [modalOpen, setModalOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<CalibrationGarment | null>(null);
+  const [profileRequiredToast, setProfileRequiredToast] = useState(false);
 
   const averaged = useMemo(() => averageCalibration(garments), [garments]);
   const typical = useMemo(() => deriveTypicalSize(averaged), [averaged]);
 
   const handleConfirmDelete = (g: CalibrationGarment) => {
-    Alert.alert(
-      'Remove garment',
-      `Remove "${g.brand} ${g.size}" from your calibration?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => removeGarment(g.id),
-        },
-      ]
-    );
+    setPendingDelete(g);
   };
 
   const confidenceColor = (c: 'high' | 'medium' | 'low') =>
@@ -100,10 +92,7 @@ export default function FitCalibrationCard() {
           style={styles.addButton}
           onPress={() => {
             if (!avatar) {
-              Alert.alert(
-                'Body profile required',
-                'Set up your body profile first so we can calibrate accurately.'
-              );
+              setProfileRequiredToast(true);
               return;
             }
             setModalOpen(true);
@@ -200,6 +189,23 @@ export default function FitCalibrationCard() {
         onClose={() => setModalOpen(false)}
         onAdd={addGarment}
       />
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title="Remove garment"
+        message={pendingDelete ? `Remove "${pendingDelete.brand} ${pendingDelete.size}" from your calibration?` : ''}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (pendingDelete) removeGarment(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
+      <ToastNotice
+        visible={profileRequiredToast}
+        title="Body profile required"
+        message="Set up your body profile first so we can calibrate accurately."
+        onDismiss={() => setProfileRequiredToast(false)}
+      />
     </>
   );
 }
@@ -223,6 +229,7 @@ function AddGarmentModal({
   const [category, setCategory] = useState<GarmentCategory>('top');
   const [fit, setFit] = useState<GarmentFit>('perfect');
   const [submitting, setSubmitting] = useState(false);
+  const [failureToast, setFailureToast] = useState<string | null>(null);
 
   const reset = () => {
     setBrand('');
@@ -253,8 +260,7 @@ function AddGarmentModal({
 
     if (!result.success || !result.estimated_cm) {
       setSubmitting(false);
-      Alert.alert(
-        'Calibration failed',
+      setFailureToast(
         result.message || result.error || 'Could not estimate measurements. Please try again.'
       );
       return;
@@ -273,6 +279,7 @@ function AddGarmentModal({
   };
 
   return (
+    <>
     <Modal
       visible={visible}
       animationType="slide"
@@ -398,6 +405,14 @@ function AddGarmentModal({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+    <ToastNotice
+      visible={failureToast !== null}
+      variant="error"
+      title="Calibration failed"
+      message={failureToast ?? undefined}
+      onDismiss={() => setFailureToast(null)}
+    />
+    </>
   );
 }
 

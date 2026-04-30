@@ -34,9 +34,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim } from '../constants/theme';
+import { colors, spacing, borderRadius, shadows, typography, whiteAlpha, textAlpha, scrim, fontFamily } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
+import BrandHeading from './BrandHeading';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 // Portrait-heavy product cards. Per Claude Design mockup: cards are
@@ -86,9 +87,14 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
       style={styles.cardGradient}
     >
       <View style={styles.folio}>
-        <Text style={styles.folioBrand} numberOfLines={1}>
-          {brand.toUpperCase()}
-        </Text>
+        <BrandHeading
+          brand={brand}
+          height={26}
+          color="#fff"
+          uppercase
+          textStyle={styles.folioBrand}
+          testID={`folio-brand-${entry.id}`}
+        />
         {price && <Text style={styles.folioPrice}>{price}</Text>}
       </View>
     </LinearGradient>
@@ -467,10 +473,17 @@ const styles = StyleSheet.create({
   folio: {
     flexDirection: 'column',
   },
+  // Folio brand — text style overrides applied to the BrandHeading
+  // fallback path (the wrap when no SVG is registered for this slug).
+  // Critical: NO `fontFamily` or `fontWeight` here — that would stomp
+  // BrandHeading's Viaoda Libre + 400 weight and force the brand
+  // name into system serif, which is the wrong voice for this
+  // surface. Per April 29 2026 user feedback ("SUMMER AWAY rendered
+  // as bold sans-serif on the History card") — the fix is to keep
+  // visual treatment (size, colour, shadow) here and let BrandHeading
+  // own the typeface.
   folioBrand: {
-    fontFamily: SERIF,
     fontSize: 22,
-    fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.5,
     lineHeight: 26,
@@ -478,12 +491,20 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
+  // Folio price — Viaoda Libre per user direction April 29 2026.
+  // Display serif on the digit makes the price read as editorial
+  // not utilitarian. Drop fontWeight to 400 (single-weight font;
+  // anything else falls back to system serif bold and we lose the
+  // display character — same trap as headings, see anti-pattern
+  // #12 in project_anti_patterns.md). Slightly larger and tighter
+  // letterSpacing for the heavier glyphs.
   folioPrice: {
-    ...typography.labelSmall,
+    fontFamily: fontFamily.display,
+    fontSize: 16,
     color: whiteAlpha.textBright,
-    fontWeight: '700',
+    fontWeight: '400',
     marginTop: 2,
-    letterSpacing: 1.5,
+    letterSpacing: 0.5,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

@@ -17,11 +17,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, secondaryAlpha, statusAlpha } from '../constants/theme';
+import { isEnabled } from '../constants/featureFlags';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import HeadingImage from '../components/HeadingImage';
+import BrandHeading from '../components/BrandHeading';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -30,6 +33,34 @@ function isValidUrl(text: string): boolean {
     const url = new URL(text);
     return url.protocol === 'http:' || url.protocol === 'https:';
   } catch { return false; }
+}
+
+/**
+ * Quick heuristic for "this URL looks like a product page". Used to
+ * decide whether to auto-fire the scrape from a clipboard URL on
+ * focus — we don't want to scrape every random link the user has on
+ * their clipboard, just shopping URLs.
+ *
+ * Catches the major patterns:
+ *   - Shopify: /products/<handle>
+ *   - Amazon / many SEAsian sites: /dp/<asin>, /gp/product/<id>
+ *   - ASOS / Boohoo / etc.: /prd/<id>
+ *   - Net-a-Porter / Mr Porter: /product/<id>
+ *   - H&M / Zara: /productpage. or trailing -p<digits>
+ *   - Generic fallback: path contains the literal word "product"
+ */
+function looksLikeProductUrl(text: string): boolean {
+  try {
+    const path = new URL(text).pathname.toLowerCase();
+    return (
+      /\/products?\//.test(path) ||
+      /\/(dp|gp\/product|prd)\//.test(path) ||
+      /productpage/.test(path) ||
+      /-p\d{4,}\b/.test(path)
+    );
+  } catch {
+    return false;
+  }
 }
 
 type NavigationProp = CompositeNavigationProp<
@@ -57,6 +88,13 @@ export default function HomeScreen() {
   // Auto-trigger debounce on paste
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Track whether we've already consumed a clipboard URL this session,
+  // so a single product URL on the user's clipboard auto-fires once
+  // (when they open the app) but doesn't keep re-triggering on every
+  // tab focus. The "ref" not "state" pattern keeps the auto-fire path
+  // out of the render cycle.
+  const consumedClipboardUrlRef = useRef<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       // If we just came back from AvatarSetup with a pending URL, auto-trigger
@@ -70,6 +108,21 @@ export default function HomeScreen() {
       // Normal focus — reset URL so a stale paste doesn't auto-trigger
       // a fresh fit-check the moment the screen mounts.
       setUrl('');
+
+      // Auto-clipboard-detection on focus was REMOVED April 29 2026.
+      // Earlier behaviour read the clipboard whenever Home regained
+      // focus and auto-fired the scraper if the URL "looked like a
+      // product". Per user feedback: that triggered at odd times —
+      // e.g. a male user setting up his profile while a women's
+      // product URL sat in the clipboard from an earlier session.
+      // The "I want to check this product" intent must be explicit:
+      // the user pastes into the input themselves. Manual paste keeps
+      // the 700ms debounce auto-fire (deliberate paste = deliberate
+      // intent), so the convenience for the active path is preserved
+      // — only the passive clipboard sniff is gone.
+      // (consumedClipboardUrlRef + Clipboard import retained in case
+      // we re-introduce the feature behind a "Check this link?" pill
+      // — see backlog notes on opt-in clipboard prompt.)
     }, [avatar])
   );
 
@@ -130,7 +183,15 @@ export default function HomeScreen() {
       >
         <ScrollView
           style={styles.container}
-          contentContainerStyle={styles.content}
+          // Tight bottom padding when the RECENT list is empty —
+          // otherwise the 280px clearance reserved for the fade-out
+          // of recents reads as a dead zone. Per user feedback April
+          // 29 2026: "reduce footer spacing on the home page on
+          // empty history".
+          contentContainerStyle={[
+            styles.content,
+            recent.length === 0 && styles.contentNoRecent,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -140,14 +201,14 @@ export default function HomeScreen() {
             <Text style={styles.eyebrow}>ALATE</Text>
             <HeadingImage
               slot="home-verse"
-              fallback={"paste anything.\nwe'll tell you\nif it fits."}
+              fallback={"Paste anything.\nWe'll tell you\nif it fits."}
               height={200}
               color="#fff"
               style={styles.heroVerseWrap}
               textStyle={styles.heroVerse}
             />
             <Text style={styles.heroTagline}>
-              from any store. dresses, denim, knitwear — we read the brand's size chart against your body.
+              From any store.{'\n'}Dresses, denim, knitwear — we read the brand's size chart against your body.
             </Text>
           </View>
 
@@ -182,6 +243,30 @@ export default function HomeScreen() {
               fire when FitResult's internal scrape fails (unsupported
               brand, blocked origin, network error). Backlog: re-add a
               fully-styled brand-nudge card with email send. */}
+
+          {/* v2: Story share entry. Only rendered when the feature flag
+              is on — production builds never see this tile. */}
+          {isEnabled('V2') && (
+            <TouchableOpacity
+              testID="story-share-entry"
+              onPress={() => navigation.navigate('PickImage')}
+              activeOpacity={0.85}
+              style={styles.setupWrap}
+            >
+              <GlassCard style={styles.setupCard}>
+                <View style={styles.setupIconContainer}>
+                  <Feather name="image" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.setupTextContainer}>
+                  <Text style={styles.setupTitle}>make a story</Text>
+                  <Text style={styles.setupSubtitle}>
+                    drop words + the track you're listening to onto a photo
+                  </Text>
+                </View>
+                <Text style={styles.setupArrow}>→</Text>
+              </GlassCard>
+            </TouchableOpacity>
+          )}
 
           {/* Profile Setup Prompt — shown only when the user hasn't built a
               body profile yet. Not in the design mockup (which assumes a
@@ -301,9 +386,14 @@ function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () =>
           </View>
         )}
         <View style={styles.recentMeta}>
-          <Text style={styles.recentBrand} numberOfLines={1}>
-            {(entry.brand || 'UNKNOWN').toUpperCase()}
-          </Text>
+          <BrandHeading
+            brand={entry.brand || 'UNKNOWN'}
+            height={14}
+            color={colors.textMuted}
+            uppercase
+            textStyle={styles.recentBrand}
+            testID={`recent-brand-${entry.id}`}
+          />
           <Text style={styles.recentName} numberOfLines={1}>
             {entry.productName || 'Product'}
           </Text>
@@ -336,6 +426,13 @@ const styles = StyleSheet.create({
     // gradient (height 320 below), the last RECENT row ends deep inside
     // the dark zone — cards never show up cleanly near the nav pill.
     paddingBottom: 280,
+  },
+  // Empty-history variant — only enough bottom padding to clear the
+  // floating tab pill (~96px). The big 280px reservation in `content`
+  // exists purely so the RECENT list can fade nicely into the dark
+  // gradient; when there are no recents, it reads as wasted space.
+  contentNoRecent: {
+    paddingBottom: 96,
   },
   // --- Hero — Claude Design mockup layout, inverted for dark gradient
   //     backdrop. Text reads as light on the hero; glass cards below
@@ -551,10 +648,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 1,
   },
+  // Recent-card brand label — DELIBERATELY no fontFamily / fontWeight
+  // overrides: BrandHeading owns the typeface (Viaoda Libre via the
+  // SVG path or styled-text fallback) and 400 weight. We only set the
+  // visual treatment (size, letter-spacing, colour). Same lesson as
+  // HistoryCoverFlow.folioBrand — see comment there.
   recentBrand: {
-    fontFamily: fontFamily.primary,
     fontSize: 10,
-    fontWeight: '600',
     letterSpacing: 0.5,
     // Dark text on the frosted card — WCAG AA passes on the 0.78
     // white-tint bg. Light text was failing contrast on the mid-

@@ -1,4 +1,4 @@
-import React, { useEffect, Component, ReactNode } from 'react';
+import React, { useEffect, useState, Component, ReactNode } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +36,13 @@ import FitCalibrationCard from '../components/FitCalibrationCard';
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ToastNotice from '../components/ToastNotice';
+import {
+  getGoogleAuthConfig,
+  hasAnyGoogleAuthConfig,
+  logMissingGoogleAuthConfigOnce,
+} from '../utils/googleAuthEnv';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -134,17 +140,15 @@ function AccountCardView({
  * always has valid inputs. Still wrapped in an ErrorBoundary at the call site
  * for defence in depth.
  */
-function GoogleSignInCardConfigured() {
-  const { googleUser, setGoogleUser, clearAccount } = useAccountStore();
+function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: () => void }) {
+  const { googleUser, setGoogleUser } = useAccountStore();
+  const [signInError, setSignInError] = useState(false);
 
-  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
-  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-
+  const cfg = getGoogleAuthConfig();
   const [, response, promptAsync] = Google.useAuthRequest({
-    clientId: googleClientId,
-    androidClientId: googleAndroidClientId,
-    iosClientId: googleIosClientId,
+    clientId: cfg.clientId,
+    androidClientId: cfg.androidClientId,
+    iosClientId: cfg.iosClientId,
   });
 
   useEffect(() => {
@@ -158,26 +162,26 @@ function GoogleSignInCardConfigured() {
           .then((user) =>
             setGoogleUser({ id: user.id, email: user.email, name: user.name, picture: user.picture })
           )
-          .catch(() =>
-            Alert.alert('Sign-in error', 'Could not fetch your Google profile. Please try again.')
-          );
+          .catch(() => setSignInError(true));
       }
     }
   }, [response]);
 
-  const handleSignOut = () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: clearAccount },
-    ]);
-  };
-
   return (
-    <AccountCardView
-      googleUser={googleUser}
-      onSignIn={() => promptAsync()}
-      onSignOut={handleSignOut}
-    />
+    <>
+      <AccountCardView
+        googleUser={googleUser}
+        onSignIn={() => promptAsync()}
+        onSignOut={onRequestSignOut}
+      />
+      <ToastNotice
+        visible={signInError}
+        variant="error"
+        title="Sign-in error"
+        message="Could not fetch your Google profile. Please try again."
+        onDismiss={() => setSignInError(false)}
+      />
+    </>
   );
 }
 
@@ -187,28 +191,33 @@ function GoogleSignInCardConfigured() {
  * The hook-bearing variant is wrapped in an ErrorBoundary so a throw in
  * useAuthRequest or any child cannot blank the whole Account screen.
  */
-function GoogleSignInCard() {
-  const { googleUser, clearAccount } = useAccountStore();
+function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }) {
+  const { googleUser } = useAccountStore();
+  const [notConfiguredToast, setNotConfiguredToast] = useState(false);
 
-  const hasGoogleConfig = !!(
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
-  );
+  const hasGoogleConfig = hasAnyGoogleAuthConfig();
+  if (!hasGoogleConfig) {
+    // Log once per app session so a missing EAS env entry surfaces in
+    // Sentry instead of leaving the user to guess whether GCC was the
+    // problem. The .env-on-disk vs EAS-stored split is the most common
+    // confusion source.
+    logMissingGoogleAuthConfigOnce();
+  }
 
   const notConfiguredCard = (
-    <AccountCardView
-      googleUser={googleUser}
-      onSignIn={() =>
-        Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }])
-      }
-      onSignOut={() =>
-        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign out', style: 'destructive', onPress: clearAccount },
-        ])
-      }
-    />
+    <>
+      <AccountCardView
+        googleUser={googleUser}
+        onSignIn={() => setNotConfiguredToast(true)}
+        onSignOut={onRequestSignOut}
+      />
+      <ToastNotice
+        visible={notConfiguredToast}
+        title="Not configured"
+        message="Google Sign-In is not set up yet."
+        onDismiss={() => setNotConfiguredToast(false)}
+      />
+    </>
   );
 
   if (!hasGoogleConfig) {
@@ -217,7 +226,7 @@ function GoogleSignInCard() {
 
   return (
     <GoogleSignInErrorBoundary fallback={notConfiguredCard}>
-      <GoogleSignInCardConfigured />
+      <GoogleSignInCardConfigured onRequestSignOut={onRequestSignOut} />
     </GoogleSignInErrorBoundary>
   );
 }
@@ -227,6 +236,18 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { avatar, clearAvatar } = useAvatarStore();
   const { entries } = useFitHistoryStore();
+  // Gate "Delete Account" on the legal footer — only meaningful when
+  // there's actually a Google account linked. Per user feedback April
+  // 29 2026: showing it without an account read as a misleading CTA
+  // ("delete what?"). Privacy Policy + Brand opt-out always render.
+  const { googleUser, clearAccount } = useAccountStore();
+  // Themed delete + sign-out confirmations. Native Alert.alert pops
+  // a system-styled dialog that ignores the grey-purple glass voice
+  // — replaced with the ConfirmDialog used elsewhere (Clear history
+  // / Remove from history). Per user direction April 29 2026: "make
+  // sure other modals match the clear-history modal's aesthetics."
+  const [pendingDeleteProfile, setPendingDeleteProfile] = useState(false);
+  const [pendingSignOut, setPendingSignOut] = useState(false);
 
   const greatFits = entries.filter((e) => e.fitScore === 'great').length;
 
@@ -248,7 +269,7 @@ export default function AccountScreen() {
         <View style={styles.header}>
           <HeadingImage
             slot="profile"
-            fallback="profile"
+            fallback="Profile"
             height={60}
             color="#fff"
             textStyle={styles.title}
@@ -256,7 +277,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Google account card — isolated so a hook crash here can't blank the page */}
-        <GoogleSignInCard />
+        <GoogleSignInCard onRequestSignOut={() => setPendingSignOut(true)} />
 
         {/* Body profile — section header with Edit pill on the right.
             Per Claude Design ScreenProfile mockup. */}
@@ -323,16 +344,7 @@ export default function AccountScreen() {
           <TouchableOpacity
             testID="delete-body-profile-button"
             style={styles.resetButton}
-            onPress={() => {
-              Alert.alert(
-                'Delete body profile?',
-                'Your height, measurements and fit preferences will be erased from this device. This cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: clearAvatar },
-                ]
-              );
-            }}
+            onPress={() => setPendingDeleteProfile(true)}
             activeOpacity={0.7}
           >
             <Text style={styles.resetText}>Delete my body profile</Text>
@@ -352,14 +364,18 @@ export default function AccountScreen() {
           >
             <Text style={styles.legalLinkText}>Privacy Policy</Text>
           </TouchableOpacity>
-          <Text style={styles.legalDivider}>·</Text>
-          <TouchableOpacity
-            testID="delete-account-link"
-            onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.legalLinkText}>Delete Account</Text>
-          </TouchableOpacity>
+          {googleUser && (
+            <>
+              <Text style={styles.legalDivider}>·</Text>
+              <TouchableOpacity
+                testID="delete-account-link"
+                onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.legalLinkText}>Delete Account</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <Text style={styles.legalDivider}>·</Text>
           <TouchableOpacity
             testID="brand-optout-link"
@@ -369,6 +385,25 @@ export default function AccountScreen() {
             <Text style={styles.legalLinkText}>Brand opt-out</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Are you a brand? — large bold heading + sub copy + tap
+            target. Sits below the policy footer per user direction
+            April 29 2026: "Add a 'are you a brand' in large bold
+            heading below privacy pages, delete account... keep the
+            current setting for fonts/headings". Routes brands to the
+            opt-out page for now (which is also the contact path).
+            Replaceable with a dedicated /for-brands page later. */}
+        <TouchableOpacity
+          testID="brand-cta"
+          style={styles.brandCta}
+          onPress={() => Linking.openURL(BRAND_OPTOUT_URL)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.brandCtaTitle}>are you a brand?</Text>
+          <Text style={styles.brandCtaSubtitle}>
+            Run a Shopify store? Send us a note → we'll set up consented size-chart access for your catalogue.
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Bottom-edge fade — same pattern as Home. Content melts into
@@ -385,6 +420,38 @@ export default function AccountScreen() {
         locations={[0, 0.22, 0.55, 1]}
         style={styles.bottomFade}
         pointerEvents="none"
+      />
+
+      {/* Themed delete-body-profile confirmation. Replaces the system
+          Alert.alert which broke visual continuity with the rest of
+          the grey-purple glass aesthetic. Uses the same ConfirmDialog
+          shell as Clear history / Remove from history. */}
+      <ConfirmDialog
+        visible={pendingDeleteProfile}
+        title="Delete body profile?"
+        confirmLabel="Delete"
+        icon="trash-2"
+        confirmTestID="confirm-delete-body-profile"
+        onConfirm={() => {
+          clearAvatar();
+          setPendingDeleteProfile(false);
+        }}
+        onCancel={() => setPendingDeleteProfile(false)}
+      />
+
+      {/* Themed sign-out confirmation. Triggered from GoogleSignInCard
+          via the onSignOut callback above. */}
+      <ConfirmDialog
+        visible={pendingSignOut}
+        title="Sign out?"
+        confirmLabel="Sign out"
+        icon="log-out"
+        confirmTestID="confirm-sign-out"
+        onConfirm={() => {
+          clearAccount();
+          setPendingSignOut(false);
+        }}
+        onCancel={() => setPendingSignOut(false)}
       />
     </View>
   );
@@ -562,7 +629,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   // Glass list card for body profile + preferences — inner rows are
-  // divided by hairlines except the last row.
+  // Compact body-profile card (April 29 2026): 7 measurement rows
+  // were previously 12px vertical padding × body-sized type, which
+  // made the card feel like its own page. Tightened to 6px padding +
+  // labelSmall / bodySmall so the whole profile fits in a glance
+  // alongside everything else on the Account screen.
   profileCard: {
     borderRadius: borderRadius.xl,
     padding: 4,
@@ -571,7 +642,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 6,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: textAlpha.divider,
@@ -580,14 +651,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   profileLabel: {
-    ...typography.label,
+    ...typography.labelSmall,
     color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   profileValue: {
-    ...typography.body,
+    ...typography.bodySmall,
     color: colors.text,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   emptyProfileCard: {
     borderRadius: borderRadius.xl,
@@ -677,6 +748,36 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primary,
     fontSize: 11,
     color: whiteAlpha.textFaint,
+  },
+
+  // "are you a brand?" CTA — sits below the legal footer. Heading
+  // matches the rest of the heading typography (Viaoda Libre italic
+  // display serif at heading-XL weight) so the brand voice carries.
+  // Sub copy is body-small over the same dark gradient backdrop as
+  // the policy links above.
+  brandCta: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  brandCtaTitle: {
+    ...typography.headingXL,
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    // No underline on the heading — user reverted that direction
+    // (April 29 2026, two passes apart): the underline at this size
+    // and weight on Viaoda Libre read clunky against the body. The
+    // sub-copy + tap target carry the "interactive" cue instead.
+  },
+  brandCtaSubtitle: {
+    fontFamily: fontFamily.primary,
+    fontSize: 13,
+    lineHeight: 19,
+    color: whiteAlpha.textMuted,
+    textAlign: 'center',
+    maxWidth: 320,
   },
 
   // Bottom-edge fade — 280px tall for a heavier horizon effect.

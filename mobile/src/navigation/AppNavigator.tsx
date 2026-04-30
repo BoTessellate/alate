@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef, StackActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
+import { isEnabled } from '../constants/featureFlags';
 import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
@@ -27,6 +28,8 @@ import HistoryScreen from '../screens/HistoryScreen';
 import AvatarSetupScreen from '../screens/AvatarSetupScreen';
 import FitResultScreen from '../screens/FitResultScreen';
 import AccountScreen from '../screens/AccountScreen';
+import PickImageScreen from '../screens/PickImageScreen';
+import OverlayEditorScreen from '../screens/OverlayEditorScreen';
 
 // Wrap each screen with an error boundary so a crash shows a fallback
 // instead of a white screen. The `name` prop tags the Sentry report.
@@ -35,11 +38,17 @@ const SafeHistory = () => <ScreenErrorBoundary name="HistoryScreen"><HistoryScre
 const SafeAccount = () => <ScreenErrorBoundary name="AccountScreen"><AccountScreen /></ScreenErrorBoundary>;
 const SafeAvatarSetup = () => <ScreenErrorBoundary name="AvatarSetupScreen"><AvatarSetupScreen /></ScreenErrorBoundary>;
 const SafeFitResult = () => <ScreenErrorBoundary name="FitResultScreen"><FitResultScreen /></ScreenErrorBoundary>;
+const SafePickImage = () => <ScreenErrorBoundary name="PickImageScreen"><PickImageScreen /></ScreenErrorBoundary>;
+const SafeOverlayEditor = () => <ScreenErrorBoundary name="OverlayEditorScreen"><OverlayEditorScreen /></ScreenErrorBoundary>;
 
 // Navigation types
 export type RootStackParamList = {
   Main: undefined;
   AvatarSetup: undefined;
+  /** v2: Story share — gated by featureFlags.V2 */
+  PickImage: undefined;
+  /** v2: Story share — gated by featureFlags.V2 */
+  OverlayEditor: undefined;
   FitResult: {
     /** Optional — when present, FitResult skips its internal scrape
      *  step and goes straight to enrichment + fit-check. Sources that
@@ -78,8 +87,12 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 // Tab icon + label mapping — Claude Design uses a floating glass pill
 // with three tabs: Check / History / Profile (not "Home"/"Account").
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+// The "Check" tab is the paste-a-URL entry point, not a home page —
+// the previous `home` (house) glyph read as a misdirect. `link` mirrors
+// the URL-paste action of the screen and pairs visually with the link
+// icon inside the paste pill on HomeScreen.
 const TAB_ICONS: Record<string, FeatherIconName> = {
-  Home: 'home',
+  Home: 'link',
   History: 'clock',
   Account: 'user',
 };
@@ -126,7 +139,15 @@ function MainTabs() {
           // side. 24+insets on bottom.
           left: 40,
           right: 40,
-          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 24,
+          // Bottom offset reduced from +24 → +10 so the pill sits
+          // closer to the device gesture-bar without crowding it.
+          // Per user direction "drop the placement of the floating
+          // nav bar by a few more pixels, it floats a little too
+          // high right now". 10px clears the edge on phones with no
+          // home indicator; on devices with insets.bottom > 0 the
+          // safe-area inset already covers the gesture-bar so the
+          // +10 is pure breathing room.
+          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 10,
           height: 64,
           // Full pill — borderRadius matches the height/2 cap so the
           // shape is unambiguously capsule-shaped at any width.
@@ -207,21 +228,35 @@ export default function AppNavigator() {
   const { avatar } = useAvatarStore();
   const { setPendingUrl } = usePendingShareStore();
   const ageConfirmedAt = useAgeGateStore((s) => s.confirmedAt);
+  // Hard block on share-intent when the user self-declared under 16.
+  // The age gate already keeps them on the deflection screen, but
+  // ShareIntent is OS-level — Android can deliver a URL via the share
+  // sheet to a backgrounded app, which would otherwise navigate them
+  // INTO the avatar / fit flow regardless of the deflection. This
+  // flag short-circuits the handler before any data-collection path
+  // can fire.
+  const declaredUnder16 = useAgeGateStore((s) => s.declaredUnder16);
   const [isProcessingShare, setIsProcessingShare] = useState(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const processingRef = useRef(false);
 
-  // First-launch age gate — blocks everything until the user confirms
-  // they're 16+. Measurements are GDPR Article 8 / DPDPA-sensitive data,
-  // so we gate collection behind an explicit confirmation. The store
-  // persists the confirmation timestamp, so this only shows on first
-  // install (or after body-profile deletion if we later wire that to
-  // reset the gate).
-  if (!ageConfirmedAt) {
-    return <AgeGateOverlay />;
-  }
-
+  // Share-intent handler — runs on every render; bails out internally
+  // when the gate is closed or when there's nothing to process. Stays
+  // ABOVE the early-return below because React requires hooks to be
+  // called in the same order every render, and the AgeGate early-
+  // return would otherwise add/remove this hook between renders (the
+  // exact bug that produced the white screen on April 29 2026 after
+  // confirming the age gate — pre-confirm React saw 7 hooks, post-
+  // confirm it saw 8, and crashed the tree on the count change).
   useEffect(() => {
+    // Drop any incoming share intent without processing when the
+    // user is under 16. The intent is reset so it won't re-fire
+    // when the age state later flips.
+    if (declaredUnder16) {
+      if (hasShareIntent) resetShareIntent();
+      return;
+    }
+    if (!ageConfirmedAt) return;
     if (!hasShareIntent || processingRef.current) return;
 
     const url = shareIntent?.webUrl || shareIntent?.text;
@@ -231,7 +266,17 @@ export default function AppNavigator() {
     }
 
     handleSharedUrl(url);
-  }, [hasShareIntent, shareIntent]);
+  }, [hasShareIntent, shareIntent, ageConfirmedAt, declaredUnder16]);
+
+  // First-launch age gate — blocks everything until the user confirms
+  // they're 16+. Measurements are GDPR Article 8 / DPDPA-sensitive
+  // data, so we gate collection behind an explicit confirmation. The
+  // store persists the timestamp, so this only shows on first install
+  // (or after body-profile deletion if we later wire that to reset
+  // the gate). Render-level early return — DO NOT add hooks below.
+  if (!ageConfirmedAt) {
+    return <AgeGateOverlay />;
+  }
 
   const handleSharedUrl = async (url: string) => {
     processingRef.current = true;
@@ -254,10 +299,29 @@ export default function AppNavigator() {
       if (result.success && result.data) {
         resetShareIntent();
         setTimeout(() => {
-          navigationRef.current?.navigate('FitResult', {
-            product: result.data!,
-            url,
-          });
+          // CRITICAL: use `dispatch(StackActions.replace(...))` rather
+          // than `navigate(...)`. If the user is ALREADY on FitResult
+          // (viewing a previously-checked product) and shares another
+          // URL from a browser, react-navigation's `navigate` keeps
+          // the existing FitResult mount and just updates `route.params`.
+          // FitResult's `useState` lazy initialisers fire ONCE per
+          // mount, so the screen kept showing the OLD product's data
+          // (warnings / fitScore / brand / images) while the new
+          // params silently sat under the surface. Three observable
+          // bugs from the same root cause (April 29 2026):
+          //   1. Shared product not saved to history (analyzeFit
+          //      didn't re-run with the new URL).
+          //   2. Wrong scrape details on screen (state from prev mount).
+          //   3. Male profile saw women's-fit results because the
+          //      stale state carried a women's product through.
+          // `replace` forces a remount → fresh state, fresh
+          // analyzeFit, addEntry runs, history saves correctly.
+          navigationRef.current?.dispatch(
+            StackActions.replace('FitResult', {
+              product: result.data!,
+              url,
+            })
+          );
         }, 100);
       } else {
         resetShareIntent();
@@ -328,6 +392,23 @@ export default function AppNavigator() {
             headerShown: false,
           }}
         />
+        {/* v2: Story share. Routes are only registered when the flag is
+            on so there's no way to reach them in a production build until
+            the feature ships. */}
+        {isEnabled('V2') && (
+          <>
+            <Stack.Screen
+              name="PickImage"
+              component={SafePickImage}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="OverlayEditor"
+              component={SafeOverlayEditor}
+              options={{ headerShown: false }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

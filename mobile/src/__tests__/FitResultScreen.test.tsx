@@ -54,6 +54,7 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('../services/api', () => ({
   enrichProduct: jest.fn(),
   checkFit: jest.fn(),
+  scrapeProduct: jest.fn(),
   extractBrandFromUrl: jest.fn((url: string) => {
     try {
       const host = new URL(url).hostname.replace(/^www\./, '');
@@ -182,11 +183,39 @@ describe('FitResultScreen', () => {
       await findByTestId('view-on-store-button');
     });
 
-    it('re-evaluate button routes to AvatarSetup', async () => {
+    it('re-evaluate button re-scrapes + re-runs checkFit IN PLACE (no AvatarSetup nav)', async () => {
+      // Re-evaluate now stays on the FitResult screen and refreshes
+      // the data directly from the product URL + current avatar. Per
+      // user feedback April 29 2026: "re-evalute should ideally only
+      // hit the product URL" — going via AvatarSetup felt round-about
+      // when "Change your measurements" already exists for that path.
+      (api.scrapeProduct as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: {
+          name: 'Black Midi Dress',
+          image: 'https://example.com/img.jpg',
+          price: { amount: 49, currency: 'GBP' },
+          brand: 'ASOS',
+        },
+      });
+      (api.checkFit as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        fit_score: 'moderate',
+        warnings: [{ severity: 'minor', message: 'snug at waist' }],
+        size_recommendation: { size: 'M', confidence: 'high' },
+      });
+
       const { findByTestId } = render(<FitResultScreen />);
       const btn = await findByTestId('reevaluate-button');
       fireEvent.press(btn);
-      expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
+
+      await waitFor(() => {
+        // The fixture URL is whatever HISTORY_PARAMS / activeEntry has.
+        expect(api.scrapeProduct).toHaveBeenCalled();
+        expect(api.checkFit).toHaveBeenCalled();
+      });
+      // Should NOT navigate anywhere — stays on FitResult.
+      expect(mockNavigate).not.toHaveBeenCalledWith('AvatarSetup');
     });
 
     it('change measurements button routes to AvatarSetup', async () => {
@@ -269,7 +298,13 @@ describe('FitResultScreen', () => {
       (api.checkFit as jest.Mock).mockResolvedValueOnce({
         success: true,
         fit_score: 'moderate',
-        warnings: [{ severity: 'minor', message: 'Check the sleeves' }],
+        // Severity must be 'moderate' so the verdict stays at the
+        // "Some Concerns" tier. April 29 2026 the FIT badge derives
+        // from MAX warning severity (effectiveScore) rather than the
+        // raw fit_score string — a 'moderate' fit_score with only
+        // 'minor' warnings re-tiers to "Great Fit, with a note".
+        // Keeping the test focused on the moderate verdict path.
+        warnings: [{ severity: 'moderate', message: 'Sleeves run long for your shoulders' }],
       });
 
       const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
@@ -277,6 +312,26 @@ describe('FitResultScreen', () => {
       // Verdict label now lives on the HeadingImage wrapper's
       // accessibilityLabel, not a raw Text node.
       expect(getAllByLabelText('Some Concerns').length).toBeGreaterThan(0);
+    });
+
+    it('a `moderate` fit_score with ONLY minor warnings re-tiers to "Great Fit, with a note"', async () => {
+      // Regression: backend marks any non-empty warnings as 'moderate'
+      // but a single minor concern shouldn't trigger the warning
+      // triangle. Mobile derives effectiveScore from max severity.
+      (api.enrichProduct as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        product: { id: 'p-1', name: 'Linen shirt' },
+      });
+      (api.checkFit as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        fit_score: 'moderate',
+        warnings: [{ severity: 'minor', message: 'A-line styles add hip volume' }],
+        size_recommendation: { size: 'M', confidence: 'high' },
+      });
+
+      const { findByTestId, getAllByLabelText } = render(<FitResultScreen />);
+      await findByTestId('fit-score-display');
+      expect(getAllByLabelText('Great Fit, with a note').length).toBeGreaterThan(0);
     });
 
     it('renders live-mode action buttons', async () => {

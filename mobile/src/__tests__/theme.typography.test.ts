@@ -1,12 +1,15 @@
 /**
  * Theme typography tests.
  *
- *   - Display + heading tokens use the DM Serif Italic fallback face
- *     (TAN Nightingale SVGs replace these at the screen level when
- *     rendered — see HeadingImage).
- *   - Display + heading tokens render in lowercase.
- *   - Body / label / caption tokens run on the SYSTEM SERIF to pair
- *     with the display serif — the whole app now reads as serif-led.
+ *   - Display + heading tokens use Viaoda Libre (Google Fonts, OFL)
+ *     bundled via expo-font; family name resolves on Android only
+ *     when set to the ttf's NameID 1 ("Viaoda Libre" with space).
+ *   - Body / label / caption tokens run on the SYSTEM SERIF so the
+ *     whole app reads as serif-led without bundling a second face.
+ *   - The fontFamily registry is intentionally minimal: ONLY
+ *     `primary` (system serif) and `display` (Viaoda Libre). No
+ *     accent, mono, fallback, or legacy aliases. See anti-pattern
+ *     comment in theme.ts.
  *
  * These tokens are the single source of truth — if a heading anywhere
  * drifts off them, that's a bug.
@@ -15,8 +18,15 @@
 import { typography, fontFamily } from '../constants/theme';
 
 describe('theme — heading typography', () => {
-  it('exposes DMSerifDisplay-Italic as the display font family fallback', () => {
-    expect(fontFamily.display).toBe('DMSerifDisplay-Italic');
+  it('exposes Viaoda Libre as the display font family', () => {
+    expect(fontFamily.display).toBe('ViaodaLibre-Regular');
+  });
+
+  it('the fontFamily registry exposes ONLY primary + display (no accent/mono/legacy bloat)', () => {
+    // Regression guard: April 29 2026 we slimmed the registry to two
+    // faces after the user flagged "too many fonts for an app". Don't
+    // add a new key without an explicit reason logged in theme.ts.
+    expect(Object.keys(fontFamily).sort()).toEqual(['display', 'primary']);
   });
 
   const headingKeys = [
@@ -28,24 +38,33 @@ describe('theme — heading typography', () => {
   ] as const;
 
   headingKeys.forEach((key) => {
-    it(`${key} uses the display serif font`, () => {
-      expect((typography as any)[key].fontFamily).toBe('DMSerifDisplay-Italic');
+    it(`${key} uses Viaoda Libre`, () => {
+      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre-Regular');
     });
 
-    it(`${key} renders in lowercase`, () => {
-      expect((typography as any)[key].textTransform).toBe('lowercase');
+    it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {
+      // Earlier versions forced textTransform: 'lowercase' on every
+      // heading token for an editorial feel. The user moved to
+      // title-case page titles ("Body Profile", "History", "Profile")
+      // so the lowercase transform was dropped — render whatever case
+      // the source string supplies.
+      expect((typography as any)[key].textTransform).toBeUndefined();
     });
   });
 
-  // Body / label tokens now use the system serif (paired with TAN
-  // Nightingale headings) — they should not inherit lowercase.
+  // Body / label tokens — currently routed through fontFamily.primary
+  // (April 29 2026 experiment: primary swapped from 'serif' to
+  // 'ViaodaLibre-Regular' so the whole app reads in Viaoda Libre).
+  // The assertion just ensures the tokens point at whatever
+  // fontFamily.primary resolves to today; if the experiment reverts,
+  // these stay green automatically.
   const nonHeadingKeys = ['body', 'bodyLarge', 'bodySmall', 'label', 'labelLarge', 'caption'] as const;
   nonHeadingKeys.forEach((key) => {
     it(`${key} is not forced into lowercase`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
-    it(`${key} uses the system serif (paired with the display serif)`, () => {
-      expect((typography as any)[key].fontFamily).toBe('serif');
+    it(`${key} uses fontFamily.primary`, () => {
+      expect((typography as any)[key].fontFamily).toBe(fontFamily.primary);
     });
   });
 });

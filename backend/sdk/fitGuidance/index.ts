@@ -12,6 +12,10 @@ export interface AvatarMeasurements {
   shoulders: 'narrow' | 'average' | 'broad';
   bust: 'small' | 'medium' | 'large' | 'extra-large';
   waist: 'defined' | 'average' | 'undefined';
+  /** Midsection projection at and below the natural waist. Distinct
+   *  from `waist` (which is silhouette curve, not depth). Optional —
+   *  legacy avatars persisted before April 29 2026 don't carry it. */
+  tummy?: 'flat' | 'slight' | 'soft' | 'full';
   hips: 'narrow' | 'average' | 'wide' | 'extra-wide';
   thighs: 'slim' | 'average' | 'muscular' | 'full';
   torso_length: 'short' | 'average' | 'long';
@@ -422,6 +426,51 @@ export function predictFit(product: ProductData, avatar: AvatarMeasurements): Fi
       warnings.push({
         severity: 'minor',
         message: 'Boxy/oversized fit will hide waist definition — add a belt to cinch if desired',
+      });
+    }
+  }
+
+  // =========================================================================
+  // TUMMY RULES
+  //
+  // The tummy field captures abdominal projection at and below the
+  // natural waist. Non-stretch waistband-fitted garments (high-rise
+  // trousers, pencil skirts, fitted A-line dresses, bodycon) sit on
+  // top of the abdomen, so a "soft" or "full" tummy with no fabric
+  // give means the waistband digs in or the placket gaps. We keep
+  // the warning out of the way for stretch fabrics and oversized
+  // cuts where the garment accommodates volume on its own.
+  // =========================================================================
+
+  const isHighRise = hasTag(tags, 'high-waisted', 'high-rise', 'high waist');
+  const isPencilSkirt = isSkirt && hasTag(tags, 'pencil');
+  const isBodycon = hasTag(tags, 'bodycon', 'body-con');
+
+  if ((avatar.tummy === 'soft' || avatar.tummy === 'full') && !isStretch && !isOversized) {
+    const sev: 'minor' | 'moderate' = avatar.tummy === 'full' ? 'moderate' : 'minor';
+
+    if (isPants && (isFitted || isHighRise)) {
+      warnings.push({
+        severity: sev,
+        message: 'Non-stretch fitted waistband may feel snug across the tummy — consider sizing up at the waist',
+      });
+    }
+    if (isPencilSkirt) {
+      warnings.push({
+        severity: sev,
+        message: 'Pencil skirts in non-stretch fabric tend to pull at the tummy — sizing up at the waist helps',
+      });
+    }
+    if (isBodycon && (isDress || isTop)) {
+      warnings.push({
+        severity: sev,
+        message: 'Bodycon styles in non-stretch fabric will trace the midsection closely',
+      });
+    }
+    if (isFitted && isDress && !isStretch) {
+      warnings.push({
+        severity: sev,
+        message: 'Fitted non-stretch dress may pull across the midsection — empire or A-line cuts tend to flatter',
       });
     }
   }

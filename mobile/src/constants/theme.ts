@@ -4,33 +4,61 @@
  */
 
 // =============================================================================
-// FONT FAMILIES
+// FONT FAMILIES — two faces, full stop.
 // =============================================================================
-// The display face is TAN Nightingale (rendered as SVGs by HeadingImage).
-// Body copy now runs on a system serif so it pairs with Nightingale's
-// art-deco serif character — mixing sans body with a display serif made
-// the headings feel like stickers dropped onto sans-serif chrome.
-// Platform-specific serifs: 'Times New Roman' (iOS Western default),
-// 'serif' (Android → Noto Serif, which ships on every Android device).
+// The app intentionally uses ONLY two faces:
+//   - `primary`: the platform's system serif. Android → Noto Serif
+//     (ships on every device); iOS → Times New Roman. Used for body,
+//     labels, captions, chips, tags, buttons — every non-display
+//     surface.
+//   - `display`: Viaoda Libre (Google Fonts, OFL). Bundled via
+//     `useFonts` in App.tsx. Used for page titles + hero verses.
+//     Family name MUST be the exact string the ttf's name table
+//     reports for NameID 1, including the space — see anti-pattern
+//     #12 in `project_anti_patterns.md`.
+//
+// History: earlier versions also exported `accent` (Georgia), `mono`
+// (system monospace), `fallback` (duplicate of primary), and
+// `displayLegacy` (DM Serif Display Italic — the .ttf was deleted
+// when we moved to Viaoda Libre). None had any callsites; all were
+// dropped April 29 2026 to keep the design system tight ("two fonts,
+// not five"). Adding a new face needs an explicit reason — every
+// extra font is one more thing to load, mismatch, or reconcile.
 export const fontFamily = {
-  // Primary UI font — system serif that pairs with TAN Nightingale.
+  // System serif — Noto Serif on Android, Times New Roman on iOS.
+  // Multi-weight, so labels / buttons / chips can lean on bold for
+  // hierarchy without falling back to a different face.
+  //
+  // Briefly experimented with primary: 'ViaodaLibre-Regular' to put
+  // the whole app on the display serif (April 29 2026), but
+  // Viaoda Libre is single-weight — every inline `fontWeight: '500'`
+  // / '600' / '700' across screens silently fell back to system
+  // serif Bold, defeating the point. Reverted same day; multi-
+  // weight reading-serif is on the v2 typography roadmap.
   primary: 'serif',
-  // Legacy alias for the editorial body face
-  accent: 'Georgia',
-  // Display font loaded via expo-font (see App.tsx). Stand-in for TAN Nightingale
-  // when the SVG slot falls back to text (i.e. missing asset).
-  display: 'DMSerifDisplay-Italic',
-  // Monospace for code/data
-  mono: 'ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace',
-  // Fallback
-  fallback: 'serif',
+  display: 'ViaodaLibre-Regular',
 };
 
-// Shared heading trait: every display/heading token mixes this in so the
-// serif italic + lowercase transform stays consistent across the app.
+// Shared heading trait: every display/heading token mixes this in so
+// the serif display face stays consistent across the app.
+//
+// CRITICAL: heading tokens MUST NOT set `fontWeight: '700'` (or any
+// non-400 weight). Viaoda Libre is shipped as Regular only — when
+// styles request weight 700, Android's font manager fails the lookup
+// (no `ViaodaLibre-Regular_bold.ttf` exists) and silently falls back
+// to the system serif Bold (Noto Serif Bold), which produced the
+// "headings render in plain serif bold, not Viaoda Libre" regression
+// of April 29 2026 (~5 install cycles spent chasing it). Keep all
+// heading tokens at `fontWeight: '400'`. The Viaoda Libre face has
+// enough display character on its own; synthetic bold is a trap.
+//
+// History: earlier versions forced `textTransform: 'lowercase'` for
+// an editorial feel, but the user moved to title-case page headings
+// (April 29 2026 — "Camel case page headings"). Whatever case the
+// source string uses is what renders. Page titles in title case;
+// poetic / phrase headings in sentence case.
 const headingSerif = {
-  fontFamily: 'DMSerifDisplay-Italic',
-  textTransform: 'lowercase' as const,
+  fontFamily: 'ViaodaLibre-Regular',
 };
 
 // =============================================================================
@@ -190,61 +218,79 @@ export const typography = {
     lineHeight: 24,
   },
 
-  // Body text — now on system serif to pair with TAN Nightingale
+  // Body text — every size bumped +2pt (April 29 2026) to push back
+  // against the lightness of a single-weight display serif. Without
+  // a Bold variant we lean on size for visual presence; +2pt is the
+  // smallest jump that meaningfully reads as "bigger" without
+  // breaking the existing layout grid (chip rows, dock heights, etc.
+  // were laid out around the prior 11–18pt scale and tolerate a
+  // 2pt expansion). Line heights bumped proportionally.
   bodyLarge: {
     fontFamily: fontFamily.primary,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '400' as const,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   body: {
     fontFamily: fontFamily.primary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '400' as const,
-    lineHeight: 22,
+    lineHeight: 25,
   },
   bodySmall: {
     fontFamily: fontFamily.primary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '400' as const,
-    lineHeight: 18,
+    lineHeight: 21,
   },
 
-  // Labels & Buttons — serif so small copy matches the editorial voice
+  // Labels & Buttons — Medium weight back; system serif (Noto Serif
+  // on Android) ships multiple weights so this resolves cleanly.
   labelLarge: {
     fontFamily: fontFamily.primary,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '500' as const,
-    lineHeight: 22,
+    lineHeight: 25,
     letterSpacing: 0.1,
   },
   label: {
     fontFamily: fontFamily.primary,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500' as const,
-    lineHeight: 18,
+    lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelSmall: {
     fontFamily: fontFamily.primary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '500' as const,
-    lineHeight: 16,
+    lineHeight: 18,
     letterSpacing: 0.2,
+  },
+
+  // Status banners — re-eval, "loading", "success", inline notices.
+  // Smaller than body so the banner reads as ambient feedback rather
+  // than primary content. Single source of truth so any future banner
+  // (sync status, offline, undo prompt) inherits the size.
+  banner: {
+    fontFamily: fontFamily.primary,
+    fontSize: 13,
+    fontWeight: '400' as const,
+    lineHeight: 18,
   },
 
   // Caption & Overline
   caption: {
     fontFamily: fontFamily.primary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '400' as const,
-    lineHeight: 16,
+    lineHeight: 19,
   },
   overline: {
     fontFamily: fontFamily.primary,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600' as const,
-    lineHeight: 14,
+    lineHeight: 16,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
@@ -331,10 +377,14 @@ export const glass = {
   borderColor: 'rgba(255, 255, 255, 0.85)',
   borderWidth: 0.5,
   // Variant tuned for the FitResult dock — sits over a (potentially
-  // busy) product image, so the tint is firmer and the inner border
-  // brighter to keep text legible without losing the frosted feel.
-  // Works in tandem with the underlying BlurView.
-  dockBackgroundColor: 'rgba(255, 255, 255, 0.65)',
+  // busy) product image. Iterations (April 29 2026):
+  //   0.65 → 0.58 → 0.55 — user wanted progressively more translucency
+  //                         so the hero image breathes through. At
+  //                         0.55 we're close to the floor where the
+  //                         BlurView alone needs to carry legibility.
+  // Works in tandem with the underlying BlurView; legibility is
+  // still fine because the BlurView softens the imagery underneath.
+  dockBackgroundColor: 'rgba(255, 255, 255, 0.55)',
   dockBorderColor: 'rgba(255, 255, 255, 0.9)',
 };
 

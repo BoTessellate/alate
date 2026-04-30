@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, borderRadius, ms, fontFamily, whiteAlpha, textAlpha } from '../constants/theme';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
@@ -81,9 +82,39 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
   },
 ];
 
+// Fit-score priority for the history sort. Lower = surfaces first.
+// Order is great → moderate → poor so the cover flow opens on the
+// user's wins (the items they're most likely to act on or revisit)
+// before working through the things that didn't fit.
+const FIT_PRIORITY: Record<'great' | 'moderate' | 'poor', number> = {
+  great: 0,
+  moderate: 1,
+  poor: 2,
+};
+
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { entries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+  const { entries: storeEntries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
+
+  // Sort the store's entries for display. Primary key is fit-score
+  // priority (great → moderate → poor) so the cover flow groups
+  // similar verdicts together. Secondary key is checkedAt desc so
+  // within each group the most-recent check surfaces first.
+  //
+  // The store keeps insertion order (newest first) — we don't mutate
+  // it, just produce a sorted view here. Per user feedback April 29
+  // 2026: dummy data was inserted in good→concerns→poor order which
+  // happened to look right; real data inserts in time order and
+  // therefore appeared unsorted to the eye.
+  const entries = React.useMemo(() => {
+    return [...storeEntries].sort((a, b) => {
+      const pri = FIT_PRIORITY[a.fitScore] - FIT_PRIORITY[b.fitScore];
+      if (pri !== 0) return pri;
+      // Same fit group → newer first (descending checkedAt).
+      return b.checkedAt.localeCompare(a.checkedAt);
+    });
+  }, [storeEntries]);
+
   // Count of entries scored 'great' — surfaced in the header meta so the
   // subtitle carries real signal ("3 good fits") instead of the redundant
   // "swipe through to revisit" instruction the coverflow already implies.
@@ -147,11 +178,22 @@ export default function HistoryScreen() {
   if (entries.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        {/* Brand grey-purple ombre — same gradient as Home / Account
+            / FitResult hero. Per user direction April 29 2026: the
+            History tab read flat against the rest of the app's
+            atmospheric backdrop. */}
+        <LinearGradient
+          colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+          locations={[0, 0.3, 0.6, 0.9]}
+          start={{ x: 0.15, y: 0.1 }}
+          end={{ x: 0.85, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
         <View testID="history-screen" style={styles.emptyContainer}>
           <Text style={styles.pageTitle}>History</Text>
           <View style={styles.emptyIconContainer}>
-            <Feather name="clock" size={36} color={colors.primaryLight} />
+            <Feather name="clock" size={36} color="#fff" />
           </View>
           <Text style={styles.emptyTitle}>No fit checks yet</Text>
           <Text style={styles.emptySubtitle}>
@@ -173,14 +215,22 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      {/* Same brand ombre as the empty state above. */}
+      <LinearGradient
+        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
+        locations={[0, 0.3, 0.6, 0.9]}
+        start={{ x: 0.15, y: 0.1 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <View testID="history-screen" style={styles.container}>
         {/* Page title + slim stats pill under it. TAN Nightingale SVG
             via HeadingImage falls back to styled text if missing. */}
         <View style={styles.header}>
           <HeadingImage
             slot="history"
-            fallback="your history"
+            fallback="History"
             height={60}
             color={colors.text}
             textStyle={styles.pageTitle}
@@ -256,14 +306,16 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Transparent so the brand-purple ombre LinearGradient (rendered
+    // beneath via absoluteFill) shows through. Was `colors.background`
+    // (solid light) before April 29 2026 — flipped to match Home.
   },
   container: {
     flex: 1,
   },
-  // Header — left-aligned per Claude Design mockup. Title is DM Serif
-  // italic lowercase via displayMedium; subtitle sits tight under it
-  // (marginTop 4) in plain body 13px, textMuted, no letter-spacing.
+  // Header — left-aligned per Claude Design mockup. Title + meta now
+  // render LIGHT-on-dark to read against the gradient backdrop. Was
+  // dark-on-light back when the screen had a solid #e6e4e9 background.
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -271,13 +323,21 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     ...typography.displayMedium,
-    color: colors.text,
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
+  // Numbers in this header line ("3 items · 3 good fits") render in
+  // Viaoda Libre per user direction April 29 2026 — the digits feel
+  // editorial-deck instead of utilitarian when they're in the
+  // display serif. Slightly larger size + tighter line height to
+  // suit the heavier strokes.
   headerMeta: {
-    fontFamily: fontFamily.primary,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.textMuted,
+    fontFamily: fontFamily.display,
+    fontSize: 15,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
   },
   list: {
@@ -433,23 +493,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
+  // Empty-state icon ring — light frosted disc, readable on the
+  // brand-purple gradient (April 29 2026 backdrop change).
   emptyIconContainer: {
     width: ms(80),
     height: ms(80),
     borderRadius: ms(40),
-    backgroundColor: colors.primaryLight + '20',
+    backgroundColor: 'rgba(255,255,255,0.22)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   emptyTitle: {
     ...typography.headingM,
-    color: colors.text,
+    color: '#fff',
     marginBottom: spacing.sm,
   },
   emptySubtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
   },
   seedButton: {

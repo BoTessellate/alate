@@ -57,7 +57,24 @@ function App() {
   // fires, so the first visible frame renders in the real face, not a
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
-    'DMSerifDisplay-Italic': require('./assets/fonts/DMSerifDisplay-Italic.ttf'),
+    // Viaoda Libre (Google Fonts, OFL) — display face for all heading
+    // tokens. Replaces DM Serif Display Italic.
+    //
+    // The ttf is bundled in TWO places:
+    //   - `mobile/assets/fonts/ViaodaLibre-Regular.ttf` — read by
+    //     expo-font's `useFonts` for iOS (and as a backup for Android).
+    //   - `mobile/android/app/src/main/assets/fonts/ViaodaLibre-Regular.ttf`
+    //     — read by React Native's Android typeface manager directly.
+    //     RN Android's font lookup checks `assets/fonts/<family>.ttf`
+    //     by file basename, which is the most reliable resolve path
+    //     on Android. Three earlier attempts trying to bind via
+    //     expo-font alone (key as 'ViaodaLibre', then 'Viaoda Libre',
+    //     then 'ViaodaLibre-Regular') all silently fell back to system
+    //     serif on the device — see project_regression_log.md.
+    //
+    // Both paths reference the SAME file basename + key, so JS can
+    // use `fontFamily: 'ViaodaLibre-Regular'` cross-platform.
+    'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

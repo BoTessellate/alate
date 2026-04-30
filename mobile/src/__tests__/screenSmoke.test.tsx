@@ -93,10 +93,13 @@ import HistoryScreen from '../screens/HistoryScreen';
 import AccountScreen from '../screens/AccountScreen';
 import AvatarSetupScreen from '../screens/AvatarSetupScreen';
 import FitResultScreen from '../screens/FitResultScreen';
+import PickImageScreen from '../screens/PickImageScreen';
+import OverlayEditorScreen from '../screens/OverlayEditorScreen';
 
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore } from '../store/calibrationStore';
+import { useEditorStore } from '../store/editorStore';
 
 // --- Tests ---------------------------------------------------------------
 
@@ -106,6 +109,7 @@ describe('Screen Smoke Tests', () => {
     useAvatarStore.setState({ avatar: null });
     useFitHistoryStore.setState({ entries: [] });
     useCalibrationStore.setState({ garments: [] });
+    useEditorStore.getState().reset();
     mockRouteParams = {};
   });
 
@@ -178,6 +182,67 @@ describe('Screen Smoke Tests', () => {
       url: 'https://asos.com/p/1',
     };
     expect(() => render(<FitResultScreen />)).not.toThrow();
+  });
+
+  it('PickImageScreen renders without crashing', () => {
+    expect(() => render(<PickImageScreen />)).not.toThrow();
+  });
+
+  it('OverlayEditorScreen renders empty state without crashing', () => {
+    // No image seeded — screen should render the "no photo picked" fallback.
+    expect(() => render(<OverlayEditorScreen />)).not.toThrow();
+  });
+
+  it('OverlayEditorScreen renders with image seeded without crashing', () => {
+    useEditorStore.getState().setImage('file:///tmp/seed.jpg');
+    useEditorStore.getState().addOverlay('peace');
+    expect(() => render(<OverlayEditorScreen />)).not.toThrow();
+  });
+
+  it('FitResultScreen renders the custom-fit badge when product.customFit is set', () => {
+    mockRouteParams = {
+      product: {
+        name: 'Felled Seam Set',
+        image: 'https://cdn.example.com/c.jpg',
+        price: { amount: 12000, currency: 'INR' },
+        brand: 'Oshin Sarin',
+        customFit: { available: true, label: 'Made to measure' },
+      },
+      url: 'https://oshinsarin.in/products/felled-seam-set',
+      historyEntryId: 'h-2',
+      precomputed: {
+        fitScore: 'great' as const,
+        warnings: [],
+        sizeRecommendation: { size: 'M', confidence: 'high' as const },
+        enrichedProduct: {},
+        checkedAt: '2026-04-29T00:00:00.000Z',
+      },
+    };
+    const { getByTestId, getByText } = render(<FitResultScreen />);
+    expect(getByTestId('custom-fit-badge')).toBeTruthy();
+    expect(getByText('Made to measure')).toBeTruthy();
+  });
+
+  it('FitResultScreen omits the custom-fit badge when product.customFit is unset', () => {
+    mockRouteParams = {
+      product: {
+        name: 'Costa Top',
+        image: 'https://cdn.example.com/d.jpg',
+        price: { amount: 5931, currency: 'INR' },
+        brand: 'Summer Away',
+      },
+      url: 'https://summeraway.in/products/costa-top',
+      historyEntryId: 'h-3',
+      precomputed: {
+        fitScore: 'great' as const,
+        warnings: [],
+        sizeRecommendation: { size: 'M', confidence: 'high' as const },
+        enrichedProduct: {},
+        checkedAt: '2026-04-29T00:00:00.000Z',
+      },
+    };
+    const { queryByTestId } = render(<FitResultScreen />);
+    expect(queryByTestId('custom-fit-badge')).toBeNull();
   });
 
   it('ScreenErrorBoundary catches render errors and shows fallback', () => {

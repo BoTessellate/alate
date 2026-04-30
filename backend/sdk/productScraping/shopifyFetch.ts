@@ -30,6 +30,41 @@ export interface ShopifyScrapedData {
   category?: string;
   tags?: string[];
   material?: string;
+  /** Set when the storefront advertises made-to-measure / bespoke /
+   *  custom-size service for this product. Detection is product-local
+   *  (option names, option values, tags, handle/title) — we do NOT
+   *  persist a brand-level registry, since scraped product metadata
+   *  staying out of a shared catalog is anti-pattern #1. */
+  customFit?: { available: boolean; label?: string };
+}
+
+/**
+ * Strip HTML tags + decode entities from a scraped string. Some
+ * Shopify stores (yamayoga.in) embed `<span class="...">…</span>`
+ * inside the `vendor` or `title` field as a CSS-driven font swap;
+ * without stripping, that markup lands on the fit card as raw text.
+ * Mirror of `mobile/src/utils/sanitize.ts` so cleaning happens at
+ * BOTH ends of the pipe — defense in depth.
+ */
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+};
+function stripHtmlAndDecode(s: string | undefined): string | undefined {
+  if (!s) return s;
+  const stripped = s
+    .replace(/<\s*br\s*\/?\s*>/gi, ' ')
+    .replace(/<\s*\/\s*(p|div|h[1-6]|li|tr|td)\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(?:nbsp|amp|lt|gt|quot|#39|apos);/g, (m) => HTML_ENTITY_MAP[m] ?? m)
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped || undefined;
 }
 
 /**
@@ -66,6 +101,77 @@ export function extractMaterialFromTags(tags: string[]): string | undefined {
     for (const pattern of MATERIAL_PATTERNS) {
       const match = tag.match(pattern);
       if (match) return tag.trim();
+    }
+  }
+  return undefined;
+}
+
+// =============================================================================
+// Custom-fit detection
+//
+// Some brands (Oshin Sarin, etc.) sell hand-tailored / made-to-measure
+// pieces alongside their standard size ladder. The storefront surfaces
+// this as either an option name (e.g. "Custom Size"), an option value
+// in the size axis ("XS / S / M / L / Custom Size"), a tag
+// (`made-to-measure`, `bespoke`), or words in the handle/title. We pick
+// up any of those signals and surface a short human label the mobile
+// client can render as a badge near the brand line. Detection is
+// per-request — we never persist a brand-level "supports custom fit"
+// flag (anti-pattern #1: don't aggregate scraped metadata into a shared
+// catalog). If we later want a brand registry, that's a separate
+// product decision with explicit opt-in, not a side-effect of scraping.
+// =============================================================================
+
+const CUSTOM_FIT_PATTERN =
+  /\b(custom\s?(?:size|fit)|made[-\s]?to[-\s]?measure|made[-\s]?to[-\s]?order|bespoke|tailored\s?to\s?fit)\b/i;
+
+function canonicaliseCustomFitLabel(raw: string): string {
+  const t = raw.toLowerCase();
+  if (/made[-\s]?to[-\s]?measure/.test(t)) return 'Made to measure';
+  if (/made[-\s]?to[-\s]?order/.test(t)) return 'Made to order';
+  if (/bespoke/.test(t)) return 'Bespoke';
+  if (/tailored/.test(t)) return 'Tailored to fit';
+  if (/custom\s?fit/.test(t)) return 'Custom fit available';
+  return 'Custom sizing available';
+}
+
+export interface CustomFitDetectionInput {
+  options: Array<{ name?: string; values?: string[] }>;
+  tags: string[];
+  title: string;
+  handle: string;
+}
+
+/**
+ * Inspect a Shopify product payload for custom-fit signals. Priority
+ * order: option names → option values → tags → handle/title. First
+ * match wins (we also pick the label off it). Returns `undefined`
+ * when no signal is found — keeping the field unset means the mobile
+ * client can omit the badge instead of rendering an empty pill.
+ */
+export function detectCustomFit(
+  input: CustomFitDetectionInput
+): { available: boolean; label?: string } | undefined {
+  for (const opt of input.options) {
+    if (opt.name && CUSTOM_FIT_PATTERN.test(opt.name)) {
+      return { available: true, label: canonicaliseCustomFitLabel(opt.name) };
+    }
+    if (Array.isArray(opt.values)) {
+      for (const value of opt.values) {
+        if (value && CUSTOM_FIT_PATTERN.test(value)) {
+          return { available: true, label: canonicaliseCustomFitLabel(value) };
+        }
+      }
+    }
+  }
+  for (const tag of input.tags) {
+    if (CUSTOM_FIT_PATTERN.test(tag)) {
+      return { available: true, label: canonicaliseCustomFitLabel(tag) };
+    }
+  }
+  for (const source of [input.title, input.handle]) {
+    if (source && CUSTOM_FIT_PATTERN.test(source)) {
+      return { available: true, label: canonicaliseCustomFitLabel(source) };
     }
   }
   return undefined;
@@ -199,6 +305,13 @@ export async function tryShopifyJSON(
       vendor?: string;
       product_type?: string;
       tags?: string;
+      handle?: string;
+      // Shopify exposes the named dimensions of a multi-variant
+      // product as an ordered array. Position 1 → option1, position 2
+      // → option2, position 3 → option3 on each variant. We use the
+      // names to find which option index is the size dimension
+      // instead of guessing it's always option1.
+      options?: Array<{ name?: string; position?: number; values?: string[] }>;
       variants?: Array<{
         id?: number | string;
         title?: string;
@@ -206,6 +319,8 @@ export async function tryShopifyJSON(
         compare_at_price?: string | null;
         price_currency?: string;
         option1?: string | null;
+        option2?: string | null;
+        option3?: string | null;
         inventory_management?: string | null;
       }>;
       images?: Array<{ src?: string }>;
@@ -239,9 +354,69 @@ export async function tryShopifyJSON(
       ? product.tags.split(',').map((t) => t.trim()).filter(Boolean)
       : [];
 
-    const availableSizes = trackedVariants
-      .map((v) => v.option1)
-      .filter((s): s is string => Boolean(s));
+    // Identify size axes from product.options. Any option whose name
+    // contains "size" counts — this catches "Size", "Top Size",
+    // "Bottom Size", and the Oshin Sarin two-axis case where a co-ord
+    // set carries both top and bottom axes. The Reistor case (April
+    // 29 2026 regression) where colour=option1 and size=option2 also
+    // resolves correctly through this path since "Size" matches the
+    // /size/i regex. When the option list is missing OR no axis name
+    // matches, we fall back to option1 (legacy single-axis stores).
+    //
+    // We dedupe across colour variants via the `seen` Set: a product
+    // with 2 colours × 5 sizes lists every size twice in `variants`;
+    // the fit card just wants the unique set in storefront order.
+    const productOptions = Array.isArray(product.options) ? product.options : [];
+    const sizeAxisIndices: number[] = [];
+    productOptions.forEach((opt, i) => {
+      if (opt && typeof opt.name === 'string' && /size/i.test(opt.name)) {
+        sizeAxisIndices.push(i);
+      }
+    });
+
+    const variantOptionAt = (
+      v: NonNullable<typeof product.variants>[number],
+      idx: number
+    ): string | null | undefined => {
+      if (idx === 0) return v.option1;
+      if (idx === 1) return v.option2;
+      if (idx === 2) return v.option3;
+      return undefined;
+    };
+
+    let availableSizes: string[];
+    if (sizeAxisIndices.length > 0) {
+      const collected: string[] = [];
+      const seen = new Set<string>();
+      for (const v of trackedVariants) {
+        for (const axis of sizeAxisIndices) {
+          const value = variantOptionAt(v, axis);
+          if (!value) continue;
+          // "Custom Size" / "Made to Measure" surfaced as an option
+          // value is a service tier, not a stocked size. Excluding it
+          // keeps the recommended-size lookup honest — including it
+          // would let a "M" recommendation match nothing in real
+          // ladders that happen to also expose a custom slot.
+          if (CUSTOM_FIT_PATTERN.test(value)) continue;
+          const key = value.trim().toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          collected.push(value);
+        }
+      }
+      availableSizes = collected;
+    } else {
+      availableSizes = trackedVariants
+        .map((v) => v.option1)
+        .filter((s): s is string => Boolean(s));
+    }
+
+    const customFit = detectCustomFit({
+      options: productOptions,
+      tags,
+      title: product.title ?? '',
+      handle: product.handle ?? handle,
+    });
 
     // Strip HTML from body_html and trim. Shopify stores often include
     // inline mce editor attributes — strip the full tag, not just <>.
@@ -271,8 +446,13 @@ export async function tryShopifyJSON(
     const currency = primaryVariant?.price_currency || inferCurrencyFromHostname(url.hostname);
 
     const result: ShopifyScrapedData = {
-      title: product.title,
-      brandName: product.vendor,
+      // title and brandName are run through `stripHtmlAndDecode`
+      // because some merchants (yamayoga.in confirmed April 29 2026)
+      // embed `<span class="...">` inside the Shopify JSON's vendor /
+      // title fields for a CSS font-swap hack. Without stripping,
+      // the markup renders literally on the fit card.
+      title: stripHtmlAndDecode(product.title),
+      brandName: stripHtmlAndDecode(product.vendor),
       category,
       price: primaryVariant?.price,
       currency,
@@ -282,6 +462,7 @@ export async function tryShopifyJSON(
       tags: tags.length ? tags : undefined,
       material: extractMaterialFromTags(tags),
       availableSizes: availableSizes.length ? availableSizes : undefined,
+      customFit,
     };
 
     log.info({ jsonUrl, handle }, 'Shopify JSON fetch succeeded');

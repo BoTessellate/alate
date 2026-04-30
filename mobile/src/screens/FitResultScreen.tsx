@@ -46,6 +46,7 @@ import { useCalibrationStore, averageCalibration } from '../store/calibrationSto
 import FitLoader from '../components/FitLoader';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
+import BrandHeading from '../components/BrandHeading';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
 // Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
@@ -55,6 +56,11 @@ import { formatPrice } from '../utils/currency';
 // "best seller" labels, etc.) so users only see tags that describe
 // the actual garment (material, colour, fit, occasion, vibe).
 import { filterUserFacingTags } from '../utils/tagFilter';
+// Last-ditch deterministic derivation when neither Shopify direct
+// fetch nor Gemini enrichment surfaced a category / material —
+// extracts from URL handle, product title, and tag list. See
+// productInference.ts for the keyword tables.
+import { inferCategory, inferMaterial } from '../utils/productInference';
 // Availability — computed locally from the storefront's
 // `availableSizes` list (Shopify direct-fetch surfaces this) + the
 // user's recommended size. No separate backend call needed.
@@ -247,6 +253,21 @@ export default function FitResultScreen() {
       [0, borderRadius.xxxl]
     ),
   }));
+
+  // Animated tint alpha: dock background becomes more translucent
+  // when collapsed so the underlying product image breathes through
+  // the dock strip ("dock" mode feels pinned to the image; expanded
+  // is the analysis card). Iterations:
+  //   0.65 → 0.58 → 0.55 → 0.54 expanded (1% increments per user)
+  //   collapsed pulls a further ~20% (0.34) so the dock-strip mode
+  //   reads as image-first; BlurView keeps legibility for verdict +
+  //   stats at that lower alpha.
+  const cardTintStyle = useAnimatedStyle(() => {
+    const alpha = interpolate(collapseProgress.value, [0, 1], [0.34, 0.54]);
+    return {
+      backgroundColor: `rgba(255, 255, 255, ${alpha})`,
+    };
+  });
 
   // Factory: every drag-target on the overlay (top header, tags region)
   // gets its own Pan instance built from the same recipe so they all
@@ -538,18 +559,77 @@ export default function FitResultScreen() {
     }
   };
 
+  /**
+   * Re-evaluate the current fit in-place. Re-scrapes the product URL
+   * (so price / availability / category / tags refresh against
+   * whatever the storefront says today) and re-runs checkFit against
+   * the user's current avatar. Stays on FitResultScreen.
+   *
+   * Two ways this gets triggered:
+   *   1. Direct user tap on "Re-evaluate" — this function runs.
+   *   2. User taps "Change your measurements", edits in AvatarSetup,
+   *      navigates back. The useFocusEffect detects an avatar change
+   *      and calls this same function — same code path, same UX.
+   *
+   * On scrape failure we keep the existing product data and only
+   * re-run checkFit. The user's intent ("did this still fit?") is
+   * preserved even if the storefront briefly 503'd.
+   */
   const runReevaluation = async () => {
     if (!avatar || !historyEntryId) return;
     setReevaluating(true);
     try {
+      // Step 1 — refresh product data from the URL. Price + sizes +
+      // category/tags can drift between visits (sale ends, item goes
+      // out of stock in your size, merchant retags). This is exactly
+      // what users want when they tap Re-evaluate. If the scrape fails
+      // we silently fall through to the cached data.
+      let workingProduct = product;
+      const enrichedFromScrape: { category?: string; material?: string; tags?: string[] } = {};
+      if (url) {
+        try {
+          const scrapeResult = await scrapeProduct(url);
+          if (scrapeResult.success && scrapeResult.data) {
+            workingProduct = scrapeResult.data;
+            // Surface the freshly-scraped product to the rest of the
+            // screen (price pill, hero image, availability stat) so
+            // the user sees the update immediately.
+            setScrapedProduct(scrapeResult.data);
+            // Refresh enriched fields too if Shopify direct-fetch
+            // returned them (storefronts often retag items between
+            // visits).
+            if (scrapeResult.data.category) enrichedFromScrape.category = scrapeResult.data.category;
+            if (scrapeResult.data.material) enrichedFromScrape.material = scrapeResult.data.material;
+            if (Array.isArray(scrapeResult.data.tags)) enrichedFromScrape.tags = scrapeResult.data.tags;
+            if (Object.keys(enrichedFromScrape).length > 0) {
+              setEnrichedProduct((prev) => ({ ...prev, ...enrichedFromScrape }));
+            }
+          }
+        } catch {
+          // Silent — fall through to checkFit with cached data.
+        }
+      }
+
+      // Step 2 — re-run fit check with the freshest product + the
+      // current avatar.
       const calibration = averageCalibration(calibrationGarments);
       const fitResult = await checkFit(
         {
           id: historyEntryId,
-          product_name: product?.name || 'Unknown',
-          category: enrichedProduct?.category || precomputed?.enrichedProduct?.category || 'clothing',
-          material: enrichedProduct?.material || precomputed?.enrichedProduct?.material,
-          tags: enrichedProduct?.tags || precomputed?.enrichedProduct?.tags,
+          product_name: workingProduct?.name || 'Unknown',
+          category:
+            enrichedFromScrape.category ||
+            enrichedProduct?.category ||
+            precomputed?.enrichedProduct?.category ||
+            'clothing',
+          material:
+            enrichedFromScrape.material ||
+            enrichedProduct?.material ||
+            precomputed?.enrichedProduct?.material,
+          tags:
+            enrichedFromScrape.tags ||
+            enrichedProduct?.tags ||
+            precomputed?.enrichedProduct?.tags,
         },
         avatar,
         calibration ?? undefined,
@@ -563,13 +643,51 @@ export default function FitResultScreen() {
         setFitScore(newScore);
         setSizeRec(newSizeRec);
         setReevaluated(true);
+
+        // Persist the refreshed snapshot to the history entry so
+        // re-opening this card later shows the same updated values.
+        // Brand is sanitised here too — yamayoga.in (and any other
+        // store with HTML in `vendor`) ships markup that the new
+        // sanitize() strip-flow cleans. Without including `brand`
+        // in this patch, the Home Recents pill kept showing the
+        // stale (unsanitised) brand even after a successful re-eval
+        // on the History coverflow path. (April 29 2026 fix.)
+        const refreshedBrand = sanitize(workingProduct?.brand);
         updateEntry(historyEntryId, {
           warnings: newWarnings,
           fitScore: newScore,
           sizeRecommendation: newSizeRec
             ? { size: newSizeRec.size, confidence: newSizeRec.confidence, note: newSizeRec.note }
             : undefined,
+          // Refresh price + image if the scrape returned them — keeps
+          // the History tab's coverflow card in sync with the dock.
+          ...(workingProduct?.price ? { price: workingProduct.price } : {}),
+          ...(workingProduct?.image ? { productImage: workingProduct.image } : {}),
+          ...(refreshedBrand ? { brand: refreshedBrand } : {}),
+          ...(enrichedFromScrape.category ? { category: enrichedFromScrape.category } : {}),
+          ...(enrichedFromScrape.material ? { material: enrichedFromScrape.material } : {}),
+          ...(enrichedFromScrape.tags ? { tags: enrichedFromScrape.tags } : {}),
+          checkedAt: new Date().toISOString(),
         });
+
+        // Also sync the local `siblings` array. siblings was
+        // initialised from the historyEntries route param at mount
+        // and isn't subscribed to the store, so without this the
+        // sift-away-and-back path would re-populate fitScore /
+        // warnings / sizeRec from the STALE entry in siblings.
+        // Read the just-updated entry back from the store and swap
+        // it into the local list. Keeps the user's "I changed my
+        // measurements, hit Re-evaluate, then sifted to another
+        // card and back" journey consistent (April 29 2026
+        // regression fix).
+        const refreshed = useFitHistoryStore
+          .getState()
+          .entries.find((e) => e.id === historyEntryId);
+        if (refreshed) {
+          setSiblings((prev) =>
+            prev.map((s) => (s.id === historyEntryId ? refreshed : s))
+          );
+        }
       }
     } catch {
       // silently fail — keep showing original result
@@ -582,17 +700,55 @@ export default function FitResultScreen() {
     Linking.openURL(url);
   };
 
+  /**
+   * Effective severity for the FIT badge — derived from the actual
+   * warnings list, NOT just the backend `fitScore` label. The backend
+   * marks any non-empty warning list as 'moderate', which made a
+   * single MINOR concern (e.g. "minor: A-line styles add volume at
+   * the hip") render with the full ⚠ warning triangle. Per user
+   * direction April 29 2026: "showing a warning on 1 minor concern
+   * feels excessive". Now we compute four tiers:
+   *
+   *   - great:    no warnings
+   *   - minor:    only minor warnings present
+   *   - moderate: at least one moderate warning
+   *   - poor:     at least one major warning
+   *
+   * `minor` reads as a positive verdict ("Great Fit, with a note") —
+   * same green check, but the verdict line carries the "with notes"
+   * sub-text so the user knows there's something to read in the FIT
+   * CONCERNS section.
+   */
+  const effectiveScore: 'great' | 'minor' | 'moderate' | 'poor' = (() => {
+    if (warnings.some((w) => w.severity === 'major')) return 'poor';
+    if (warnings.some((w) => w.severity === 'moderate')) return 'moderate';
+    if (warnings.length > 0) return 'minor';
+    // No warnings — trust the backend's call, which can still be
+    // 'moderate' or 'poor' from rule-based fit logic that didn't
+    // produce a textual warning. (Rare but possible.)
+    return fitScore === 'great' ? 'great' : fitScore;
+  })();
+
   const getScoreConfig = () => {
     // Use the *Deep text variants per Claude Design — the verdict label
     // reads as hero text on a white-tinted glass card, so it needs more
     // ink than the mid-saturation `success/warning/error` (which are
     // tuned for chip backgrounds). Same hue family, darker shade.
-    switch (fitScore) {
+    switch (effectiveScore) {
       case 'great':
         return {
           color: colors.successDeep,
           icon: '✓',
           text: 'Great Fit!',
+        };
+      case 'minor':
+        // Same icon + colour as 'great' — a single minor note isn't
+        // a fit warning, it's a sizing tip. The note itself appears
+        // below in the FIT CONCERNS section.
+        return {
+          color: colors.successDeep,
+          icon: '✓',
+          text: 'Great Fit, with a note',
         };
       case 'moderate':
         return {
@@ -715,13 +871,37 @@ export default function FitResultScreen() {
       : liveAvailability;
   const showAvailability = displayAvailability.status !== 'unknown' || !!displayAvailability.size;
 
-  const showCategory = !!(enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase()));
-  const showMaterial = !!enrichedProduct?.material;
+  // Category + Material derivation chain (April 29 2026):
+  //   1. Use enrichedProduct.category if it's specific (not in
+  //      FILTERED_CATEGORIES — guards against AI returning
+  //      "general"/"clothing"/empty).
+  //   2. Otherwise infer from URL handle / title / tags via
+  //      productInference.ts — deterministic regex fallback for
+  //      stores that don't fill product_type / material fields
+  //      (yamayoga and others). No network round-trip.
+  //   3. Otherwise undefined → render "—" placeholder.
+  const enrichedCategory =
+    enrichedProduct?.category && !FILTERED_CATEGORIES.has(enrichedProduct.category.toLowerCase())
+      ? enrichedProduct.category
+      : undefined;
+  const inferredCategory = enrichedCategory
+    ? undefined
+    : inferCategory({ url, title: product.name, tags: enrichedProduct?.tags });
+  const displayCategory = enrichedCategory ?? inferredCategory;
+  const showCategory = !!displayCategory;
+
+  const enrichedMaterial = enrichedProduct?.material || undefined;
+  const inferredMaterial = enrichedMaterial
+    ? undefined
+    : inferMaterial({ title: product.name, tags: enrichedProduct?.tags });
+  const displayMaterial = enrichedMaterial ?? inferredMaterial;
+  const showMaterial = !!displayMaterial;
+
   // Tags pass through the noise filter before render — keeps things
   // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
   // user-facing chip row. Also strips a tag that duplicates the
   // category (e.g. "Top" tag when category is already "Top").
-  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, enrichedProduct?.category);
+  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, displayCategory);
   const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
@@ -795,10 +975,34 @@ export default function FitResultScreen() {
 
       {/* Brand + product name centred near the top of the image */}
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
-        {safeBrand ? <Text style={styles.heroBrand}>{safeBrand.toUpperCase()}</Text> : null}
+        {safeBrand ? (
+          <BrandHeading
+            brand={safeBrand}
+            height={20}
+            color="rgba(255,255,255,0.92)"
+            uppercase
+            style={{ alignSelf: 'center', marginBottom: 6 }}
+            textStyle={styles.heroBrand}
+            testID="hero-brand"
+          />
+        ) : null}
         <Text style={styles.heroName} numberOfLines={2}>
           {safeName || 'Product'}
         </Text>
+        {/* Custom-fit brand spotlight — appears when the storefront
+            advertises made-to-measure / bespoke / custom sizing. The
+            badge sits between the product name and the glass card so
+            shoppers who care about tailored service notice it before
+            they read the standard fit verdict. Per anti-pattern #1
+            this is ephemeral per scrape — never persisted into a
+            shared brand catalog. */}
+        {product.customFit?.available && (
+          <View style={styles.customFitBadge} testID="custom-fit-badge">
+            <Text style={styles.customFitBadgeText}>
+              {product.customFit.label ?? 'Custom sizing available'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Glass info card — expanded = 70% screen + symmetric side/bottom
@@ -815,10 +1019,11 @@ export default function FitResultScreen() {
           blurAmount={22}
           reducedTransparencyFallbackColor="rgba(255,255,255,0.75)"
         />
-        {/* Tint is lighter now that the QmBlurView backend does a real
-            blur on mid-range Android. Inner border catches "light" on
-            the edge for a frosted-glass feel. */}
-        <View style={styles.cardTint} pointerEvents="none" />
+        {/* Tint alpha animates with collapseProgress (see cardTintStyle
+            above) — collapsed shows the product image through more
+            clearly, expanded firms up for legibility. The static
+            `cardTint` style still carries the border + radii. */}
+        <Animated.View style={[styles.cardTint, cardTintStyle]} pointerEvents="none" />
 
         {/* Drag covers the WHOLE top of the overlay — handle bar + the
             verdict header (title, sub-line, price pill). User
@@ -842,10 +1047,15 @@ export default function FitResultScreen() {
                 <View style={styles.verdictMain}>
                   <HeadingImage
                     testID="fit-score-label"
+                    // Slot follows effectiveScore so the SVG/heading
+                    // matches the visual tier (a 1-minor result reads
+                    // as great-fit, not some-concerns). The text
+                    // fallback (scoreConfig.text) carries the
+                    // "with a note" sub-line for the minor case.
                     slot={
-                      fitScore === 'great'
+                      effectiveScore === 'great' || effectiveScore === 'minor'
                         ? 'great-fit'
-                        : fitScore === 'moderate'
+                        : effectiveScore === 'moderate'
                         ? 'some-concerns'
                         : 'may-not-fit'
                     }
@@ -857,6 +1067,8 @@ export default function FitResultScreen() {
                   <Text style={styles.verdictSub}>
                     {warnings.length === 0
                       ? 'No fit concerns'
+                      : effectiveScore === 'minor'
+                      ? `${warnings.length} ${warnings.length === 1 ? 'note' : 'notes'}`
                       : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
                   </Text>
                 </View>
@@ -978,69 +1190,87 @@ export default function FitResultScreen() {
             </View>
           )}
 
-          {/* Concerns — only render when the card is expanded. When the user
-              drags the handle down to collapse, this section disappears and
-              the card shrinks to show just the verdict + stats + material.
-              Re-expanding brings it back. */}
-          {isExpanded && warnings.length > 0 && (
+          {/* Concerns — always render in expanded state so every fit
+              card shows the same panel structure. When the analysis
+              flagged no concerns we render a quiet positive line in
+              the same visual treatment instead of hiding the section.
+              Per user feedback April 29 2026: "all three [screenshots
+              of real fit checks] have different analyzed information
+              — which makes the app appear unreliable". The fix is
+              consistent layout across cards. */}
+          {isExpanded && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
-              {warnings.map((warning, index) => {
-                const config = getSeverityConfig(warning.severity);
-                return (
-                  <View key={index} style={styles.concernRow}>
-                    <View style={[styles.concernDot, { backgroundColor: config.color }]} />
-                    <View style={styles.concernBody}>
-                      <Text style={[styles.concernSeverity, { color: config.color }]}>
-                        {config.label.toUpperCase()}
-                      </Text>
-                      <Text style={styles.concernText}>{warning.message}</Text>
+              {warnings.length > 0 ? (
+                warnings.map((warning, index) => {
+                  const config = getSeverityConfig(warning.severity);
+                  return (
+                    <View key={index} style={styles.concernRow}>
+                      <View style={[styles.concernDot, { backgroundColor: config.color }]} />
+                      <View style={styles.concernBody}>
+                        <Text style={[styles.concernSeverity, { color: config.color }]}>
+                          {config.label.toUpperCase()}
+                        </Text>
+                        <Text style={styles.concernText}>{warning.message}</Text>
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <Text style={styles.concernEmptyText}>
+                  No concerns flagged for your profile — this should fit comfortably.
+                </Text>
+              )}
             </View>
           )}
 
-          {/* Tags — expanded only. The whole tags section (label +
-              chip row) is a drag target so the user can collapse the
+          {/* Tags — always render in expanded state. The whole tags
+              section is a drag target so the user can collapse the
               overlay from around the tags region without scrolling
-              back to the handle. The activeOffsetY([-10, 10]) on the
-              Pan gesture means small touches still pass through to
-              the ScrollView's vertical scroll; only deliberate
-              vertical swipes trigger the collapse. */}
-          {isExpanded && showTags && (
+              back to the handle. When the scrape didn't surface any
+              user-facing tags (Shopify storefront returned an empty
+              tag array, or every tag was filtered as merchandising
+              noise), we render a single "—" placeholder so the panel
+              keeps the same structure as cards with rich tag data. */}
+          {isExpanded && (
             <GestureDetector gesture={tagsDragGesture}>
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>TAGS</Text>
-                <View style={styles.tagsContainer}>
-                  {visibleTags.slice(0, 6).map((tag: string, i: number) => (
-                    <View key={i} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
-                    </View>
-                  ))}
-                </View>
+                {showTags ? (
+                  <View style={styles.tagsContainer}>
+                    {visibleTags.slice(0, 6).map((tag: string, i: number) => (
+                      <View key={i} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag.toLowerCase()}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.metaPlaceholder}>—</Text>
+                )}
               </View>
             </GestureDetector>
           )}
 
-          {/* Meta rows — Material survives the dock's minimum-info
-              treatment. Category appears only when expanded.
-              Availability used to live here as a row; it's now a
-              circular icon in the stats row above for consistency
-              with the rest of the at-a-glance signals. */}
-          {(showMaterial || (isExpanded && showCategory)) && (
+          {/* Meta rows — Material always survives the dock's minimum-
+              info treatment (most-asked spec when shopping fabric-
+              first); Category appears only when expanded. Both rows
+              fall back to "—" when the scrape didn't surface the
+              field, so the panel structure stays consistent across
+              cards even when the source storefront is sparse. */}
+          {(showMaterial || isExpanded) && (
             <View style={styles.metaSection}>
-              {showMaterial && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Material</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.material}</Text>
-                </View>
-              )}
-              {isExpanded && showCategory && (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Material</Text>
+                <Text style={showMaterial ? styles.metaValue : styles.metaPlaceholder}>
+                  {showMaterial ? displayMaterial : '—'}
+                </Text>
+              </View>
+              {isExpanded && (
                 <View style={styles.metaRow}>
                   <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={styles.metaValue}>{enrichedProduct!.category}</Text>
+                  <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
+                    {showCategory ? displayCategory : '—'}
+                  </Text>
                 </View>
               )}
             </View>
@@ -1052,16 +1282,26 @@ export default function FitResultScreen() {
           <View style={styles.actionsSection}>
             {isHistoryMode ? (
               <>
+                {/* Re-evaluate stays on this screen and refreshes
+                    fit data in place. Re-scrapes the product URL +
+                    re-runs checkFit against the current avatar — see
+                    runReevaluation for the flow. The "Change your
+                    measurements" button below is the dedicated path
+                    to AvatarSetup; routing Re-evaluate through there
+                    too felt round-about (per user direction April 29
+                    2026). */}
                 <TouchableOpacity
                   testID="reevaluate-button"
-                  style={styles.primaryButton}
-                  onPress={() => {
-                    wentToAvatarSetup.current = true;
-                    navigation.navigate('AvatarSetup');
-                  }}
+                  style={[styles.primaryButton, reevaluating && styles.primaryButtonDisabled]}
+                  onPress={runReevaluation}
+                  disabled={reevaluating}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                  {reevaluating ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Re-evaluate</Text>
+                  )}
                 </TouchableOpacity>
                 {/* Swapped order: View on Store above Change measurements
                     so the shopping-intent action sits closer to the
@@ -1336,6 +1576,36 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
 
+  // --- Custom-fit brand spotlight badge ---
+  // Lavender-tinted pill in italic display serif. Sits below the
+  // product name in the hero so the made-to-measure / bespoke /
+  // custom-sizing service is the first thing a fit-conscious shopper
+  // notices before the standard verdict. Background uses primaryAlpha
+  // tokens so the saturation lines up with chip backgrounds elsewhere
+  // (FIT badge, MATCH donut, price pill). The pill itself is
+  // pointerEvents-passive (the parent hero blocks pointer events) —
+  // it is informational, not a tap target. We can lift this out into
+  // a Pressable later when we have a custom-sizing URL to link to.
+  customFitBadge: {
+    marginTop: 10,
+    backgroundColor: primaryAlpha.tintMd,
+    borderWidth: 1,
+    borderColor: primaryAlpha.tintLg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: borderRadius.pill,
+    alignSelf: 'center',
+  },
+  customFitBadgeText: {
+    fontFamily: 'DMSerifDisplay-Italic',
+    fontSize: 13,
+    color: '#fff',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
   // --- Glass card ---
   // Layout props (height / left / right / bottom / bottom-radii) are all
   // driven by `cardLayoutStyle` — animated from collapseProgress. We keep
@@ -1354,12 +1624,11 @@ const styles = StyleSheet.create({
   },
   cardTint: {
     ...StyleSheet.absoluteFillObject,
-    // Glass tokens (theme.ts → glass.dock*) drive the dock's frosted
-    // look. dockBackgroundColor (rgba 0.65) sits over the BlurView
-    // for legibility on busy product images; dockBorderColor (rgba
-    // 0.9) is a brighter inner edge that catches "light" and makes
-    // the surface read as glass rather than a solid wash.
-    backgroundColor: glass.dockBackgroundColor,
+    // Border + radii are static; the backgroundColor is set
+    // dynamically by `cardTintStyle` (interpolated off
+    // collapseProgress so the dock flexes between 0.35 collapsed
+    // and 0.55 expanded). The brighter inner edge catches "light"
+    // and reads as glass rather than a solid wash.
     borderWidth: 1,
     borderColor: glass.dockBorderColor,
     borderTopLeftRadius: borderRadius.xxxl,
@@ -1536,7 +1805,7 @@ const styles = StyleSheet.create({
     backgroundColor: statusAlpha.successSoft,
   },
   bannerText: {
-    ...typography.bodySmall,
+    ...typography.banner,
     color: colors.text,
     flex: 1,
   },
@@ -1563,9 +1832,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing.md,
   },
+  // Section label — darkest text (`colors.text`) so the small-caps
+  // overline visually OWNS the section above its body. The body
+  // content underneath then drops to textSecondary or textMuted,
+  // creating a three-tier colour ramp. Lean on COLOUR for hierarchy
+  // since Viaoda Libre body weight options are limited and we want
+  // the same hierarchy logic to apply across heading-fonted regions.
   sectionLabel: {
     ...typography.overline,
-    color: colors.textSecondary,
+    color: colors.text,
     marginBottom: spacing.sm,
   },
 
@@ -1592,9 +1867,24 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 2,
   },
+  // Concern body — mid-tier `textSecondary` so it sits CLEARLY
+  // below the section label (which is `colors.text`). Was `colors.text`
+  // before; that put the label and the body at the same colour, which
+  // is what the user flagged as "no visual hierarchy" April 29 2026.
   concernText: {
     ...typography.bodySmall,
-    color: colors.text,
+    color: colors.textSecondary,
+    lineHeight: 19,
+  },
+  // Empty-state line shown inside the FIT CONCERNS section when the
+  // analysis flagged no warnings. Same colour tier as concernText
+  // (`textSecondary` — WCAG AA-safe at 15px regular on white).
+  // Was italic for an affirmative tone but the user flagged it as
+  // unwanted (April 29 2026: "keep this as normal"); plain regular
+  // weight reads as factual not decorative.
+  concernEmptyText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
     lineHeight: 19,
   },
 
@@ -1631,15 +1921,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
   },
+  // Meta row — bumped DOWN to labelSmall (13px) + UPPERCASE per user
+  // direction April 29 2026 ("material and category can be in one
+  // size smaller and all caps"). The smaller-caps treatment reads
+  // as a tight spec-table line rather than body copy, which is the
+  // right register for a value-pair like Material: Cotton.
+  //
+  // Colour ramp stays:
+  //   metaLabel        textSecondary + 500   (caption)
+  //   metaValue        text + 700           (value, most prominent)
+  //   metaPlaceholder  textSecondary + 500   (no value present)
+  // textMuted (#8a7e94) is 3.75:1 on white — fails WCAG AA for
+  // body text; reserved for ≥18px or decorative-only contexts.
   metaLabel: {
-    ...typography.bodySmall,
+    ...typography.labelSmall,
+    fontWeight: '500',
     color: colors.textSecondary,
+    textTransform: 'uppercase',
   },
   metaValue: {
-    ...typography.bodySmall,
-    fontWeight: '700',
+    ...typography.labelSmall,
+    // 800 (was 700) — Noto Serif has the variant. Visibly heavier
+    // than the metaLabel (500) so the row reads as label-then-VALUE
+    // even at 13px caps. Per user direction April 29 2026.
+    fontWeight: '800',
     color: colors.text,
-    textTransform: 'capitalize',
+    textTransform: 'uppercase',
+  },
+  // Placeholder for "—" when the scrape didn't surface a value.
+  // Same caps + size as the rest of the row so the empty state
+  // doesn't break vertical rhythm; same colour tier as the label.
+  metaPlaceholder: {
+    ...typography.labelSmall,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
   },
 
   // Availability row — colored dot + status text. Right-aligned to
@@ -1669,6 +1985,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
     ...shadows.md,
+  },
+  // Disabled state for Re-evaluate while a re-scrape + checkFit
+  // round-trip is in flight. Same brand-purple background but at
+  // ~70% opacity so the user sees the press registered without an
+  // ambiguous "did anything happen?" gap.
+  primaryButtonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     fontFamily: fontFamily.primary,
