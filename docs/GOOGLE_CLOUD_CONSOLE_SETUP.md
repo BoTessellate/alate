@@ -173,10 +173,14 @@ redirect path.
 3. Name: `Alate Web`.
 4. **Authorised JavaScript origins**: leave empty.
 5. **Authorised redirect URIs** — add these:
-   - `https://auth.expo.io/@ramsaptami/alate`
-     (matches `expo` username + slug; replace `@ramsaptami` with your
-     own Expo username if different. Find it via `eas whoami`.)
-   - `com.tessellate.alate:/oauthredirect` (for native deep-link).
+   - `https://auth.expo.io/@newbietrawler/alate`
+     (matches the `owner` field in `mobile/app.json` + the `slug`.
+     Verify with `eas whoami` — change `@newbietrawler` if your Expo
+     username has changed.)
+   - `com.tessellate.alate:/oauthredirect` (native deep-link for
+     standalone APKs / production builds).
+   - `alate://` (the short app scheme from `app.json`, used by some
+     Expo SDK 55 deep-link paths).
 6. **CREATE**.
 
 Copy the client ID — this is `EXPO_PUBLIC_GOOGLE_CLIENT_ID`.
@@ -188,28 +192,39 @@ used by the Expo flow. Don't paste it into the repo.
 
 ## 7. Wire the env vars into the app
 
-Local dev (`expo start`):
+This project uses `mobile/.env` (not `.env.local`):
 
 ```bash
-# mobile/.env.local
+# mobile/.env
 EXPO_PUBLIC_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=...apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com
 ```
 
-Make sure `mobile/.env.local` is gitignored (it should be by default
-for any `.env*` file).
+`.env` is gitignored. After saving, **fully restart Metro** (`Ctrl+C`
+then `npx expo start -c`) — Expo only re-reads `EXPO_PUBLIC_*` vars
+on a cold start, and `babel-preset-expo` inlines them at compile time.
+A "soft" reload (`r` in Metro) won't pick up env changes.
 
-EAS builds (`eas build`):
+### EAS builds — separate env source
+
+This is the most common gotcha. **`mobile/.env` is NOT bundled into
+EAS builds** — only EAS-stored env vars are. So if you're testing on
+a `preview` or `production` APK and see the "Not configured" toast,
+you need to set the vars in EAS too:
 
 ```bash
 cd mobile
 eas env:create --name EXPO_PUBLIC_GOOGLE_CLIENT_ID --value '...' --environment production
 eas env:create --name EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID --value '...' --environment production
 eas env:create --name EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID --value '...' --environment production
+
+# Repeat for --environment preview if you build preview APKs
+eas env:create --name EXPO_PUBLIC_GOOGLE_CLIENT_ID --value '...' --environment preview
+# etc.
 ```
 
-(Repeat for `--environment preview` if you build preview channels.)
+Verify with `eas env:list --environment production`.
 
 ---
 
@@ -225,10 +240,27 @@ eas env:create --name EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID --value '...' --environme
 
 If you see the **"Not configured" toast**, the env vars aren't being
 read. Check:
-- `.env.local` lives in `mobile/` (not the repo root).
-- You restarted Metro after creating it (Expo only re-reads `EXPO_PUBLIC_*`
-  vars on cold start).
+- The file is `mobile/.env` (not `.env.local` — different convention).
+- You **fully restarted Metro** with `npx expo start -c` after saving
+  `.env`. Soft reload (`r`) does NOT pick up env changes.
 - The variable names match exactly — typos are silent.
+- If testing an **EAS build** (preview/production APK), `.env` is
+  NOT bundled — set the vars in EAS too (step 7).
+- Open Sentry and look for "Google sign-in env vars missing" — the
+  app emits this breadcrumb when the toast fires, with flags showing
+  which client IDs were resolved as truthy. If all three flags are
+  `false` in Sentry but you've set them locally, you're hitting the
+  EAS-vs-`.env` split.
+
+If "Not configured" toast fires even when env vars ARE set, the
+error boundary fallback is masking a `useAuthRequest` throw. Check
+Sentry for a `feature: 'google-signin-card'` error — most common
+causes:
+- The Android OAuth client's SHA-1 doesn't match the signing key of
+  the APK on your test device (mismatch between debug-vs-release
+  keystore).
+- The web client's redirect URIs don't include the Expo proxy URL
+  for your username.
 
 If you see the **"Sign-in error" toast** ("Could not fetch your Google
 profile"), the OAuth flow succeeded but the userinfo call failed.

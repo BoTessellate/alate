@@ -38,6 +38,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ToastNotice from '../components/ToastNotice';
+import {
+  getGoogleAuthConfig,
+  hasAnyGoogleAuthConfig,
+  logMissingGoogleAuthConfigOnce,
+} from '../utils/googleAuthEnv';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -139,14 +144,11 @@ function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: ()
   const { googleUser, setGoogleUser } = useAccountStore();
   const [signInError, setSignInError] = useState(false);
 
-  const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
-  const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-
+  const cfg = getGoogleAuthConfig();
   const [, response, promptAsync] = Google.useAuthRequest({
-    clientId: googleClientId,
-    androidClientId: googleAndroidClientId,
-    iosClientId: googleIosClientId,
+    clientId: cfg.clientId,
+    androidClientId: cfg.androidClientId,
+    iosClientId: cfg.iosClientId,
   });
 
   useEffect(() => {
@@ -193,11 +195,14 @@ function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }
   const { googleUser } = useAccountStore();
   const [notConfiguredToast, setNotConfiguredToast] = useState(false);
 
-  const hasGoogleConfig = !!(
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
-  );
+  const hasGoogleConfig = hasAnyGoogleAuthConfig();
+  if (!hasGoogleConfig) {
+    // Log once per app session so a missing EAS env entry surfaces in
+    // Sentry instead of leaving the user to guess whether GCC was the
+    // problem. The .env-on-disk vs EAS-stored split is the most common
+    // confusion source.
+    logMissingGoogleAuthConfigOnce();
+  }
 
   const notConfiguredCard = (
     <>
