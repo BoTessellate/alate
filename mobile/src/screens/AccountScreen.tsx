@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +37,7 @@ import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ToastNotice from '../components/ToastNotice';
 
 // Required: completes the auth session on app resume
 WebBrowser.maybeCompleteAuthSession();
@@ -137,6 +137,7 @@ function AccountCardView({
  */
 function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: () => void }) {
   const { googleUser, setGoogleUser } = useAccountStore();
+  const [signInError, setSignInError] = useState(false);
 
   const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
   const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
@@ -159,19 +160,26 @@ function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: ()
           .then((user) =>
             setGoogleUser({ id: user.id, email: user.email, name: user.name, picture: user.picture })
           )
-          .catch(() =>
-            Alert.alert('Sign-in error', 'Could not fetch your Google profile. Please try again.')
-          );
+          .catch(() => setSignInError(true));
       }
     }
   }, [response]);
 
   return (
-    <AccountCardView
-      googleUser={googleUser}
-      onSignIn={() => promptAsync()}
-      onSignOut={onRequestSignOut}
-    />
+    <>
+      <AccountCardView
+        googleUser={googleUser}
+        onSignIn={() => promptAsync()}
+        onSignOut={onRequestSignOut}
+      />
+      <ToastNotice
+        visible={signInError}
+        variant="error"
+        title="Sign-in error"
+        message="Could not fetch your Google profile. Please try again."
+        onDismiss={() => setSignInError(false)}
+      />
+    </>
   );
 }
 
@@ -183,6 +191,7 @@ function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: ()
  */
 function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }) {
   const { googleUser } = useAccountStore();
+  const [notConfiguredToast, setNotConfiguredToast] = useState(false);
 
   const hasGoogleConfig = !!(
     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
@@ -191,13 +200,19 @@ function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }
   );
 
   const notConfiguredCard = (
-    <AccountCardView
-      googleUser={googleUser}
-      onSignIn={() =>
-        Alert.alert('Not configured', 'Google Sign-In is not set up yet.', [{ text: 'OK' }])
-      }
-      onSignOut={onRequestSignOut}
-    />
+    <>
+      <AccountCardView
+        googleUser={googleUser}
+        onSignIn={() => setNotConfiguredToast(true)}
+        onSignOut={onRequestSignOut}
+      />
+      <ToastNotice
+        visible={notConfiguredToast}
+        title="Not configured"
+        message="Google Sign-In is not set up yet."
+        onDismiss={() => setNotConfiguredToast(false)}
+      />
+    </>
   );
 
   if (!hasGoogleConfig) {

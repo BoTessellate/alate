@@ -20,7 +20,6 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -42,6 +41,7 @@ import { colors, spacing, typography, borderRadius, shadows } from '../constants
 import { useEditorStore, TextOverlay } from '../store/editorStore';
 import { useMusicStore } from '../store/musicStore';
 import { PRESET_WORDS } from '../constants/presetWords';
+import ToastNotice from '../components/ToastNotice';
 
 export default function OverlayEditorScreen() {
   const insets = useSafeAreaInsets();
@@ -60,6 +60,7 @@ export default function OverlayEditorScreen() {
 
   const [exporting, setExporting] = useState(false);
   const [manualTrack, setManualTrack] = useState('');
+  const [toast, setToast] = useState<{ title: string; message?: string; variant?: 'info' | 'error' } | null>(null);
 
   useEffect(() => {
     if (accessToken) {
@@ -101,12 +102,12 @@ export default function OverlayEditorScreen() {
       });
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        Alert.alert('Sharing unavailable', 'Your device does not support sharing.');
+        setToast({ title: 'Sharing unavailable', message: 'Your device does not support sharing.' });
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'share your story' });
     } catch (err) {
-      Alert.alert('Export failed', String((err as Error)?.message ?? err));
+      setToast({ title: 'Export failed', message: String((err as Error)?.message ?? err), variant: 'error' });
     } finally {
       setExporting(false);
     }
@@ -222,6 +223,13 @@ export default function OverlayEditorScreen() {
           ))}
         </ScrollView>
       </View>
+      <ToastNotice
+        visible={toast !== null}
+        title={toast?.title ?? ''}
+        message={toast?.message}
+        variant={toast?.variant ?? 'info'}
+        onDismiss={() => setToast(null)}
+      />
     </GestureHandlerRootView>
   );
 }

@@ -99,4 +99,18 @@ describe('filterUserFacingTags', () => {
     expect(filterUserFacingTags(['collection::summer', 'Slim Fit'])).toEqual(['Slim Fit']);
     expect(filterUserFacingTags(['brand|core', 'Black'])).toEqual(['Black']);
   });
+
+  it('replaces underscores with spaces in surviving snake_case tags', () => {
+    // yamayoga ships tags like "yoga_pilates" and "working_out" — these
+    // pass the noise filter (no marketing keywords, no internal-slug
+    // punctuation) but render badly with underscores intact.
+    expect(filterUserFacingTags(['yoga_pilates'])).toEqual(['yoga pilates']);
+    expect(filterUserFacingTags(['working_out', 'Linen'])).toEqual(['working out', 'Linen']);
+  });
+
+  it('drops "new_drop" / "new_arrival" merchandising tags before underscore polish', () => {
+    // These match the merchandising-flag noise pattern and never reach
+    // the underscore-replacement step. Lock the behavior in.
+    expect(filterUserFacingTags(['new_drop', 'new_arrival', 'Linen'])).toEqual(['Linen']);
+  });
 });

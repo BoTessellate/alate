@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { colors, spacing, typography, borderRadius, shadows } from '../constants/theme';
 import GlassCard from '../components/GlassCard';
+import ToastNotice from '../components/ToastNotice';
 import { useEditorStore } from '../store/editorStore';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -33,6 +33,7 @@ export default function PickImageScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ title: string; message?: string; variant?: 'info' | 'error' } | null>(null);
   const setImage = useEditorStore((s) => s.setImage);
   const resetEditor = useEditorStore((s) => s.reset);
 
@@ -43,13 +44,13 @@ export default function PickImageScreen() {
       if (source === 'camera') {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) {
-          Alert.alert('Camera access needed', 'Enable camera in Settings to take a photo.');
+          setToast({ title: 'Camera access needed', message: 'Enable camera in Settings to take a photo.' });
           return;
         }
       } else {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!perm.granted) {
-          Alert.alert('Photo access needed', 'Enable photo library in Settings.');
+          setToast({ title: 'Photo access needed', message: 'Enable photo library in Settings.' });
           return;
         }
       }
@@ -74,7 +75,7 @@ export default function PickImageScreen() {
       setImage(asset.uri);
       navigation.navigate('OverlayEditor');
     } catch (err) {
-      Alert.alert('Something went wrong', String((err as Error)?.message ?? err));
+      setToast({ title: 'Something went wrong', message: String((err as Error)?.message ?? err), variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -143,6 +144,13 @@ export default function PickImageScreen() {
           </View>
         )}
       </View>
+      <ToastNotice
+        visible={toast !== null}
+        title={toast?.title ?? ''}
+        message={toast?.message}
+        variant={toast?.variant ?? 'info'}
+        onDismiss={() => setToast(null)}
+      />
     </View>
   );
 }
