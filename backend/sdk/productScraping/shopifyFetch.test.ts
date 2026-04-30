@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { tryShopifyJSON, extractMaterialFromTags } from './shopifyFetch';
+import { tryShopifyJSON, extractMaterialFromTags, detectCustomFit } from './shopifyFetch';
 
 const SAMPLE_SUMMERAWAY_RESPONSE = {
   product: {
@@ -70,6 +70,42 @@ const SAMPLE_SUMMERAWAY_RESPONSE = {
 // Shopify variants for distinct SKUs (color + size combo). The URL
 // the user shares pins a specific variant via `?variant=<id>`; we
 // must honor that ID instead of blindly returning variants[0].
+// Real-world payload shape reduced from oshinsarin.in. The "Felled Seam
+// Set" is a top + bottom co-ord with TWO size axes (Top Size, Bottom
+// Size), each carrying the same XS / S / M / L / XL / XXL ladder plus
+// a "Custom Size" value the merchant uses to surface their made-to-
+// measure service. The previous shopifyFetch only read `option1` which
+// captured "Top Size" but missed every Bottom-Size-only variant when
+// the merchant skipped the Top axis on a custom-size SKU. Downstream,
+// availability.ts saw an incomplete sizes array and reported the user's
+// recommended size as out-of-stock even though the storefront stocked
+// every size in the standard ladder.
+const SAMPLE_OSHIN_RESPONSE = {
+  product: {
+    id: 9123456789012,
+    title: 'Felled Seam Set',
+    body_html: '<p>Hand-tailored co-ord set in raw silk.</p>',
+    vendor: 'Oshin Sarin',
+    product_type: 'Sets',
+    handle: 'felled-seam-set',
+    tags: 'Made to Measure, Sets, raw silk, co-ord',
+    options: [
+      { name: 'Top Size', position: 1, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Custom Size'] },
+      { name: 'Bottom Size', position: 2, values: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Custom Size'] },
+    ],
+    variants: [
+      { id: 1, title: 'XS / XS', price: '12000.00', option1: 'XS', option2: 'XS', inventory_management: 'shopify' },
+      { id: 2, title: 'S / S', price: '12000.00', option1: 'S', option2: 'S', inventory_management: 'shopify' },
+      { id: 3, title: 'M / M', price: '12000.00', option1: 'M', option2: 'M', inventory_management: 'shopify' },
+      { id: 4, title: 'L / L', price: '12000.00', option1: 'L', option2: 'L', inventory_management: 'shopify' },
+      { id: 5, title: 'XL / XL', price: '12000.00', option1: 'XL', option2: 'XL', inventory_management: 'shopify' },
+      { id: 6, title: 'XXL / XXL', price: '12000.00', option1: 'XXL', option2: 'XXL', inventory_management: 'shopify' },
+      { id: 7, title: 'Custom Size / Custom Size', price: '14000.00', option1: 'Custom Size', option2: 'Custom Size', inventory_management: 'shopify' },
+    ],
+    images: [{ src: 'https://oshinsarin.in/cdn/shop/files/felled-seam.jpg' }],
+  },
+};
+
 const SAMPLE_YAMAYOGA_RESPONSE = {
   product: {
     id: 7755555555555,
@@ -300,12 +336,11 @@ describe('tryShopifyJSON', () => {
   });
 
   // ── product.options-driven size discovery ────────────────────────
-  // Reistor (and many other multi-dimension Shopify storefronts) put
-  // colour in option1 and size in option2. Storefronts with only ONE
-  // dimension (just sizes) put size in option1. The previous logic
-  // hard-coded `option1` as size — wrong for any multi-dimension store.
-  // Fix: read `product.options[*].name` to find which option index
-  // holds "Size" and use that index for availableSizes.
+  // Multi-dimension Shopify storefronts (Reistor: colour=option1,
+  // size=option2) and two-axis stores (Oshin Sarin: Top Size +
+  // Bottom Size) need to read `product.options[*].name` to find the
+  // size axis instead of always reading option1. The previous logic
+  // was hard-coded to option1.
   const SAMPLE_REISTOR_RESPONSE = {
     product: {
       id: 9464065949973,
@@ -329,13 +364,11 @@ describe('tryShopifyJSON', () => {
     },
   };
 
-  it('returns the variant price unchanged from the Shopify JSON (regression: Reistor live API returned 19165.30 for a 4500.00 product when running pre-#82 code)', async () => {
-    // Sanity check: the price must come straight off the variant.
-    // No multiplication, no currency conversion, no field swap. Captured
-    // April 29 2026 after a live scrape returned ₹19,165.30 for a
-    // ₹4,500 Reistor product because the deployed backend was running
-    // pre-#82 code AND had the option1 size bug. Once #82 is deployed
-    // the price reads cleanly from variants[0].price = '4500.00'.
+  it('returns the variant price unchanged from the Shopify JSON', async () => {
+    // April 29 2026 capture: live Reistor scrape returned ₹19,165.30 for
+    // a ₹4,500 product because the deployed backend was running pre-#82
+    // code AND had the option1 size bug. Once #82 is deployed the price
+    // reads cleanly from variants[0].price = '4500.00'.
     const fetchFn = mockFetch(SAMPLE_REISTOR_RESPONSE);
     const result = await tryShopifyJSON(
       new URL('https://reistor.in/products/striped-matching-set-with-regular-shorts-and-v-neck-top'),
@@ -349,8 +382,7 @@ describe('tryShopifyJSON', () => {
     // Regression: reistor.in puts colour in option1 ("Linear Canvas") and
     // size in option2 ("XS" / "S" / "M"). The previous logic always used
     // option1, so the fit card showed `availableSizes: ["Linear Canvas",
-    // "Linear Canvas", ...]` instead of the actual sizes. Fix reads
-    // `product.options` to find which dimension is named "Size".
+    // "Linear Canvas", ...]` instead of the actual sizes.
     const fetchFn = mockFetch(SAMPLE_REISTOR_RESPONSE);
     const result = await tryShopifyJSON(
       new URL('https://reistor.in/products/striped-matching-set-with-regular-shorts-and-v-neck-top'),
@@ -360,8 +392,8 @@ describe('tryShopifyJSON', () => {
   });
 
   it('dedupes sizes across colour variants when one size exists in many colours', async () => {
-    // Same shape as Reistor but with two colours × two sizes — the size
-    // list should collapse to the unique set, not repeat per colour.
+    // Two colours × two sizes — the size list should collapse to the
+    // unique set, not repeat per colour.
     const TWO_COLOR_TWO_SIZE = {
       product: {
         ...SAMPLE_REISTOR_RESPONSE.product,
@@ -382,11 +414,9 @@ describe('tryShopifyJSON', () => {
   });
 
   it('strips HTML embedded in vendor / title (yamayoga.in regression)', async () => {
-    // yamayoga.in's Shopify storefront returns the `vendor` field
-    // wrapped in `<span class="custom-fonts">…</span>` markup —
-    // their store uses a CSS class to swap a custom font on the
-    // brand wordmark and that bled into the JSON. Without stripping
-    // at the scrape layer, the raw markup landed on the fit card.
+    // yamayoga.in's Shopify storefront wraps the `vendor` field in
+    // `<span class="custom-fonts">…</span>` for a CSS font-swap hack;
+    // without stripping, the markup lands on the fit card.
     const SAMPLE_YAMAYOGA_HTML = {
       product: {
         id: 1,
@@ -411,17 +441,122 @@ describe('tryShopifyJSON', () => {
     expect(result!.title).toBe('aeroyama™ Flared Yoga Pants');
   });
 
-  it('still works when product.options is missing (single-dimension store)', async () => {
+  // -- Two-axis sizing (Oshin Sarin "Felled Seam Set" regression) --------
+
+  it('collects sizes from both axes when a product has two size dimensions', async () => {
+    // oshinsarin.in serves co-ords with `Top Size` AND `Bottom Size`
+    // axes. Reading only `option1` gave a partial size ladder; the
+    // user's recommended size (e.g. M) wasn't in it, so availability.ts
+    // reported out-of-stock. Both axes are size axes — the surfaced
+    // ladder should be the deduped union.
+    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/felled-seam-set'),
+      fetchFn
+    );
+    expect(result).not.toBeNull();
+    expect(result!.availableSizes).toEqual(
+      expect.arrayContaining(['XS', 'S', 'M', 'L', 'XL', 'XXL'])
+    );
+  });
+
+  it('excludes "Custom Size" from availableSizes (it is a service, not a stocked size)', async () => {
+    // "Custom Size" is the merchant's made-to-measure offer surfaced as
+    // an option value. It must NOT count as a stocked size — the
+    // recommended-size lookup would never match a real avatar size,
+    // flipping the in_stock state on its head.
+    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/felled-seam-set'),
+      fetchFn
+    );
+    expect(result!.availableSizes).not.toContain('Custom Size');
+    expect(result!.availableSizes).not.toContain('custom size');
+  });
+
+  it('detects custom-fit availability and surfaces a label', async () => {
+    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/felled-seam-set'),
+      fetchFn
+    );
+    expect(result!.customFit?.available).toBe(true);
+    expect(result!.customFit?.label).toBeTruthy();
+  });
+
+  it('does not set customFit on a brand without made-to-measure offering', async () => {
+    const fetchFn = mockFetch(SAMPLE_SUMMERAWAY_RESPONSE);
+    const result = await tryShopifyJSON(
+      new URL('https://summeraway.in/products/costa-top'),
+      fetchFn
+    );
+    expect(result!.customFit).toBeUndefined();
+  });
+
+  it('preserves single-axis size behavior when product.options is missing', async () => {
     // Some Shopify stores expose only sizes (no colour dimension) and
-    // omit the `options` array. Falls back to option1. The Summer Away
-    // sample doesn't carry `options` so this is the regression check
-    // that single-dimension stores keep working.
+    // omit the `options` array. Falls back to option1. SUMMERAWAY has
+    // no `options` field — sizes come from variants[*].option1 directly.
     const fetchFn = mockFetch(SAMPLE_SUMMERAWAY_RESPONSE);
     const result = await tryShopifyJSON(
       new URL('https://summeraway.in/products/costa-top'),
       fetchFn
     );
     expect(result!.availableSizes).toEqual(['XS', 'S', 'M']);
+  });
+});
+
+describe('detectCustomFit', () => {
+  it('flags option-name signals like "Custom Size"', () => {
+    const result = detectCustomFit({
+      options: [{ name: 'Custom Size', values: ['Yes'] }],
+      tags: [],
+      title: 'Some product',
+      handle: 'some-product',
+    });
+    expect(result?.available).toBe(true);
+  });
+
+  it('flags option-value signals like "Custom Size" / "Made to Measure"', () => {
+    const result = detectCustomFit({
+      options: [{ name: 'Size', values: ['XS', 'S', 'M', 'Custom Size'] }],
+      tags: [],
+      title: '',
+      handle: '',
+    });
+    expect(result?.available).toBe(true);
+    expect(result?.label?.toLowerCase()).toMatch(/custom|measure/);
+  });
+
+  it('flags tag signals like "made-to-measure" or "bespoke"', () => {
+    const result = detectCustomFit({
+      options: [],
+      tags: ['silk', 'made-to-measure'],
+      title: '',
+      handle: '',
+    });
+    expect(result?.available).toBe(true);
+    expect(result?.label?.toLowerCase()).toContain('measure');
+  });
+
+  it('flags handle / title signals as a last resort', () => {
+    const result = detectCustomFit({
+      options: [],
+      tags: [],
+      title: 'Bespoke Wedding Gown',
+      handle: 'bespoke-wedding-gown',
+    });
+    expect(result?.available).toBe(true);
+  });
+
+  it('returns undefined when no signal is present', () => {
+    const result = detectCustomFit({
+      options: [{ name: 'Size', values: ['XS', 'S', 'M'] }],
+      tags: ['linen', 'best seller'],
+      title: 'Costa Top',
+      handle: 'costa-top',
+    });
+    expect(result).toBeUndefined();
   });
 });
 

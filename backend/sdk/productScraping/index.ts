@@ -34,6 +34,10 @@ export interface ScrapedData {
   tags?: string[];
   material?: string;
   compareAtPrice?: string;
+  // Surfaced when the storefront advertises made-to-measure / custom
+  // sizing for this product. Per anti-pattern #1 we keep this
+  // ephemeral per request — never aggregated into a brand registry.
+  customFit?: { available: boolean; label?: string };
 }
 
 interface ProductData {
@@ -607,6 +611,7 @@ export async function scrapeProduct(url: string): Promise<{
           tags: shopifyResult.tags,
           material: shopifyResult.material,
           compareAtPrice: shopifyResult.compareAtPrice,
+          customFit: shopifyResult.customFit,
         },
         debug: {
           requestedUrl: url,

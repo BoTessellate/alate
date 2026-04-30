@@ -199,6 +199,52 @@ describe('Screen Smoke Tests', () => {
     expect(() => render(<OverlayEditorScreen />)).not.toThrow();
   });
 
+  it('FitResultScreen renders the custom-fit badge when product.customFit is set', () => {
+    mockRouteParams = {
+      product: {
+        name: 'Felled Seam Set',
+        image: 'https://cdn.example.com/c.jpg',
+        price: { amount: 12000, currency: 'INR' },
+        brand: 'Oshin Sarin',
+        customFit: { available: true, label: 'Made to measure' },
+      },
+      url: 'https://oshinsarin.in/products/felled-seam-set',
+      historyEntryId: 'h-2',
+      precomputed: {
+        fitScore: 'great' as const,
+        warnings: [],
+        sizeRecommendation: { size: 'M', confidence: 'high' as const },
+        enrichedProduct: {},
+        checkedAt: '2026-04-29T00:00:00.000Z',
+      },
+    };
+    const { getByTestId, getByText } = render(<FitResultScreen />);
+    expect(getByTestId('custom-fit-badge')).toBeTruthy();
+    expect(getByText('Made to measure')).toBeTruthy();
+  });
+
+  it('FitResultScreen omits the custom-fit badge when product.customFit is unset', () => {
+    mockRouteParams = {
+      product: {
+        name: 'Costa Top',
+        image: 'https://cdn.example.com/d.jpg',
+        price: { amount: 5931, currency: 'INR' },
+        brand: 'Summer Away',
+      },
+      url: 'https://summeraway.in/products/costa-top',
+      historyEntryId: 'h-3',
+      precomputed: {
+        fitScore: 'great' as const,
+        warnings: [],
+        sizeRecommendation: { size: 'M', confidence: 'high' as const },
+        enrichedProduct: {},
+        checkedAt: '2026-04-29T00:00:00.000Z',
+      },
+    };
+    const { queryByTestId } = render(<FitResultScreen />);
+    expect(queryByTestId('custom-fit-badge')).toBeNull();
+  });
+
   it('ScreenErrorBoundary catches render errors and shows fallback', () => {
     const ScreenErrorBoundary = require('../components/ScreenErrorBoundary').default;
     const ThrowingComponent = () => {
