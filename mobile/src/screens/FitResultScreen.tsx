@@ -11,7 +11,6 @@ import {
   Linking,
   Dimensions,
   StatusBar,
-  BackHandler,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -107,7 +106,6 @@ export default function FitResultScreen() {
     precomputed,
     historyEntries,
     currentIndex = 0,
-    cameFromShare = false,
   } = route.params;
   const { avatar } = useAvatarStore();
   const { addEntry, updateEntry, removeEntry } = useFitHistoryStore();
@@ -191,11 +189,6 @@ export default function FitResultScreen() {
   // Themed delete confirmation — replaces native Alert so the modal
   // matches the rest of the grey-purple glass aesthetic.
   const [pendingDelete, setPendingDelete] = useState(false);
-  // Two-choice "going back?" dialog for share-intent entries: continue
-  // shopping in the source app vs stay in alate. Only fires when
-  // `cameFromShare` is true on the route — regular pop / sift-back
-  // flows behave normally.
-  const [shareBackDialog, setShareBackDialog] = useState(false);
   const collapseProgress = useSharedValue(1);
   const startProgress = useSharedValue(1);
 
@@ -395,25 +388,6 @@ export default function FitResultScreen() {
         runReevaluation();
       }
     }, [avatar])
-  );
-
-  // Hardware back-press intercept for share-intent entries.
-  // The user came in from a browser / shopping app via the OS share
-  // sheet, so a vanilla back-pop to Home is one valid choice but not
-  // the only one — they might want to keep shopping. Show an
-  // explicit two-choice dialog instead of guessing. Only registered
-  // when cameFromShare is true so regular FitResult navigation
-  // (HomeScreen URL paste, History sift-in) keeps default back.
-  useFocusEffect(
-    useCallback(() => {
-      if (!cameFromShare) return undefined;
-      const onBackPress = () => {
-        setShareBackDialog(true);
-        return true; // consume — dialog drives the next step
-      };
-      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => sub.remove();
-    }, [cameFromShare])
   );
 
   useEffect(() => {
@@ -1427,37 +1401,6 @@ export default function FitResultScreen() {
           setPendingDelete(false);
         }}
         onCancel={() => setPendingDelete(false)}
-      />
-
-      {/* Share-intent back-press dialog. Two equal-weight choices —
-          continue shopping (back to the source app) or stay in alate
-          (drop to Home). Both labels read as explicit actions, not
-          as confirm/cancel. */}
-      <ConfirmDialog
-        visible={shareBackDialog}
-        title="Going back?"
-        message="Continue shopping where you were, or stay in alate?"
-        confirmLabel="Continue shopping"
-        cancelLabel="Stay in alate"
-        icon="arrow-left"
-        destructive={false}
-        confirmTestID="share-back-continue-shopping"
-        onConfirm={() => {
-          // Finish the alate task → Android returns the user to the
-          // app that launched the share intent (browser, store app).
-          // exitApp on Android calls finishAffinity(), which respects
-          // the singleTask launch mode and lifts the prior task to
-          // the foreground.
-          setShareBackDialog(false);
-          BackHandler.exitApp();
-        }}
-        onCancel={() => {
-          // Stay in alate → drop to Home. The reset that delivered
-          // FitResult put Main beneath us in the stack, so goBack
-          // takes us straight there.
-          setShareBackDialog(false);
-          navigation.goBack();
-        }}
       />
     </View>
     </GestureDetector>

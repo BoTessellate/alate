@@ -54,11 +54,6 @@ export interface ConfirmDialogProps {
   message?: string;
   /** Label for the destructive action (e.g. "Delete", "Remove"). */
   confirmLabel: string;
-  /** Optional override for the cancel button. Defaults to "Cancel".
-   *  Useful when both choices need to read as explicit actions
-   *  (e.g. "Continue shopping" / "Stay in alate") rather than the
-   *  usual destructive-vs-cancel pairing. */
-  cancelLabel?: string;
   /** Optional Feather icon shown above the title — typically
    *  'alert-triangle' for destructive flows. */
   icon?: React.ComponentProps<typeof Feather>['name'];
@@ -78,7 +73,6 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel,
-  cancelLabel = 'Cancel',
   icon = 'alert-triangle',
   destructive = true,
   onConfirm,
@@ -113,7 +107,7 @@ export default function ConfirmDialog({
                 onPress={onCancel}
                 activeOpacity={0.75}
               >
-                <Text style={styles.cancelText}>{cancelLabel}</Text>
+                <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 testID={confirmTestID || 'confirm-dialog-confirm'}

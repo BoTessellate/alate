@@ -59,12 +59,6 @@ export type RootStackParamList = {
      *  loader back-to-back. */
     product?: ScrapedProduct;
     url: string;
-    /** Set when the user reached FitResult via the OS share sheet
-     *  (Send → alate from a browser / shopping app). The back-press
-     *  handler shows a two-choice dialog: continue shopping (returns
-     *  to the source app) vs stay in alate (drops to Home). Without
-     *  this flag, back behaves normally — pop the stack frame. */
-    cameFromShare?: boolean;
     historyEntryId?: string;
     precomputed?: {
       fitScore: 'great' | 'moderate' | 'poor';
@@ -305,11 +299,11 @@ export default function AppNavigator() {
     // the HomeScreen URL-paste flow.
     //
     // We `reset` rather than `replace` so the resulting stack is
-    // [Main, FitResult] instead of [FitResult]. Two reasons:
-    //   1. Back-press has somewhere to go (Main / Home tab) instead
-    //      of falling through to Android's default which silently
-    //      exits the app — confusing for users who expected to land
-    //      back in alate.
+    // [Main(History tab focused), FitResult] instead of [FitResult]:
+    //   1. Back from FitResult lands on the History tab — once the
+    //      fit completes it's saved to history, so the user can
+    //      scroll past the just-shared item to access prior searches.
+    //      Same UX as navigating into FitResult from History.
     //   2. `reset` rebuilds the stack from scratch, which forces a
     //      remount even when the user was already viewing FitResult.
     //      That preserves the fix for the April 29 2026 regression
@@ -317,18 +311,24 @@ export default function AppNavigator() {
     //      (shared product missing from history, wrong scrape details,
     //      male-profile users seeing women's-fit results from the
     //      previous mount).
-    //
-    // `cameFromShare: true` flips on the back-press dialog inside
-    // FitResult so the user gets an explicit choice — continue
-    // shopping (back to the source app) vs stay in alate.
     resetShareIntent();
     processingRef.current = false;
     setTimeout(() => {
       navigationRef.current?.reset({
         index: 1,
         routes: [
-          { name: 'Main' },
-          { name: 'FitResult', params: { url, cameFromShare: true } },
+          {
+            name: 'Main',
+            state: {
+              index: 1,
+              routes: [
+                { name: 'Home' },
+                { name: 'History' },
+                { name: 'Account' },
+              ],
+            },
+          },
+          { name: 'FitResult', params: { url } },
         ],
       });
     }, 100);

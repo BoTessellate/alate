@@ -245,50 +245,6 @@ describe('Screen Smoke Tests', () => {
     expect(queryByTestId('custom-fit-badge')).toBeNull();
   });
 
-  it('FitResultScreen registers a hardware back handler when cameFromShare is true', () => {
-    const { BackHandler } = require('react-native');
-    const addSpy = jest.spyOn(BackHandler, 'addEventListener');
-    addSpy.mockClear();
-    mockRouteParams = {
-      product: { name: 'Shared product' },
-      url: 'https://example.com/p/1',
-      cameFromShare: true,
-      precomputed: {
-        fitScore: 'great' as const,
-        warnings: [],
-        sizeRecommendation: { size: 'M', confidence: 'high' as const },
-        enrichedProduct: {},
-        checkedAt: '2026-05-02T00:00:00.000Z',
-      },
-      historyEntryId: 'h-share-1',
-    };
-    render(<FitResultScreen />);
-    expect(addSpy).toHaveBeenCalledWith('hardwareBackPress', expect.any(Function));
-    addSpy.mockRestore();
-  });
-
-  it('FitResultScreen does NOT register a hardware back handler when cameFromShare is false / unset', () => {
-    const { BackHandler } = require('react-native');
-    const addSpy = jest.spyOn(BackHandler, 'addEventListener');
-    addSpy.mockClear();
-    mockRouteParams = {
-      product: { name: 'Shared product' },
-      url: 'https://example.com/p/2',
-      precomputed: {
-        fitScore: 'great' as const,
-        warnings: [],
-        sizeRecommendation: { size: 'M', confidence: 'high' as const },
-        enrichedProduct: {},
-        checkedAt: '2026-05-02T00:00:00.000Z',
-      },
-      historyEntryId: 'h-noshare-1',
-    };
-    render(<FitResultScreen />);
-    const shareBackCalls = addSpy.mock.calls.filter((c) => c[0] === 'hardwareBackPress');
-    expect(shareBackCalls.length).toBe(0);
-    addSpy.mockRestore();
-  });
-
   it('ScreenErrorBoundary catches render errors and shows fallback', () => {
     const ScreenErrorBoundary = require('../components/ScreenErrorBoundary').default;
     const ThrowingComponent = () => {
