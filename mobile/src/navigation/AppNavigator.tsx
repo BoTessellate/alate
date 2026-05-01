@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { NavigationContainer, NavigationContainerRef, StackActions } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
@@ -52,13 +52,19 @@ export type RootStackParamList = {
   FitResult: {
     /** Optional — when present, FitResult skips its internal scrape
      *  step and goes straight to enrichment + fit-check. Sources that
-     *  already have product data (history mode, share-intent post-
-     *  scrape) pass it. The HomeScreen URL-paste flow does NOT pass
-     *  this — FitResult does the scrape itself, eliminating the
-     *  double-loader regression where users saw HomeScreen's loader
-     *  followed by FitResult's loader back-to-back. */
+     *  already have product data (history mode) pass it. The
+     *  URL-paste and share-intent flows do NOT pass this — FitResult
+     *  does the scrape itself, eliminating the double-loader regression
+     *  where users saw an intermediate loader followed by FitResult's
+     *  loader back-to-back. */
     product?: ScrapedProduct;
     url: string;
+    /** Set when the user reached FitResult via the OS share sheet
+     *  (Send → alate from a browser / shopping app). The back-press
+     *  handler shows a two-choice dialog: continue shopping (returns
+     *  to the source app) vs stay in alate (drops to Home). Without
+     *  this flag, back behaves normally — pop the stack frame. */
+    cameFromShare?: boolean;
     historyEntryId?: string;
     precomputed?: {
       fitScore: 'great' | 'moderate' | 'poor';
@@ -298,21 +304,33 @@ export default function AppNavigator() {
     // the destination screen so the transition feels seamless. Mirrors
     // the HomeScreen URL-paste flow.
     //
-    // CRITICAL: dispatch(StackActions.replace) — not navigate. If the
-    // user is ALREADY on FitResult (viewing a previous product) and
-    // shares another URL, navigate would keep the existing mount and
-    // only update route.params, leaving stale useState lazy initialisers
-    // in place. The previous architecture (April 29 2026) hit three
-    // bugs from this root cause: shared product missing from history,
-    // wrong scrape details on screen, and male-profile users seeing
-    // women's-fit results because the prior mount's state carried
-    // through. `replace` forces a remount → fresh state.
+    // We `reset` rather than `replace` so the resulting stack is
+    // [Main, FitResult] instead of [FitResult]. Two reasons:
+    //   1. Back-press has somewhere to go (Main / Home tab) instead
+    //      of falling through to Android's default which silently
+    //      exits the app — confusing for users who expected to land
+    //      back in alate.
+    //   2. `reset` rebuilds the stack from scratch, which forces a
+    //      remount even when the user was already viewing FitResult.
+    //      That preserves the fix for the April 29 2026 regression
+    //      where stale useState lazy initialisers carried through
+    //      (shared product missing from history, wrong scrape details,
+    //      male-profile users seeing women's-fit results from the
+    //      previous mount).
+    //
+    // `cameFromShare: true` flips on the back-press dialog inside
+    // FitResult so the user gets an explicit choice — continue
+    // shopping (back to the source app) vs stay in alate.
     resetShareIntent();
     processingRef.current = false;
     setTimeout(() => {
-      navigationRef.current?.dispatch(
-        StackActions.replace('FitResult', { url })
-      );
+      navigationRef.current?.reset({
+        index: 1,
+        routes: [
+          { name: 'Main' },
+          { name: 'FitResult', params: { url, cameFromShare: true } },
+        ],
+      });
     }, 100);
   };
 
