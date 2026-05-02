@@ -11,13 +11,17 @@ import { BlurView } from 'expo-blur';
 import { spacing, borderRadius, typography, fontFamily, primaryAlpha, whiteAlpha } from '../constants/theme';
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
+import { computeEffectiveFitScore, EffectiveFitScore } from '../utils/effectiveFitScore';
 
-type Score = FitHistoryEntry['fitScore'];
-
-const scoreMeta = (score: Score) => {
+const scoreMeta = (score: EffectiveFitScore) => {
   switch (score) {
     case 'great':
       return { dot: '#7de0a0', label: 'GREAT FIT' };
+    case 'minor':
+      // Same green dot as 'great' — the warning is informational, not
+      // a fit concern. The "with a note" suffix tells the user there's
+      // something to read on the full FitResult screen.
+      return { dot: '#7de0a0', label: 'GREAT FIT, WITH A NOTE' };
     case 'moderate':
       return { dot: '#ffc97a', label: 'CONCERNS' };
     case 'poor':
@@ -32,7 +36,7 @@ interface Props {
 export default function FitDetailBar({ entry }: Props) {
   if (!entry) return null;
 
-  const meta = scoreMeta(entry.fitScore);
+  const meta = scoreMeta(computeEffectiveFitScore(entry.warnings, entry.fitScore));
   const name = sanitize(entry.productName) || 'Unknown product';
   const size = entry.sizeRecommendation?.size;
 

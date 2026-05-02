@@ -20,6 +20,7 @@ import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
 import HeadingImage from '../components/HeadingImage';
+import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 type NavigationProp = CompositeNavigationProp<
@@ -83,23 +84,29 @@ const SEED_ENTRIES: Omit<FitHistoryEntry, 'id'>[] = [
 ];
 
 // Fit-score priority for the history sort. Lower = surfaces first.
-// Order is great → moderate → poor so the cover flow opens on the
-// user's wins (the items they're most likely to act on or revisit)
-// before working through the things that didn't fit.
-const FIT_PRIORITY: Record<'great' | 'moderate' | 'poor', number> = {
+// Order is great → minor → moderate → poor so the cover flow opens
+// on the user's wins (great + minor read as positive verdicts), then
+// works through concerns. Keyed by EFFECTIVE score (see
+// utils/effectiveFitScore.ts) so a minor-only entry doesn't end up
+// in the moderate bucket just because the backend labelled it as
+// such.
+const EFFECTIVE_PRIORITY: Record<'great' | 'minor' | 'moderate' | 'poor', number> = {
   great: 0,
-  moderate: 1,
-  poor: 2,
+  minor: 1,
+  moderate: 2,
+  poor: 3,
 };
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { entries: storeEntries, addEntry, clearHistory, removeEntry } = useFitHistoryStore();
 
-  // Sort the store's entries for display. Primary key is fit-score
-  // priority (great → moderate → poor) so the cover flow groups
-  // similar verdicts together. Secondary key is checkedAt desc so
-  // within each group the most-recent check surfaces first.
+  // Sort the store's entries for display. Primary key is the
+  // EFFECTIVE fit-score (great→minor→moderate→poor) so the cover
+  // flow groups verdicts the way the user actually reads them — a
+  // "Great Fit, with a note" sits with great fits, not with concerns.
+  // Secondary key is checkedAt desc so within each group the most-
+  // recent check surfaces first.
   //
   // The store keeps insertion order (newest first) — we don't mutate
   // it, just produce a sorted view here. Per user feedback April 29
@@ -107,18 +114,23 @@ export default function HistoryScreen() {
   // happened to look right; real data inserts in time order and
   // therefore appeared unsorted to the eye.
   const entries = React.useMemo(() => {
+    const effective = (e: FitHistoryEntry) =>
+      computeEffectiveFitScore(e.warnings, e.fitScore);
     return [...storeEntries].sort((a, b) => {
-      const pri = FIT_PRIORITY[a.fitScore] - FIT_PRIORITY[b.fitScore];
+      const pri = EFFECTIVE_PRIORITY[effective(a)] - EFFECTIVE_PRIORITY[effective(b)];
       if (pri !== 0) return pri;
       // Same fit group → newer first (descending checkedAt).
       return b.checkedAt.localeCompare(a.checkedAt);
     });
   }, [storeEntries]);
 
-  // Count of entries scored 'great' — surfaced in the header meta so the
-  // subtitle carries real signal ("3 good fits") instead of the redundant
-  // "swipe through to revisit" instruction the coverflow already implies.
-  const goodFits = entries.filter((e) => e.fitScore === 'great').length;
+  // Count of entries that read as a positive verdict — great PLUS
+  // minor (which is "great with a note", not a concern). Surfaced in
+  // the header meta so the subtitle carries real signal.
+  const goodFits = entries.filter((e) => {
+    const eff = computeEffectiveFitScore(e.warnings, e.fitScore);
+    return eff === 'great' || eff === 'minor';
+  }).length;
 
   // Delete confirmation — themed via ConfirmDialog instead of the
   // native Alert popup, which broke visual continuity with the rest
