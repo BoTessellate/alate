@@ -185,7 +185,7 @@ function MainTabs() {
         },
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontFamily: fontFamily.primary,
+          fontFamily: fontFamily.primarySemiBold,
           fontSize: 10,
           fontWeight: '600',
           letterSpacing: 0.3,

@@ -1673,7 +1673,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statLabel: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.3,
@@ -1707,14 +1707,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
     letterSpacing: -0.2,
   },
   statIconText: {
-    fontFamily: fontFamily.primary,
+    // No 900-weight DM Sans cut — use Bold (700) which is the heaviest
+    // we ship. The fontWeight: '900' below is preserved as a hint to
+    // RN's text engine but the actual face is Bold.
+    fontFamily: fontFamily.primaryBold,
     fontSize: 18,
     fontWeight: '900',
   },
@@ -1847,7 +1850,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   tagText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.3,
@@ -1940,7 +1943,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   primaryButtonText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
@@ -1954,7 +1957,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 14,
     color: colors.primary,
     fontWeight: '700',

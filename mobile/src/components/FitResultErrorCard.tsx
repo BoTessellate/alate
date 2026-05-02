@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ghostButtonText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryMedium,
     fontSize: 14,
     color: colors.primary,
     fontWeight: '500',

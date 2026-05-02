@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   recentName: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   recentChipLabel: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,

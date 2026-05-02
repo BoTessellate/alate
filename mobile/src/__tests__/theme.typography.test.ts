@@ -4,12 +4,14 @@
  *   - Display + heading tokens use Viaoda Libre (Google Fonts, OFL)
  *     bundled via expo-font; family name resolves on Android only
  *     when set to the ttf's NameID 1 ("Viaoda Libre" with space).
- *   - Body / label / caption tokens run on the SYSTEM SERIF so the
- *     whole app reads as serif-led without bundling a second face.
- *   - The fontFamily registry is intentionally minimal: ONLY
- *     `primary` (system serif) and `display` (Viaoda Libre). No
- *     accent, mono, fallback, or legacy aliases. See anti-pattern
- *     comment in theme.ts.
+ *   - Body / label / caption / button tokens use DM Sans (May 2 2026
+ *     swap from system serif). Loaded as four discrete weight files
+ *     because RN Android's font weight resolver can't walk across
+ *     sub-families — see fontFamily comment in theme.ts.
+ *   - The fontFamily registry exposes the four DM Sans weight tokens
+ *     (`primary`, `primaryMedium`, `primarySemiBold`, `primaryBold`)
+ *     plus `display` (Viaoda Libre). No accent, mono, fallback, or
+ *     legacy aliases.
  *
  * These tokens are the single source of truth — if a heading anywhere
  * drifts off them, that's a bug.
@@ -22,11 +24,26 @@ describe('theme — heading typography', () => {
     expect(fontFamily.display).toBe('ViaodaLibre-Regular');
   });
 
-  it('the fontFamily registry exposes ONLY primary + display (no accent/mono/legacy bloat)', () => {
+  it('exposes DM Sans for body / label tokens (4 weight tokens)', () => {
+    expect(fontFamily.primary).toBe('DMSans-Regular');
+    expect(fontFamily.primaryMedium).toBe('DMSans-Medium');
+    expect(fontFamily.primarySemiBold).toBe('DMSans-SemiBold');
+    expect(fontFamily.primaryBold).toBe('DMSans-Bold');
+  });
+
+  it('the fontFamily registry exposes ONLY DM Sans weights + display (no accent/mono/legacy bloat)', () => {
     // Regression guard: April 29 2026 we slimmed the registry to two
-    // faces after the user flagged "too many fonts for an app". Don't
-    // add a new key without an explicit reason logged in theme.ts.
-    expect(Object.keys(fontFamily).sort()).toEqual(['display', 'primary']);
+    // faces. May 2 2026: expanded `primary` to four weighted tokens
+    // for DM Sans because RN Android can't resolve fontWeight across
+    // sub-families (Medium / SemiBold each register their own family
+    // per the ttf name table).
+    expect(Object.keys(fontFamily).sort()).toEqual([
+      'display',
+      'primary',
+      'primaryBold',
+      'primaryMedium',
+      'primarySemiBold',
+    ]);
   });
 
   const headingKeys = [
@@ -52,19 +69,31 @@ describe('theme — heading typography', () => {
     });
   });
 
-  // Body / label tokens — currently routed through fontFamily.primary
-  // (April 29 2026 experiment: primary swapped from 'serif' to
-  // 'ViaodaLibre-Regular' so the whole app reads in Viaoda Libre).
-  // The assertion just ensures the tokens point at whatever
-  // fontFamily.primary resolves to today; if the experiment reverts,
-  // these stay green automatically.
-  const nonHeadingKeys = ['body', 'bodyLarge', 'bodySmall', 'label', 'labelLarge', 'caption'] as const;
-  nonHeadingKeys.forEach((key) => {
+  // Body tokens — DMSans-Regular (400 weight).
+  const bodyKeys = ['body', 'bodyLarge', 'bodySmall', 'caption', 'banner'] as const;
+  bodyKeys.forEach((key) => {
     it(`${key} is not forced into lowercase`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
-    it(`${key} uses fontFamily.primary`, () => {
+    it(`${key} uses DMSans-Regular`, () => {
       expect((typography as any)[key].fontFamily).toBe(fontFamily.primary);
     });
+  });
+
+  // Label tokens — DMSans-Medium (500 weight) so the medium-weight
+  // file is actually rendered instead of falling back to Regular.
+  const labelKeys = ['label', 'labelLarge', 'labelSmall'] as const;
+  labelKeys.forEach((key) => {
+    it(`${key} uses DMSans-Medium`, () => {
+      expect((typography as any)[key].fontFamily).toBe(fontFamily.primaryMedium);
+    });
+  });
+
+  it('overline uses DMSans-SemiBold (600 weight)', () => {
+    expect(typography.overline.fontFamily).toBe(fontFamily.primarySemiBold);
+  });
+
+  it('headingS uses DMSans-SemiBold (600 weight)', () => {
+    expect(typography.headingS.fontFamily).toBe(fontFamily.primarySemiBold);
   });
 });

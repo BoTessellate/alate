@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   typicalValue: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 38,
     fontWeight: '700',
     color: colors.primary,
