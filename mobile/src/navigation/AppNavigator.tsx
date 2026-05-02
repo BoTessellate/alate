@@ -2,11 +2,11 @@
  * App Navigator - Fit Check Tool
  */
 
-import React, { useEffect, useState, useRef } from 'react';
-import { NavigationContainer, NavigationContainerRef, StackActions } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -14,7 +14,7 @@ import { useShareIntentContext } from '../utils/shareIntent';
 
 import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
 import { isEnabled } from '../constants/featureFlags';
-import { ScrapedProduct, FitWarning, scrapeProduct } from '../services/api';
+import { ScrapedProduct, FitWarning } from '../services/api';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
@@ -52,11 +52,11 @@ export type RootStackParamList = {
   FitResult: {
     /** Optional — when present, FitResult skips its internal scrape
      *  step and goes straight to enrichment + fit-check. Sources that
-     *  already have product data (history mode, share-intent post-
-     *  scrape) pass it. The HomeScreen URL-paste flow does NOT pass
-     *  this — FitResult does the scrape itself, eliminating the
-     *  double-loader regression where users saw HomeScreen's loader
-     *  followed by FitResult's loader back-to-back. */
+     *  already have product data (history mode) pass it. The
+     *  URL-paste and share-intent flows do NOT pass this — FitResult
+     *  does the scrape itself, eliminating the double-loader regression
+     *  where users saw an intermediate loader followed by FitResult's
+     *  loader back-to-back. */
     product?: ScrapedProduct;
     url: string;
     historyEntryId?: string;
@@ -236,7 +236,6 @@ export default function AppNavigator() {
   // flag short-circuits the handler before any data-collection path
   // can fire.
   const declaredUnder16 = useAgeGateStore((s) => s.declaredUnder16);
-  const [isProcessingShare, setIsProcessingShare] = useState(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const processingRef = useRef(false);
 
@@ -278,72 +277,62 @@ export default function AppNavigator() {
     return <AgeGateOverlay />;
   }
 
-  const handleSharedUrl = async (url: string) => {
+  const handleSharedUrl = (url: string) => {
     processingRef.current = true;
-    setIsProcessingShare(true);
 
-    // If no avatar, store URL and redirect to avatar setup
+    // If no avatar, store URL and redirect to avatar setup. The URL
+    // is replayed once the user finishes onboarding.
     if (!avatar) {
       setPendingUrl(url);
       resetShareIntent();
       processingRef.current = false;
-      setIsProcessingShare(false);
       setTimeout(() => {
         navigationRef.current?.navigate('AvatarSetup');
       }, 100);
       return;
     }
 
-    try {
-      const result = await scrapeProduct(url);
-      if (result.success && result.data) {
-        resetShareIntent();
-        setTimeout(() => {
-          // CRITICAL: use `dispatch(StackActions.replace(...))` rather
-          // than `navigate(...)`. If the user is ALREADY on FitResult
-          // (viewing a previously-checked product) and shares another
-          // URL from a browser, react-navigation's `navigate` keeps
-          // the existing FitResult mount and just updates `route.params`.
-          // FitResult's `useState` lazy initialisers fire ONCE per
-          // mount, so the screen kept showing the OLD product's data
-          // (warnings / fitScore / brand / images) while the new
-          // params silently sat under the surface. Three observable
-          // bugs from the same root cause (April 29 2026):
-          //   1. Shared product not saved to history (analyzeFit
-          //      didn't re-run with the new URL).
-          //   2. Wrong scrape details on screen (state from prev mount).
-          //   3. Male profile saw women's-fit results because the
-          //      stale state carried a women's product through.
-          // `replace` forces a remount → fresh state, fresh
-          // analyzeFit, addEntry runs, history saves correctly.
-          navigationRef.current?.dispatch(
-            StackActions.replace('FitResult', {
-              product: result.data!,
-              url,
-            })
-          );
-        }, 100);
-      } else {
-        resetShareIntent();
-      }
-    } catch (error) {
-      console.error('Share intent processing failed:', error);
-      resetShareIntent();
-    } finally {
-      processingRef.current = false;
-      setIsProcessingShare(false);
-    }
+    // Hand the URL straight to FitResult — it scrapes + enriches +
+    // fit-checks under a single FitLoader. No intermediate "Processing
+    // shared URL..." screen; FitLoader IS the processing UI, just on
+    // the destination screen so the transition feels seamless. Mirrors
+    // the HomeScreen URL-paste flow.
+    //
+    // We `reset` rather than `replace` so the resulting stack is
+    // [Main(History tab focused), FitResult] instead of [FitResult]:
+    //   1. Back from FitResult lands on the History tab — once the
+    //      fit completes it's saved to history, so the user can
+    //      scroll past the just-shared item to access prior searches.
+    //      Same UX as navigating into FitResult from History.
+    //   2. `reset` rebuilds the stack from scratch, which forces a
+    //      remount even when the user was already viewing FitResult.
+    //      That preserves the fix for the April 29 2026 regression
+    //      where stale useState lazy initialisers carried through
+    //      (shared product missing from history, wrong scrape details,
+    //      male-profile users seeing women's-fit results from the
+    //      previous mount).
+    resetShareIntent();
+    processingRef.current = false;
+    setTimeout(() => {
+      navigationRef.current?.reset({
+        index: 1,
+        routes: [
+          {
+            name: 'Main',
+            state: {
+              index: 1,
+              routes: [
+                { name: 'Home' },
+                { name: 'History' },
+                { name: 'Account' },
+              ],
+            },
+          },
+          { name: 'FitResult', params: { url } },
+        ],
+      });
+    }, 100);
   };
-
-  // Show loading overlay when processing share intent
-  if (isProcessingShare) {
-    return (
-      <View style={styles.loadingOverlay}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Processing shared URL...</Text>
-      </View>
-    );
-  }
 
   return (
     <NavigationContainer ref={navigationRef}>
@@ -422,16 +411,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: whiteAlpha.surfaceFrost,
     borderRadius: 32,
-  },
-  loadingOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.md,
   },
 });

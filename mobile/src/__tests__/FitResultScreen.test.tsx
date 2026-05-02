@@ -334,7 +334,15 @@ describe('FitResultScreen', () => {
       expect(getAllByLabelText('Great Fit, with a note').length).toBeGreaterThan(0);
     });
 
-    it('renders live-mode action buttons', async () => {
+    it('promotes to history-mode action buttons after the live fit saves', async () => {
+      // Once analyzeFit completes, the entry is auto-saved to history
+      // and the screen flips into history mode. Action buttons match
+      // what users see when navigating in from History — Re-evaluate
+      // / View on Store / Change measurements. The previous
+      // "View on Store / Check Another" pair only appeared during the
+      // brief live-render window before the save lands; making it the
+      // permanent state for share-intent + URL-paste flows broke
+      // experience consistency with History sift-in.
       (api.enrichProduct as jest.Mock).mockResolvedValueOnce({
         success: true,
         product: { id: 'p-1', name: 'Linen shirt' },
@@ -346,11 +354,10 @@ describe('FitResultScreen', () => {
       });
 
       const { findByTestId, queryByTestId } = render(<FitResultScreen />);
+      await findByTestId('reevaluate-button');
       await findByTestId('view-on-store-button');
-      await findByTestId('check-another-button');
-      // Live mode must NOT show re-evaluate / change measurements buttons.
-      expect(queryByTestId('reevaluate-button')).toBeNull();
-      expect(queryByTestId('change-measurements-button')).toBeNull();
+      await findByTestId('change-measurements-button');
+      expect(queryByTestId('check-another-button')).toBeNull();
     });
 
     it('view-on-store button opens the product url', async () => {
@@ -373,7 +380,11 @@ describe('FitResultScreen', () => {
       openUrlSpy.mockRestore();
     });
 
-    it('check-another button calls navigation.goBack', async () => {
+    it('change-measurements button navigates to AvatarSetup', async () => {
+      // Replaces the old "check another → goBack" assertion. The
+      // post-save history-mode treatment doesn't expose Check Another
+      // any more; users hit back at the OS level (or use the cover-
+      // flow back chevron) to leave the screen.
       (api.enrichProduct as jest.Mock).mockResolvedValueOnce({
         success: true,
         product: { id: 'p-1', name: 'Linen shirt' },
@@ -385,9 +396,9 @@ describe('FitResultScreen', () => {
       });
 
       const { findByTestId } = render(<FitResultScreen />);
-      const btn = await findByTestId('check-another-button');
+      const btn = await findByTestId('change-measurements-button');
       fireEvent.press(btn);
-      expect(mockGoBack).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
     });
 
     it('does not crash when checkFit rejects — loader ends, no history entry', async () => {

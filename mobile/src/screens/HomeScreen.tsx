@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+// utils/effectiveFitScore — see RecentCard below
+import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { Feather } from '@expo/vector-icons';
@@ -298,7 +300,23 @@ export default function HomeScreen() {
               Replaces the old "feature highlights" section entirely. */}
           {recent.length > 0 && (
             <View style={styles.recentSection}>
-              <Text style={styles.recentLabel}>RECENT</Text>
+              <View style={styles.recentHeader}>
+                <Text style={styles.recentLabel}>RECENT</Text>
+                {/* Tap-target to the full History tab. Only render when
+                    there's more history than what fits in the Recent
+                    list (3 most recent), so users with a small history
+                    don't see a CTA that just reloads the same view. */}
+                {historyEntries.length > recent.length && (
+                  <TouchableOpacity
+                    testID="recent-see-all"
+                    onPress={() => navigation.navigate('History')}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={styles.recentSeeAll}>See all</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.recentList}>
                 {recent.map((entry) => (
                   <RecentCard
@@ -369,10 +387,17 @@ export default function HomeScreen() {
 
 // Recent-fit row. Thumbnail + brand eyebrow + name + size + verdict chip.
 function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () => void }) {
+  // Re-tier the verdict so a single MINOR-only warning reads as
+  // "Fits·" (with note marker) instead of the heavy "Check" /
+  // "Concerns" chip. Same rule as FitResultScreen + FitDetailBar —
+  // see utils/effectiveFitScore.ts.
+  const effective = computeEffectiveFitScore(entry.warnings, entry.fitScore);
   const { bg, fg, label } =
-    entry.fitScore === 'great'
+    effective === 'great'
       ? { bg: statusAlpha.successMed, fg: colors.successDeep, label: 'Fits' }
-      : entry.fitScore === 'moderate'
+      : effective === 'minor'
+      ? { bg: statusAlpha.successMed, fg: colors.successDeep, label: 'Fits · note' }
+      : effective === 'moderate'
       ? { bg: statusAlpha.warningMed, fg: colors.warningDeep, label: 'Check' }
       : { bg: statusAlpha.errorMed, fg: colors.errorDeep, label: 'Concerns' };
   return (
@@ -610,10 +635,20 @@ const styles = StyleSheet.create({
   recentSection: {
     marginTop: spacing.xl,
   },
+  recentHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
   recentLabel: {
     ...typography.overline,
     color: whiteAlpha.textBody,
-    marginBottom: spacing.sm,
+  },
+  recentSeeAll: {
+    ...typography.labelSmall,
+    color: whiteAlpha.textBody,
+    textDecorationLine: 'underline',
   },
   recentList: {
     gap: spacing.sm,

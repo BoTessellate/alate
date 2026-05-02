@@ -25,8 +25,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
-  useDerivedValue,
-  useAnimatedReaction,
   interpolate,
   Extrapolation,
   SharedValue,
@@ -284,34 +282,36 @@ export default function HistoryCoverFlow({
   const scrollRef = useRef<Animated.ScrollView>(null);
   const prevLengthRef = useRef(entries.length);
 
-  // Scroll handler just mirrors the offset to a SharedValue. zIndex + all
-  // transforms derive from this on the UI thread — no JS state re-renders
-  // on scroll, so rapid swipes stay smooth and the paint-order transition
-  // is continuous (not a stop-then-pop at momentum-end).
+  // Scroll handler mirrors the offset to a SharedValue (UI thread) AND
+  // emits the snap index to JS only when the gesture comes to rest —
+  // either momentum-end after a flick, or drag-end with no momentum.
+  // Per-frame JS callbacks during a swipe were the choppiness source:
+  // every snap crossing fired runOnJS → setActiveIndex → FitDetailBar
+  // re-render mid-glide, stalling the animation thread for one frame
+  // per crossing. Deferring the JS hop to rest gives Vision-Pro / iPod-
+  // shuffle smoothness while keeping the bar accurate at the destination.
+  const reportActiveIndex = (offsetX: number) => {
+    if (!onActiveIndexChange) return;
+    const raw = Math.round(offsetX / ITEM_GAP);
+    const clamped = Math.max(0, Math.min(entries.length - 1, raw));
+    onActiveIndexChange(clamped);
+  };
+
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => {
       scrollX.value = e.contentOffset.x;
     },
-  });
-
-  // Derive the snapped index on the UI thread and surface it to JS only when
-  // it changes. Avoids re-rendering on every scroll pixel.
-  const activeIndexShared = useDerivedValue(() => {
-    const raw = Math.round(scrollX.value / ITEM_GAP);
-    return Math.max(0, Math.min(entries.length - 1, raw));
-  });
-
-  // Live-track the snapped index for the external callback (detail bar)
-  // only. Cheap — only the consumer re-renders, not the whole grid.
-  useAnimatedReaction(
-    () => activeIndexShared.value,
-    (curr, prev) => {
-      if (curr !== prev && onActiveIndexChange) {
-        runOnJS(onActiveIndexChange)(curr);
-      }
+    onMomentumEnd: (e) => {
+      runOnJS(reportActiveIndex)(e.contentOffset.x);
     },
-    [onActiveIndexChange]
-  );
+    onEndDrag: (e) => {
+      // Fires when the user lifts the finger. If the gesture had
+      // momentum, onMomentumEnd will fire later with the resting
+      // offset; this call uses the lift-off offset which is close
+      // enough to keep the bar live for short drags.
+      runOnJS(reportActiveIndex)(e.contentOffset.x);
+    },
+  });
 
   const snapOffsets = useMemo(
     () => entries.map((_, i) => i * ITEM_GAP),
