@@ -18,7 +18,8 @@ jest.mock('../../services/api', () => ({
   scrapeProduct: jest.fn(),
   enrichProduct: jest.fn(),
   checkFit: jest.fn(),
-  nudgeBrand: jest.fn(),
+  logBrandRequest: jest.fn(),
+  getBrandRequestCount: jest.fn().mockResolvedValue(0),
   extractBrandFromUrl: jest.requireActual('../../services/api').extractBrandFromUrl,
 }));
 

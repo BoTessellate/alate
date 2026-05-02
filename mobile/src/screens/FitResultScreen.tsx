@@ -45,6 +45,7 @@ import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
+import FitResultErrorCard from '../components/FitResultErrorCard';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BrandHeading from '../components/BrandHeading';
@@ -775,47 +776,22 @@ export default function FitResultScreen() {
   }
 
   // Internal-scrape failure path — shown when the URL-paste flow hits
-  // an unsupported brand, a blocked origin, or a network error. Quiet
-  // glass card with a way back. The brand-nudge UX from the previous
-  // architecture (when HomeScreen handled scrape errors) is on the
-  // backlog — this is the minimum-viable "we couldn't read this URL"
-  // state.
+  // an unsupported brand, a blocked origin, or a network error. The
+  // FitResultErrorCard mirrors FitLoader's structure (URL pill + hero
+  // orb + headline + body + CTAs) so the transition reads as one
+  // screen resolving rather than two different states. For
+  // kind='unsupported' the card POSTs to /api/brand-request as a
+  // demand signal — see BACKLOG.md "Demand capture v1" for the
+  // architecture decision (no email goes out to the brand).
   if (scrapeError) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <View style={styles.errorCardWrap}>
-          <Feather
-            name={scrapeError.kind === 'blocked' ? 'shield' : 'alert-circle'}
-            size={32}
-            color={colors.textSecondary}
-            style={{ marginBottom: spacing.md }}
-          />
-          <Text style={styles.errorCardTitle}>
-            {scrapeError.kind === 'blocked'
-              ? `${scrapeError.origin || 'This brand'} has opted out`
-              : "We couldn't read this product"}
-          </Text>
-          <Text style={styles.errorCardBody}>{scrapeError.message}</Text>
-          <TouchableOpacity
-            testID="fit-result-error-go-back"
-            style={[styles.primaryButton, { marginTop: spacing.lg }]}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryButtonText}>Go back</Text>
-          </TouchableOpacity>
-          {routeUrl ? (
-            <TouchableOpacity
-              testID="fit-result-error-open-store"
-              style={[styles.secondaryButton, { marginTop: spacing.sm }]}
-              onPress={() => Linking.openURL(routeUrl)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.secondaryButtonText}>Visit store directly</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <FitResultErrorCard
+          url={routeUrl}
+          scrapeError={scrapeError}
+          onGoBack={() => navigation.goBack()}
+        />
       </View>
     );
   }
@@ -1471,33 +1447,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  // --- Internal-scrape error card (used in URL-paste flow when the
-  //     scrape fails after FitResult-internal scrape kicked off) ---
-  errorCardWrap: {
-    width: '85%',
-    maxWidth: 360,
-    padding: spacing.xl,
-    borderRadius: borderRadius.xxl,
-    // Slightly more opaque than the standard glass token because it
-    // sits on the loadingContainer's plain background — needs to read
-    // as a definite card rather than a translucent overlay.
-    backgroundColor: glass.backgroundColor,
-    alignItems: 'center',
-    ...shadows.glass,
-  },
-  errorCardTitle: {
-    ...typography.headingM,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  errorCardBody: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
   },
 
   // --- Background product image (full-bleed) ---

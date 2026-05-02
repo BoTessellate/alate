@@ -240,11 +240,10 @@ export default function HomeScreen() {
             <Text style={styles.shareHint}>or use the share extension from your browser</Text>
           </View>
 
-          {/* Brand-nudge + brand-opt-out cards have moved into FitResult's
-              error-card state as part of the single-loader cleanup. They
-              fire when FitResult's internal scrape fails (unsupported
-              brand, blocked origin, network error). Backlog: re-add a
-              fully-styled brand-nudge card with email send. */}
+          {/* Scrape-error UX (unsupported brand, blocked origin, network
+              error) lives in FitResultErrorCard now. The unsupported
+              variant logs demand to /api/brand-request — no email is
+              sent to the brand. See BACKLOG.md "Demand capture v1". */}
 
           {/* v2: Story share entry. Only rendered when the feature flag
               is on — production builds never see this tile. */}

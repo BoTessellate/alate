@@ -26,7 +26,7 @@
 </head>
 <body>
     <h1>Privacy Policy</h1>
-    <p class="date">Effective date: March 13, 2026 | Version 2.0</p>
+    <p class="date">Effective date: May 2, 2026 | Version 2.1</p>
 
     <p>Alate ("we", "our", "the app") is a mobile application developed by <strong>Bits of Tessellate</strong> that helps you predict whether clothing items will fit based on your body profile. This policy explains what data we collect, how we use it, and your rights.</p>
 
@@ -54,12 +54,17 @@
     <h3>e) Automatically Collected Data</h3>
     <p>We do not use analytics SDKs, crash reporting, or advertising trackers. We do not collect device identifiers, IP addresses, or usage analytics beyond what Expo and Google Play infrastructure may collect by default.</p>
 
+    <h3>f) Brand Request Data</h3>
+    <p>When you paste a product URL from a brand we don't yet support, the URL and the brand domain are recorded in our database so we can prioritise which brands to onboard next. We do not contact the brand on your behalf.</p>
+    <p>Optionally, you can opt in to be notified by email when we add support for that brand. If you do, the email address you provide is stored alongside the brand entry for the sole purpose of sending that one notification. Providing this email is optional &mdash; the rest of the app works without it.</p>
+
     <h2>2. How We Use Your Data</h2>
     <ul>
         <li><strong>Body profile:</strong> Used solely to generate personalized fit predictions for clothing items.</li>
         <li><strong>Product URLs:</strong> Used to scrape product information for fit analysis. URLs are processed in real-time and not retained on our servers.</li>
         <li><strong>Fit history:</strong> Stored to let you review past fit checks.</li>
         <li><strong>Account info:</strong> Used to authenticate you and sync data across devices.</li>
+        <li><strong>Brand request data:</strong> The unsupported-brand URL is used to prioritise which storefronts to onboard next. The optional notify-me email is used <em>only</em> to send a single one-off "this brand is now supported" email; never for marketing, newsletters, or any other communication.</li>
     </ul>
 
     <h2>3. Data Sharing</h2>
@@ -86,6 +91,7 @@
         <li>Local data persists until you clear it or uninstall the app.</li>
         <li>Cloud data persists until you delete your account.</li>
         <li>Fit history is limited to your 50 most recent checks.</li>
+        <li>Brand request entries (URL + brand domain) are retained indefinitely as anonymised demand signal. Optional notify-me email addresses are deleted within 30 days of the notification being sent, or upon your request &mdash; whichever is sooner.</li>
     </ul>
 
     <h2>6. Your Rights</h2>
@@ -95,6 +101,7 @@
         <li><strong>Clear your fit history</strong> from within the app.</li>
         <li><strong>Sign out</strong> to stop cloud syncing.</li>
         <li><strong>Delete your account</strong> from within the app (Account tab &gt; Delete Account), or via our <a href="https://ramsaptami.github.io/app_privacy_policy/alate/delete-account.html">web deletion page</a>. All cloud data will be permanently deleted within 30 days.</li>
+        <li><strong>Delete a brand-request notify email</strong> by emailing <a href="mailto:privacy@tessellate.co.in?subject=Delete%20brand-request%20notify%20-%20Alate">privacy@tessellate.co.in</a> with the subject "Delete brand-request notify - Alate" and the email address you provided.</li>
         <li><strong>Request a copy of your data</strong> by contacting us at the email below.</li>
     </ul>
 
@@ -142,8 +149,8 @@
 
     <h2>11. App Store Privacy Details</h2>
     <p><strong>Tracking:</strong> Alate does not track you across other companies' apps or websites. We do not use the IDFA or any device advertising identifier.</p>
-    <p><strong>Data linked to you:</strong> Email address, name (if signed in via Google), body profile measurements, fit check history.</p>
-    <p><strong>Data not linked to you:</strong> Product URLs (processed in real-time, not stored with your identity on our servers).</p>
+    <p><strong>Data linked to you:</strong> Email address, name (if signed in via Google), body profile measurements, fit check history. The optional brand-request notify email is also linked to you while it is held (up to 30 days after the notification is sent).</p>
+    <p><strong>Data not linked to you:</strong> Product URLs (processed in real-time, not stored with your identity on our servers). Brand request URL + brand domain (recorded as anonymised demand signal when the optional notify email is not provided).</p>
     <p><strong>Data used to track you:</strong> None.</p>
 
     <h2>12. Changes to This Policy</h2>

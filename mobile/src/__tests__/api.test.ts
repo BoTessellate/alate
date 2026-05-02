@@ -21,7 +21,8 @@ import {
   enrichProduct,
   checkFit,
   calibrateGarment,
-  nudgeBrand,
+  logBrandRequest,
+  getBrandRequestCount,
   extractBrandFromUrl,
 } from '../services/api';
 import type { Avatar } from '../store/avatarStore';
@@ -373,27 +374,104 @@ describe('api service', () => {
   });
 
   // ------------------------------------------------------------------
-  // nudgeBrand
+  // logBrandRequest
   // ------------------------------------------------------------------
-  describe('nudgeBrand', () => {
-    it('forwards server response on success', async () => {
+  describe('logBrandRequest', () => {
+    it('returns success + count + brandHandle from server', async () => {
       (global.fetch as jest.Mock).mockReturnValueOnce(
-        mockFetchResponse({ success: true })
+        mockFetchResponse({ success: true, brandHandle: 'asos.com', count: 42 })
       );
 
-      const result = await nudgeBrand('asos.com', 'Asos');
+      const result = await logBrandRequest({ sourceUrl: 'https://asos.com/p/1' });
 
       expect(result.success).toBe(true);
+      expect(result.brandHandle).toBe('asos.com');
+      expect(result.count).toBe(42);
+    });
+
+    it('returns stable failure shape on non-2xx', async () => {
+      (global.fetch as jest.Mock).mockReturnValueOnce(
+        mockFetchResponse({ error: 'bad request' }, { ok: false, status: 400 })
+      );
+
+      const result = await logBrandRequest({ sourceUrl: 'not-a-url' });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('HTTP 400');
     });
 
     it('returns stable failure shape when fetch rejects', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(
-        new Error('DNS failure')
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('DNS failure'));
+
+      const result = await logBrandRequest({ sourceUrl: 'https://asos.com/p/1' });
+
+      expect(result).toEqual({ success: false, error: 'Failed to log brand request' });
+    });
+
+    it('forwards optional fields (email + userId) on the wire', async () => {
+      const fetchSpy = global.fetch as jest.Mock;
+      fetchSpy.mockReturnValueOnce(
+        mockFetchResponse({ success: true, brandHandle: 'cosstores.com', count: 5 })
       );
 
-      const result = await nudgeBrand('asos.com', 'Asos');
+      await logBrandRequest({
+        sourceUrl: 'https://cosstores.com/p/1',
+        brandDisplay: 'COS',
+        requesterEmail: 'a@b.co',
+        userId: 'u-1',
+      });
 
-      expect(result).toEqual({ success: false, error: 'Failed to send nudge' });
+      const sentBody = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(sentBody).toMatchObject({
+        sourceUrl: 'https://cosstores.com/p/1',
+        brandDisplay: 'COS',
+        requesterEmail: 'a@b.co',
+        userId: 'u-1',
+      });
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // getBrandRequestCount
+  // ------------------------------------------------------------------
+  describe('getBrandRequestCount', () => {
+    it('returns the server count for a known brand', async () => {
+      (global.fetch as jest.Mock).mockReturnValueOnce(
+        mockFetchResponse({ brandHandle: 'cosstores.com', count: 23 })
+      );
+
+      const count = await getBrandRequestCount('cosstores.com');
+
+      expect(count).toBe(23);
+    });
+
+    it('returns 0 on non-2xx (treat as no demand yet)', async () => {
+      (global.fetch as jest.Mock).mockReturnValueOnce(
+        mockFetchResponse({ error: 'bad' }, { ok: false, status: 400 })
+      );
+
+      expect(await getBrandRequestCount('cosstores.com')).toBe(0);
+    });
+
+    it('returns 0 when fetch rejects (offline / dns)', async () => {
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+
+      expect(await getBrandRequestCount('cosstores.com')).toBe(0);
+    });
+
+    it('returns 0 when count is missing or non-numeric', async () => {
+      (global.fetch as jest.Mock).mockReturnValueOnce(mockFetchResponse({}));
+
+      expect(await getBrandRequestCount('cosstores.com')).toBe(0);
+    });
+
+    it('url-encodes the brand handle', async () => {
+      const fetchSpy = global.fetch as jest.Mock;
+      fetchSpy.mockReturnValueOnce(mockFetchResponse({ count: 0 }));
+
+      await getBrandRequestCount('weird brand.com');
+
+      expect(fetchSpy.mock.calls[0][0]).toContain('brandHandle=weird%20brand.com');
     });
   });
 

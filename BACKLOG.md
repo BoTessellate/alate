@@ -12,8 +12,29 @@ deleting them.
 
 ## P0 — pre-App-Store launch
 
-Nothing. See `project_anti_patterns.md` checklist in memory for the
-confirmed launch-readiness state.
+### ~~Privacy-policy entry + delete-my-data path for brand_requests.requester_email~~ — DONE 2026-05-02
+
+Local copies updated in this worktree:
+  - `mobile/privacy-policy.html` (v2.1, effective 2026-05-02) — added
+    section 1(f) Brand Request Data, section 2 bullet, section 5
+    retention rule (notify email purged within 30 days of send / on
+    request), section 6 deletion CTA, section 11 App Store details.
+  - `mobile/delete-account.html` — added "Delete a Brand-Request
+    Notify Email" section pointing at the privacy mailbox with a
+    pre-filled subject line.
+
+**Manual sync still required:** the canonical privacy pages live in
+`BoTessellate/app_privacy_policy` (rendered via GitHub Pages at
+`ramsaptami.github.io/app_privacy_policy/alate/*`). Copy the diffs
+across to that repo and push before App Store submission.
+
+The CTA copy on the FitResultErrorCard input is plain English ("your@email.com")
+with the explicit purpose visible in the privacy-policy + the
+"notify me when added" button label. No further mobile copy
+change needed.
+
+Rest of launch readiness — see `project_anti_patterns.md` checklist
+in memory.
 
 ## P1 — near-term polish
 
@@ -27,37 +48,84 @@ returns 500 and the scraper's blocklist check fails open (no-op). Not
 a blocker — safe default is "nothing gets blocked" — but needed
 before the opt-out feature is real.
 
-### Brand-nudge UX inside FitResult error card (replaces HomeScreen card)
-**Files:** `mobile/src/screens/FitResultScreen.tsx`
+### ~~Brand-nudge UX inside FitResult error card (email-the-brand version)~~ — REJECTED 2026-05-02
 
-Done: single-loader architecture. HomeScreen navigates immediately on
-URL detection; FitResult runs scrape → enrich → fit-check under one
-loading state. Brand-nudge / blocked-brand cards moved from HomeScreen
-into FitResult's `scrapeError` state.
+Original plan was a "Nudge {brand}" CTA that fires an email to the
+brand's `info@` inbox from alate. **Decision: don't do this.** Cold
+email from a small app to a brand customer-service inbox doesn't
+reach integration decision-makers, and lets any user spam any brand
+under alate's name. Demand signal is real gold; the email is not the
+way to capture it.
 
-**Still to add:** the nudge CTA path. FitResult currently shows a
-generic "we couldn't read this product" error card with Go Back +
-Visit Store buttons. The pre-refactor flow had a "Nudge {brand}" CTA
-that fired an email to the brand's `info@` address. Restore that CTA
-inside the FitResult error card so unsupported-brand discovery still
-ends in a customer-acquisition email, not a dead-end.
+**Replacement plan: three-layer demand capture (see below).**
 
-Implementation:
-- In `FitResultScreen.tsx` error card, when `scrapeError.kind ===
-  'unsupported'`, add a `Nudge {brandName}` button using
-  `extractBrandFromUrl(routeUrl)` for the brand
-- `nudgeBrand` API call already exists in `services/api.ts`
-- After successful nudge, swap to "Thanks — we've reached out to
-  {brand}" copy, same as the old HomeScreen flow
-- testID `fit-result-nudge-brand-button` for E2E coverage
+### ~~Demand capture v1 — silent tracking + "we'll notify you" CTA~~ — SHIPPED 2026-05-02
+**Files:** `mobile/src/screens/FitResultScreen.tsx`,
+  `mobile/src/components/FitResultErrorCard.tsx`,
+  `backend/api/brand-request.ts`,
+  `backend/supabase/migrations/brand_requests.sql`
 
-### Wire up real email sending for `/api/brand-nudge`
-**Path:** `backend/api/brand-nudge.ts`
+Migration applied to live Supabase 2026-05-02. The endpoint is
+deployable as soon as the next Vercel build runs.
 
-Currently logs the nudge request but doesn't send. Pre-existing
-`TODO` in the file points at Resend / SendGrid / nodemailer. Add a
-`NUDGE_SENDER_EMAIL` env var, pick a provider, wire it. Not a launch
-blocker (the UI already shows confirmation copy optimistically).
+When FitResult's scrape fails with `kind === 'unsupported'`, the error
+card surfaces:
+  - "[brand] isn't supported yet" headline
+  - Body copy that the brand is being tracked, with the count of
+    other users who've requested it (if > 0): "23 others have asked
+    for this brand"
+  - Optional email-capture: "we'll let you know when [brand] is added"
+  - The existing Go Back + Visit Store CTAs stay
+
+No email goes out to the brand. Backend logs the unsupported URL +
+extracted brand + (optional) requester email to `brand_requests`
+(Supabase). The aggregate count powers both the in-app social proof
+("N others want this") and a marketing/BD dashboard.
+
+Schema (sketch):
+```sql
+CREATE TABLE brand_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_handle text NOT NULL,         -- normalized: lowercase host minus tld
+  brand_display text,                  -- as scraped from URL
+  source_url text NOT NULL,
+  requester_email text,                -- nullable; only if user opts in
+  user_id text,                        -- if signed in
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX brand_requests_handle_idx ON brand_requests(brand_handle);
+```
+
+Aggregate query (called when error card mounts):
+```sql
+SELECT count(*) FROM brand_requests WHERE brand_handle = $1;
+```
+
+testIDs: `fit-result-error-brand-request-card`,
+`fit-result-error-notify-input`, `fit-result-error-notify-submit`.
+
+### Demand capture v2 — user-as-advocate social share
+**Trigger:** v1 ships and we have ~20 brand requests/week.
+
+When a brand crosses N requests, the error card adds a "tell [brand]
+you want them on alate" CTA that opens a pre-drafted Instagram story
+or tweet tagging the brand from the **user's** account. Brands
+respond to social mentions; this is the clout play. No app-as-spammer
+risk because nothing originates from alate.
+
+Out of scope for v1 — needs the social-share infrastructure from the
+P2 story-compose feature anyway.
+
+### Demand capture v3 — armed B2B outreach dashboard
+**Trigger:** v1 ships and we have a meaningful demand corpus.
+
+Internal-only Supabase view + simple admin page that ranks brands by
+request volume, shows the top requesting cities/countries (from
+request metadata if available), and exports a contact list. This is
+the data that makes a cold pitch warm: "we have 5,000 unsupported
+pastes for COS in 30 days" beats a deck.
+
+Out of scope for v1 — purely a query layer on the v1 table.
 
 ---
 
@@ -158,6 +226,24 @@ Trigger: user licenses TAN Nightingale (planned purchase — see
 ---
 
 ## P3 — nice-to-haves
+
+### Delete legacy `backend/api/brand-nudge.ts` + its sender env var
+**Path:** `backend/api/brand-nudge.ts`
+
+This endpoint emails `info@<brand-domain>` with a pitch when a user
+nudges. The email-the-brand path was rejected 2026-05-02 (see
+"Demand capture" above). The mobile client no longer calls this
+endpoint — `nudgeBrand` was replaced with `logBrandRequest`. The
+file is unreachable from production but still on disk; `NUDGE_SENDER_EMAIL`
+env var is still set in Vercel.
+
+Clean kill (separate small PR):
+  1. `git rm backend/api/brand-nudge.ts`
+  2. Remove `NUDGE_SENDER_EMAIL` from Vercel env vars
+  3. Confirm no internal docs reference `/api/brand-nudge`
+
+Left in this PR to keep the diff focused on the demand-capture v1
+swap. Safe to delete any time.
 
 ### Build the Shopify merchant plugin
 Longer-term play: merchants install your app on their Shopify admin,

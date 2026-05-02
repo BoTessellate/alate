@@ -283,18 +283,56 @@ export function extractBrandFromUrl(url: string): { brandName: string; brandDoma
 }
 
 /**
- * Send a brand nudge - asks our backend to email the brand a pitch
+ * Log a brand request — demand-tracking signal for unsupported brands.
+ * Called from FitResult's error state. NO email goes out to the brand.
+ * The aggregate count powers in-app social proof + a marketing/BD
+ * dashboard. See backend/api/brand-request.ts for shape.
  */
-export async function nudgeBrand(brandDomain: string, brandName: string): Promise<{ success: boolean; error?: string }> {
+export interface LogBrandRequestPayload {
+  sourceUrl: string;
+  brandDisplay?: string;
+  requesterEmail?: string;
+  userId?: string;
+}
+export interface LogBrandRequestResult {
+  success: boolean;
+  brandHandle?: string;
+  count?: number;
+  error?: string;
+}
+export async function logBrandRequest(
+  payload: LogBrandRequestPayload
+): Promise<LogBrandRequestResult> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/brand-nudge`, {
+    const response = await fetch(`${API_BASE_URL}/api/brand-request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brandDomain, brandName }),
+      body: JSON.stringify(payload),
     });
-    return response.json();
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+    const data = await response.json();
+    return { success: true, brandHandle: data.brandHandle, count: data.count };
   } catch {
-    return { success: false, error: 'Failed to send nudge' };
+    return { success: false, error: 'Failed to log brand request' };
+  }
+}
+
+/**
+ * Read-only aggregate count for a brand_handle. Used by FitResult's
+ * error card to gate the social-proof copy at >= 20.
+ */
+export async function getBrandRequestCount(brandHandle: string): Promise<number> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/brand-request?brandHandle=${encodeURIComponent(brandHandle)}`
+    );
+    if (!response.ok) return 0;
+    const data = await response.json();
+    return typeof data.count === 'number' ? data.count : 0;
+  } catch {
+    return 0;
   }
 }
 
