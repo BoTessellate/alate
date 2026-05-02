@@ -84,7 +84,13 @@ export interface FitHistoryEntry {
 
 interface FitHistoryStore {
   entries: FitHistoryEntry[];
-  addEntry: (entry: Omit<FitHistoryEntry, 'id'>) => void;
+  /** Returns the id of the persisted entry. New entries get a fresh
+   *  id; re-checking an existing URL returns the existing entry's id
+   *  (we dedupe by canonical URL). Callers that need to reference
+   *  the saved entry afterwards (e.g. live-mode FitResult promoting
+   *  itself to history mode) use this id to resolve precomputed
+   *  state on the next render. */
+  addEntry: (entry: Omit<FitHistoryEntry, 'id'>) => string;
   updateEntry: (id: string, patch: Partial<Omit<FitHistoryEntry, 'id'>>) => void;
   removeEntry: (id: string) => void;
   clearHistory: () => void;
@@ -96,39 +102,41 @@ interface FitHistoryStore {
 
 export const useFitHistoryStore = create<FitHistoryStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       entries: [],
-      addEntry: (entry) =>
-        set((state) => {
-          // Dedupe by canonical product URL — re-checking the same item
-          // updates the existing entry's fit score / availability /
-          // timestamp instead of stacking up duplicate cards.
-          const key = canonicalProductKey(entry.url);
-          const existingIdx = state.entries.findIndex(
-            (e) => canonicalProductKey(e.url) === key
-          );
+      addEntry: (entry) => {
+        // Dedupe by canonical product URL — re-checking the same item
+        // updates the existing entry's fit score / availability /
+        // timestamp instead of stacking up duplicate cards.
+        const state = get();
+        const key = canonicalProductKey(entry.url);
+        const existingIdx = state.entries.findIndex(
+          (e) => canonicalProductKey(e.url) === key
+        );
 
-          if (existingIdx !== -1) {
-            const existing = state.entries[existingIdx];
-            const merged: FitHistoryEntry = {
-              ...existing,
-              ...entry,
-              // Keep the original id so anything referencing it
-              // (e.g. an open FitResult screen) still resolves.
-              id: existing.id,
-            };
-            // Move to the front (most recent re-check) and dedupe.
-            const rest = state.entries.filter((_, i) => i !== existingIdx);
-            return { entries: [merged, ...rest].slice(0, 50) };
-          }
-
-          return {
-            entries: [
-              { ...entry, id: generateEntryId() },
-              ...state.entries,
-            ].slice(0, 50), // Keep last 50 entries
+        if (existingIdx !== -1) {
+          const existing = state.entries[existingIdx];
+          const merged: FitHistoryEntry = {
+            ...existing,
+            ...entry,
+            // Keep the original id so anything referencing it
+            // (e.g. an open FitResult screen) still resolves.
+            id: existing.id,
           };
-        }),
+          const rest = state.entries.filter((_, i) => i !== existingIdx);
+          set({ entries: [merged, ...rest].slice(0, 50) });
+          return existing.id;
+        }
+
+        const id = generateEntryId();
+        set({
+          entries: [
+            { ...entry, id },
+            ...state.entries,
+          ].slice(0, 50), // Keep last 50 entries
+        });
+        return id;
+      },
       updateEntry: (id, patch) =>
         set((state) => ({
           entries: state.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),

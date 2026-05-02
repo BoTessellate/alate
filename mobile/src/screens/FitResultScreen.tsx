@@ -39,6 +39,7 @@ import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
+import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
@@ -152,8 +153,18 @@ export default function FitResultScreen() {
       }
     : routeProduct ?? scrapedProduct ?? undefined;
   const url = activeEntry ? activeEntry.url : routeUrl;
-  const historyEntryId = activeEntry ? activeEntry.id : routeHistoryId;
-  const isHistoryMode = !!historyEntryId && (!!activeEntry || !!precomputed);
+  // Live-mode fit auto-saves to history once analyzeFit completes.
+  // The resulting entry id flips this screen into history mode so
+  // the action buttons (Re-evaluate / View on Store / Change
+  // measurements) + remove-from-history affordance match what the
+  // user sees when sifting in from the History tab. Declared early
+  // so the historyEntryId derivation below can fall through to it.
+  const [liveSavedHistoryId, setLiveSavedHistoryId] = useState<string | null>(null);
+  const historyEntryId = activeEntry
+    ? activeEntry.id
+    : routeHistoryId ?? liveSavedHistoryId ?? undefined;
+  const isHistoryMode =
+    !!historyEntryId && (!!activeEntry || !!precomputed || !!liveSavedHistoryId);
 
   // Lazy state init — from activeEntry when available, else precomputed.
   const [loading, setLoading] = useState(!isHistoryMode);
@@ -527,7 +538,7 @@ export default function FitResultScreen() {
           workingProduct.availableSizes
         );
 
-        addEntry({
+        const savedId = addEntry({
           url,
           productName: safeName,
           productImage: workingProduct.image,
@@ -550,6 +561,7 @@ export default function FitResultScreen() {
           brand: safeBrand,
           availability: availabilitySnapshot,
         });
+        setLiveSavedHistoryId(savedId);
       }
     } catch (error) {
       console.error('Fit analysis failed:', error);
@@ -700,34 +712,11 @@ export default function FitResultScreen() {
     Linking.openURL(url);
   };
 
-  /**
-   * Effective severity for the FIT badge — derived from the actual
-   * warnings list, NOT just the backend `fitScore` label. The backend
-   * marks any non-empty warning list as 'moderate', which made a
-   * single MINOR concern (e.g. "minor: A-line styles add volume at
-   * the hip") render with the full ⚠ warning triangle. Per user
-   * direction April 29 2026: "showing a warning on 1 minor concern
-   * feels excessive". Now we compute four tiers:
-   *
-   *   - great:    no warnings
-   *   - minor:    only minor warnings present
-   *   - moderate: at least one moderate warning
-   *   - poor:     at least one major warning
-   *
-   * `minor` reads as a positive verdict ("Great Fit, with a note") —
-   * same green check, but the verdict line carries the "with notes"
-   * sub-text so the user knows there's something to read in the FIT
-   * CONCERNS section.
-   */
-  const effectiveScore: 'great' | 'minor' | 'moderate' | 'poor' = (() => {
-    if (warnings.some((w) => w.severity === 'major')) return 'poor';
-    if (warnings.some((w) => w.severity === 'moderate')) return 'moderate';
-    if (warnings.length > 0) return 'minor';
-    // No warnings — trust the backend's call, which can still be
-    // 'moderate' or 'poor' from rule-based fit logic that didn't
-    // produce a textual warning. (Rare but possible.)
-    return fitScore === 'great' ? 'great' : fitScore;
-  })();
+  // Re-tiered fit verdict — see `utils/effectiveFitScore.ts` for the
+  // full rationale. Same logic now drives the FitDetailBar (cover-flow
+  // detail pill) + HomeScreen RecentCard so a "Great Fit, with a
+  // note" doesn't render as "Concerns" in those views.
+  const effectiveScore = computeEffectiveFitScore(warnings, fitScore);
 
   const getScoreConfig = () => {
     // Use the *Deep text variants per Claude Design — the verdict label
