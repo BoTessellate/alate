@@ -38,9 +38,15 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+    # NOTE: do NOT set `working-directory: backend` here. The Vercel
+    # project is configured with `Root Directory = backend` in its
+    # dashboard settings, and `vercel pull` rehydrates that into
+    # `.vercel/project.json`. If we also `cd backend` before invoking
+    # the CLI, the rootDirectory gets applied a SECOND time → the CLI
+    # looks for the project at `<repo>/backend/backend` and bails
+    # ("provided path does not exist"). Every backend deploy from
+    # 2026-04-25 through 2026-05-02 failed this way. Run from the
+    # repo root and let Vercel's project settings handle the chase.
 
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

@@ -8,6 +8,7 @@ import chromium from '@sparticuz/chromium';
 import { validateUrl } from '../shared/middleware';
 import { createModuleLogger } from '../shared/logger';
 import { tryShopifyJSON } from './shopifyFetch';
+import { tryWooCommerceJSON } from './wooCommerceFetch';
 import { isOriginBlocked, normaliseOrigin } from './blocklist';
 import { isDisallowedByRobots } from './robotsTxt';
 import { parseJSONLDProduct } from './jsonLdParser';
@@ -601,6 +602,46 @@ export async function scrapeProduct(url: string): Promise<{
     // exceptions (e.g. URL parse failures slipping past validateUrl) so
     // the HTML path still runs.
     log.warn({ url, error: (error as Error).message }, 'Shopify direct-fetch threw unexpectedly');
+  }
+
+  // Priority 0.5: WooCommerce direct-fetch. Mirrors the Shopify path
+  // for `/product/<handle>` (singular) URLs via the WC Store API.
+  // Many Indian boutique storefronts (tarshari.in is the canonical
+  // case) emit no JSON-LD and no product:price OG tags, so without
+  // this layer the fit card lands with no price + the wrong title.
+  // Returns null silently for non-WooCommerce sites.
+  try {
+    const wooResult = await tryWooCommerceJSON(new URL(url));
+    if (wooResult && wooResult.title) {
+      log.info({ url }, 'Using WooCommerce direct-fetch result (skipping HTML extraction)');
+      return {
+        data: {
+          title: wooResult.title,
+          brandName: wooResult.brandName,
+          price: wooResult.price,
+          currency: wooResult.currency,
+          imageUrl: wooResult.imageUrl,
+          description: wooResult.description,
+          availableSizes: wooResult.availableSizes,
+          category: wooResult.category,
+          tags: wooResult.tags,
+          material: wooResult.material,
+          compareAtPrice: wooResult.compareAtPrice,
+          customFit: wooResult.customFit,
+        },
+        debug: {
+          requestedUrl: url,
+          finalUrl: url,
+          htmlLength: 0,
+          hasPriceAmount: !!wooResult.price,
+          hasPriceCurrency: !!wooResult.currency,
+          usedPuppeteer: false,
+          htmlPreview: '[WooCommerce direct-fetch — no HTML processed]',
+        },
+      };
+    }
+  } catch (error) {
+    log.warn({ url, error: (error as Error).message }, 'WooCommerce direct-fetch threw unexpectedly');
   }
 
   let html: string;

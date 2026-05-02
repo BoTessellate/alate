@@ -113,4 +113,86 @@ describe('filterUserFacingTags', () => {
     // the underscore-replacement step. Lock the behavior in.
     expect(filterUserFacingTags(['new_drop', 'new_arrival', 'Linen'])).toEqual(['Linen']);
   });
+
+  // Reistor + Oshin regression cases (May 2 2026 user testing). The
+  // existing filter let through campaign codes, near-typos of "sale",
+  // SKU-style design codes, and "new price" pricing labels. Each
+  // pattern below is its own test so a future regression points at
+  // the exact missing rule.
+
+  it('strips resort / cruise / capsule season codes', () => {
+    // Reistor: "resort24" — the brand's resort 2024 collection slug.
+    // Mirrors how we already drop SS24 / AW2024.
+    expect(filterUserFacingTags(['resort24', 'cruise2025', 'holiday-25', 'capsule24', 'Linen'])).toEqual(['Linen']);
+  });
+
+  it('strips "new price" / "regular price" / "marked down" pricing labels', () => {
+    // Oshin: "new price" — merchandising flag for re-priced items.
+    // Same family as the existing "Full Price" rule.
+    expect(filterUserFacingTags(['new price', 'Regular Price', 'marked down', 'Linen'])).toEqual(['Linen']);
+  });
+
+  it('strips short SKU / design codes like "dc-01", "tm08-2", "sku123"', () => {
+    // Oshin: "dc-01" — design code, not a garment attribute. Pattern:
+    // 1-4 letters + optional separator + 1-4 digits, with optional
+    // trailing -<digit> suffix. Excludes legit hyphenated tags like
+    // "v-neck" (no digits) and "high-waisted".
+    expect(filterUserFacingTags(['dc-01', 'tm08', 'sku123', 'AB-12-3', 'Linen'])).toEqual(['Linen']);
+    // Negative cases: real garment tags survive.
+    expect(filterUserFacingTags(['v-neck', 'high-waisted', 'off-shoulder', 'square-neck'])).toEqual([
+      'v-neck', 'high-waisted', 'off-shoulder', 'square-neck',
+    ]);
+  });
+
+  it('catches near-typos of "sale" like "salex", "sales", "saleitem"', () => {
+    // Reistor: "salex" slipped past the word-bounded \bsale\b rule.
+    // Broaden to catch the suffix variants merchants actually emit.
+    expect(filterUserFacingTags(['salex', 'sales', 'saleitem', 'Linen'])).toEqual(['Linen']);
+    // Negative case: don't false-positive on words that contain
+    // "sale" as part of a real word (e.g. "wholesale" — unlikely as
+    // a garment tag but cover the regression).
+    expect(filterUserFacingTags(['wholesaler', 'Linen'])).toEqual(['wholesaler', 'Linen']);
+  });
+
+  it('dedupes near-identical tags case + space insensitively (organic cotton vs organiccotton)', () => {
+    // Reistor emitted both "organic cotton" and "organiccotton" — same
+    // attribute, two formattings. First occurrence wins; later dupes
+    // dropped. Comparison is case + whitespace insensitive.
+    expect(filterUserFacingTags(['organic cotton', 'organiccotton', 'Linen'])).toEqual([
+      'organic cotton', 'Linen',
+    ]);
+    // Order-preserved: if the run-on form comes first, it wins.
+    expect(filterUserFacingTags(['organiccotton', 'organic cotton', 'Linen'])).toEqual([
+      'organiccotton', 'Linen',
+    ]);
+    // Case insensitive too.
+    expect(filterUserFacingTags(['Cotton', 'COTTON', 'cotton'])).toEqual(['Cotton']);
+  });
+
+  it('strips "dawn to dusk" style brand campaign / lookbook names is NOT covered (regression spec)', () => {
+    // Documenting the limit: free-form campaign names ("dawn to dusk",
+    // "nightfall edit", "weekend ritual") aren't predictable enough to
+    // pattern-match without false-positives on legit tags ("date night",
+    // "weekend"). They remain user-visible. If this gets flagged in
+    // testing again, the answer is brand-level overrides, not more
+    // regex. Test locks the current behavior.
+    expect(filterUserFacingTags(['dawn to dusk', 'Linen'])).toEqual(['dawn to dusk', 'Linen']);
+  });
+
+  it('end-to-end on the live Reistor tag list (May 2 2026 regression)', () => {
+    const raw = ['cotton', 'dawn to dusk', 'organic cotton', 'organiccotton', 'resort24', 'salex'];
+    expect(filterUserFacingTags(raw)).toEqual([
+      'cotton',
+      'dawn to dusk',
+      'organic cotton',
+    ]);
+  });
+
+  it('end-to-end on the live Oshin tag list (May 2 2026 regression)', () => {
+    const raw = ['custom', 'dc-01', 'new price', 'women'];
+    // "women" survives — the demographic filter is intentionally NOT
+    // included (would false-positive on "for women" / "womens cut" /
+    // similar legit attributes; brand-override is the better lever).
+    expect(filterUserFacingTags(raw)).toEqual(['custom', 'women']);
+  });
 });

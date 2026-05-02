@@ -25,13 +25,21 @@
  */
 
 const NOISE_PATTERNS: RegExp[] = [
-  // Sale codes: "sale", "sale-10", "may-sale", "blackfriday-sale", etc.
-  /\bsale\b/i,
+  // Sale codes: "sale", "sale-10", "may-sale", "blackfriday-sale", and
+  // common typos / merchant suffixes: "salex", "sales", "saleitem".
+  // Word-boundary on the LEFT only — anchoring right with \b would
+  // miss "salex" (which is what bit us in Reistor testing May 2 2026).
+  /\bsale(?:s|x|item)?\b/i,
   // Date-bounded marketing tags: "april26-sale-10", "spring2026"
   /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\d/i,
-  // Pricing labels
+  // Pricing labels — "Full Price", "20% off", "new price", "regular
+  // price", "marked down". Same family: merchandising flags that
+  // describe the price stage, not the garment.
   /\bfull\s*price\b/i,
   /\b\d+%\s*off\b/i,
+  /\bnew\s+price\b/i,
+  /\bregular\s+price\b/i,
+  /\bmarked\s+down\b/i,
   // Marketing labels
   /\bbest\s*seller\b/i,
   /\bmost\s*loved\b/i,
@@ -42,10 +50,20 @@ const NOISE_PATTERNS: RegExp[] = [
   // Collection / drop slugs
   /\bdrop\s+[ivx\d]+/i,
   /\b(ss|aw|fw|ss)\d{2,4}\b/i, // "SS24", "AW2024"
+  // Resort / cruise / capsule + 2-4 digit collection codes —
+  // "resort24", "cruise2025", "holiday-25", "capsule24". Mirrors the
+  // existing season-prefix pattern; merchants extend the same naming
+  // scheme to non-spring/fall lines.
+  /\b(resort|cruise|holiday|festive|capsule)\W?\d{2,4}\b/i,
   /\bcollection\s*\d+/i,
   // Sizes (already shown in the size pill, redundant as tags)
   /^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|4xl|one\s*size)$/i,
   /^(uk|us|eu|au)\s*\d+/i, // "UK 10", "US 4"
+  // SKU / design-code shaped tags: 1-4 letters, optional separator,
+  // 1-4 digits, optional `-N` suffix. Catches "dc-01", "tm08", "sku123",
+  // "AB-12-3". Real garment tags with hyphens stay safe because they
+  // have no digit run ("v-neck", "high-waisted", "off-shoulder").
+  /^[a-z]{1,4}[-_]?\d{1,4}(?:[-_]\d{1,3})?$/i,
   // Mix-and-match / set merchandising
   /\bmix\s*\+?\s*match\b/i,
   /\bsets?\b/i,
@@ -75,6 +93,16 @@ const NOISE_PATTERNS: RegExp[] = [
 ];
 
 /**
+ * Normalize a tag for dedup comparison. Lowercase, strip whitespace +
+ * hyphens + underscores. Catches the Reistor case (May 2 2026) where
+ * "organic cotton" and "organiccotton" rendered as separate chips —
+ * same attribute, two formattings.
+ */
+function dedupKey(tag: string): string {
+  return tag.toLowerCase().replace(/[\s\-_]+/g, '');
+}
+
+/**
  * Filter a list of raw Shopify tags down to user-facing ones.
  * Order is preserved. Empty / whitespace-only entries are dropped.
  *
@@ -90,7 +118,7 @@ export function filterUserFacingTags(
 
   const lowerCategory = (excludeCategory || '').trim().toLowerCase();
 
-  return tags
+  const cleaned = tags
     .map((t) => (typeof t === 'string' ? t.trim() : ''))
     .filter((t) => t.length > 0)
     .filter((t) => !NOISE_PATTERNS.some((p) => p.test(t)))
@@ -100,4 +128,18 @@ export function filterUserFacingTags(
     // intact. Normalize to spaces so they render as natural words on
     // the chip pill (April 29 2026 polish).
     .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim());
+
+  // Dedupe: case + whitespace + separator-insensitive. Reistor (May 2
+  // 2026) shipped both "organic cotton" and "organiccotton" — same
+  // attribute, two formattings. First occurrence wins to preserve the
+  // merchant's preferred presentation.
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const tag of cleaned) {
+    const key = dedupKey(tag);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(tag);
+  }
+  return deduped;
 }
