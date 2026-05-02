@@ -500,5 +500,40 @@ describe('api service', () => {
     it('returns null on empty string', () => {
       expect(extractBrandFromUrl('')).toBeNull();
     });
+
+    it('strips wwwN. numeric subdomains (H&M www2.hm.com regression)', () => {
+      // May 2 2026 user testing: H&M product URLs hostname is
+      // `www2.hm.com`. The strict `^www\.` strip left it intact, so
+      // the brand label rendered as "Www2" instead of "Hm".
+      expect(extractBrandFromUrl('https://www2.hm.com/en_in/productpage.123.html')).toEqual({
+        brandName: 'Hm',
+        brandDomain: 'hm.com',
+      });
+      expect(extractBrandFromUrl('https://www3.example.com/p/1')).toEqual({
+        brandName: 'Example',
+        brandDomain: 'example.com',
+      });
+    });
+
+    it('strips shop / store subdomains', () => {
+      expect(extractBrandFromUrl('https://shop.example.com/p/1')).toEqual({
+        brandName: 'Example',
+        brandDomain: 'example.com',
+      });
+      expect(extractBrandFromUrl('https://store2.example.com/p/1')).toEqual({
+        brandName: 'Example',
+        brandDomain: 'example.com',
+      });
+    });
+
+    it('does NOT strip arbitrary subdomains', () => {
+      // Don't over-strip — `eu.somebrand.com` should still resolve
+      // to "Eu" (caller can normalise further if needed); only the
+      // generic www/shop/store/m prefixes get treated.
+      expect(extractBrandFromUrl('https://eu.somebrand.com/p/1')).toEqual({
+        brandName: 'Eu',
+        brandDomain: 'eu.somebrand.com',
+      });
+    });
   });
 });

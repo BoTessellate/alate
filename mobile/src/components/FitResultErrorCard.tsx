@@ -32,6 +32,8 @@ import {
   Linking,
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -138,20 +140,20 @@ export default function FitResultErrorCard({ url, scrapeError, onGoBack }: Props
   const isUnsupported = scrapeError.kind === 'unsupported';
 
   const headline = isBlocked
-    ? `${scrapeError.origin || brandName || 'this brand'} has opted out`
+    ? `${scrapeError.origin || brandName || 'This brand'} has opted out`
     : isUnsupported
     ? brandName
       ? `${brandName} isn't on alate yet`
-      : "we couldn't read this product"
-    : 'something went wrong';
+      : "We couldn't read this product"
+    : 'Something went wrong';
 
   const showSocialProof = isUnsupported && count >= SOCIAL_PROOF_MIN;
   const body = isBlocked
-    ? "this brand has asked us not to read their products. you can still visit their store."
+    ? "This brand has asked us not to read their products. You can still visit their store."
     : isUnsupported
     ? showSocialProof
-      ? `you're one of ${count} people who want this brand on alate. we'll get to it.`
-      : "we're tracking demand for this brand. visit the store directly in the meantime."
+      ? `You're one of ${count} people who want this brand on alate. We'll get to it.`
+      : "We're tracking demand for this brand. Visit the store directly in the meantime."
     : scrapeError.message;
 
   const showNotifyCta = isUnsupported && !submitted;
@@ -202,7 +204,7 @@ export default function FitResultErrorCard({ url, scrapeError, onGoBack }: Props
               style={styles.notifyInput}
               value={email}
               onChangeText={setEmail}
-              placeholder="your@email.com"
+              placeholder="Your email"
               placeholderTextColor={colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -231,44 +233,53 @@ export default function FitResultErrorCard({ url, scrapeError, onGoBack }: Props
         ) : null}
         {submitted ? (
           <Text style={styles.submittedNote} testID="fit-result-error-notify-confirm">
-            we'll let you know when {brandName ?? 'this brand'} is added.
+            We'll let you know when {brandName ?? 'this brand'} is added.
           </Text>
         ) : null}
       </View>
 
-      {/* Actions */}
-      <View style={styles.actions}>
-        {showVisitStore ? (
-          <TouchableOpacity
-            testID="fit-result-error-open-store"
-            style={styles.primaryButton}
-            onPress={() => Linking.openURL(url)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.primaryButtonText}>visit store directly</Text>
-          </TouchableOpacity>
-        ) : null}
+      {/* Actions — KeyboardAvoidingView lifts the whole stack when the
+          notify input opens the soft keyboard, so the email field stays
+          visible above the keyboard instead of being covered. The
+          actions container sits above the floating nav pill (bottom
+          margin clears the ~96px pill + safe-area). */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <View style={styles.actions}>
+          {showVisitStore ? (
+            <TouchableOpacity
+              testID="fit-result-error-open-store"
+              style={styles.primaryButton}
+              onPress={() => Linking.openURL(url)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryButtonText}>Visit store directly</Text>
+            </TouchableOpacity>
+          ) : null}
 
-        {showNotifyCta && !notifyOpen ? (
+          {showNotifyCta && !notifyOpen ? (
+            <TouchableOpacity
+              testID="fit-result-error-notify-toggle"
+              style={styles.ghostButton}
+              onPress={() => setNotifyOpen(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.ghostButtonText}>Notify me when added</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
-            testID="fit-result-error-notify-toggle"
+            testID="fit-result-error-go-back"
             style={styles.ghostButton}
-            onPress={() => setNotifyOpen(true)}
+            onPress={onGoBack}
             activeOpacity={0.7}
           >
-            <Text style={styles.ghostButtonText}>notify me when added</Text>
+            <Text style={styles.ghostButtonText}>Back</Text>
           </TouchableOpacity>
-        ) : null}
-
-        <TouchableOpacity
-          testID="fit-result-error-go-back"
-          style={styles.ghostButton}
-          onPress={onGoBack}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.ghostButtonText}>back</Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -377,7 +388,11 @@ const styles = StyleSheet.create({
   },
 
   actions: {
-    paddingBottom: spacing.xl,
+    // The floating nav pill sits ~10px above the gesture-bar with
+    // height 64. Need to clear it (74-100px) PLUS some breathing room
+    // so "Back" doesn't visually crowd the pill. spacing.xl wasn't
+    // enough — Back was ~touching the pill on Pixel-class screens.
+    paddingBottom: 110,
     gap: spacing.sm,
   },
   primaryButton: {
