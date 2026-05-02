@@ -55,13 +55,13 @@ function shortUrl(url: string): string {
 }
 
 export default function FitLoader({
-  title = 'reading the size chart…',
+  title = 'Reading the size chart…',
   // Gender-neutral copy. Earlier text named "bust, waist and hip"
   // explicitly, which read as woman-coded for users whose profile
   // doesn't centre on those landmarks. The size-chart match still
   // uses the same body measurements internally — the loader just
   // doesn't need to enumerate them.
-  subtitle = 'matching your measurements against the size chart. usually under ten seconds.',
+  subtitle = 'Matching your measurements against the size chart. Usually under ten seconds.',
   url,
 }: FitLoaderProps) {
   return (
