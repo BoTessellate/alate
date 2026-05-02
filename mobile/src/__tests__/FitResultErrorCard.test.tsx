@@ -88,7 +88,7 @@ describe('FitResultErrorCard — unsupported brand', () => {
       />
     );
     expect(getByTestId('fit-result-error-headline').props.children).toBe(
-      "we couldn't read this product"
+      "We couldn't read this product"
     );
   });
 

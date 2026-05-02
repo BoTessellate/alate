@@ -61,7 +61,7 @@ export default function FitLoader({
   // doesn't centre on those landmarks. The size-chart match still
   // uses the same body measurements internally — the loader just
   // doesn't need to enumerate them.
-  subtitle = 'Matching your measurements against the size chart. Usually under ten seconds.',
+  subtitle = "Matching your measurements against the size chart. Usually takes a hot second — hang tight.",
   url,
 }: FitLoaderProps) {
   return (

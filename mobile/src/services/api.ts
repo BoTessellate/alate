@@ -268,12 +268,20 @@ export async function enrichProduct(product: {
 /**
  * Extract brand name from a URL domain
  */
+// Generic-subdomain prefixes we strip before extracting the brand
+// label. Captures the standard `www.`, the numeric variants H&M uses
+// (`www2.hm.com`), and shop / store / store2 prefixes some brands
+// route through. Anything past the prefix is the real domain.
+//
+// Known regression (May 2 2026): H&M's product pages live under
+// `www2.hm.com/...`, and a strict `^www\.` strip left `www2.hm.com`
+// intact, so the brand label rendered as "Www2" instead of "Hm".
+const SUBDOMAIN_PREFIX_PATTERN = /^(www\d*|shop\d*|store\d*|m|mobile)\./i;
+
 export function extractBrandFromUrl(url: string): { brandName: string; brandDomain: string } | null {
   try {
     const { hostname } = new URL(url);
-    // Remove www. and get the main domain name
-    const domain = hostname.replace(/^www\./, '');
-    // Extract brand name from domain (e.g. "asos.com" -> "ASOS")
+    const domain = hostname.replace(SUBDOMAIN_PREFIX_PATTERN, '');
     const name = domain.split('.')[0];
     const brandName = name.charAt(0).toUpperCase() + name.slice(1);
     return { brandName, brandDomain: domain };

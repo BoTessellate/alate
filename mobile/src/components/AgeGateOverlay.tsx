@@ -53,7 +53,7 @@ export default function AgeGateOverlay() {
         <View style={styles.content}>
           <GlassCard style={styles.card}>
             <Feather name="heart" size={28} color={colors.primary} />
-            <Text style={styles.deflectTitle}>thank you for being honest</Text>
+            <Text style={styles.deflectTitle}>Thank you for being honest</Text>
             <Text style={styles.deflectBody}>
               Alate collects body measurements to predict garment fit, so we ask users to
               be 16 or older. Please come back when you meet the age requirement — we'll
@@ -178,7 +178,9 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   deflectTitle: {
-    ...typography.headingM,
+    // Bumped to headingXL to match the "are you a brand?" CTA voice;
+    // headingM read too small as a deflect-screen title.
+    ...typography.headingXL,
     color: colors.text,
     textAlign: 'center',
   },

@@ -15,6 +15,21 @@ import { useShareIntentContext } from '../utils/shareIntent';
 import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
 import { isEnabled } from '../constants/featureFlags';
 import { ScrapedProduct, FitWarning } from '../services/api';
+
+/** Steps the AvatarSetup screen scrolls to when navigated with a
+ *  `focusKey`. Mirrors the STEPS array's `key` field; centralised
+ *  here so tap-to-edit affordances elsewhere (Account screen profile
+ *  rows) stay in sync without duplicating the literal union. */
+export type AvatarFocusKey =
+  | 'gender'
+  | 'height'
+  | 'shoulders'
+  | 'bust'
+  | 'waist'
+  | 'tummy'
+  | 'hips'
+  | 'thighs'
+  | 'torso';
 import type { FitHistoryEntry } from '../store/fitHistoryStore';
 import { useAvatarStore } from '../store/avatarStore';
 import { usePendingShareStore } from '../store/pendingShareStore';
@@ -44,7 +59,7 @@ const SafeOverlayEditor = () => <ScreenErrorBoundary name="OverlayEditorScreen">
 // Navigation types
 export type RootStackParamList = {
   Main: undefined;
-  AvatarSetup: undefined;
+  AvatarSetup: { focusKey?: AvatarFocusKey } | undefined;
   /** v2: Story share — gated by featureFlags.V2 */
   PickImage: undefined;
   /** v2: Story share — gated by featureFlags.V2 */

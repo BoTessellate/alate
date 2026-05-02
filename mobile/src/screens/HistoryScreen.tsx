@@ -203,7 +203,7 @@ export default function HistoryScreen() {
           style={StyleSheet.absoluteFill}
         />
         <View testID="history-screen" style={styles.emptyContainer}>
-          <Text style={styles.pageTitle}>History</Text>
+          <Text style={[styles.pageTitle, styles.emptyPageTitle]}>History</Text>
           <View style={styles.emptyIconContainer}>
             <Feather name="clock" size={36} color="#fff" />
           </View>
@@ -505,6 +505,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
+  // Empty-state "History" heading. The shared pageTitle style sits
+  // flush against the icon ring below it (centred container has no
+  // intrinsic gap). Add breathing room so the heading reads as the
+  // page title, not as a label glued to the icon.
+  emptyPageTitle: {
+    marginBottom: spacing.xl,
+  },
   // Empty-state icon ring — light frosted disc, readable on the
   // brand-purple gradient (April 29 2026 backdrop change).
   emptyIconContainer: {
@@ -517,7 +524,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   emptyTitle: {
-    ...typography.headingM,
+    // Bumped from headingM → headingXL to match the "are you a brand?"
+    // CTA on the Account tab — the empty-state title was reading too
+    // small against the gradient backdrop, especially on phones with
+    // larger screens.
+    ...typography.headingXL,
     color: '#fff',
     marginBottom: spacing.sm,
   },
