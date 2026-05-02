@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   sectionLabel: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 1.8,
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     backgroundColor: whiteAlpha.surfaceMid,
   },
   editPillText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 10,
     fontWeight: '600',
     color: '#fff',

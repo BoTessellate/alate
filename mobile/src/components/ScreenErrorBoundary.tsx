@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   icon: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 48,
     fontWeight: '700',
     color: colors.error,

@@ -75,6 +75,24 @@ function App() {
     // Both paths reference the SAME file basename + key, so JS can
     // use `fontFamily: 'ViaodaLibre-Regular'` cross-platform.
     'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
+    // DM Sans (Google Fonts, OFL) — body / label / button face,
+    // replacing the platform system serif (May 2 2026). Loaded as four
+    // discrete weight files because RN Android's font weight resolution
+    // is unreliable across sub-families (Medium and SemiBold register
+    // as their own family per the ttf name table — `'DM Sans Medium'`,
+    // `'DM Sans SemiBold'`). Reference each weight by its expo-font
+    // key directly in styles (`fontFamily: 'DMSans-Medium'`) instead of
+    // relying on the family + fontWeight resolver — same defensive
+    // pattern as Viaoda Libre.
+    //
+    // Each ttf is also bundled into
+    // `android/app/src/main/assets/fonts/` so RN Android's typeface
+    // manager can resolve by file basename — same belt-and-braces as
+    // Viaoda Libre (see project_regression_log.md font-binding saga).
+    'DMSans-Regular': require('./assets/fonts/DMSans-Regular.ttf'),
+    'DMSans-Medium': require('./assets/fonts/DMSans-Medium.ttf'),
+    'DMSans-SemiBold': require('./assets/fonts/DMSans-SemiBold.ttf'),
+    'DMSans-Bold': require('./assets/fonts/DMSans-Bold.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

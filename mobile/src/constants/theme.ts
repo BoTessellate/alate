@@ -4,38 +4,47 @@
  */
 
 // =============================================================================
-// FONT FAMILIES — two faces, full stop.
+// FONT FAMILIES — two faces, four weights.
 // =============================================================================
-// The app intentionally uses ONLY two faces:
-//   - `primary`: the platform's system serif. Android → Noto Serif
-//     (ships on every device); iOS → Times New Roman. Used for body,
-//     labels, captions, chips, tags, buttons — every non-display
-//     surface.
+// The app uses two faces:
+//   - `primary*`: DM Sans (Google Fonts, OFL). Geometric humanist
+//     sans-serif. Replaces the platform system serif (May 2 2026)
+//     because the system serif rendered inconsistently across phones
+//     and read clinical against the Viaoda Libre display headings.
+//     Loaded as four discrete weight files (Regular / Medium /
+//     SemiBold / Bold) bundled via `useFonts` in App.tsx.
+//
+//     Why four named tokens instead of one + fontWeight: RN Android's
+//     font weight resolver only walks within a single family, but DM
+//     Sans static ttfs split Medium and SemiBold into their own
+//     families per the name table (`'DM Sans Medium'`, `'DM Sans
+//     SemiBold'`) — so `fontFamily: 'DM Sans' + fontWeight: '500'`
+//     silently falls back to Regular or Bold. Solution: name each
+//     weight by its expo-font key (matches its file basename + ttf
+//     PostScript name) and pick the right token per role.
+//
 //   - `display`: Viaoda Libre (Google Fonts, OFL). Bundled via
 //     `useFonts` in App.tsx. Used for page titles + hero verses.
 //     Family name MUST be the exact string the ttf's name table
 //     reports for NameID 1, including the space — see anti-pattern
 //     #12 in `project_anti_patterns.md`.
 //
-// History: earlier versions also exported `accent` (Georgia), `mono`
+// History: prior to May 2 2026 `primary` was `'serif'` (system serif).
+// Earlier still, the registry also exported `accent` (Georgia), `mono`
 // (system monospace), `fallback` (duplicate of primary), and
-// `displayLegacy` (DM Serif Display Italic — the .ttf was deleted
-// when we moved to Viaoda Libre). None had any callsites; all were
-// dropped April 29 2026 to keep the design system tight ("two fonts,
-// not five"). Adding a new face needs an explicit reason — every
-// extra font is one more thing to load, mismatch, or reconcile.
+// `displayLegacy` (DM Serif Display Italic — ttf deleted when we
+// moved to Viaoda Libre). None had any callsites; all were dropped
+// April 29 2026. Adding a new face needs an explicit reason.
 export const fontFamily = {
-  // System serif — Noto Serif on Android, Times New Roman on iOS.
-  // Multi-weight, so labels / buttons / chips can lean on bold for
-  // hierarchy without falling back to a different face.
-  //
-  // Briefly experimented with primary: 'ViaodaLibre-Regular' to put
-  // the whole app on the display serif (April 29 2026), but
-  // Viaoda Libre is single-weight — every inline `fontWeight: '500'`
-  // / '600' / '700' across screens silently fell back to system
-  // serif Bold, defeating the point. Reverted same day; multi-
-  // weight reading-serif is on the v2 typography roadmap.
-  primary: 'serif',
+  // Body / paragraph default. 400 weight.
+  primary: 'DMSans-Regular',
+  // Labels, button copy, chip labels — anywhere the system used to
+  // ask for fontWeight: '500'.
+  primaryMedium: 'DMSans-Medium',
+  // Section labels, overline copy — fontWeight: '600' equivalent.
+  primarySemiBold: 'DMSans-SemiBold',
+  // Strong emphasis, primary CTA labels — fontWeight: '700' equivalent.
+  primaryBold: 'DMSans-Bold',
   display: 'ViaodaLibre-Regular',
 };
 
@@ -212,7 +221,7 @@ export const typography = {
     lineHeight: 28,
   },
   headingS: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 16,
     fontWeight: '600' as const,
     lineHeight: 24,
@@ -244,24 +253,24 @@ export const typography = {
     lineHeight: 21,
   },
 
-  // Labels & Buttons — Medium weight back; system serif (Noto Serif
-  // on Android) ships multiple weights so this resolves cleanly.
+  // Labels & Buttons — Medium weight via DMSans-Medium (own family
+  // file, see fontFamily comment).
   labelLarge: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryMedium,
     fontSize: 17,
     fontWeight: '500' as const,
     lineHeight: 25,
     letterSpacing: 0.1,
   },
   label: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryMedium,
     fontSize: 15,
     fontWeight: '500' as const,
     lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelSmall: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryMedium,
     fontSize: 13,
     fontWeight: '500' as const,
     lineHeight: 18,
@@ -287,7 +296,7 @@ export const typography = {
     lineHeight: 19,
   },
   overline: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primarySemiBold,
     fontSize: 13,
     fontWeight: '600' as const,
     lineHeight: 16,
@@ -296,10 +305,10 @@ export const typography = {
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primary, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primary, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primary, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primary, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primarySemiBold, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primarySemiBold, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primarySemiBold, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primarySemiBold, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
 };
 
 // =============================================================================

@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   primaryBtnText: {
-    fontFamily: fontFamily.primary,
+    fontFamily: fontFamily.primaryBold,
     fontSize: 15,
     color: colors.white,
     fontWeight: '700',
