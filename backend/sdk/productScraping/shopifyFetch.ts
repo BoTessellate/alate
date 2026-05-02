@@ -445,6 +445,18 @@ export async function tryShopifyJSON(
     // object entirely (it requires both amount + currency).
     const currency = primaryVariant?.price_currency || inferCurrencyFromHostname(url.hostname);
 
+    // Some merchants (Oshin Sarin confirmed May 2 2026) offer
+    // made-to-measure as a page-level CTA but don't expose any signal
+    // in their Shopify JSON — it's rendered as an HTML button via
+    // their theme. When detectCustomFit() found nothing in the JSON,
+    // fetch the rendered HTML page and run the same pattern over it
+    // so we don't miss the affordance. Skipped when JSON already had
+    // a signal — keeps the happy path single-request.
+    let resolvedCustomFit = customFit;
+    if (!resolvedCustomFit) {
+      resolvedCustomFit = await tryCustomFitFromHtml(url, fetchFn);
+    }
+
     const result: ShopifyScrapedData = {
       // title and brandName are run through `stripHtmlAndDecode`
       // because some merchants (yamayoga.in confirmed April 29 2026)
@@ -462,7 +474,7 @@ export async function tryShopifyJSON(
       tags: tags.length ? tags : undefined,
       material: extractMaterialFromTags(tags),
       availableSizes: availableSizes.length ? availableSizes : undefined,
-      customFit,
+      customFit: resolvedCustomFit,
     };
 
     log.info({ jsonUrl, handle }, 'Shopify JSON fetch succeeded');
@@ -470,5 +482,42 @@ export async function tryShopifyJSON(
   } catch (error) {
     log.debug({ jsonUrl, error: (error as Error).message }, 'Shopify JSON fetch failed');
     return null;
+  }
+}
+
+/**
+ * Fallback custom-fit detection from the rendered product page HTML.
+ * Used when the Shopify JSON has no signal (option / tag / title) but
+ * the merchant exposes their made-to-measure offer via a theme-level
+ * button. Cheap to run — a single GET and a regex sweep — gated on
+ * the JSON-side signal being absent so the typical scrape stays one
+ * request.
+ *
+ * Returns undefined on any failure (network, non-2xx, parse) — the
+ * call site already treats undefined as "no custom fit".
+ */
+async function tryCustomFitFromHtml(
+  url: URL,
+  fetchFn: typeof fetch
+): Promise<{ available: boolean; label?: string } | undefined> {
+  try {
+    const response = await fetchFn(url.toString(), {
+      method: 'GET',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 ' +
+          'Alate/1.0 (+https://alate.app)',
+        Accept: 'text/html',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return undefined;
+    const html = await response.text();
+    const match = html.match(CUSTOM_FIT_PATTERN);
+    if (!match) return undefined;
+    return { available: true, label: canonicaliseCustomFitLabel(match[0]) };
+  } catch {
+    return undefined;
   }
 }

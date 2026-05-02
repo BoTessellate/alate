@@ -175,7 +175,31 @@ function mockFetch(response: unknown, status = 200) {
     ok: status >= 200 && status < 300,
     status,
     json: async () => response,
+    text: async () => '',
   } as Response);
+}
+
+/** Two-call mock: first call (JSON) returns the JSON payload, second
+ *  call (HTML fallback for custom-fit) returns the given HTML body. */
+function mockFetchJsonThenHtml(jsonPayload: unknown, html: string) {
+  let call = 0;
+  return vi.fn().mockImplementation(async () => {
+    call++;
+    if (call === 1) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => jsonPayload,
+        text: async () => '',
+      } as Response;
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => html,
+    } as Response;
+  });
 }
 
 describe('tryShopifyJSON', () => {
@@ -542,17 +566,76 @@ describe('tryShopifyJSON', () => {
     expect(result!.customFit).toBeUndefined();
   });
 
-  it('does not set customFit on real Oshin co-ord JSON (live shape has no JSON-level signal)', async () => {
-    // Documents the known coverage gap: Oshin offers made-to-measure
-    // via a page-level CTA, but the storefront JSON has no option /
-    // tag / title signal. Detecting it would need HTML scraping or a
-    // brand allowlist (anti-pattern #1). Locked in so a future regex
-    // tweak can't accidentally tag every Oshin co-ord as MtM.
-    const fetchFn = mockFetch(SAMPLE_OSHIN_RESPONSE);
+  it('detects customFit from the rendered HTML page when JSON has no signal', async () => {
+    // Oshin (and others) offer made-to-measure via a theme-level CTA
+    // that doesn't appear in the Shopify JSON. After the JSON-level
+    // detection misses, we fetch the page HTML and run the same
+    // pattern. The May 2 2026 capture from oshinsarin.in shows
+    // `subtitle" onclick="showCustomSize()"> CUSTOM SIZE </p>` in the
+    // page body — the regex picks that up.
+    const html = `
+      <!DOCTYPE html><html><body>
+      <div class="size-options">XS S M L XL</div>
+      <p class="subtitle" onclick="showCustomSize()"> CUSTOM SIZE </p>
+      <script>function showCustomSize() {}</script>
+      </body></html>
+    `;
+    const fetchFn = mockFetchJsonThenHtml(SAMPLE_OSHIN_RESPONSE, html);
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/draped-blazer-set'),
+      fetchFn
+    );
+    expect(result!.customFit?.available).toBe(true);
+    expect(result!.customFit?.label?.toLowerCase()).toMatch(/custom|measure/);
+    // Confirms the fallback ran (two fetches: JSON + HTML).
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not run the HTML fallback when the JSON already has a custom-fit signal', async () => {
+    // Happy path stays single-request — no extra latency for products
+    // that DID surface custom-fit at the JSON layer.
+    const fetchFn = mockFetchJsonThenHtml(SAMPLE_CUSTOM_SIZE_RESPONSE, '');
+    const result = await tryShopifyJSON(
+      new URL('https://example.com/products/mtm-dress'),
+      fetchFn
+    );
+    expect(result!.customFit?.available).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns undefined customFit when neither JSON nor HTML show the signal', async () => {
+    // Plain product, no custom-fit anywhere. Both fetches happen but
+    // the result is still undefined.
+    const html = '<html><body><p>Just a regular product</p></body></html>';
+    const fetchFn = mockFetchJsonThenHtml(SAMPLE_OSHIN_RESPONSE, html);
     const result = await tryShopifyJSON(
       new URL('https://oshinsarin.in/products/harbour-set'),
       fetchFn
     );
+    expect(result!.customFit).toBeUndefined();
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('handles HTML fallback failure gracefully (network error → no customFit)', async () => {
+    // Sentry breadcrumb is fine; we should not throw or break the
+    // whole scrape because of a fallback failure.
+    let call = 0;
+    const fetchFn = vi.fn().mockImplementation(async () => {
+      call++;
+      if (call === 1) {
+        return {
+          ok: true, status: 200,
+          json: async () => SAMPLE_OSHIN_RESPONSE,
+          text: async () => '',
+        } as Response;
+      }
+      throw new Error('ECONNRESET');
+    });
+    const result = await tryShopifyJSON(
+      new URL('https://oshinsarin.in/products/harbour-set'),
+      fetchFn
+    );
+    expect(result).not.toBeNull();
     expect(result!.customFit).toBeUndefined();
   });
 
