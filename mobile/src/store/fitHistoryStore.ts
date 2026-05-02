@@ -80,6 +80,12 @@ export interface FitHistoryEntry {
    *  because pre-availability history entries don't have this field;
    *  components should treat missing as "unknown". */
   availability?: HistoryAvailability;
+  /** Made-to-measure / custom-fit signal surfaced by the scraper.
+   *  Persisted on the history entry so the lavender pill on the
+   *  FitResult hero stays visible when the user re-opens this fit
+   *  via History (otherwise the badge disappeared on back-nav since
+   *  the activeEntry → product remap dropped the field). */
+  customFit?: { available: boolean; label?: string };
 }
 
 interface FitHistoryStore {

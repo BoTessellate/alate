@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { RootStackParamList, AvatarFocusKey } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, fontFamily, whiteAlpha, primaryAlpha } from '../constants/theme';
 import {
   useAvatarStore,
@@ -287,11 +287,48 @@ const chipStyles = StyleSheet.create({
 
 export default function AvatarSetupScreen() {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'AvatarSetup'>>();
+  const focusKey = route.params?.focusKey;
   const insets = useSafeAreaInsets();
   const { avatar, setAvatar } = useAvatarStore();
   const { pendingUrl, clearPendingUrl } = usePendingShareStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePart, setActivePart] = useState<BodyFocusArea | null>(null);
+
+  // Section-scroll wiring. When the screen is opened with a `focusKey`
+  // (typically from a tap on a single body-profile row in Account),
+  // we scroll the matching section into view so the user lands on
+  // the chip group they want to edit instead of the top of the form.
+  // Each section captures its onLayout y-offset; the effect scrolls
+  // once both the offset is known AND the screen has mounted.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Partial<Record<AvatarFocusKey, number>>>({});
+  const recordOffset = (key: AvatarFocusKey) => (e: { nativeEvent: { layout: { y: number } } }) => {
+    sectionOffsets.current[key] = e.nativeEvent.layout.y;
+    // If the focus key was already requested before this section's
+    // layout settled, scroll now that we know its position.
+    if (focusKey === key) {
+      // Subtract a small offset so the section title clears the
+      // sticky page header / progress bar above it.
+      const y = Math.max(0, e.nativeEvent.layout.y - 24);
+      // Defer to next frame so the layout pass completes.
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y, animated: true });
+      });
+    }
+  };
+
+  // First-mount fallback: if the section already laid out before this
+  // effect fires (which is the common case for cached-mount nav), we
+  // scroll directly. Otherwise the recordOffset path above handles it.
+  useEffect(() => {
+    if (!focusKey) return;
+    const y = sectionOffsets.current[focusKey];
+    if (y === undefined) return;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
+    });
+  }, [focusKey]);
 
   // Gender — read with `?? 'woman'` for legacy avatars persisted
   // before this field existed (April 2026). New profiles always pick
@@ -385,6 +422,7 @@ export default function AvatarSetupScreen() {
           point; see `project_body_croquis_plan.md` memory. */}
       <View style={styles.row}>
         <ScrollView
+          ref={scrollRef}
           style={styles.formPane}
           contentContainerStyle={styles.formContent}
           showsVerticalScrollIndicator={false}
@@ -423,7 +461,7 @@ export default function AvatarSetupScreen() {
               Picked first so the rest of the flow can adapt. The
               chip group is at columns=3 to fit the three options
               (woman / man / non-binary) on one row. */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('gender')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>1</Text>
               <View style={styles.sectionHeaderText}>
@@ -440,7 +478,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 2: Height */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('height')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>2</Text>
               <View style={styles.sectionHeaderText}>
@@ -462,7 +500,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 3: Shoulders */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('shoulders')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>3</Text>
               <View style={styles.sectionHeaderText}>
@@ -481,7 +519,7 @@ export default function AvatarSetupScreen() {
           {/* Step 4: Bust / Chest — title flips with gender. Same
               chips either way (chest girth at the bust line is the
               fit-relevant dimension for both menswear + womenswear). */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('bust')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>4</Text>
               <View style={styles.sectionHeaderText}>
@@ -499,7 +537,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 5: Waist */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('waist')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>5</Text>
               <View style={styles.sectionHeaderText}>
@@ -520,7 +558,7 @@ export default function AvatarSetupScreen() {
               top-to-bottom on the body. Critical fit factor for non-
               stretch fabrics; backend `checkFit` doesn't yet branch
               on `tummy` but ignores unknown fields gracefully. */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('tummy')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>6</Text>
               <View style={styles.sectionHeaderText}>
@@ -538,7 +576,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 7: Hips */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('hips')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>7</Text>
               <View style={styles.sectionHeaderText}>
@@ -556,7 +594,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 8: Thighs */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('thighs')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>8</Text>
               <View style={styles.sectionHeaderText}>
@@ -574,7 +612,7 @@ export default function AvatarSetupScreen() {
           </View>
 
           {/* Step 9: Torso Length */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={recordOffset('torso')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.stepNumber}>9</Text>
               <View style={styles.sectionHeaderText}>

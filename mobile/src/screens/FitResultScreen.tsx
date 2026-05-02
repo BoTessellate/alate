@@ -151,6 +151,10 @@ export default function FitResultScreen() {
         image: activeEntry.productImage,
         price: activeEntry.price,
         brand: activeEntry.brand,
+        // Carry customFit through the history-mode remap so the
+        // lavender pill stays visible when the user re-enters this
+        // fit from History (it would otherwise drop on back-nav).
+        customFit: activeEntry.customFit,
       }
     : routeProduct ?? scrapedProduct ?? undefined;
   const url = activeEntry ? activeEntry.url : routeUrl;
@@ -561,6 +565,10 @@ export default function FitResultScreen() {
             : undefined,
           brand: safeBrand,
           availability: availabilitySnapshot,
+          // Persist made-to-measure / custom-fit signal so the
+          // lavender pill stays visible the next time the user opens
+          // this fit from History.
+          customFit: workingProduct.customFit,
         });
         setLiveSavedHistoryId(savedId);
       }

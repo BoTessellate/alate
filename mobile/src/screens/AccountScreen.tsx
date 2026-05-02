@@ -295,22 +295,47 @@ export default function AccountScreen() {
 
         {avatar ? (
           <GlassCard style={styles.profileCard}>
-            <View style={styles.profileRow}>
+            {/* Each row taps through to AvatarSetup with a focusKey
+                so the user lands on that exact chip group instead of
+                the top of the form. The AvatarSetup screen scrolls
+                the matching section into view on mount. */}
+            <TouchableOpacity
+              testID="profile-row-height"
+              activeOpacity={0.6}
+              onPress={() => navigation.navigate('AvatarSetup', { focusKey: 'height' })}
+              style={styles.profileRow}
+            >
               <Text style={styles.profileLabel}>Height</Text>
-              <Text style={styles.profileValue}>
-                {Math.floor(avatar.height_cm / 30.48)}′{Math.round((avatar.height_cm / 2.54) % 12)}″
-              </Text>
-            </View>
+              <View style={styles.profileValueRow}>
+                <Text style={styles.profileValue}>
+                  {Math.floor(avatar.height_cm / 30.48)}′{Math.round((avatar.height_cm / 2.54) % 12)}″
+                </Text>
+                <Feather name="chevron-right" size={14} color={colors.textMuted} />
+              </View>
+            </TouchableOpacity>
             {(
-              ['shoulders', 'bust', 'waist', 'hips', 'thighs', 'torso_length'] as const
-            ).map((key, i, arr) => (
-              <View
+              [
+                ['shoulders', 'shoulders'],
+                ['bust', 'bust'],
+                ['waist', 'waist'],
+                ['hips', 'hips'],
+                ['thighs', 'thighs'],
+                ['torso_length', 'torso'],
+              ] as const
+            ).map(([key, focusKey], i, arr) => (
+              <TouchableOpacity
                 key={key}
+                testID={`profile-row-${key}`}
+                activeOpacity={0.6}
+                onPress={() => navigation.navigate('AvatarSetup', { focusKey })}
                 style={[styles.profileRow, i === arr.length - 1 && styles.profileRowLast]}
               >
                 <Text style={styles.profileLabel}>{MEASUREMENT_LABELS[key]}</Text>
-                <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
-              </View>
+                <View style={styles.profileValueRow}>
+                  <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
+                  <Feather name="chevron-right" size={14} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
             ))}
           </GlassCard>
         ) : (
@@ -659,6 +684,14 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.text,
     fontWeight: '600',
+  },
+  // Holds the value + a chevron — visually announces the row is
+  // tappable. Each row navigates to AvatarSetup with a focusKey
+  // so the user lands on the matching chip group.
+  profileValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   emptyProfileCard: {
     borderRadius: borderRadius.xl,
