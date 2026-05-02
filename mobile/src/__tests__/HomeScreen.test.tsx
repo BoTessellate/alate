@@ -6,8 +6,8 @@
  *
  *   - Empty state (no avatar) shows the "Set up your body profile" card
  *   - Valid URL + avatar → scrapeProduct call → navigate to FitResult
- *   - scrapeProduct failure → brand-nudge card renders
- *   - Nudge button → calls nudgeBrand + flips to confirmation copy
+ *   - (scrapeProduct failure / brand-nudge UX moved to FitResultScreen
+ *      after the single-loader refactor — covered there, not here.)
  *   - Empty input → inline validation error
  *   - No avatar → tapping Check Fit routes to AvatarSetup
  *
@@ -43,7 +43,8 @@ jest.mock('@react-navigation/native', () => {
 
 jest.mock('../services/api', () => ({
   scrapeProduct: jest.fn(),
-  nudgeBrand: jest.fn(),
+  logBrandRequest: jest.fn(),
+  getBrandRequestCount: jest.fn().mockResolvedValue(0),
   extractBrandFromUrl: jest.fn((url: string) => {
     try {
       const host = new URL(url).hostname.replace(/^www\./, '');

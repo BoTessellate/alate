@@ -75,7 +75,7 @@ npm run test:e2e
 ### Medium priority
 - [ ] Screen component tests (HomeScreen, FitResultScreen, AvatarSetupScreen) using `@testing-library/react-native`
 - [ ] API error-path tests (timeout, 500, malformed response)
-- [ ] Brand nudge flow test (scrape fail → nudge card → nudgeBrand call)
+- [ ] Brand-request flow test (scrape fail → error card → logBrandRequest call → social-proof gate at >= 20)
 
 ### Nice to have
 - [ ] Visual regression tests (screen snapshots)

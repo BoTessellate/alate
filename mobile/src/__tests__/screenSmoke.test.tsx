@@ -58,7 +58,8 @@ jest.mock('../services/api', () => ({
   scrapeProduct: jest.fn().mockResolvedValue({ success: false }),
   enrichProduct: jest.fn().mockResolvedValue({ success: false }),
   checkFit: jest.fn().mockResolvedValue({ success: true, fit_score: 'great', warnings: [] }),
-  nudgeBrand: jest.fn().mockResolvedValue({ success: true }),
+  logBrandRequest: jest.fn().mockResolvedValue({ success: true, brandHandle: 'x', count: 0 }),
+  getBrandRequestCount: jest.fn().mockResolvedValue(0),
   extractBrandFromUrl: jest.fn(() => null),
   calibrateGarment: jest.fn().mockResolvedValue({ success: false }),
 }));

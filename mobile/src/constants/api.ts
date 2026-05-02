@@ -11,7 +11,7 @@ export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
 export const ENDPOINTS = {
   AI: '/api/ai',
   SEARCH: '/api/search',
-  BRAND_NUDGE: '/api/brand-nudge',
+  BRAND_REQUEST: '/api/brand-request',
 } as const;
 
 // Request timeouts (ms)
