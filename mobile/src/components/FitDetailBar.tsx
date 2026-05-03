@@ -12,6 +12,8 @@ import { spacing, borderRadius, typography, fontFamily, primaryAlpha, whiteAlpha
 import { FitHistoryEntry } from '../store/fitHistoryStore';
 import { sanitize } from '../utils/sanitize';
 import { computeEffectiveFitScore, EffectiveFitScore } from '../utils/effectiveFitScore';
+import AffordabilityIcon from './AffordabilityIcon';
+import { usePriceRange } from '../store/priceRangeStore';
 
 const scoreMeta = (score: EffectiveFitScore) => {
   switch (score) {
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export default function FitDetailBar({ entry }: Props) {
+  const range = usePriceRange();
   if (!entry) return null;
 
   const meta = scoreMeta(computeEffectiveFitScore(entry.warnings, entry.fitScore));
@@ -59,6 +62,15 @@ export default function FitDetailBar({ entry }: Props) {
           <Text style={styles.sizeLabel}>SIZE {size}</Text>
         </View>
       )}
+
+      <AffordabilityIcon
+        price={entry.price}
+        range={range}
+        size="sm"
+        color="#fff"
+        warningColor="#ffc97a"
+        style={styles.affordChip}
+      />
     </View>
   );
 }
@@ -129,5 +141,9 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 1.2,
     color: '#fff',
+  },
+  affordChip: {
+    backgroundColor: whiteAlpha.surfaceStrong,
+    borderColor: whiteAlpha.surfaceSoft,
   },
 });

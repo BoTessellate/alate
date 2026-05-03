@@ -2,6 +2,7 @@ import React, { useEffect, useState, Component, ReactNode } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -30,6 +31,7 @@ import { colors, spacing, typography, borderRadius, fontFamily, whiteAlpha, prim
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { useAccountStore, GoogleUser } from '../store/accountStore';
+import { usePriceRangeStore } from '../store/priceRangeStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { captureError } from '../utils/sentry';
 import FitCalibrationCard from '../components/FitCalibrationCard';
@@ -231,6 +233,127 @@ function GoogleSignInCard({ onRequestSignOut }: { onRequestSignOut: () => void }
   );
 }
 
+/**
+ * Price Range section. Compact, two TextInput fields for min/max with a
+ * tiny currency toggle. Saves to the priceRangeStore on submit (or
+ * blur). Reads back from the store so the values persist across
+ * app launches. The `Clear` link appears once a range is set.
+ */
+const SUPPORTED_CURRENCIES = ['GBP', 'USD', 'EUR', 'INR'] as const;
+
+function PriceRangeSection() {
+  const { min, max, currency, setRange, clearRange } = usePriceRangeStore();
+  const [draftMin, setDraftMin] = useState(min !== null ? String(min) : '');
+  const [draftMax, setDraftMax] = useState(max !== null ? String(max) : '');
+  const [draftCurrency, setDraftCurrency] = useState(currency);
+
+  // Re-sync drafts whenever the store changes (e.g. cleared from elsewhere).
+  useEffect(() => {
+    setDraftMin(min !== null ? String(min) : '');
+    setDraftMax(max !== null ? String(max) : '');
+    setDraftCurrency(currency);
+  }, [min, max, currency]);
+
+  const commit = () => {
+    const minVal = parseFloat(draftMin);
+    const maxVal = parseFloat(draftMax);
+    if (!Number.isFinite(minVal) || !Number.isFinite(maxVal)) return;
+    setRange(minVal, maxVal, draftCurrency);
+  };
+
+  const isSet = min !== null && max !== null;
+
+  return (
+    <>
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionLabel}>PRICE RANGE</Text>
+        {isSet ? (
+          <TouchableOpacity
+            testID="clear-price-range"
+            style={styles.editPill}
+            onPress={clearRange}
+            activeOpacity={0.75}
+          >
+            <Feather name="x" size={11} color={colors.primary} />
+            <Text style={styles.editPillText}>Clear</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <GlassCard style={styles.profileCard}>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Min</Text>
+          <View style={styles.priceInputWrap}>
+            <Text style={styles.priceCurrencyPrefix}>{draftCurrency}</Text>
+            <TextInput
+              testID="price-range-min"
+              style={styles.priceInput}
+              keyboardType="decimal-pad"
+              value={draftMin}
+              onChangeText={setDraftMin}
+              onBlur={commit}
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="next"
+            />
+          </View>
+        </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Max</Text>
+          <View style={styles.priceInputWrap}>
+            <Text style={styles.priceCurrencyPrefix}>{draftCurrency}</Text>
+            <TextInput
+              testID="price-range-max"
+              style={styles.priceInput}
+              keyboardType="decimal-pad"
+              value={draftMax}
+              onChangeText={setDraftMax}
+              onBlur={commit}
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="done"
+            />
+          </View>
+        </View>
+        <View style={[styles.priceRow, styles.priceRowLast]}>
+          <Text style={styles.priceLabel}>Currency</Text>
+          <View style={styles.currencyChips}>
+            {SUPPORTED_CURRENCIES.map((c) => {
+              const active = draftCurrency === c;
+              return (
+                <TouchableOpacity
+                  key={c}
+                  testID={`currency-chip-${c}`}
+                  style={[styles.currencyChip, active && styles.currencyChipActive]}
+                  onPress={() => {
+                    setDraftCurrency(c);
+                    // Commit immediately on currency change so the chip on
+                    // other surfaces updates without an extra blur.
+                    const a = parseFloat(draftMin);
+                    const b = parseFloat(draftMax);
+                    if (Number.isFinite(a) && Number.isFinite(b)) setRange(a, b, c);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[styles.currencyChipText, active && styles.currencyChipTextActive]}
+                  >
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </GlassCard>
+
+      <Text style={styles.priceHint}>
+        Set a budget bracket — products show $ / $$ / $$$ on cards based on where they sit in your range.
+      </Text>
+    </>
+  );
+}
+
 export default function AccountScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
@@ -354,6 +477,11 @@ export default function AccountScreen() {
             </GlassCard>
           </TouchableOpacity>
         )}
+
+        {/* Price Range — user-defined budget bracket. Drives the $/$$/$$$
+            affordability chip on Recent cards, fit-result hero, and the
+            History detail bar. See [src/utils/affordability.ts]. */}
+        <PriceRangeSection />
 
         {/* Preferences section removed — the Fit preference / Notifications
             rows were mockup placeholders that weren't wired to any store.
@@ -754,6 +882,72 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: whiteAlpha.textBody,
     fontWeight: '400',
+  },
+  // Price range section — same glass list-card visual as Body Profile,
+  // with text-input rows + a currency chip strip.
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: textAlpha.divider,
+  },
+  priceRowLast: {
+    borderBottomWidth: 0,
+  },
+  priceLabel: {
+    ...typography.label,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  priceInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priceCurrencyPrefix: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+  priceInput: {
+    ...typography.body,
+    color: colors.text,
+    minWidth: 80,
+    textAlign: 'right',
+    padding: 0,
+  },
+  currencyChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  currencyChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.pill,
+    backgroundColor: primaryAlpha.tintSm,
+  },
+  currencyChipActive: {
+    backgroundColor: colors.primary,
+  },
+  currencyChipText: {
+    fontFamily: fontFamily.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
+  },
+  currencyChipTextActive: {
+    color: colors.white,
+  },
+  priceHint: {
+    ...typography.caption,
+    color: whiteAlpha.textBody,
+    marginTop: spacing.sm,
+    paddingHorizontal: 4,
+    lineHeight: 18,
   },
 
   // Legal/policy links — small row at the bottom of the Account page.

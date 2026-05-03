@@ -16,6 +16,8 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, borderRadius, ms, fontFamily, whiteAlpha, textAlpha } from '../constants/theme';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
+import { usePriceRange } from '../store/priceRangeStore';
+import { computeAffordability } from '../utils/affordability';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
@@ -131,6 +133,19 @@ export default function HistoryScreen() {
     return eff === 'great' || eff === 'minor';
   }).length;
 
+  // Within-budget tally — only meaningful once the user has set a price
+  // range on the profile. Counts entries whose computed affordability
+  // exists AND isn't flagged overBudget. Currency-mismatched entries are
+  // excluded (they can't be compared to the range).
+  const priceRange = usePriceRange();
+  const rangeConfigured = priceRange.min !== null && priceRange.max !== null;
+  const withinBudget = rangeConfigured
+    ? entries.filter((e) => {
+        const r = computeAffordability(e.price, priceRange);
+        return r !== null && !r.overBudget;
+      }).length
+    : 0;
+
   // Delete confirmation — themed via ConfirmDialog instead of the
   // native Alert popup, which broke visual continuity with the rest
   // of the app's grey-purple glass aesthetic. State holds the entry
@@ -242,8 +257,8 @@ export default function HistoryScreen() {
             +3pt so it carries the section on its own without the
             display title above it. */}
         <View style={styles.header}>
-          <Text style={styles.headerMeta}>
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}
+          <Text style={styles.headerMeta} testID="history-meta">
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
           </Text>
         </View>
 
