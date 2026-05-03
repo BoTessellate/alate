@@ -359,7 +359,7 @@ export default function AppNavigator() {
           headerShadowVisible: false,
           headerTintColor: colors.text,
           headerTitleStyle: {
-            fontWeight: '600',
+            fontWeight: '400',
           },
           contentStyle: {
             backgroundColor: colors.background,

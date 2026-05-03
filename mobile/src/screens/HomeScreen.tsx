@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   buttonText: {
     ...typography.button,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
     fontSize: 17,
   },
   setupCard: {
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
   nudgeButtonText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   // --- Recent — glass-card list of last N fit checks (Claude Design) ---
   recentSection: {

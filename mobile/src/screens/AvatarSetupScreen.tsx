@@ -793,7 +793,7 @@ const styles = StyleSheet.create({
   buttonText: {
     ...typography.button,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   remainingNote: {
     ...typography.bodySmall,

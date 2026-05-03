@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fontFamily.primary,
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '400',
     letterSpacing: 1.2,
     color: '#fff',
   },
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     flex: 1,
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: '400',
     fontSize: 14,
     // The name is the Vision-Pro-bar's "song title" slot — a bit quieter
     // than the accent pills so the eye still lands on the fit verdict first.
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   sizeLabel: {
     fontFamily: fontFamily.primary,
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '400',
     letterSpacing: 1.2,
     color: '#fff',
   },
