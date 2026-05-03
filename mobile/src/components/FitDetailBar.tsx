@@ -89,15 +89,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.pill,
   },
   left: {
+    // Inner background dropped May 3 2026 — the double-pill nesting
+    // (outer wrap pill + inner verdict chip + inner size chip) read
+    // as visual clutter. Outer pill alone now carries the bar; the
+    // dot + label sit on it directly.
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: borderRadius.pill,
-    // Slightly stronger inner chip — the medium bg needs a nudge to keep
-    // the fit-pill readable as a distinct token, not a flat label.
-    backgroundColor: whiteAlpha.surfaceSoft,
   },
   dot: {
     width: 7,
@@ -122,10 +120,8 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
   sizeChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: borderRadius.pill,
-    backgroundColor: whiteAlpha.surfaceStrong,
+    // Inner background dropped May 3 2026 — see `left` comment.
+    paddingLeft: 4,
   },
   sizeLabel: {
     fontFamily: fontFamily.primary,

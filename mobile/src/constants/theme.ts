@@ -490,7 +490,8 @@ export const whiteAlpha = {
   surfaceMid: hexToRgba('#FFFFFF', 0.20),      // editPill / sizePill bg
   surfaceStrong: hexToRgba('#FFFFFF', 0.22),   // emphasis chip
   surfaceFrost: hexToRgba('#FFFFFF', 0.58),    // floating-tab tint (AppNavigator)
-  surfaceCard: hexToRgba('#FFFFFF', 0.78),     // frosted recent card on dark
+  surfaceCard: hexToRgba('#FFFFFF', 0.78),     // frosted recent card on dark (legacy — see surfaceCardGlass)
+  surfaceCardGlass: hexToRgba('#FFFFFF', 0.32), // lighter frosted card — more gradient bleeds through (Home Recent, May 3 2026)
   surfaceSolid: hexToRgba('#FFFFFF', 0.92),    // opaque static card (no BlurView)
 
   // Borders — paired with surfaces above

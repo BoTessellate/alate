@@ -411,22 +411,20 @@ export default function AccountScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Are you a brand? — large bold heading + sub copy + tap
-            target. Sits below the policy footer per user direction
-            April 29 2026: "Add a 'are you a brand' in large bold
-            heading below privacy pages, delete account... keep the
-            current setting for fonts/headings". Routes brands to the
-            opt-out page for now (which is also the contact path).
-            Replaceable with a dedicated /for-brands page later. */}
+        {/* Are you a brand? — pitch CTA for store owners. Routes to
+            the in-app BrandIntegration screen (May 3 2026: previously
+            opened the privacy-policy brand-opt-out URL externally,
+            which was both the wrong destination and a dead end for
+            interested brands). */}
         <TouchableOpacity
           testID="brand-cta"
           style={styles.brandCta}
-          onPress={() => Linking.openURL(BRAND_OPTOUT_URL)}
+          onPress={() => navigation.navigate('BrandIntegration')}
           activeOpacity={0.85}
         >
           <Text style={styles.brandCtaTitle}>are you a brand?</Text>
           <Text style={styles.brandCtaSubtitle}>
-            Run a Shopify store? Send us a note → we'll set up consented size-chart access for your catalogue.
+            Run an online store? Want to give your customers a better way to check size, and reduce return headaches? Plug your sizing into alate — your shoppers see fit confidence before they buy, and you see fewer "doesn't fit" returns.
           </Text>
         </TouchableOpacity>
       </ScrollView>

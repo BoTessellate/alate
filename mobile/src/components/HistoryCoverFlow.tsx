@@ -142,12 +142,17 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
 function CoverFlowCard({
   entry,
   index,
+  totalCount,
   scrollX,
   onTap,
   onDelete,
 }: {
   entry: FitHistoryEntry;
   index: number;
+  /** Total number of cards in the deck — needed to detect overscroll
+   *  past the last card so the end card can give a subtle "this is
+   *  the end" bounce. */
+  totalCount: number;
   scrollX: SharedValue<number>;
   onTap: () => void;
   onDelete?: () => void;
@@ -199,10 +204,30 @@ function CoverFlowCard({
       [1, 0.88, 0.45, 0],
       Extrapolation.CLAMP
     );
+    // End-of-deck rubber-band: when the user drags past the last
+    // card's snap point (Android's ScrollView lets you continue
+    // scrolling slightly past max during a drag, even with snap), the
+    // last card stretches with a small extra translateX + rotateY
+    // tilt. This signals "you've reached the end" without a hard wall.
+    // Applied only to the LAST card. Returns to neutral when the
+    // ScrollView snaps back to the resting position.
+    let endBounceTx = 0;
+    let endBounceTilt = 0;
+    if (index === totalCount - 1) {
+      const maxOffset = (totalCount - 1) * ITEM_GAP;
+      const overshoot = scrollX.value - maxOffset;
+      if (overshoot > 0) {
+        // Cap the visible bounce — otherwise dragging far would tilt
+        // the card off-screen. ~24px of stretch is plenty to feel.
+        const capped = Math.min(overshoot, 60);
+        endBounceTx = -capped * 0.4;
+        endBounceTilt = -capped * 0.15;
+      }
+    }
     return {
       transform: [
-        { translateX },
-        { rotateY: `${rotateY}deg` },
+        { translateX: translateX + endBounceTx },
+        { rotateY: `${rotateY + endBounceTilt}deg` },
         { scale },
       ],
       opacity,
@@ -369,6 +394,7 @@ export default function HistoryCoverFlow({
             key={entry.id}
             entry={entry}
             index={i}
+            totalCount={entries.length}
             scrollX={scrollX}
             onTap={() => onCardTap(entry)}
             onDelete={onCardDelete ? () => onCardDelete(entry) : undefined}
@@ -483,6 +509,11 @@ const styles = StyleSheet.create({
   // visual treatment (size, colour, shadow) here and let BrandHeading
   // own the typeface.
   folioBrand: {
+    // Viaoda Libre override (May 3 2026 trial) — brand name on
+    // history cards specifically renders in the italic display
+    // serif. textStyle overrides BrandHeading's internal
+    // fontFamily.display (Marcellus).
+    fontFamily: 'ViaodaLibre-Regular',
     fontSize: 22,
     color: '#fff',
     letterSpacing: -0.5,
