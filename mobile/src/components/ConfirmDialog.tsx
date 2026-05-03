@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   cancelText: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '400',
     color: colors.textSecondary,
   },
   confirmButton: {
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   confirmText: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '400',
     color: colors.white,
   },
 });

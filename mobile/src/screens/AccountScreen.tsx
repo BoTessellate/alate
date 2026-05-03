@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '400',
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     // Light on dark gradient bg.
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   editPillText: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '400',
     color: '#fff',
   },
   prefValue: {

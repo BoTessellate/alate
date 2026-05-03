@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
   typicalValue: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 38,
-    fontWeight: '700',
+    fontWeight: '400',
     color: colors.primary,
     lineHeight: 42,
     marginTop: 2,

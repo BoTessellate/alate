@@ -1543,7 +1543,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   customFitBadgeText: {
-    fontFamily: 'DMSerifDisplay-Italic',
+    // Was 'DMSerifDisplay-Italic' — that font was retired when we
+    // moved to Viaoda Libre, then again when we moved to Marcellus.
+    // Reference was orphaned (silently fell back to system serif,
+    // making this badge read in a different face from everything
+    // else on the screen). Now routed through the registry.
+    fontFamily: fontFamily.display,
     fontSize: 13,
     color: '#fff',
     letterSpacing: 0.2,
@@ -1675,7 +1680,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 1.3,
     color: colors.textMuted,
     textTransform: 'uppercase',
@@ -1709,7 +1714,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '400',
     color: colors.primary,
     letterSpacing: -0.2,
   },
@@ -1719,7 +1724,7 @@ const styles = StyleSheet.create({
     // RN's text engine but the actual face is Bold.
     fontFamily: fontFamily.primaryBold,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '400',
   },
 
   // --- Confidence donut — circular arc, purple saturation + arc length
@@ -1852,7 +1857,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '400',
     letterSpacing: 0.3,
     color: colors.primary,
   },
@@ -1946,7 +1951,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primaryBold,
     fontSize: 15,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 0.3,
   },
   secondaryButton: {
@@ -1960,7 +1965,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primaryBold,
     fontSize: 14,
     color: colors.primary,
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 0.2,
   },
   ghostButton: {
