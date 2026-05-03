@@ -264,6 +264,36 @@ after App Store.
 
 ---
 
+## P4 — post-V2 (deferred until demand validates)
+
+### Wardrobe-app integration (Indyx, Whering, Acloset, etc.) + Alate-native capsule wardrobe
+**Detail doc:** [`backlog/wardrobe-integration.md`](backlog/wardrobe-integration.md)
+
+Status: parked. Reconsider once social listening on Reddit / Instagram /
+Pinterest validates which wardrobe app the target user is actually
+using and whether the demand is for "save to my existing app" vs
+"Alate has its own closet".
+
+Quick read of the detail doc:
+- **No consumer wardrobe app has a public API** — verified across Indyx,
+  Whering, Acloset, Stylebook, Save Your Wardrobe (the last is B2B,
+  not consumer). Plan must work around that.
+- **Tier 1 (universal share-sheet export)** is the only path that
+  ships unilaterally. ~2 days work. Marketing-safe to call this
+  "Save to your wardrobe app" without naming partners.
+- **Tier 2 (per-app deep links)** is opportunistic per-app QA.
+- **Tier 3 (signed partnerships)** are 2-3 month sales cycles — start
+  in parallel, never block a release on them.
+- **Tier 4 (Alate-native wardrobe)** is the V3+ play; only commit when
+  V2 retention shows the wardrobe-shaped need.
+
+**Don't unblock until** the social-listening cheat-sheet from the
+2026-05-03 conversation produces enough signal to pick a target user
++ target app. Marketing announcements before then risk implying
+partnerships that don't exist.
+
+---
+
 ## Dismissed / out of scope
 
 None currently.
