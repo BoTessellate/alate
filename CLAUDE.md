@@ -3,6 +3,13 @@
 ## Project
 React Native Android app (Expo 55, RN 0.81.5, React 19). Monorepo: `/mobile` (app) + `/backend` (Vercel API).
 
+## Planning docs — start here for any V2 / strategy / scope question
+- [`RELEASE_V2.md`](./RELEASE_V2.md) — single source of truth for V2 release status (what's built, what's pending, what flips at launch)
+- [`BACKLOG.md`](./BACKLOG.md) — durable record of out-of-scope work, P0–P4 sections; check before proposing "should we build X?"
+- [`USER_PATHS.md`](./USER_PATHS.md) — happy + edge + still-uncovered user flows; update when a flow drifts or a new path is added
+- [`backlog/`](./backlog/) — long-form planning docs for parked items (referenced from `BACKLOG.md` entries)
+- `~/.claude/projects/C--Users-mailt-Documents-alate/memory/` — project-wide memory: regression log, anti-patterns, design vision, font plans (referenced in the bug-fix pre-flight rule below)
+
 ## Bug-fix Pre-flight — ALWAYS Reference the Regression Log First
 
 Before writing any code in response to a user-reported bug:
