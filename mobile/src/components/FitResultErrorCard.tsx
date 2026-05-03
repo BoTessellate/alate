@@ -337,7 +337,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   body: {
-    fontFamily: fontFamily.primary,
+    // Jost Light (300) — overlay body face per May 3 2026 trial.
+    // Inline override; no global theme change.
+    fontFamily: 'Jost-Light',
     fontSize: 14,
     lineHeight: 21,
     color: colors.textMuted,
@@ -404,7 +406,8 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   primaryButtonText: {
-    fontFamily: fontFamily.primaryBold,
+    // Jost Regular — overlay button face per May 3 2026 trial.
+    fontFamily: 'Jost-Regular',
     fontSize: 15,
     color: colors.white,
     fontWeight: '400',
@@ -415,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ghostButtonText: {
-    fontFamily: fontFamily.primaryMedium,
+    fontFamily: 'Jost-Regular',
     fontSize: 14,
     color: colors.primary,
     fontWeight: '400',

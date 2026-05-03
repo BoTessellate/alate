@@ -509,6 +509,11 @@ const styles = StyleSheet.create({
   // visual treatment (size, colour, shadow) here and let BrandHeading
   // own the typeface.
   folioBrand: {
+    // Viaoda Libre override (May 3 2026 trial) — brand name on
+    // history cards specifically renders in the italic display
+    // serif. textStyle overrides BrandHeading's internal
+    // fontFamily.display (Marcellus).
+    fontFamily: 'ViaodaLibre-Regular',
     fontSize: 22,
     color: '#fff',
     letterSpacing: -0.5,

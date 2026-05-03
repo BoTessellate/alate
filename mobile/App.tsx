@@ -108,6 +108,10 @@ function App() {
     // type repo's 400-Book ttf, registered as Jost-Regular). NameID 1
     // is "Jost*" with an asterisk; resolve via the file basename / key.
     'Jost-Regular': require('./assets/fonts/Jost-Regular.ttf'),
+    // Jost Light (300 weight) — applied on the FitResult error
+    // overlay body text. Sister of Jost-Regular; trial pairing with
+    // Marcellus headings (May 3 2026).
+    'Jost-Light': require('./assets/fonts/Jost-Light.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

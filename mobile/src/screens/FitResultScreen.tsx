@@ -1514,7 +1514,11 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   heroName: {
-    ...typography.headingXL, // DM Serif Italic lowercase, 28px, from token
+    ...typography.headingXL,
+    // Viaoda Libre override per May 3 2026 trial — product name on
+    // the FitResult hero specifically rendered in the italic display
+    // serif. Inline override; global typography stays on Marcellus.
+    fontFamily: 'ViaodaLibre-Regular',
     color: '#fff',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.55)',
@@ -1640,6 +1644,10 @@ const styles = StyleSheet.create({
     // hero. Matches the visual weight of the size pill + stat row sitting
     // beside it.
     ...typography.headingM,
+    // Viaoda Libre override (May 3 2026 trial) — verdict text
+    // ('Great Fit', 'Some Concerns', etc.) reads in the italic
+    // display serif while the rest of the screen stays on Marcellus.
+    fontFamily: 'ViaodaLibre-Regular',
   },
   verdictSub: {
     ...typography.bodySmall,
