@@ -93,6 +93,14 @@ function App() {
     'DMSans-Medium': require('./assets/fonts/DMSans-Medium.ttf'),
     'DMSans-SemiBold': require('./assets/fonts/DMSans-SemiBold.ttf'),
     'DMSans-Bold': require('./assets/fonts/DMSans-Bold.ttf'),
+    // Marcellus (Google Fonts, OFL) — single-weight roman serif. Trial
+    // swap May 3 2026: replaces DM Sans on body / labels AND Viaoda
+    // Libre on headings to put the entire app on a single typographic
+    // voice. Font is single-weight (Regular only) so the
+    // medium/semibold/bold tokens point at the same file — Android
+    // synthesises bolder strokes where needed; expect uniform weight
+    // visually.
+    'Marcellus-Regular': require('./assets/fonts/Marcellus-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {

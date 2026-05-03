@@ -35,17 +35,18 @@
 // `displayLegacy` (DM Serif Display Italic — ttf deleted when we
 // moved to Viaoda Libre). None had any callsites; all were dropped
 // April 29 2026. Adding a new face needs an explicit reason.
+// May 3 2026 trial: collapse to a single typeface across the entire
+// app (Marcellus). Single-weight serif — every token points at the
+// same file. Bold/medium tokens stay in the registry so callers don't
+// have to change, but the rendered face is identical; visual hierarchy
+// has to come from size + colour + spacing instead of weight. Revert
+// to the prior DM Sans + Viaoda setup if the uniform weight reads flat.
 export const fontFamily = {
-  // Body / paragraph default. 400 weight.
-  primary: 'DMSans-Regular',
-  // Labels, button copy, chip labels — anywhere the system used to
-  // ask for fontWeight: '500'.
-  primaryMedium: 'DMSans-Medium',
-  // Section labels, overline copy — fontWeight: '600' equivalent.
-  primarySemiBold: 'DMSans-SemiBold',
-  // Strong emphasis, primary CTA labels — fontWeight: '700' equivalent.
-  primaryBold: 'DMSans-Bold',
-  display: 'ViaodaLibre-Regular',
+  primary: 'Marcellus-Regular',
+  primaryMedium: 'Marcellus-Regular',
+  primarySemiBold: 'Marcellus-Regular',
+  primaryBold: 'Marcellus-Regular',
+  display: 'Marcellus-Regular',
 };
 
 // Shared heading trait: every display/heading token mixes this in so
@@ -66,8 +67,12 @@ export const fontFamily = {
 // (April 29 2026 — "Camel case page headings"). Whatever case the
 // source string uses is what renders. Page titles in title case;
 // poetic / phrase headings in sentence case.
+// Headings now render in Marcellus too (May 3 2026 trial — single
+// typeface across the whole app). Same single-weight constraint
+// (Marcellus is Regular-only) so heading tokens stay at
+// fontWeight: '400'; visual hierarchy comes from size + spacing.
 const headingSerif = {
-  fontFamily: 'ViaodaLibre-Regular',
+  fontFamily: fontFamily.display,
 };
 
 // =============================================================================
