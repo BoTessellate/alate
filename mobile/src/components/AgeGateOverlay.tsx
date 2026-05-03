@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primaryBold,
     fontSize: 15,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 0.3,
   },
   secondaryBtn: {

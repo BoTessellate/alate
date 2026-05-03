@@ -228,7 +228,12 @@ export const typography = {
   headingS: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 16,
-    fontWeight: '600' as const,
+    // Marcellus is single-weight (Regular only). fontWeight: '600'
+    // forced Android to synthesise a fake bold on top of the Regular
+    // file — read as "thick" headings on the fit hero (May 3 2026
+    // user feedback). Drop to '400' so the rendered face is the
+    // designed regular. Restore to '600' if we revert to DM Sans.
+    fontWeight: '400' as const,
     lineHeight: 24,
   },
 
@@ -258,26 +263,27 @@ export const typography = {
     lineHeight: 21,
   },
 
-  // Labels & Buttons — Medium weight via DMSans-Medium (own family
-  // file, see fontFamily comment).
+  // Labels & Buttons — fontWeight dropped to '400' during the
+  // Marcellus trial so Android doesn't synthesise fake medium on a
+  // single-weight font. Restore to '500' if reverting to DM Sans.
   labelLarge: {
     fontFamily: fontFamily.primaryMedium,
     fontSize: 17,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 25,
     letterSpacing: 0.1,
   },
   label: {
     fontFamily: fontFamily.primaryMedium,
     fontSize: 15,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelSmall: {
     fontFamily: fontFamily.primaryMedium,
     fontSize: 13,
-    fontWeight: '500' as const,
+    fontWeight: '400' as const,
     lineHeight: 18,
     letterSpacing: 0.2,
   },
@@ -303,17 +309,18 @@ export const typography = {
   overline: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 13,
-    fontWeight: '600' as const,
+    // Single-weight Marcellus — see headingS comment.
+    fontWeight: '400' as const,
     lineHeight: 16,
     letterSpacing: 0.8,
     textTransform: 'uppercase' as const,
   },
 
   // @deprecated — use headingXL, headingM, headingS, labelLarge instead
-  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primarySemiBold, fontSize: 28, fontWeight: '600' as const, lineHeight: 36, letterSpacing: -0.5 },
-  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primarySemiBold, fontSize: 22, fontWeight: '600' as const, lineHeight: 28 },
-  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primarySemiBold, fontSize: 18, fontWeight: '600' as const, lineHeight: 24 },
-  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primarySemiBold, fontSize: 16, fontWeight: '600' as const, lineHeight: 22 },
+  /** @deprecated use headingXL */ h1: { fontFamily: fontFamily.primarySemiBold, fontSize: 28, fontWeight: '400' as const, lineHeight: 36, letterSpacing: -0.5 },
+  /** @deprecated use headingL */  h2: { fontFamily: fontFamily.primarySemiBold, fontSize: 22, fontWeight: '400' as const, lineHeight: 28 },
+  /** @deprecated use bodyLarge */ h3: { fontFamily: fontFamily.primarySemiBold, fontSize: 18, fontWeight: '400' as const, lineHeight: 24 },
+  /** @deprecated use labelLarge */ button: { fontFamily: fontFamily.primarySemiBold, fontSize: 16, fontWeight: '400' as const, lineHeight: 22 },
 };
 
 // =============================================================================

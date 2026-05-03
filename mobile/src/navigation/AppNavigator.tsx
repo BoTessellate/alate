@@ -187,7 +187,7 @@ function MainTabs() {
         tabBarLabelStyle: {
           fontFamily: fontFamily.primarySemiBold,
           fontSize: 10,
-          fontWeight: '600',
+          fontWeight: '400',
           letterSpacing: 0.3,
           marginTop: 2,
         },

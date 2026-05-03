@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   icon: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 48,
-    fontWeight: '700',
+    fontWeight: '400',
     color: colors.error,
     marginBottom: spacing.md,
   },

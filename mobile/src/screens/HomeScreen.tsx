@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   recentName: {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '400',
     color: colors.text,
     lineHeight: 18,
   },
@@ -717,7 +717,7 @@ const styles = StyleSheet.create({
   recentChipLabel: {
     fontFamily: fontFamily.primaryBold,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '400',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
