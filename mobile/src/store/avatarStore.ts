@@ -54,16 +54,52 @@ export interface Avatar {
 
 interface AvatarStore {
   avatar: Avatar | null;
+  /**
+   * ISO timestamp of the last meaningful avatar change. Used by FitResult
+   * to detect stale entries (any history entry whose `checkedAt` predates
+   * `lastChangedAt` was evaluated against an older body and should be
+   * re-evaluated on view, regardless of which screen path the user took).
+   *
+   * Stays untouched if `setAvatar` is called with an identical value, so
+   * a re-render or save-without-change doesn't cascade into re-evals.
+   */
+  lastChangedAt: string | null;
   setAvatar: (avatar: Avatar) => void;
   clearAvatar: () => void;
 }
 
+function avatarsEqual(a: Avatar | null, b: Avatar | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  return (
+    a.height_cm === b.height_cm &&
+    a.gender === b.gender &&
+    a.shoulders === b.shoulders &&
+    a.bust === b.bust &&
+    a.waist === b.waist &&
+    a.tummy === b.tummy &&
+    a.hips === b.hips &&
+    a.thighs === b.thighs &&
+    a.torso_length === b.torso_length
+  );
+}
+
 export const useAvatarStore = create<AvatarStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       avatar: null,
-      setAvatar: (avatar) => set({ avatar }),
-      clearAvatar: () => set({ avatar: null }),
+      lastChangedAt: null,
+      setAvatar: (avatar) => {
+        // Skip the timestamp bump for no-op saves — saves a few useless
+        // re-evaluations when the user opens AvatarSetup, taps Save without
+        // editing, and returns. Only structural change moves the clock.
+        if (avatarsEqual(avatar, get().avatar)) return;
+        set({ avatar, lastChangedAt: new Date().toISOString() });
+      },
+      clearAvatar: () => {
+        if (get().avatar === null) return;
+        set({ avatar: null, lastChangedAt: new Date().toISOString() });
+      },
     }),
     {
       name: 'avatar-storage',
