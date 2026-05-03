@@ -1,42 +1,34 @@
 /**
  * Theme typography tests.
  *
- *   - Display + heading tokens use Viaoda Libre (Google Fonts, OFL)
- *     bundled via expo-font; family name resolves on Android only
- *     when set to the ttf's NameID 1 ("Viaoda Libre" with space).
- *   - Body / label / caption / button tokens use DM Sans (May 2 2026
- *     swap from system serif). Loaded as four discrete weight files
- *     because RN Android's font weight resolver can't walk across
- *     sub-families — see fontFamily comment in theme.ts.
- *   - The fontFamily registry exposes the four DM Sans weight tokens
- *     (`primary`, `primaryMedium`, `primarySemiBold`, `primaryBold`)
- *     plus `display` (Viaoda Libre). No accent, mono, fallback, or
- *     legacy aliases.
+ * May 3 2026 trial: collapse to a SINGLE typeface across the whole
+ * app — Marcellus (Google Fonts, OFL). Single-weight serif: every
+ * fontFamily token (primary / primaryMedium / primarySemiBold /
+ * primaryBold / display) points at the same `Marcellus-Regular`
+ * file. The weight-named tokens stay in the registry so call sites
+ * don't have to change, but the rendered face is identical;
+ * hierarchy comes from size + colour + spacing instead of weight.
  *
- * These tokens are the single source of truth — if a heading anywhere
- * drifts off them, that's a bug.
+ * Revert to the prior DM Sans + Viaoda Libre setup if the uniform
+ * weight reads flat.
  */
 
 import { typography, fontFamily } from '../constants/theme';
 
+const MARCELLUS = 'Marcellus-Regular';
+
 describe('theme — heading typography', () => {
-  it('exposes Viaoda Libre as the display font family', () => {
-    expect(fontFamily.display).toBe('ViaodaLibre-Regular');
+  it('exposes Marcellus on every fontFamily token (single typeface trial)', () => {
+    expect(fontFamily.primary).toBe(MARCELLUS);
+    expect(fontFamily.primaryMedium).toBe(MARCELLUS);
+    expect(fontFamily.primarySemiBold).toBe(MARCELLUS);
+    expect(fontFamily.primaryBold).toBe(MARCELLUS);
+    expect(fontFamily.display).toBe(MARCELLUS);
   });
 
-  it('exposes DM Sans for body / label tokens (4 weight tokens)', () => {
-    expect(fontFamily.primary).toBe('DMSans-Regular');
-    expect(fontFamily.primaryMedium).toBe('DMSans-Medium');
-    expect(fontFamily.primarySemiBold).toBe('DMSans-SemiBold');
-    expect(fontFamily.primaryBold).toBe('DMSans-Bold');
-  });
-
-  it('the fontFamily registry exposes ONLY DM Sans weights + display (no accent/mono/legacy bloat)', () => {
-    // Regression guard: April 29 2026 we slimmed the registry to two
-    // faces. May 2 2026: expanded `primary` to four weighted tokens
-    // for DM Sans because RN Android can't resolve fontWeight across
-    // sub-families (Medium / SemiBold each register their own family
-    // per the ttf name table).
+  it('the fontFamily registry keeps the 5-key shape (no extra aliases)', () => {
+    // Token names stay so consumers don't have to change. Only the
+    // value moved.
     expect(Object.keys(fontFamily).sort()).toEqual([
       'display',
       'primary',
@@ -55,45 +47,25 @@ describe('theme — heading typography', () => {
   ] as const;
 
   headingKeys.forEach((key) => {
-    it(`${key} uses Viaoda Libre`, () => {
-      expect((typography as any)[key].fontFamily).toBe('ViaodaLibre-Regular');
+    it(`${key} uses Marcellus`, () => {
+      expect((typography as any)[key].fontFamily).toBe(MARCELLUS);
     });
 
     it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {
-      // Earlier versions forced textTransform: 'lowercase' on every
-      // heading token for an editorial feel. The user moved to
-      // title-case page titles ("Body Profile", "History", "Profile")
-      // so the lowercase transform was dropped — render whatever case
-      // the source string supplies.
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
   });
 
-  // Body tokens — DMSans-Regular (400 weight).
-  const bodyKeys = ['body', 'bodyLarge', 'bodySmall', 'caption', 'banner'] as const;
-  bodyKeys.forEach((key) => {
-    it(`${key} is not forced into lowercase`, () => {
-      expect((typography as any)[key].textTransform).toBeUndefined();
+  // All non-heading tokens render in the same Marcellus file. The
+  // weight-named token references stay so callers can express intent.
+  const nonHeadingKeys = [
+    'body', 'bodyLarge', 'bodySmall', 'caption', 'banner',
+    'label', 'labelLarge', 'labelSmall',
+    'overline', 'headingS',
+  ] as const;
+  nonHeadingKeys.forEach((key) => {
+    it(`${key} renders in Marcellus`, () => {
+      expect((typography as any)[key].fontFamily).toBe(MARCELLUS);
     });
-    it(`${key} uses DMSans-Regular`, () => {
-      expect((typography as any)[key].fontFamily).toBe(fontFamily.primary);
-    });
-  });
-
-  // Label tokens — DMSans-Medium (500 weight) so the medium-weight
-  // file is actually rendered instead of falling back to Regular.
-  const labelKeys = ['label', 'labelLarge', 'labelSmall'] as const;
-  labelKeys.forEach((key) => {
-    it(`${key} uses DMSans-Medium`, () => {
-      expect((typography as any)[key].fontFamily).toBe(fontFamily.primaryMedium);
-    });
-  });
-
-  it('overline uses DMSans-SemiBold (600 weight)', () => {
-    expect(typography.overline.fontFamily).toBe(fontFamily.primarySemiBold);
-  });
-
-  it('headingS uses DMSans-SemiBold (600 weight)', () => {
-    expect(typography.headingS.fontFamily).toBe(fontFamily.primarySemiBold);
   });
 });

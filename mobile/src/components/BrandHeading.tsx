@@ -25,7 +25,7 @@
 
 import React from 'react';
 import { Text, View, StyleProp, TextStyle, ViewStyle, StyleSheet } from 'react-native';
-import { typography, colors } from '../constants/theme';
+import { typography, colors, fontFamily } from '../constants/theme';
 import { isEnabled } from '../constants/featureFlags';
 
 // Slug → SVG component registry. Add a brand in two steps:
@@ -124,7 +124,7 @@ export default function BrandHeading({
       style={[
         typography.headingS,
         {
-          fontFamily: 'ViaodaLibre-Regular',
+          fontFamily: fontFamily.display,
           fontSize: Math.round(height * 0.72),
           lineHeight: height,
           letterSpacing: 0.4,
