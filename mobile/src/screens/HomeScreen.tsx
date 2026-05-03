@@ -507,8 +507,13 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     ...typography.body,
-    // -1pt from body (May 3 2026) — sub-heading was reading slightly
-    // too prominent next to the hero verse above it.
+    // Jost trial (May 3 2026): Home body text uses Jost (geometric
+    // humanist sans) while the rest of the app stays on Marcellus
+    // (roman serif). Override the family inline so the global
+    // typography token isn't affected — easy revert by removing this
+    // line. -1pt from body so the sub-heading doesn't dominate the
+    // hero verse above it.
+    fontFamily: 'Jost-Regular',
     fontSize: 16,
     color: whiteAlpha.textHigh,
     marginTop: 14,
@@ -540,6 +545,7 @@ const styles = StyleSheet.create({
   },
   shareHint: {
     ...typography.caption,
+    fontFamily: 'Jost-Regular',
     color: whiteAlpha.textSecondary,
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -712,14 +718,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   recentName: {
-    fontFamily: fontFamily.primarySemiBold,
+    fontFamily: 'Jost-Regular',
     fontSize: 14,
     fontWeight: '400',
     color: colors.text,
     lineHeight: 18,
   },
   recentSize: {
-    fontFamily: fontFamily.primary,
+    fontFamily: 'Jost-Regular',
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 13,

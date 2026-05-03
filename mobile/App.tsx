@@ -101,6 +101,13 @@ function App() {
     // synthesises bolder strokes where needed; expect uniform weight
     // visually.
     'Marcellus-Regular': require('./assets/fonts/Marcellus-Regular.ttf'),
+    // Jost (Google Fonts, OFL) — geometric humanist sans-serif. Trial
+    // body face on the Home screen only (May 3 2026): paired with
+    // Marcellus to test a sans/serif voice mix on the landing
+    // surface. Bundled as the static "Book" weight (the indestructible-
+    // type repo's 400-Book ttf, registered as Jost-Regular). NameID 1
+    // is "Jost*" with an asterisk; resolve via the file basename / key.
+    'Jost-Regular': require('./assets/fonts/Jost-Regular.ttf'),
   });
 
   const onLayoutReady = useCallback(() => {
