@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useShareIntentContext } from '../utils/shareIntent';
 
-import { colors, spacing, typography, fontFamily, whiteAlpha } from '../constants/theme';
+import { colors, spacing, typography, fontFamily, whiteAlpha, borderRadius } from '../constants/theme';
 import { isEnabled } from '../constants/featureFlags';
 import { ScrapedProduct, FitWarning } from '../services/api';
 
@@ -169,9 +169,12 @@ function MainTabs() {
           // +10 is pure breathing room.
           bottom: (insets.bottom > 0 ? insets.bottom : 0) + 10,
           height: 64,
-          // Full pill — borderRadius matches the height/2 cap so the
-          // shape is unambiguously capsule-shaped at any width.
-          borderRadius: 32,
+          // Rounded rectangle (May 3 2026) — matches the search-pill
+          // and Recent card corner radius (borderRadius.xl = 16) on
+          // the Home screen so the nav bar reads as a tile in the
+          // same family, not a separate capsule shape. Was 32 (full
+          // pill) — felt visually disconnected from the rest.
+          borderRadius: borderRadius.xl,
           borderTopWidth: 0,
           borderWidth: 1,
           borderColor: whiteAlpha.borderSoft,
@@ -441,6 +444,8 @@ const styles = StyleSheet.create({
   tabBarTint: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: whiteAlpha.surfaceFrost,
-    borderRadius: 32,
+    // Matches tabBarStyle.borderRadius above so the tint clips
+    // cleanly inside the rounded-rectangle bar.
+    borderRadius: borderRadius.xl,
   },
 });
