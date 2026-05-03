@@ -107,6 +107,6 @@ const styles = StyleSheet.create({
   buttonText: {
     ...typography.button,
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '400',
   },
 });

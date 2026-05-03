@@ -1635,7 +1635,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   verdictText: {
-    ...typography.headingL, // 24px DM Serif Italic lowercase
+    // headingM (20px) — bumped down from headingL (24px) per May 3 2026
+    // user feedback: the verdict was reading too large on the FitResult
+    // hero. Matches the visual weight of the size pill + stat row sitting
+    // beside it.
+    ...typography.headingM,
   },
   verdictSub: {
     ...typography.bodySmall,
@@ -1652,7 +1656,7 @@ const styles = StyleSheet.create({
   priceText: {
     fontFamily: fontFamily.primary,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '400',
     color: colors.primary,
     letterSpacing: 0.3,
   },
@@ -1740,7 +1744,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.primary,
     position: 'absolute',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '400',
     color: colors.primary,
     letterSpacing: -0.3,
   },
@@ -1817,7 +1821,7 @@ const styles = StyleSheet.create({
   concernSeverity: {
     fontFamily: fontFamily.primary,
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '400',
     letterSpacing: 1.2,
     marginBottom: 2,
   },
@@ -1889,7 +1893,7 @@ const styles = StyleSheet.create({
   // body text; reserved for ≥18px or decorative-only contexts.
   metaLabel: {
     ...typography.labelSmall,
-    fontWeight: '500',
+    fontWeight: '400',
     color: colors.textSecondary,
     textTransform: 'uppercase',
   },
@@ -1898,7 +1902,7 @@ const styles = StyleSheet.create({
     // 800 (was 700) — Noto Serif has the variant. Visibly heavier
     // than the metaLabel (500) so the row reads as label-then-VALUE
     // even at 13px caps. Per user direction April 29 2026.
-    fontWeight: '800',
+    fontWeight: '400',
     color: colors.text,
     textTransform: 'uppercase',
   },
@@ -1907,7 +1911,7 @@ const styles = StyleSheet.create({
   // doesn't break vertical rhythm; same colour tier as the label.
   metaPlaceholder: {
     ...typography.labelSmall,
-    fontWeight: '500',
+    fontWeight: '400',
     color: colors.textSecondary,
     textTransform: 'uppercase',
   },
@@ -1975,7 +1979,7 @@ const styles = StyleSheet.create({
   ghostButtonText: {
     ...typography.bodySmall,
     color: colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '400',
   },
 
   // Attribution footer — small, centred, muted. Intentionally quiet so

@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   brandText: {
     ...typography.labelSmall,
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '400',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   priceText: {
     ...typography.labelSmall,
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '400',
   },
   deleteButton: {
     width: ms(28),
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   sizePillLabel: {
     ...typography.labelSmall,
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '400',
   },
   confidenceDot: {
     width: ms(6),
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   },
   scoreLabel: {
     ...typography.labelSmall,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   metaRow: {
     flexDirection: 'row',
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   warningCount: {
     ...typography.caption,
     color: colors.warningLight,
-    fontWeight: '500',
+    fontWeight: '400',
   },
 
   // --- Empty state ---
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   seedButtonText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '600',
+    fontWeight: '400',
     fontSize: 13,
   },
 

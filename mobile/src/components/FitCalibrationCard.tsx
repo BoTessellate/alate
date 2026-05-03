@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   // Typical size headline
   typicalCard: {
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   },
   confidenceText: {
     ...typography.labelSmall,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   typicalSource: {
     ...typography.caption,
@@ -537,12 +537,12 @@ const styles = StyleSheet.create({
   garmentBrand: {
     ...typography.labelLarge,
     color: colors.text,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   garmentSize: {
     ...typography.bodySmall,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   garmentMetaRow: {
     flexDirection: 'row',
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   modalActions: {
     flexDirection: 'row',
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   cancelText: {
     ...typography.label,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   saveBtn: {
     flex: 2,
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
   saveText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
     fontSize: 15,
   },
 });

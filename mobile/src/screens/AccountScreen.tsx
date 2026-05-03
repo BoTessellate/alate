@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
   googleButtonText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
     fontSize: 15,
   },
   signedInRow: {
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   userName: {
     ...typography.labelLarge,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '400',
     marginBottom: 2,
   },
   userEmail: {
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   signOutText: {
     ...typography.label,
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '400',
     fontSize: 12,
   },
   // Stats
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   profileValue: {
     ...typography.bodySmall,
     color: colors.text,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   // Holds the value + a chevron — visually announces the row is
   // tappable. Each row navigates to AvatarSetup with a focusKey
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
   emptyProfileCtaText: {
     ...typography.label,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   tipCard: {
     flexDirection: 'row',
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   resetText: {
     ...typography.label,
     color: whiteAlpha.textBody,
-    fontWeight: '600',
+    fontWeight: '400',
   },
 
   // Legal/policy links — small row at the bottom of the Account page.

@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   badgeText: {
     ...typography.labelSmall,
     color: colors.secondary,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   title: {
     ...typography.headingXL,
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   ctaButtonText: {
     ...typography.button,
     color: colors.white,
-    fontWeight: '700',
+    fontWeight: '400',
   },
   footerNote: {
     ...typography.caption,
