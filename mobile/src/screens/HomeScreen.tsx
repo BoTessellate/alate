@@ -107,24 +107,35 @@ export default function HomeScreen() {
         runCheck(saved);
         return;
       }
-      // Normal focus — reset URL so a stale paste doesn't auto-trigger
-      // a fresh fit-check the moment the screen mounts.
+      // Normal focus — reset the input so a stale paste doesn't sit
+      // there from a previous session.
       setUrl('');
 
-      // Auto-clipboard-detection on focus was REMOVED April 29 2026.
-      // Earlier behaviour read the clipboard whenever Home regained
-      // focus and auto-fired the scraper if the URL "looked like a
-      // product". Per user feedback: that triggered at odd times —
-      // e.g. a male user setting up his profile while a women's
-      // product URL sat in the clipboard from an earlier session.
-      // The "I want to check this product" intent must be explicit:
-      // the user pastes into the input themselves. Manual paste keeps
-      // the 700ms debounce auto-fire (deliberate paste = deliberate
-      // intent), so the convenience for the active path is preserved
-      // — only the passive clipboard sniff is gone.
-      // (consumedClipboardUrlRef + Clipboard import retained in case
-      // we re-introduce the feature behind a "Check this link?" pill
-      // — see backlog notes on opt-in clipboard prompt.)
+      // Auto-clipboard pickup on tab focus (re-enabled May 3 2026).
+      // Reads the clipboard once per session; if it holds a valid URL
+      // that looks like a product page, it auto-fires the fit-check.
+      // The `consumedClipboardUrlRef` guard means a single URL only
+      // fires once — toggling tabs won't re-trigger the same URL.
+      //
+      // Was removed April 29 2026 over false-positive concerns (URL
+      // sitting in clipboard from a previous session). The product
+      // call has flipped: speed-of-paste matters more than the rare
+      // accidental fire, which the user can always back out of.
+      (async () => {
+        if (!avatar) return;
+        try {
+          const text = await Clipboard.getStringAsync();
+          if (!text) return;
+          if (consumedClipboardUrlRef.current === text) return;
+          if (!isValidUrl(text) || !looksLikeProductUrl(text)) return;
+          consumedClipboardUrlRef.current = text;
+          setUrl(text);
+          runCheck(text);
+        } catch {
+          // Clipboard access can fail on Android in restricted contexts;
+          // silently skip — the manual paste path still works.
+        }
+      })();
     }, [avatar])
   );
 
@@ -237,7 +248,7 @@ export default function HomeScreen() {
                 button to "submit" duplicates that interaction. The
                 share-extension hint below stays as the alternative
                 entry point. */}
-            <Text style={styles.shareHint}>or use the share extension from your browser</Text>
+            <Text style={styles.shareHint}>or share a product link to alate from any shopping app</Text>
           </View>
 
           {/* Scrape-error UX (unsupported brand, blocked origin, network
@@ -445,11 +456,13 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    // Extra clearance so the RECENT list is visibly dying into the fade
-    // before it reaches the floating pill. Paired with the heavier fade
-    // gradient (height 320 below), the last RECENT row ends deep inside
-    // the dark zone — cards never show up cleanly near the nav pill.
-    paddingBottom: 280,
+    // Trimmed from 280 → 140 (May 3 2026): the prior 280 reserved
+    // empty space below the RECENT list so it could fade into the
+    // dark zone before reaching the floating pill, but on devices
+    // with a small history this read as a big empty void below the
+    // last card. 140 still clears the nav pill (~96px + breathing
+    // room) and lets the fade gradient kick in just above it.
+    paddingBottom: 140,
   },
   // Empty-history variant — only enough bottom padding to clear the
   // floating tab pill (~96px). The big 280px reservation in `content`
@@ -494,6 +507,9 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     ...typography.body,
+    // -1pt from body (May 3 2026) — sub-heading was reading slightly
+    // too prominent next to the hero verse above it.
+    fontSize: 16,
     color: whiteAlpha.textHigh,
     marginTop: 14,
     maxWidth: 300,
@@ -658,14 +674,14 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 10,
     borderRadius: borderRadius.xl,
-    // White frost opaque enough for dark text to pass WCAG AA against
-    // the dark-gradient backdrop. At 0.38 the card was mid-tone, so
-    // neither white nor dark text read well. 0.78 reads as frosted
-    // glass (gradient still perceptible at the edges) but carries the
-    // dark ink cleanly.
-    backgroundColor: whiteAlpha.surfaceCard,
+    // Lightened from surfaceCard (0.78) → surfaceCardGlass (0.32)
+    // per user feedback May 3 2026: the cards read too opaque and
+    // sat as flat panels rather than glass. Lower alpha lets the
+    // gradient bleed through. Border alpha dropped in step so the
+    // edge doesn't look harsh against the softer fill.
+    backgroundColor: whiteAlpha.surfaceCardGlass,
     borderWidth: 1,
-    borderColor: whiteAlpha.borderStrong,
+    borderColor: whiteAlpha.borderSoft,
   },
   recentThumb: {
     width: 44,

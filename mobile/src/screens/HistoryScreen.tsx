@@ -19,7 +19,6 @@ import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
-import HeadingImage from '../components/HeadingImage';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -237,16 +236,12 @@ export default function HistoryScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
-        {/* Page title + slim stats pill under it. TAN Nightingale SVG
-            via HeadingImage falls back to styled text if missing. */}
+        {/* Sub-heading meta is now the only header line (the "History"
+            display title was retired May 3 2026 — felt redundant since
+            the tab nav already labels the screen). Sub-heading bumped
+            +3pt so it carries the section on its own without the
+            display title above it. */}
         <View style={styles.header}>
-          <HeadingImage
-            slot="history"
-            fallback="History"
-            height={60}
-            color={colors.text}
-            textStyle={styles.pageTitle}
-          />
           <Text style={styles.headerMeta}>
             {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}
           </Text>
@@ -325,13 +320,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Header — left-aligned per Claude Design mockup. Title + meta now
-  // render LIGHT-on-dark to read against the gradient backdrop. Was
-  // dark-on-light back when the screen had a solid #e6e4e9 background.
+  // Header — meta-only since the display title was retired (May 3
+  // 2026). Tighter top + bottom padding so the cover-flow deck sits
+  // higher on the screen.
   header: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 0,
   },
   pageTitle: {
     ...typography.displayMedium,
@@ -346,9 +341,11 @@ const styles = StyleSheet.create({
   // display serif. Slightly larger size + tighter line height to
   // suit the heavier strokes.
   headerMeta: {
+    // Bumped 15 → 18 (May 3 2026): now the only header line, needs
+    // to carry the section on its own.
     fontFamily: fontFamily.display,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 24,
     color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
   },
@@ -578,7 +575,11 @@ const styles = StyleSheet.create({
   },
   clearLinkText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    // Was colors.textSecondary (dark grey) on the dark gradient
+    // backdrop — invisible. Light text with moderate alpha so it
+    // reads as a quiet but legible link, not loud as the primary
+    // action.
+    color: 'rgba(255,255,255,0.75)',
     textDecorationLine: 'underline',
     letterSpacing: 0.6,
   },

@@ -45,6 +45,7 @@ import FitResultScreen from '../screens/FitResultScreen';
 import AccountScreen from '../screens/AccountScreen';
 import PickImageScreen from '../screens/PickImageScreen';
 import OverlayEditorScreen from '../screens/OverlayEditorScreen';
+import BrandIntegrationScreen from '../screens/BrandIntegrationScreen';
 
 // Wrap each screen with an error boundary so a crash shows a fallback
 // instead of a white screen. The `name` prop tags the Sentry report.
@@ -55,11 +56,15 @@ const SafeAvatarSetup = () => <ScreenErrorBoundary name="AvatarSetupScreen"><Ava
 const SafeFitResult = () => <ScreenErrorBoundary name="FitResultScreen"><FitResultScreen /></ScreenErrorBoundary>;
 const SafePickImage = () => <ScreenErrorBoundary name="PickImageScreen"><PickImageScreen /></ScreenErrorBoundary>;
 const SafeOverlayEditor = () => <ScreenErrorBoundary name="OverlayEditorScreen"><OverlayEditorScreen /></ScreenErrorBoundary>;
+const SafeBrandIntegration = () => <ScreenErrorBoundary name="BrandIntegrationScreen"><BrandIntegrationScreen /></ScreenErrorBoundary>;
 
 // Navigation types
 export type RootStackParamList = {
   Main: undefined;
   AvatarSetup: { focusKey?: AvatarFocusKey } | undefined;
+  /** "For Brands" pitch screen — opened from the Account tab's
+   *  "Are you a brand?" CTA. */
+  BrandIntegration: undefined;
   /** v2: Story share — gated by featureFlags.V2 */
   PickImage: undefined;
   /** v2: Story share — gated by featureFlags.V2 */
@@ -394,6 +399,17 @@ export default function AppNavigator() {
             // native 'Fit Analysis' header would otherwise (a) cover the
             // top of the image and (b) add a second redundant back arrow.
             headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="BrandIntegration"
+          component={SafeBrandIntegration}
+          options={{
+            title: 'For Brands',
+            // Native header gives users a back button + title without
+            // the screen needing to paint its own.
+            headerShown: true,
+            presentation: 'modal',
           }}
         />
         {/* v2: Story share. Routes are only registered when the flag is
