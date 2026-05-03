@@ -51,8 +51,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import BrandHeading from '../components/BrandHeading';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
-// Currency formatting shared with HistoryCoverFlow + SwipeableHistoryStack
-// so the same symbol map (incl. ₹ for INR) drives every price display.
+// Currency formatting shared with HistoryCoverFlow so the same symbol
+// map (incl. ₹ for INR) drives every price display.
 import { formatPrice } from '../utils/currency';
 // Tag filtering — strip merchandising noise (sale codes, drops, sizes,
 // "best seller" labels, etc.) so users only see tags that describe
