@@ -39,14 +39,28 @@
 // app (Marcellus). Single-weight serif — every token points at the
 // same file. Bold/medium tokens stay in the registry so callers don't
 // have to change, but the rendered face is identical; visual hierarchy
-// has to come from size + colour + spacing instead of weight. Revert
-// to the prior DM Sans + Viaoda setup if the uniform weight reads flat.
+// has to come from size + colour + spacing instead of weight.
+//
+// May 3 2026 PM revert (partial): page headings move BACK to Viaoda
+// Libre per user direction ("change page headings to VL — paste
+// anything, body profile, profile and any other page I'm missing").
+// Body / labels stay on Marcellus so the body voice stays the way the
+// user has been A/B-ing it; only the display tier flips. Affected
+// tokens: displayLarge, displayMedium, headingXL, headingL, headingM
+// (everything that mixes in `headingSerif` below). headingS, body,
+// label, caption all stay on `primary*` (Marcellus).
+//
+// Trade-off: same single-weight constraint applies to Viaoda Libre.
+// All heading tokens MUST stay at fontWeight: '400'. The April 29
+// regression where Android's font manager fell back to Noto Serif
+// Bold when asked for Viaoda Libre 700 is documented in
+// project_regression_log.md and project_anti_patterns.md (#13).
 export const fontFamily = {
   primary: 'Marcellus-Regular',
   primaryMedium: 'Marcellus-Regular',
   primarySemiBold: 'Marcellus-Regular',
   primaryBold: 'Marcellus-Regular',
-  display: 'Marcellus-Regular',
+  display: 'ViaodaLibre-Regular',
 };
 
 // Shared heading trait: every display/heading token mixes this in so

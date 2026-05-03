@@ -29,6 +29,7 @@ import Animated, {
   Extrapolation,
   SharedValue,
   runOnJS,
+  useReducedMotion,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -115,7 +116,13 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
       <Feather
         name="shopping-bag"
         size={56}
-        color={whiteAlpha.iconLow}
+        // Was iconLow (0.20). On the placeholder card's primaryDark
+        // (#4c4356) background that gave a non-text-UI contrast of
+        // ~1.7:1 — fails WCAG 1.4.11 (3:1). Bumped to textSecondary
+        // (0.70 white) which clears 5:1+ on the same dark backdrop
+        // while keeping the icon's "this is a placeholder, not the
+        // hero" tone. May 3 2026 PM contrast pass.
+        color={whiteAlpha.textSecondary}
         style={styles.placeholderIcon}
       />
       {inner}
@@ -157,6 +164,14 @@ function CoverFlowCard({
   onTap: () => void;
   onDelete?: () => void;
 }) {
+  // Respect the OS-level "reduce motion" preference. When on, the
+  // end-of-deck rubber-band stretch is suppressed (the snap is still
+  // there — drag past the last card and it won't move; without the
+  // bounce the user just feels resistance). Vestibular-disorder users
+  // are particularly sensitive to spring-back overshoots, so this is
+  // worth the few extra branches. See accessibility-review #8 (May 3
+  // 2026 PM).
+  const reducedMotion = useReducedMotion();
   const animatedStyle = useAnimatedStyle(() => {
     // Distance from this card's snap point to the current scroll offset,
     // expressed in units of ITEM_GAP.
@@ -213,7 +228,7 @@ function CoverFlowCard({
     // ScrollView snaps back to the resting position.
     let endBounceTx = 0;
     let endBounceTilt = 0;
-    if (index === totalCount - 1) {
+    if (index === totalCount - 1 && !reducedMotion) {
       const maxOffset = (totalCount - 1) * ITEM_GAP;
       const overshoot = scrollX.value - maxOffset;
       if (overshoot > 0) {
@@ -271,7 +286,13 @@ function CoverFlowCard({
     <Animated.View style={[styles.cardSlot, slotStyle]}>
       <View style={styles.cardPerspective}>
         <Animated.View style={[styles.cardAnim, animatedStyle]}>
-          <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={onTap}
+            style={styles.cardTouch}
+            accessibilityRole="button"
+            accessibilityLabel={`Open fit details for ${sanitize(entry.brand) || 'this product'}, ${sanitize(entry.productName) || 'product'}`}
+          >
             <CardFace entry={entry} />
           </TouchableOpacity>
           {onDelete && (
@@ -281,6 +302,8 @@ function CoverFlowCard({
               style={styles.deleteBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID={`history-card-delete-${entry.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${sanitize(entry.productName) || 'product'} from history`}
             >
               <Feather name="trash-2" size={14} color="#fff" />
             </TouchableOpacity>
@@ -408,7 +431,18 @@ export default function HistoryCoverFlow({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    justifyContent: 'center',
+    // Was `justifyContent: 'center'` (cards floated in the vertical
+    // middle of the available area, which left a ~115 px void below
+    // them when the FitDetailBar pill on HistoryScreen sat at
+    // bottom: 72). May 3 2026 PM the pill moved up to bottom: 130
+    // and the cards' alignment flipped to flex-end with explicit
+    // paddingBottom — together they meet just above the pill so the
+    // deck + detail bar read as ONE element, not two unrelated
+    // pieces. paddingBottom is hand-tuned to roughly the pill's
+    // height + the pill's distance-from-bottom, so card bottoms sit
+    // ~20-30 px above the pill across phone sizes.
+    justifyContent: 'flex-end',
+    paddingBottom: 200,
   },
   scrollContent: {
     alignItems: 'center',

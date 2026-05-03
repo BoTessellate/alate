@@ -208,12 +208,15 @@ export default function HistoryScreen() {
         {/* Brand grey-purple ombre — same gradient as Home / Account
             / FitResult hero. Per user direction April 29 2026: the
             History tab read flat against the rest of the app's
-            atmospheric backdrop. */}
+            atmospheric backdrop. May 3 2026 PM: angle flipped to
+            top-RIGHT light → bottom-LEFT deep so the `headerMeta`
+            line in the top-left passes WCAG contrast — see
+            HomeScreen for the full rationale. */}
         <LinearGradient
           colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
           locations={[0, 0.3, 0.6, 0.9]}
-          start={{ x: 0.15, y: 0.1 }}
-          end={{ x: 0.85, y: 1 }}
+          start={{ x: 1, y: 0.05 }}
+          end={{ x: 0.1, y: 0.95 }}
           style={StyleSheet.absoluteFill}
         />
         <View testID="history-screen" style={styles.emptyContainer}>
@@ -242,12 +245,13 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      {/* Same brand ombre as the empty state above. */}
+      {/* Same brand ombre as the empty state above (top-right light →
+          bottom-left deep, May 3 2026 PM). */}
       <LinearGradient
         colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
         locations={[0, 0.3, 0.6, 0.9]}
-        start={{ x: 0.15, y: 0.1 }}
-        end={{ x: 0.85, y: 1 }}
+        start={{ x: 1, y: 0.05 }}
+        end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
@@ -361,7 +365,12 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.display,
     fontSize: 18,
     lineHeight: 24,
-    color: 'rgba(255,255,255,0.85)',
+    // Was 0.85 white — even after the gradient angle flip the top
+    // half of the screen sits in the mid-tone region (~#71667c),
+    // and 0.85 white only clears 4.39:1 there. WCAG AA needs 4.5:1
+    // for 18px (≈ 13.5pt = normal text). Bumped to textOpaque (0.92)
+    // which clears 4.78:1. May 3 2026 PM contrast pass.
+    color: whiteAlpha.textOpaque,
     marginTop: 4,
   },
   list: {
@@ -565,16 +574,23 @@ const styles = StyleSheet.create({
   },
 
   // --- Floating footer overlay (pill + clear link above the floating
-  //     tab bar). Dropped 100 → 72 so the detail pill isn't directly
-  //     touching the bottom of the product card — there's a visible gap
-  //     between the cover-flow card edge and the pill now, per user
-  //     feedback. Still sits clearly above the tab pill (which starts
-  //     at insets.bottom + 24 + 64 ≈ 88 from the bottom). ---
+  //     tab bar).
+  //     History (May 3 2026 PM): bumped bottom 72 → 130 to pull the
+  //     pill + "Clear history" link up closer to where the deck
+  //     visually ends. Paired with a `paddingBottom` push on the
+  //     cover-flow root in `HistoryCoverFlow.tsx` so the cards sit
+  //     LOWER and meet the pill in the middle of the screen — user
+  //     feedback: "the pill element and 'clear history' under it
+  //     needs to move higher up and the product stack needs to move
+  //     lower… right now there's an odd space between stack and the
+  //     pill making it look like they are not related but they are
+  //     very much so". The pill now visually anchors as the deck's
+  //     "now playing" bar, not a free-floating chip.
   floatingFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 72,
+    bottom: 130,
     alignItems: 'center',
   },
   detailBarWrap: {
@@ -585,8 +601,14 @@ const styles = StyleSheet.create({
   //     reserved for the confirmation Alert, not the surface styling. ---
   clearLink: {
     alignSelf: 'center',
-    paddingVertical: spacing.sm,
+    // Bumped paddingVertical sm (8) → md (16) so the visible tap zone
+    // is ≥ 44px tall on its own (16 + 19px line-height + 16 = 51px),
+    // not just after the hitSlop. Cleaner for users with cognitive
+    // accessibility needs who rely on the visible target. May 3 2026
+    // PM accessibility-review #7.
+    paddingVertical: spacing.md,
     paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   clearLinkText: {
     ...typography.caption,
@@ -594,7 +616,7 @@ const styles = StyleSheet.create({
     // backdrop — invisible. Light text with moderate alpha so it
     // reads as a quiet but legible link, not loud as the primary
     // action.
-    color: 'rgba(255,255,255,0.75)',
+    color: whiteAlpha.textBody,
     textDecorationLine: 'underline',
     letterSpacing: 0.6,
   },

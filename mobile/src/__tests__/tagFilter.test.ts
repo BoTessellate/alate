@@ -50,6 +50,56 @@ describe('filterUserFacingTags', () => {
     expect(filterUserFacingTags(['top', 'linen'], 'Top')).toEqual(['linen']);
   });
 
+  it('strips a tag that duplicates the material', () => {
+    // Cordstudio (May 3 2026 user report — `poem-dress-f22-pnd-rt`):
+    // a "100% cotton" product surfaced "100% cotton" as a tag chip
+    // even though it was already shown in the MATERIAL row. Same
+    // shape as the category dedup — case + whitespace + hyphen +
+    // underscore insensitive.
+    //
+    // Note: "days12-14" is also dropped from the same Cordstudio tag
+    // list, but by the existing SKU-shape noise pattern (4 letters +
+    // 2 digits + dash + 2 digits matches `^[a-z]{1,4}[-_]?\d{1,4}
+    // (?:[-_]\d{1,3})?$`), not by this material dedup. Tests for the
+    // SKU pattern itself live further down ("strips SKU / design-code
+    // shaped tags").
+    expect(
+      filterUserFacingTags(
+        ['100% cotton', 'cotton dress for summer', 'casual dress for summer'],
+        undefined,
+        '100% cotton',
+      ),
+    ).toEqual(['cotton dress for summer', 'casual dress for summer']);
+    // Match is case + whitespace insensitive (matches dedup key shape)
+    expect(
+      filterUserFacingTags(['100%cotton', 'Linen'], undefined, '100% Cotton'),
+    ).toEqual(['Linen']);
+    expect(
+      filterUserFacingTags(['Linen Blend', 'breezy'], undefined, 'linen blend'),
+    ).toEqual(['breezy']);
+  });
+
+  it('strips both category AND material when both are passed', () => {
+    expect(
+      filterUserFacingTags(['Dress', '100% Cotton', 'breezy', 'easystyle'], 'dress', '100% cotton'),
+    ).toEqual(['breezy', 'easystyle']);
+  });
+
+  it('end-to-end on the Cordstudio poem-dress tag list', () => {
+    // Verifies the full Cordstudio user-report shape (May 3 2026):
+    // raw tags ['days12-14', 'casual dress for summer', 'cotton
+    // dress for summer', 'dress', '100% cotton'] with category="dress"
+    // and material="100% cotton" should leave ONLY the descriptive
+    // free-form chips.
+    expect(
+      filterUserFacingTags(
+        ['days12-14', 'casual dress for summer', 'cotton dress for summer', 'dress', '100% cotton'],
+        'dress',
+        '100% cotton',
+      ),
+    ).toEqual(['casual dress for summer', 'cotton dress for summer']);
+  });
+
   it('end-to-end on a real summeraway tag list', () => {
     const raw = [
       'april26-sale-10',
@@ -152,6 +202,53 @@ describe('filterUserFacingTags', () => {
     // "sale" as part of a real word (e.g. "wholesale" — unlikely as
     // a garment tag but cover the regression).
     expect(filterUserFacingTags(['wholesaler', 'Linen'])).toEqual(['wholesaler', 'Linen']);
+  });
+
+  it('strips "save N%" / "save up to N%" / "save upto N%" merchandising labels', () => {
+    // Genes Le Coanet Hemant (May 3 2026 PM user report) shipped tags
+    // like "save 50%" and "save upto 50%" — discount-amount labels,
+    // not garment attributes.
+    expect(
+      filterUserFacingTags(['save 50%', 'save upto 50%', 'save up to 30%', 'Linen']),
+    ).toEqual(['Linen']);
+  });
+
+  it('strips "onsale" (fused sale flag, no word boundary before "sale")', () => {
+    // The existing `\bsale...\b` rule needs a word boundary on the
+    // left, so "onsale" (no separator between "on" and "sale") slips
+    // past. Add an explicit pattern for the fused form.
+    expect(filterUserFacingTags(['onsale', 'on-sale', 'on_sale', 'Linen'])).toEqual(['Linen']);
+  });
+
+  it('strips "spring summer YY" / "spring/summer YY" season-year labels', () => {
+    // Genes Le Coanet Hemant: "spring summer 23" (and family —
+    // "fall winter 24", "ss 23", "spring/summer 2023") are
+    // collection-season labels equivalent to the existing SS24 /
+    // AW2024 pattern, just spelled out long-form.
+    expect(
+      filterUserFacingTags([
+        'spring summer 23',
+        'spring/summer 2023',
+        'fall winter 24',
+        'autumn winter 2024',
+        'Linen',
+      ]),
+    ).toEqual(['Linen']);
+    // Don't strip a single season word with no year — "summer" alone
+    // is a legit garment tag (e.g. "summer dress").
+    expect(filterUserFacingTags(['summer', 'spring', 'Linen'])).toEqual([
+      'summer', 'spring', 'Linen',
+    ]);
+  });
+
+  it('end-to-end on the Genes Le Coanet Hemant tag list', () => {
+    // Verifies the full live-report tag list (May 3 2026 PM):
+    // raw tags ["save 50%", "spring summer 23", "save upto 50%",
+    // "onsale"] should yield ZERO surviving tags — every entry is
+    // merchandising noise.
+    expect(
+      filterUserFacingTags(['save 50%', 'spring summer 23', 'save upto 50%', 'onsale']),
+    ).toEqual([]);
   });
 
   it('dedupes near-identical tags case + space insensitively (organic cotton vs organiccotton)', () => {

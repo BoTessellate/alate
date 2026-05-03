@@ -37,7 +37,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, whiteAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
@@ -260,7 +260,13 @@ export default function FitResultScreen() {
     bottom: interpolate(
       collapseProgress.value,
       [0, 1],
-      [0, insets.bottom + SIDE_PAD]
+      // Raised the docked-state bottom from 0 → 2 (May 3 2026 PM
+      // user feedback: "raise docked overlay by 2px"). Tiny visual
+      // breathing room between the dock's bottom edge and the device
+      // screen edge — reads less like the dock is fused to the
+      // chrome. Expanded state's bottom is unchanged
+      // (insets.bottom + SIDE_PAD) so the floating treatment stays.
+      [2, insets.bottom + SIDE_PAD]
     ),
     borderBottomLeftRadius: interpolate(
       collapseProgress.value,
@@ -286,6 +292,44 @@ export default function FitResultScreen() {
     const alpha = interpolate(collapseProgress.value, [0, 1], [0.34, 0.54]);
     return {
       backgroundColor: `rgba(255, 255, 255, ${alpha})`,
+    };
+  });
+
+  // Hero brand+name follows the dock as it collapses (May 3 2026 PM).
+  // User direction: "on pulling the overlay into a dock, drag the
+  // brand name and product name with the overlay and place it right
+  // above but in smaller font."
+  //
+  // At progress=1 (expanded): translateY=0, scale=1 → hero sits at
+  //   its anchored top position (insets.top + spacing.xl).
+  // At progress=0 (collapsed): hero translates DOWN to a y-position
+  //   ~24px above the docked card's top edge, scales to ~58% so the
+  //   brand reads as a small eyebrow and the name as a single
+  //   condensed line. The translateOrigin sits at the hero's TOP
+  //   (default `transform-origin` for RN), so the scale shrinks
+  //   visually around its current top edge — perfect because we WANT
+  //   the bottom of the hero (which gets closer to the dock as we
+  //   collapse) to stay anchored ~24px above the dock.
+  //
+  // The COLLAPSED_H + insets.bottom math anchors the target position
+  // to the same coordinates the dock uses (cardLayoutStyle, above).
+  // SCREEN_H is computed once at module load — fine because the
+  // FitResult screen is full-bleed and doesn't reflow on rotation.
+  const heroOriginTop = insets.top + spacing.xl;
+  const heroDockStyle = useAnimatedStyle(() => {
+    // Collapsed: hero base sits ~24px above the dock's top edge.
+    //   dockTopWhenCollapsed = SCREEN_H - COLLAPSED_H
+    //   (cardLayoutStyle.bottom is 0 when collapsed, height is COLLAPSED_H)
+    const dockTopCollapsed = SCREEN_H - COLLAPSED_H;
+    const targetTopCollapsed = dockTopCollapsed - 56; // ~brand + name + 24px gap
+    const translateY = interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [targetTopCollapsed - heroOriginTop, 0]
+    );
+    const scale = interpolate(collapseProgress.value, [0, 1], [0.58, 1]);
+    return {
+      transform: [{ translateY }, { scale }],
     };
   });
 
@@ -765,13 +809,18 @@ export default function FitResultScreen() {
           text: 'Great Fit!',
         };
       case 'minor':
-        // Same icon + colour as 'great' — a single minor note isn't
-        // a fit warning, it's a sizing tip. The note itself appears
-        // below in the FIT CONCERNS section.
+        // Same icon + colour as 'great' — a minor note isn't a fit
+        // warning, it's a sizing tip. The note itself appears below
+        // in the FIT CONCERNS section. Copy pluralises off the
+        // warnings count so the verdict line agrees with the
+        // sub-line ("Great Fit, with a note" + "1 note" /
+        // "Great Fit, with notes" + "2 notes"). The mismatch was a
+        // user-flagged regression on May 3 2026 PM ("it says, 'great
+        // fit with a note' but right under it says, '2 notes'").
         return {
           color: colors.successDeep,
           icon: '✓',
-          text: 'Great Fit, with a note',
+          text: warnings.length === 1 ? 'Great Fit, with a note' : 'Great Fit, with notes',
         };
       case 'moderate':
         return {
@@ -897,9 +946,15 @@ export default function FitResultScreen() {
 
   // Tags pass through the noise filter before render — keeps things
   // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
-  // user-facing chip row. Also strips a tag that duplicates the
-  // category (e.g. "Top" tag when category is already "Top").
-  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, displayCategory);
+  // user-facing chip row. Also strips tags that duplicate the
+  // CATEGORY (e.g. "Top" tag when category is already "Top") and the
+  // MATERIAL (May 3 2026 — Cordstudio's `poem-dress` showed "100%
+  // cotton" in both the MATERIAL row and the tag chip row).
+  const visibleTags = filterUserFacingTags(
+    enrichedProduct?.tags,
+    displayCategory,
+    displayMaterial,
+  );
   const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
@@ -932,7 +987,11 @@ export default function FitResultScreen() {
         <Image source={{ uri: product.image }} style={styles.bgImage} resizeMode="cover" />
       ) : (
         <View style={[styles.bgImage, styles.bgPlaceholder]}>
-          <Feather name="shopping-bag" size={96} color="rgba(255,255,255,0.25)" />
+          {/* Was 0.25 white — only ~1.9:1 contrast on the
+              primaryDark (#4c4356) bg. WCAG 1.4.11 needs 3:1 for
+              non-text UI. Bumped to textSecondary (0.70 white) to
+              clear 5:1+ on the same backdrop. May 3 2026 PM. */}
+          <Feather name="shopping-bag" size={96} color={whiteAlpha.textSecondary} />
         </View>
       )}
 
@@ -950,6 +1009,8 @@ export default function FitResultScreen() {
         onPress={() => navigation.goBack()}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
         <Feather name="chevron-left" size={22} color="#fff" />
       </TouchableOpacity>
@@ -966,13 +1027,22 @@ export default function FitResultScreen() {
           onPress={() => setPendingDelete(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Remove from history"
         >
           <Feather name="trash-2" size={18} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* Brand + product name centred near the top of the image */}
-      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
+      {/* Brand + product name centred near the top of the image. Wrapped
+          in Animated.View so the hero translates DOWN with the dock as
+          it collapses (and shrinks ~58%), parking just above the dock
+          like a music-player now-playing strip. See `heroDockStyle`
+          above for the math. */}
+      <Animated.View
+        style={[styles.hero, { paddingTop: insets.top + spacing.xl }, heroDockStyle]}
+        pointerEvents="none"
+      >
         {safeBrand ? (
           <BrandHeading
             brand={safeBrand}
@@ -1001,7 +1071,7 @@ export default function FitResultScreen() {
             </Text>
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Glass info card — expanded = 70% screen + symmetric side/bottom
           padding, collapsed = screen-wide dock anchored to the bottom.
@@ -1257,13 +1327,37 @@ export default function FitResultScreen() {
             </GestureDetector>
           )}
 
-          {/* Meta rows — Material always survives the dock's minimum-
-              info treatment (most-asked spec when shopping fabric-
-              first); Category appears only when expanded. Both rows
-              fall back to "—" when the scrape didn't surface the
-              field, so the panel structure stays consistent across
-              cards even when the source storefront is sparse. */}
-          {(showMaterial || isExpanded) && (
+          {/* Meta rows.
+              - Collapsed (dock): a single "Fit concerns" preview line
+                replaces the Material row. The verdict + stats already
+                handle the high-level "does it fit", but a one-line
+                concerns summary is the actionable detail a shopper
+                wants to see WITHOUT expanding the dock — Material is
+                still in the expanded view and on the history card.
+                User direction May 3 2026 PM: "replace material bit
+                with fit concerns bit (keep the rest of the
+                interactions/design the same)".
+              - Expanded: full Material + Category rows as before
+                (Concerns themselves render in their own section
+                above this one). */}
+          {!isExpanded && (
+            <View style={styles.metaSection}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Fit concerns</Text>
+                <Text
+                  style={warnings.length > 0 ? styles.metaValue : styles.metaPlaceholder}
+                  numberOfLines={1}
+                >
+                  {warnings.length === 0
+                    ? 'None — fits comfortably'
+                    : warnings.length === 1
+                    ? `1 ${effectiveScore === 'minor' ? 'note' : 'concern'}`
+                    : `${warnings.length} ${effectiveScore === 'minor' ? 'notes' : 'concerns'}`}
+                </Text>
+              </View>
+            </View>
+          )}
+          {isExpanded && (showMaterial || isExpanded) && (
             <View style={styles.metaSection}>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Material</Text>
@@ -1271,14 +1365,12 @@ export default function FitResultScreen() {
                   {showMaterial ? displayMaterial : '—'}
                 </Text>
               </View>
-              {isExpanded && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
-                    {showCategory ? displayCategory : '—'}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Category</Text>
+                <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
+                  {showCategory ? displayCategory : '—'}
+                </Text>
+              </View>
             </View>
           )}
 

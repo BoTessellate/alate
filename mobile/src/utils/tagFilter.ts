@@ -30,6 +30,15 @@ const NOISE_PATTERNS: RegExp[] = [
   // Word-boundary on the LEFT only — anchoring right with \b would
   // miss "salex" (which is what bit us in Reistor testing May 2 2026).
   /\bsale(?:s|x|item)?\b/i,
+  // Fused sale flags with no word-boundary on the left:
+  // "onsale" / "on-sale" / "on_sale" — Genes Le Coanet Hemant
+  // (May 3 2026 PM) shipped these as discrete tags. Don't bound on
+  // the left so the literal "onsale" matches.
+  /\b(?:on[\s_-]?sale|onsale)\b/i,
+  // "save 50%" / "save up to 50%" / "save upto 50%" — discount-amount
+  // labels (Genes Le Coanet Hemant, May 3 2026 PM). Allow optional
+  // "up(\s)?to" between "save" and the percentage.
+  /\bsave\s+(?:up\s*to\s+)?\d{1,3}\s*%/i,
   // Date-bounded marketing tags: "april26-sale-10", "spring2026"
   /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\d/i,
   // Pricing labels — "Full Price", "20% off", "new price", "regular
@@ -55,6 +64,13 @@ const NOISE_PATTERNS: RegExp[] = [
   // existing season-prefix pattern; merchants extend the same naming
   // scheme to non-spring/fall lines.
   /\b(resort|cruise|holiday|festive|capsule)\W?\d{2,4}\b/i,
+  // Long-form season-year labels: "spring summer 23", "spring/summer
+  // 2023", "fall winter 24", "autumn winter 2024". Mirrors the
+  // SS24 / AW2024 pattern but for spelled-out season names. A SECOND
+  // season is optional (handles single-season lines like "spring
+  // 2023" too). YEAR is REQUIRED so a bare "summer" tag still passes
+  // the filter — that's a legit garment tag.
+  /\b(spring|summer|fall|autumn|winter)(?:[\s\/]+(spring|summer|fall|autumn|winter))?[\s\/]*\d{2,4}\b/i,
   /\bcollection\s*\d+/i,
   // Sizes (already shown in the size pill, redundant as tags)
   /^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|4xl|one\s*size)$/i,
@@ -106,23 +122,34 @@ function dedupKey(tag: string): string {
  * Filter a list of raw Shopify tags down to user-facing ones.
  * Order is preserved. Empty / whitespace-only entries are dropped.
  *
- * Optionally pass `excludeCategory` to also strip a tag matching the
- * product's own category (e.g. don't show "Top" as a tag when the
- * category field is already "Top").
+ * Optionally pass:
+ *   - `excludeCategory`: strip a tag matching the product's own
+ *     category (e.g. don't show "Top" as a tag when the category
+ *     field is already "Top").
+ *   - `excludeMaterial`: strip a tag matching the product's own
+ *     material (May 3 2026 — Cordstudio's `poem-dress-f22-pnd-rt`
+ *     surfaced "100% cotton" both in the MATERIAL row and as a tag
+ *     chip below; user feedback flagged the redundancy). Comparison
+ *     uses the same normalisation as dedupKey (case + whitespace +
+ *     hyphen + underscore insensitive) so "100% cotton" matches
+ *     "100%cotton" / "100%COTTON" / "100% Cotton".
  */
 export function filterUserFacingTags(
   tags: string[] | undefined | null,
-  excludeCategory?: string
+  excludeCategory?: string,
+  excludeMaterial?: string
 ): string[] {
   if (!tags || tags.length === 0) return [];
 
   const lowerCategory = (excludeCategory || '').trim().toLowerCase();
+  const materialKey = excludeMaterial ? dedupKey(excludeMaterial) : '';
 
   const cleaned = tags
     .map((t) => (typeof t === 'string' ? t.trim() : ''))
     .filter((t) => t.length > 0)
     .filter((t) => !NOISE_PATTERNS.some((p) => p.test(t)))
     .filter((t) => t.toLowerCase() !== lowerCategory)
+    .filter((t) => !materialKey || dedupKey(t) !== materialKey)
     // Snake_case slugs ("yoga_pilates", "working_out") survive the
     // noise filter but read as "internal label" with the underscores
     // intact. Normalize to spaces so they render as natural words on

@@ -8,12 +8,26 @@ import {
   StatusBar,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, typography, shadows, borderRadius, whiteAlpha } from '../constants/theme';
+import { captureError } from '../utils/sentry';
+import {
+  colors,
+  spacing,
+  typography,
+  shadows,
+  borderRadius,
+  whiteAlpha,
+  fontFamily,
+} from '../constants/theme';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 
+// "How it works" step list. Step numbers (1, 2, 3) were retired May 3
+// 2026 PM per user feedback ("remove numberings 1,2,3 from 'how it
+// works'") — the icon + ordered list reads as sequential without a
+// loud digit. Title + description carry the meaning.
 const INTEGRATION_STEPS: { icon: FeatherIconName; title: string; description: string }[] = [
   {
     icon: 'upload',
@@ -34,27 +48,84 @@ const INTEGRATION_STEPS: { icon: FeatherIconName; title: string; description: st
   },
 ];
 
-const STATS: { value: string; label: string }[] = [
-  { value: '30-40%', label: 'of online clothing returns are size-related' },
+// Stat strip — three equal-width cards under the hero.
+//
+// "30-40%" was the source of a wrap-on-Pixel-2-XL bug (May 3 2026 PM
+// user report: "% shows up on the second row. Only the % sign which
+// looks odd"). Two-line layout per stat (split into `value` +
+// optional `unit` rendered on its own line) sidesteps the wrap
+// entirely and reads more deliberately as a stat. The unit string is
+// optional — "7x" / "<1d" stay as a single value with `unit: undefined`.
+type Stat = { value: string; unit?: string; label: string };
+const STATS: Stat[] = [
+  { value: '30–40', unit: '%', label: 'of online clothing returns are size-related' },
   { value: '7x', label: 'more likely to buy with fit confidence' },
-  { value: '< 1 day', label: 'to integrate via our API' },
+  { value: '< 1', unit: 'day', label: 'to integrate via our API' },
 ];
 
+// Email destination for partner inquiries. Wired to the user's own
+// inbox for now (per CLAUDE.md userEmail context — `ramsaptami@gmail.com`)
+// because the project doesn't yet have a partners@ inbox provisioned.
+// Replace with the brand-facing alias when DNS / forwarding is set up.
+const PARTNER_INQUIRY_EMAIL = 'ramsaptami@gmail.com';
+
 export default function BrandIntegrationScreen() {
-  const handleGetInTouch = () => {
-    Linking.openURL('mailto:partners@fitcheck.app?subject=Brand%20Integration%20Inquiry');
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  const handleGetInTouch = async () => {
+    const subject = encodeURIComponent('Brand integration inquiry — alate');
+    const body = encodeURIComponent(
+      "Hi alate team,\n\nWe're interested in integrating our sizing data with alate. " +
+        'Here are a few details about us:\n\n' +
+        '• Brand:\n• Storefront URL:\n• Approx. catalogue size:\n• Best contact:\n\n' +
+        'Looking forward to hearing back.\n',
+    );
+    const url = `mailto:${PARTNER_INQUIRY_EMAIL}?subject=${subject}&body=${body}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        // Some Android devices return false for mailto: even when an
+        // email app is installed; try anyway and let the OS resolve.
+        await Linking.openURL(url);
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (err) {
+      // Most common cause: no mail client installed. Surface so we can
+      // see how often this fires and consider an in-app form fallback.
+      captureError(err, { feature: 'brand-integration', action: 'get-in-touch' });
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        {/* Header */}
+
+      {/* Custom back chevron — same pattern as FitResult / AvatarSetup
+          since the native stack header is hidden. Sits at the top-left
+          edge with a translucent dark fill so it reads above the
+          backgroundless screen content. */}
+      <TouchableOpacity
+        style={[styles.backBtn, { top: insets.top + spacing.sm }]}
+        onPress={() => navigation.goBack()}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Feather name="chevron-left" size={22} color={colors.text} />
+      </TouchableOpacity>
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.xxl }]}
+      >
+        {/* Header — page title only. The "For Brands" badge that
+            sat above the title was retired May 3 2026 PM (user
+            feedback: "remove redundant 'for brands' next to the
+            back icon… the icon and pill design says it all"). */}
         <View style={styles.header}>
-          <View style={styles.badge}>
-            <Feather name="briefcase" size={14} color={colors.secondary} />
-            <Text style={styles.badgeText}>For Brands</Text>
-          </View>
           <Text style={styles.title}>
             Help your customers{'\n'}find their perfect fit
           </Text>
@@ -64,11 +135,18 @@ export default function BrandIntegrationScreen() {
           </Text>
         </View>
 
-        {/* Stats */}
+        {/* Stats — three equal cards. Two-line value layout (number
+            line + optional unit line) so "30–40 %" doesn't orphan
+            the percent sign on small viewports. */}
         <View style={styles.statsRow}>
           {STATS.map((stat, i) => (
             <View key={i} style={styles.statCard}>
-              <Text style={styles.statValue}>{stat.value}</Text>
+              <View style={styles.statValueWrap}>
+                <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {stat.value}
+                </Text>
+                {stat.unit && <Text style={styles.statUnit}>{stat.unit}</Text>}
+              </View>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
@@ -82,7 +160,6 @@ export default function BrandIntegrationScreen() {
         {INTEGRATION_STEPS.map((step, i) => (
           <View key={i} style={styles.stepCard}>
             <View style={styles.stepIconContainer}>
-              <Text style={styles.stepNumber}>{i + 1}</Text>
               <Feather name={step.icon} size={20} color={colors.primary} />
             </View>
             <View style={styles.stepContent}>
@@ -92,8 +169,12 @@ export default function BrandIntegrationScreen() {
           </View>
         ))}
 
-        {/* What you provide */}
-        <View style={styles.sectionHeader}>
+        {/* What you provide — section header gets the same top
+            spacing as the previous one so the rhythm matches across
+            sections (May 3 2026 PM user feedback: "what we need
+            from you does not have enough spacing as the previous
+            section does"). */}
+        <View style={[styles.sectionHeader, styles.sectionHeaderSpaced]}>
           <Text style={styles.sectionTitle}>What we need from you</Text>
         </View>
 
@@ -121,15 +202,21 @@ export default function BrandIntegrationScreen() {
           <Text style={styles.ctaSubtitle}>
             Get in touch and we'll set up your integration in under a day.
           </Text>
-          <TouchableOpacity style={styles.ctaButton} onPress={handleGetInTouch} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.ctaButton}
+            onPress={handleGetInTouch}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Get in touch about brand integration"
+          >
             <Feather name="mail" size={18} color={colors.white} />
             <Text style={styles.ctaButtonText}>Get in touch</Text>
           </TouchableOpacity>
         </View>
 
-          <Text style={styles.footerNote}>
-            Currently onboarding select brand partners for our early access programme.
-          </Text>
+        <Text style={styles.footerNote}>
+          Currently onboarding select brand partners for our early access programme.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -145,26 +232,28 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    // Top padding handled inline with insets so the page-title slot
+    // begins below the back chevron.
     paddingBottom: spacing.xxl,
+  },
+  // Custom back chevron — same circular dark-fill style as the
+  // FitResult back button, but tinted for the light page bg here.
+  backBtn: {
+    position: 'absolute',
+    left: spacing.md,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: whiteAlpha.surfaceSolid,
+    borderWidth: 1,
+    borderColor: whiteAlpha.borderMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    ...shadows.sm,
   },
   header: {
     marginBottom: spacing.xl,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    backgroundColor: colors.secondary + '15',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: borderRadius.pill,
-    marginBottom: spacing.md,
-  },
-  badgeText: {
-    ...typography.labelSmall,
-    color: colors.secondary,
-    fontWeight: '400',
   },
   title: {
     ...typography.headingXL,
@@ -192,10 +281,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.glass,
   },
+  // Wraps the value + optional unit so they share a baseline. Row
+  // layout with a small gap reads as one composed stat (e.g. "30-40
+  // %") on wide phones; on narrow ones the unit drops to its own
+  // line via `flexWrap: 'wrap'` instead of orphaning a single
+  // character mid-word.
+  statValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   statValue: {
     ...typography.headingM,
     color: colors.primary,
-    marginBottom: 4,
+  },
+  statUnit: {
+    fontFamily: fontFamily.display,
+    fontSize: 14,
+    color: colors.primary,
+    marginLeft: 2,
   },
   statLabel: {
     ...typography.caption,
@@ -204,6 +310,13 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     marginBottom: spacing.md,
+  },
+  // Top-margin variant for the SECOND and later section headers so
+  // the gap above each section matches the gap below the previous
+  // section's content. Without this the second header ("What we need
+  // from you") sat too tight against the last step card.
+  sectionHeaderSpaced: {
+    marginTop: spacing.xl,
   },
   sectionTitle: {
     ...typography.headingM,
@@ -222,11 +335,10 @@ const styles = StyleSheet.create({
   stepIconContainer: {
     width: 44,
     alignItems: 'center',
-    gap: 6,
-  },
-  stepNumber: {
-    ...typography.labelSmall,
-    color: colors.textMuted,
+    justifyContent: 'center',
+    // Step numbers (1, 2, 3) used to live here above the icon. They
+    // were dropped May 3 2026 PM — the icon alone reads as the step
+    // marker and the descriptive title carries the meaning.
   },
   stepContent: {
     flex: 1,
