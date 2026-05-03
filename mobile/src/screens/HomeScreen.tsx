@@ -27,6 +27,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import HeadingImage from '../components/HeadingImage';
 import BrandHeading from '../components/BrandHeading';
+import AffordabilityIcon from '../components/AffordabilityIcon';
+import { usePriceRange } from '../store/priceRangeStore';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -397,6 +399,7 @@ export default function HomeScreen() {
 
 // Recent-fit row. Thumbnail + brand eyebrow + name + size + verdict chip.
 function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () => void }) {
+  const range = usePriceRange();
   // Re-tier the verdict so a single MINOR-only warning reads as
   // "Fits·" (with note marker) instead of the heavy "Check" /
   // "Concerns" chip. Same rule as FitResultScreen + FitDetailBar —
@@ -432,9 +435,17 @@ function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () =>
           <Text style={styles.recentName} numberOfLines={1}>
             {entry.productName || 'Product'}
           </Text>
-          {entry.sizeRecommendation?.size && (
-            <Text style={styles.recentSize}>Size {entry.sizeRecommendation.size}</Text>
-          )}
+          <View style={styles.recentSizeRow}>
+            {entry.sizeRecommendation?.size && (
+              <Text style={styles.recentSize}>Size {entry.sizeRecommendation.size}</Text>
+            )}
+            <AffordabilityIcon
+              price={entry.price}
+              range={range}
+              size="sm"
+              color={colors.textMuted}
+            />
+          </View>
         </View>
         <View style={[styles.recentChip, { backgroundColor: bg }]}>
           <Text style={[styles.recentChipLabel, { color: fg }]}>{label}</Text>
@@ -729,7 +740,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 13,
-    marginTop: 1,
+  },
+  recentSizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
   },
   recentChip: {
     paddingHorizontal: 10,

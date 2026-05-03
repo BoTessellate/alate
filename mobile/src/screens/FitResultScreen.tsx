@@ -43,6 +43,8 @@ import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
+import { usePriceRange } from '../store/priceRangeStore';
+import AffordabilityIcon from '../components/AffordabilityIcon';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
 import FitResultErrorCard from '../components/FitResultErrorCard';
@@ -110,7 +112,9 @@ export default function FitResultScreen() {
     currentIndex = 0,
   } = route.params;
   const { avatar } = useAvatarStore();
+  const lastChangedAt = useAvatarStore((s) => s.lastChangedAt);
   const { addEntry, updateEntry, removeEntry } = useFitHistoryStore();
+  const priceRange = usePriceRange();
   const { garments: calibrationGarments } = useCalibrationStore();
 
   // When we navigated in from History with a siblings list, the user
@@ -396,14 +400,35 @@ export default function FitResultScreen() {
     transform: [{ translateX: swipeX.value }],
   }));
 
+  // Stale-check: if the user has changed their avatar AFTER the entry's
+  // last `checkedAt`, the displayed verdict is from an older body and
+  // must be re-evaluated. This catches the case where the avatar was
+  // edited via a path that didn't pass through this screen's "Change
+  // measurements" button (Profile tab → Edit, etc.) — the explicit
+  // `wentToAvatarSetup.current` flag below misses those paths, but a
+  // timestamp comparison doesn't.
+  const isStale =
+    !!lastChangedAt &&
+    !!activeEntry?.checkedAt &&
+    new Date(activeEntry.checkedAt).getTime() <
+      new Date(lastChangedAt).getTime();
+
   useFocusEffect(
     useCallback(() => {
-      if (wentToAvatarSetup.current && avatar !== prevAvatarRef.current) {
+      const cameBackFromAvatarSetup =
+        wentToAvatarSetup.current && avatar !== prevAvatarRef.current;
+
+      if (cameBackFromAvatarSetup || isStale) {
         prevAvatarRef.current = avatar;
         wentToAvatarSetup.current = false;
-        runReevaluation();
+        if (!reevaluating && historyEntryId) {
+          runReevaluation();
+        }
       }
-    }, [avatar])
+      // `lastChangedAt` deliberately included — when a user edits the
+      // avatar in another tab, returning to this screen sees the new
+      // timestamp and triggers stale-reeval without needing a button.
+    }, [avatar, lastChangedAt, isStale, reevaluating, historyEntryId])
   );
 
   useEffect(() => {
@@ -1046,8 +1071,16 @@ export default function FitResultScreen() {
                   </Text>
                 </View>
                 {priceDisplay && (
-                  <View style={styles.pricePill}>
-                    <Text style={styles.priceText}>{priceDisplay}</Text>
+                  <View style={styles.priceColumn}>
+                    <View style={styles.pricePill}>
+                      <Text style={styles.priceText}>{priceDisplay}</Text>
+                    </View>
+                    <AffordabilityIcon
+                      price={product.price}
+                      range={priceRange}
+                      size="sm"
+                      color={colors.textSecondary}
+                    />
                   </View>
                 )}
               </View>
@@ -1654,12 +1687,19 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  // Vertical stack: price pill on top, $/$$/$$$ chip beneath. Lets us
+  // surface affordability without competing with the verdict label for
+  // horizontal real-estate.
+  priceColumn: {
+    alignItems: 'flex-end',
+    gap: 4,
+    marginLeft: spacing.sm,
+  },
   pricePill: {
     backgroundColor: primaryAlpha.tintSm,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: borderRadius.pill,
-    marginLeft: spacing.sm,
   },
   priceText: {
     fontFamily: fontFamily.primary,
