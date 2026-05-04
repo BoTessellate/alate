@@ -372,6 +372,10 @@ const styles = StyleSheet.create({
     // which clears 4.78:1. May 3 2026 PM contrast pass.
     color: whiteAlpha.textOpaque,
     marginTop: 4,
+    // Centred (May 4 2026) per user direction: the meta line carries
+    // the entire screen header on its own, so left-aligning it left
+    // a visible imbalance with the centred cover-flow deck below.
+    textAlign: 'center',
   },
   list: {
     padding: spacing.md,
@@ -575,22 +579,22 @@ const styles = StyleSheet.create({
 
   // --- Floating footer overlay (pill + clear link above the floating
   //     tab bar).
-  //     History (May 3 2026 PM): bumped bottom 72 → 130 to pull the
-  //     pill + "Clear history" link up closer to where the deck
-  //     visually ends. Paired with a `paddingBottom` push on the
-  //     cover-flow root in `HistoryCoverFlow.tsx` so the cards sit
-  //     LOWER and meet the pill in the middle of the screen — user
-  //     feedback: "the pill element and 'clear history' under it
-  //     needs to move higher up and the product stack needs to move
-  //     lower… right now there's an odd space between stack and the
-  //     pill making it look like they are not related but they are
-  //     very much so". The pill now visually anchors as the deck's
-  //     "now playing" bar, not a free-floating chip.
+  //     History bottom-offset history:
+  //       72 (May 3 AM) — too far from deck, gap looked accidental
+  //       130 (May 3 PM) — closer, but Clear-history sat too near
+  //                        the navbar (~30 px gap, felt cramped)
+  //       155 (May 4 round 2) — Clear-history now ~55-60 px above
+  //                        the navbar, comfortable; cover-flow's
+  //                        paddingBottom in HistoryCoverFlow.root
+  //                        bumped in step so the deck still meets
+  //                        the pill with a small, intentional gap
+  //                        ("look like they are part of the same
+  //                        interface" — user feedback).
   floatingFooter: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 130,
+    bottom: 155,
     alignItems: 'center',
   },
   detailBarWrap: {

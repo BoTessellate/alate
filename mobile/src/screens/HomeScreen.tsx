@@ -231,7 +231,8 @@ export default function HomeScreen() {
               textStyle={styles.heroVerse}
             />
             <Text style={styles.heroTagline}>
-              From any store.{'\n'}We read the size chart against your body.
+              From any store.{'\n'}We read the size chart against{'\n'}
+              <Text style={styles.heroTaglineEmphasis}>your body</Text>.
             </Text>
           </View>
 
@@ -558,6 +559,18 @@ const styles = StyleSheet.create({
     marginTop: 14,
     maxWidth: 300,
     lineHeight: 21,
+  },
+  // "your body" — typographically pulled out of the tagline. Renders
+  // in Viaoda Libre (the only true italic display face we ship; Jost
+  // doesn't have an italic variant loaded), one shade larger so the
+  // emphasis reads visually as a closer beat to the body, not a
+  // weaker fragment. Per user direction May 4 2026: "place 'your
+  // body' on a new line and make it italic".
+  heroTaglineEmphasis: {
+    fontFamily: 'ViaodaLibre-Regular',
+    fontSize: 19,
+    lineHeight: 21,
+    color: whiteAlpha.textOpaque,
   },
 
   // --- Input section — glass pill + CTA + share hint ---

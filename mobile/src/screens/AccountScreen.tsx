@@ -292,7 +292,14 @@ function PriceRangeSection() {
               value={draftMin}
               onChangeText={setDraftMin}
               onBlur={commit}
-              placeholder="0"
+              // Was placeholder="0" — on Marcellus the lone "0" glyph
+              // rendered as a near-perfect circle in the muted grey,
+              // which read as a placeholder bullet rather than "no
+              // value set yet" (May 4 2026 user feedback). The em-dash
+              // matches the rest of the app's "field is empty"
+              // convention (FitResult Material / Category rows use
+              // the same character).
+              placeholder="—"
               placeholderTextColor={colors.textMuted}
               returnKeyType="next"
             />
@@ -309,7 +316,14 @@ function PriceRangeSection() {
               value={draftMax}
               onChangeText={setDraftMax}
               onBlur={commit}
-              placeholder="0"
+              // Was placeholder="0" — on Marcellus the lone "0" glyph
+              // rendered as a near-perfect circle in the muted grey,
+              // which read as a placeholder bullet rather than "no
+              // value set yet" (May 4 2026 user feedback). The em-dash
+              // matches the rest of the app's "field is empty"
+              // convention (FitResult Material / Category rows use
+              // the same character).
+              placeholder="—"
               placeholderTextColor={colors.textMuted}
               returnKeyType="done"
             />

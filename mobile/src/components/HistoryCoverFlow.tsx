@@ -431,18 +431,20 @@ export default function HistoryCoverFlow({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    // Was `justifyContent: 'center'` (cards floated in the vertical
-    // middle of the available area, which left a ~115 px void below
-    // them when the FitDetailBar pill on HistoryScreen sat at
-    // bottom: 72). May 3 2026 PM the pill moved up to bottom: 130
-    // and the cards' alignment flipped to flex-end with explicit
-    // paddingBottom — together they meet just above the pill so the
-    // deck + detail bar read as ONE element, not two unrelated
-    // pieces. paddingBottom is hand-tuned to roughly the pill's
-    // height + the pill's distance-from-bottom, so card bottoms sit
-    // ~20-30 px above the pill across phone sizes.
+    // History deck sits flex-end (cards anchored toward the bottom of
+    // the available area) with a paddingBottom that floats them just
+    // above the FitDetailBar pill on HistoryScreen. paddingBottom is
+    // hand-tuned to ≈ (pill bottom-offset + pill height + small gap),
+    // so the deck appears to dock onto the pill like Vision Pro's
+    // cover-flow + now-playing bar.
+    //
+    // Bumped 200 → 240 (May 4 2026) in tandem with the pill's bottom
+    // 130 → 155 lift — keeps the gap between deck-bottom and pill-top
+    // tight (~15-20 px) and pulls the cards' visual centre slightly
+    // higher into the viewport so they read as deliberately framed
+    // rather than slumped against the pill.
     justifyContent: 'flex-end',
-    paddingBottom: 200,
+    paddingBottom: 240,
   },
   scrollContent: {
     alignItems: 'center',

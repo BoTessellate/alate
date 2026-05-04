@@ -49,6 +49,14 @@ export default function AffordabilityIcon({
   const symbols = '$'.repeat(result.scale);
   const tone = result.overBudget ? warningColor : color;
 
+  // Approx chip height: padV*2 + lineHeight (~fontSize * 1.4). Use
+  // that as a minWidth so a single-$ chip renders as a circle / soft
+  // square rather than an oblong (May 4 2026 user feedback: "single
+  // $ shows up in an oblong shaped element"). For 2-/3-$ counts the
+  // intrinsic text width exceeds this floor and the chip flexes
+  // wider — pill shape preserved.
+  const minWidth = Math.round(padV * 2 + fontSize * 1.4);
+
   return (
     <View
       style={[
@@ -56,6 +64,7 @@ export default function AffordabilityIcon({
         {
           paddingVertical: padV,
           paddingHorizontal: padH,
+          minWidth,
           borderColor: result.overBudget ? warningColor : tone,
         },
         style,

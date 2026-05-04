@@ -1769,10 +1769,19 @@ const styles = StyleSheet.create({
     // hero. Matches the visual weight of the size pill + stat row sitting
     // beside it.
     ...typography.headingM,
-    // Viaoda Libre override (May 3 2026 trial) — verdict text
-    // ('Great Fit', 'Some Concerns', etc.) reads in the italic
-    // display serif while the rest of the screen stays on Marcellus.
-    fontFamily: 'ViaodaLibre-Regular',
+    // Was Viaoda Libre (May 3 2026 trial). Flipped to Jost-Regular per
+    // May 4 2026 user direction: verdict text ('Great Fit', 'Some
+    // Concerns', 'May Not Fit Well') now reads in the geometric
+    // humanist sans for clarity at a glance — the italic display
+    // serif felt too editorial for what is functionally a status
+    // label. Jost is one of two faces we ship alongside VL (loaded
+    // in App.tsx as Jost-Regular / Jost-Light).
+    fontFamily: 'Jost-Regular',
+    // Drop the headingM fontWeight (400) lookup pressure — Jost has
+    // a Regular variant loaded so the inherited '400' is honoured
+    // natively, no synthetic-bold trap. Spelled out explicitly to
+    // make the reviewer's job easier.
+    fontWeight: '400',
   },
   verdictSub: {
     ...typography.bodySmall,

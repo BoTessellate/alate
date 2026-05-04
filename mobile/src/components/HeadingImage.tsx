@@ -22,27 +22,28 @@ import React from 'react';
 import { Text, StyleProp, TextStyle, View, StyleSheet, ViewStyle } from 'react-native';
 import { typography, colors } from '../constants/theme';
 
-// ── Slot → SVG module registry ───────────────────────────────────
-// TAN Nightingale headings exported from Canva Pro (SVG, transparent
-// background). Each slot corresponds to one screen-level heading.
-// Metro's `react-native-svg-transformer` (wired in metro.config.js)
-// compiles the default export as a React.FC<SvgProps>.
+// TAN Nightingale headings — exported from Canva Pro as SVG with the
+// font's glyphs already rasterised to <path>s (transparent bg). We
+// don't ship the font itself; the SVG IS the font, baked into shapes.
+import HomeVerseSvg from '../../assets/images/headings/home-verse.svg';
+import HistorySvg from '../../assets/images/headings/history.svg';
+import ProfileSvg from '../../assets/images/headings/profile.svg';
+import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
 
-// April 29 2026 — every heading slot is now rendered as styled text in
-// Viaoda Libre, NOT via the Canva-exported SVGs sitting in
-// `mobile/assets/images/headings/`. The SVGs survived a couple of
-// optimisation passes (svgo flatten + viewBox normalize) but Android's
-// react-native-svg / Skia stack still rasterised them with horizontal
-// banding artefacts visible across every slot ("tabbed display" per
-// the user). Bypassing the SVG render path entirely + falling through
-// to the styled-text path below gives clean rendering in the same
-// italic display serif (Viaoda Libre IS the fallback face), so the
-// visual voice is preserved.
+// ── Slot → SVG module registry ───────────────────────────────────
+// May 4 2026 — TAN Nightingale SVG path re-enabled per user direction
+// ("Bring back Tan Nightingale.. Nothing seems to fit quite like that
+// one"). The April 29 banding regression on Android Skia was the
+// reason this registry was emptied; re-enabling now pairs with a
+// fresh device check. If the banding artefacts return on Pixel 2 XL,
+// flip the slots back to undefined here and the styled-text fallback
+// (Viaoda Libre via typography.display tokens) takes over again — no
+// other code change needed.
 //
-// The SVG files are kept on disk for now so the v2 release (or a
-// future TAN Nightingale licence) can re-enable the SVG path with
-// freshly-exported assets. Re-enabling = put entries back into
-// SVG_BY_SLOT below and verify on a real device.
+// The fit-result slots ('great-fit', 'some-concerns', 'may-not-fit')
+// stay text-only. Their SVGs were deleted in commit c2c34a5
+// (`feat(v2): story-share + gender + tummy + font + ...`); when those
+// assets get re-exported they'd plug into the same registry shape.
 type Slot =
   | 'home-verse'     // "paste anything. / we'll tell you / if it fits."
   | 'history'        // "your history"
@@ -53,8 +54,10 @@ type Slot =
   | 'may-not-fit';   // text-only
 
 const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: number }>>> = {
-  // Intentionally empty — see comment above. Every slot falls through
-  // to the styled-text fallback so headings render in Viaoda Libre.
+  'home-verse': HomeVerseSvg,
+  history: HistorySvg,
+  profile: ProfileSvg,
+  'body-profile': BodyProfileSvg,
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
