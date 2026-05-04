@@ -357,24 +357,32 @@ export default function FitResultScreen() {
   const heroBrightness = useImageBrightness(heroImageUri);
 
   // Frosted backdrop chip behind the brand+name. Renders in BOTH
-  // expanded and collapsed states (alpha runs 0.50 → 0.30 with
-  // collapseProgress). Always a deep purple-black tint — the
-  // brightness-driven light-on-light variant was reverted May 4 2026
-  // late-PM ("keep product fit screen heading and subheading in
-  // white not this dark colour"); since text now stays white in both
-  // modes, the backdrop must stay dark to keep text legible on light
-  // photos.
+  // expanded and collapsed states. Same treatment as the dock card —
+  // BlurView + animated white tint — so it picks up the underlying
+  // product image's tone (frosted glass effect) instead of being a
+  // solid dark plate. May 4 2026 late-PM user direction: "the
+  // heading and subheading background on product fit check page
+  // should be the same style as the overlay. so it picks up the
+  // style as per background".
+  //
+  // heroChipStyle drives padding only. The backdrop fill is provided
+  // by an inner BlurView + an Animated.View tint — see the chipBg
+  // structure inside each chip's JSX.
   const heroChipStyle = useAnimatedStyle(() => {
-    const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.50, 0.30]);
-    // Padding runs 12 (expanded) → 14 (collapsed) horizontally,
-    // 6 → 8 vertically. Always non-zero so the chip never collapses
-    // to text-only.
     const padH = interpolate(collapseProgress.value, [0, 1], [14, 12]);
     const padV = interpolate(collapseProgress.value, [0, 1], [8, 6]);
     return {
-      backgroundColor: `rgba(20, 14, 28, ${bgAlpha})`,
       paddingHorizontal: padH,
       paddingVertical: padV,
+    };
+  });
+  // Tint alpha for the heroChip backdrop — mirrors cardTintStyle so
+  // both surfaces pick up the underlying image with the same opacity
+  // ramp across the collapse.
+  const heroChipTintStyle = useAnimatedStyle(() => {
+    const alpha = interpolate(collapseProgress.value, [0, 1], [0.32, 0.52]);
+    return {
+      backgroundColor: `rgba(255, 255, 255, ${alpha})`,
     };
   });
 
@@ -1116,6 +1124,16 @@ export default function FitResultScreen() {
             with padding when collapsed. */}
         {safeBrand ? (
           <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle]}>
+            <BlurView
+              style={StyleSheet.absoluteFill}
+              blurType="light"
+              blurAmount={22}
+              reducedTransparencyFallbackColor="rgba(255,255,255,0.42)"
+            />
+            <Animated.View
+              style={[StyleSheet.absoluteFill, styles.heroChipTint, heroChipTintStyle]}
+              pointerEvents="none"
+            />
             <BrandHeading
               brand={safeBrand}
               height={20}
@@ -1128,6 +1146,16 @@ export default function FitResultScreen() {
           </Animated.View>
         ) : null}
         <Animated.View style={[styles.heroChip, heroChipStyle]}>
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            blurType="light"
+            blurAmount={22}
+            reducedTransparencyFallbackColor="rgba(255,255,255,0.42)"
+          />
+          <Animated.View
+            style={[StyleSheet.absoluteFill, styles.heroChipTint, heroChipTintStyle]}
+            pointerEvents="none"
+          />
           <Text style={styles.heroName} numberOfLines={2}>
             {safeName || 'Product'}
           </Text>
@@ -1718,12 +1746,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   // Inner pill wrapping brand OR name (two separate chips per the
-  // May 4 2026 PM split). Padding + bg are animated by heroChipStyle.
-  // borderRadius stays static (pill shape) — when padding is 0
-  // (expanded) the rounded corners are invisible.
+  // May 4 2026 PM split). Padding is animated by heroChipStyle; the
+  // backdrop is provided by an inner BlurView + Animated tint layer
+  // (heroChipTint + heroChipTintStyle) — same pattern as the dock
+  // card's cardWrap + BlurView + cardTint. `overflow: hidden` clips
+  // the BlurView to the rounded edge.
   heroChip: {
     alignItems: 'center',
     borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+  },
+  // Animated white tint layer behind the heroChip text, on top of
+  // the BlurView. Static border + radii here; alpha is driven by
+  // heroChipTintStyle.
+  heroChipTint: {
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
   },
   // Brand chip — sits ABOVE the name chip with a small gap so the
   // two pills read as separate beats when collapsed.
