@@ -21,6 +21,7 @@ import { computeAffordability } from '../utils/affordability';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
+import HeadingImage from '../components/HeadingImage';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -220,7 +221,20 @@ export default function HistoryScreen() {
           style={StyleSheet.absoluteFill}
         />
         <View testID="history-screen" style={styles.emptyContainer}>
-          <Text style={[styles.pageTitle, styles.emptyPageTitle]}>History</Text>
+          {/* TAN Nightingale heading SVG. Per user direction May 4 2026
+              PM ("history does not have an svg title, still using
+              font") — switched from styled Text to HeadingImage so
+              the empty-state title renders in the same display face
+              as the other page titles. Falls back to Marcellus text
+              if the SVG asset is missing. */}
+          <HeadingImage
+            slot="history"
+            fallback="History"
+            height={56}
+            color="#fff"
+            style={styles.emptyPageTitle}
+            textStyle={styles.pageTitle}
+          />
           <View style={styles.emptyIconContainer}>
             <Feather name="clock" size={36} color="#fff" />
           </View>

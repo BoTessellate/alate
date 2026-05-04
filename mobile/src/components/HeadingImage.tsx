@@ -69,15 +69,23 @@ const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: numb
 // content-bounds viewBox; if a new SVG replaces one of these, the
 // aspect will need to be re-measured.
 const SVG_ASPECTS: Record<Slot, number> = {
-  'home-verse': 1.47,
-  history: 2.84,
-  profile: 1.93,
-  'body-profile': 3.39,
-  // before-we-begin: viewBox tightened from 0 0 450 450 → 80 178 290 70
-  // (svgo flattened the file from 30 KB → 11 KB, then a manual viewBox
-  // crop to the actual content bounds — paths span x∈[83, 365],
-  // y baseline ≈ 222 with ascender / descender extension).
-  'before-we-begin': 290 / 70,
+  // viewBoxes re-tightened May 4 2026 PM. The original Canva exports
+  // shipped with a loose 0 0 450 450 viewBox (whole canvas, content
+  // sitting in a small region). The HeadingImage render path computes
+  // width = height * aspect — but `preserveAspectRatio="xMidYMid meet"`
+  // (the default) preserves the SVG's INTRINSIC viewBox aspect, so a
+  // 1:1 viewBox renders as a 1:1 square inside whatever box we ask
+  // for, leaving the text either tiny (fit to height-of-square) or
+  // letterboxed. Fixed by tightening each viewBox to its actual
+  // content bounds (sampled from M-command starts in the path data,
+  // padded ±10 px for curve overshoot). Aspects below match those
+  // tight viewBoxes so the registered aspect equals the SVG's
+  // intrinsic aspect — text now scales to the full requested height.
+  'home-verse': 325 / 275,        // viewBox "30 75 325 275"
+  history: 285 / 75,              // viewBox "95 170 285 75"
+  profile: 310 / 135,             // viewBox "45 125 310 135"
+  'body-profile': 335 / 65,       // viewBox "45 170 335 65"
+  'before-we-begin': 290 / 70,    // viewBox "80 178 290 70"
   'great-fit': 2.17,
   'some-concerns': 3.51,
   'may-not-fit': 3.23,

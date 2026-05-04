@@ -560,15 +560,13 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     lineHeight: 21,
   },
-  // "your body" — typographically pulled out of the tagline. Renders
-  // in Viaoda Libre (the only true italic display face we ship; Jost
-  // doesn't have an italic variant loaded), one shade larger so the
-  // emphasis reads visually as a closer beat to the body, not a
-  // weaker fragment. Per user direction May 4 2026: "place 'your
-  // body' on a new line and make it italic".
+  // "your body" — typographically pulled out of the tagline onto its
+  // own line. Stays in Jost-Regular per user direction May 4 2026
+  // PM ("remove VL font on 'your body', keep it as jost"). The line
+  // break is the only emphasis; matches the rest of the tagline.
   heroTaglineEmphasis: {
-    fontFamily: 'ViaodaLibre-Regular',
-    fontSize: 19,
+    fontFamily: 'Jost-Regular',
+    fontSize: 16,
     lineHeight: 21,
     color: whiteAlpha.textOpaque,
   },
