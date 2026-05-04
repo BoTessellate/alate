@@ -356,33 +356,26 @@ export default function FitResultScreen() {
     null;
   const heroBrightness = useImageBrightness(heroImageUri);
 
-  // Frosted backdrop chip behind the brand+name. Renders in BOTH
-  // expanded and collapsed states. Same treatment as the dock card —
-  // BlurView + animated white tint — so it picks up the underlying
-  // product image's tone (frosted glass effect) instead of being a
-  // solid dark plate. May 4 2026 late-PM user direction: "the
-  // heading and subheading background on product fit check page
-  // should be the same style as the overlay. so it picks up the
-  // style as per background".
+  // Subtle white-translucent backdrop chip behind brand+name.
   //
-  // heroChipStyle drives padding only. The backdrop fill is provided
-  // by an inner BlurView + an Animated.View tint — see the chipBg
-  // structure inside each chip's JSX.
+  // Iteration history:
+  //   v1 (May 3 PM): solid dark fill, only at collapse — looked
+  //     disconnected from the dock.
+  //   v2 (May 4 late-PM): BlurView + animated tint matching the
+  //     dock card. Read too loud, plus a white border on the tint
+  //     layer produced a visible outline at collapse ("strange line
+  //     showing up when docked").
+  //   v3 (May 4 late-PM, current): plain `rgba(255, 255, 255, 0.18)`
+  //     fill — quiet enough to NOT compete with the dock, present
+  //     enough to lift text legibility on busy product photos.
+  //     Padding still animates with collapseProgress; bg alpha is
+  //     static (no second animated layer needed).
   const heroChipStyle = useAnimatedStyle(() => {
     const padH = interpolate(collapseProgress.value, [0, 1], [14, 12]);
     const padV = interpolate(collapseProgress.value, [0, 1], [8, 6]);
     return {
       paddingHorizontal: padH,
       paddingVertical: padV,
-    };
-  });
-  // Tint alpha for the heroChip backdrop — mirrors cardTintStyle so
-  // both surfaces pick up the underlying image with the same opacity
-  // ramp across the collapse.
-  const heroChipTintStyle = useAnimatedStyle(() => {
-    const alpha = interpolate(collapseProgress.value, [0, 1], [0.32, 0.52]);
-    return {
-      backgroundColor: `rgba(255, 255, 255, ${alpha})`,
     };
   });
 
@@ -1124,16 +1117,6 @@ export default function FitResultScreen() {
             with padding when collapsed. */}
         {safeBrand ? (
           <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle]}>
-            <BlurView
-              style={StyleSheet.absoluteFill}
-              blurType="light"
-              blurAmount={22}
-              reducedTransparencyFallbackColor="rgba(255,255,255,0.42)"
-            />
-            <Animated.View
-              style={[StyleSheet.absoluteFill, styles.heroChipTint, heroChipTintStyle]}
-              pointerEvents="none"
-            />
             <BrandHeading
               brand={safeBrand}
               height={20}
@@ -1146,16 +1129,6 @@ export default function FitResultScreen() {
           </Animated.View>
         ) : null}
         <Animated.View style={[styles.heroChip, heroChipStyle]}>
-          <BlurView
-            style={StyleSheet.absoluteFill}
-            blurType="light"
-            blurAmount={22}
-            reducedTransparencyFallbackColor="rgba(255,255,255,0.42)"
-          />
-          <Animated.View
-            style={[StyleSheet.absoluteFill, styles.heroChipTint, heroChipTintStyle]}
-            pointerEvents="none"
-          />
           <Text style={styles.heroName} numberOfLines={2}>
             {safeName || 'Product'}
           </Text>
@@ -1220,9 +1193,7 @@ export default function FitResultScreen() {
                     testID="fit-score-label"
                     // Slot follows effectiveScore so the SVG/heading
                     // matches the visual tier (a 1-minor result reads
-                    // as great-fit, not some-concerns). The text
-                    // fallback (scoreConfig.text) carries the
-                    // "with a note" sub-line for the minor case.
+                    // as great-fit, not some-concerns).
                     slot={
                       effectiveScore === 'great' || effectiveScore === 'minor'
                         ? 'great-fit'
@@ -1235,27 +1206,25 @@ export default function FitResultScreen() {
                     color={scoreConfig.color}
                     textStyle={[styles.verdictText, { color: scoreConfig.color }]}
                   />
-                  <Text style={styles.verdictSub}>
-                    {warnings.length === 0
-                      ? 'No fit concerns'
-                      : effectiveScore === 'minor'
-                      ? `${warnings.length} ${warnings.length === 1 ? 'note' : 'notes'}`
-                      : `${warnings.length} ${warnings.length === 1 ? 'concern' : 'concerns'}`}
-                  </Text>
+                  {/* Affordability $/$$/$$$ chip sits directly under
+                      the verdict heading. Was previously next to the
+                      price pill on the right, then briefly under a
+                      "N notes / N concerns" sub-line — May 4 2026
+                      late-PM the sub-line was retired entirely
+                      (visual noise; the verdict heading + the FIT
+                      CONCERNS section below already carry the
+                      "concerns count" signal) and the affordability
+                      chip moved up to occupy that slot. */}
+                  <AffordabilityIcon
+                    price={product.price}
+                    range={priceRange}
+                    size="sm"
+                    color={colors.textSecondary}
+                    style={styles.verdictAfford}
+                  />
                 </View>
                 {priceDisplay && (
                   <View style={styles.priceColumn}>
-                    {/* Affordability $ sits BEFORE the price (May 4
-                        2026 PM): the user reads "£ — £42" or
-                        "££ — £42" left-to-right where the $ chip
-                        sets up the budget context, then the actual
-                        price lands. Was vertically stacked above. */}
-                    <AffordabilityIcon
-                      price={product.price}
-                      range={priceRange}
-                      size="sm"
-                      color={colors.textSecondary}
-                    />
                     <View style={styles.pricePill}>
                       <Text style={styles.priceText}>{priceDisplay}</Text>
                     </View>
@@ -1745,24 +1714,14 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     alignItems: 'center',
   },
-  // Inner pill wrapping brand OR name (two separate chips per the
-  // May 4 2026 PM split). Padding is animated by heroChipStyle; the
-  // backdrop is provided by an inner BlurView + Animated tint layer
-  // (heroChipTint + heroChipTintStyle) — same pattern as the dock
-  // card's cardWrap + BlurView + cardTint. `overflow: hidden` clips
-  // the BlurView to the rounded edge.
+  // Pill wrapping brand OR name. Subtle white-translucent fill —
+  // no BlurView, no tint layer, no border. See heroChipStyle JSDoc
+  // for the iteration history. Padding interpolates with
+  // collapseProgress; `backgroundColor` is static.
   heroChip: {
     alignItems: 'center',
     borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-  },
-  // Animated white tint layer behind the heroChip text, on top of
-  // the BlurView. Static border + radii here; alpha is driven by
-  // heroChipTintStyle.
-  heroChipTint: {
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   // Brand chip — sits ABOVE the name chip with a small gap so the
   // two pills read as separate beats when collapsed.
@@ -1787,7 +1746,7 @@ const styles = StyleSheet.create({
     // Was Viaoda Libre. Migrated to Jost-Regular May 4 2026 late-PM
     // (user dropped VL from the trial entirely — keeping only Jost +
     // TAN Nightingale).
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     color: '#fff',
     textAlign: 'center',
     // Heavier shadow to clear hard-to-read product backgrounds (May 4
@@ -1931,26 +1890,27 @@ const styles = StyleSheet.create({
     // serif felt too editorial for what is functionally a status
     // label. Jost is one of two faces we ship alongside VL (loaded
     // in App.tsx as Jost-Regular / Jost-Light).
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     // Drop the headingM fontWeight (400) lookup pressure — Jost has
     // a Regular variant loaded so the inherited '400' is honoured
     // natively, no synthetic-bold trap. Spelled out explicitly to
     // make the reviewer's job easier.
     fontWeight: '400',
   },
-  verdictSub: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: 2,
+  // verdictSub style retired May 4 2026 late-PM along with the
+  // "N notes / N concerns" sub-line ("actually remove that 'n note(s)'
+  // bit"). The affordability chip moved into that slot — see
+  // verdictAfford below.
+  verdictAfford: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
   },
-  // Horizontal row (May 4 2026 PM): $/$$/$$$ chip → price pill,
-  // reading L-to-R as "budget context → actual price". Was a vertical
-  // stack until the user flipped it ("budget indicator $ shows up
-  // below price. It should show up right before the price tag").
+  // Holds just the price pill now that the affordability chip moved
+  // up under the verdict heading (May 4 2026 late-PM). Single child
+  // means flex layout no longer matters; left as a column for
+  // future siblings.
   priceColumn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'flex-end',
     marginLeft: spacing.sm,
   },
   pricePill: {

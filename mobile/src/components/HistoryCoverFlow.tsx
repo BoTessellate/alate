@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
   folioBrand: {
     // Was Viaoda Libre (May 3 2026 trial). Migrated to Jost-Regular
     // May 4 2026 late-PM ("keeping only jost and tan nightingale").
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     fontSize: 22,
     color: '#fff',
     letterSpacing: -0.5,

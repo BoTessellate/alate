@@ -269,15 +269,21 @@ export default function HistoryScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
-        {/* Deck — flex:1 so it takes the upper area and centres the
-            cards vertically. The meta line + pill + clear-history
-            sit BELOW the deck as a single grouped footer (May 4 2026
-            PM user direction: "history page stats line, cards and
-            pill shaped needs to move a few pixels lower… group these
-            3 elements and center them"). The footer block is inline
-            (not absolute) so it consumes its own space and the deck
-            naturally compresses upward — no more empty void between
-            cards and pill. */}
+        {/* Reordered May 4 2026 late-PM:
+              meta line   — at TOP (was bottom of groupedFooter)
+              deck        — flex:1 in the middle
+              pill        — below deck
+              Clear-history — bottom, closer to navbar
+            Per user: "n items, n good fits...' needs to be on the top
+            of this page. This stats comes first then cards then the
+            pill. Move the clear history option even more lower than
+            it's at right now... a tad more". */}
+        <View style={styles.headerTop}>
+          <Text style={styles.headerMeta} testID="history-meta">
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
+          </Text>
+        </View>
+
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
@@ -285,11 +291,7 @@ export default function HistoryScreen() {
           onActiveIndexChange={setActiveIndex}
         />
 
-        <View style={styles.groupedFooter}>
-          <Text style={styles.headerMeta} testID="history-meta">
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
-          </Text>
-
+        <View style={styles.bottomFooter}>
           <View style={styles.detailBarWrap}>
             <FitDetailBar entry={activeEntry} />
           </View>
@@ -586,22 +588,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Grouped footer (May 4 2026 PM) ---
-  // Replaces the prior absolute-positioned floatingFooter. Stacks
-  // [meta line, FitDetailBar pill, Clear-history link] inline as a
-  // single block UNDER the deck so the four elements (deck + meta +
-  // pill + link) read as ONE cohesive group, per user direction
-  // ("group these 3 elements and center them"). The deck above
-  // (HistoryCoverFlow flex:1) compresses to fill what remains so the
-  // overall composition vertically balances. paddingBottom clears
-  // the floating tab bar (~88 px = insets.bottom + 10 + 64) with
-  // breathing room — Clear-history now sits ~50-60 px above the
-  // navbar instead of the cramped ~30 px from the prior 130-bottom
-  // value. gap between rows controls breathing room within the group.
-  groupedFooter: {
+  // --- Top header (meta only) — May 4 2026 late-PM ---
+  // Was `groupedFooter` containing [meta, pill, clear-history] under
+  // the deck. User direction: "'n items, n good fits...' needs to be
+  // on the top of this page. This stats comes first then cards then
+  // the pill". Split into:
+  //   headerTop  — meta line at the very top
+  //   bottomFooter — pill + Clear-history at the bottom
+  headerTop: {
     alignItems: 'center',
     paddingTop: spacing.sm,
-    paddingBottom: 110,
+    paddingBottom: spacing.xs,
+  },
+  bottomFooter: {
+    alignItems: 'center',
+    // Was 110 in the groupedFooter. Dropped to 80 so Clear-history
+    // sits closer to the floating tab bar — user direction "Move
+    // the clear history option even more lower than it's at right
+    // now... a tad more". Floating tab bar is ~88 px from screen
+    // bottom (insets.bottom + 10 + 64); 80 px paddingBottom plus
+    // the link's own ~30 px height puts Clear-history ~30 px above
+    // the navbar, slightly more visible than before.
+    paddingBottom: 80,
     gap: spacing.sm,
   },
   detailBarWrap: {
