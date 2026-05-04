@@ -44,7 +44,12 @@ import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedPro
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { usePriceRange } from '../store/priceRangeStore';
-import AffordabilityIcon from '../components/AffordabilityIcon';
+// AffordabilityIcon retired from this screen May 4 2026 late-PM —
+// the affordability indicator is now the BUDGET stat column rendered
+// as an SVG arc-ring (see AffordabilityRing below). The icon
+// component still ships for the History detail pill.
+import { computeAffordability } from '../utils/affordability';
+import { CURRENCY_SYMBOLS } from '../utils/currency';
 import { useCalibrationStore, averageCalibration } from '../store/calibrationStore';
 import FitLoader from '../components/FitLoader';
 import FitResultErrorCard from '../components/FitResultErrorCard';
@@ -964,6 +969,13 @@ export default function FitResultScreen() {
       : liveAvailability;
   const showAvailability = displayAvailability.status !== 'unknown' || !!displayAvailability.size;
 
+  // Budget bucket — computed once for the new BUDGET stat column. Null
+  // when the user hasn't set a price range, the product has no price,
+  // or the currencies don't match (see computeAffordability for the
+  // full nullification rules). The column is only rendered when the
+  // result is non-null.
+  const affordResult = computeAffordability(product?.price, priceRange);
+
   // Category + Material derivation chain (April 29 2026):
   //   1. Use enrichedProduct.category if it's specific (not in
   //      FILTERED_CATEGORIES — guards against AI returning
@@ -1206,22 +1218,6 @@ export default function FitResultScreen() {
                     color={scoreConfig.color}
                     textStyle={[styles.verdictText, { color: scoreConfig.color }]}
                   />
-                  {/* Affordability $/$$/$$$ chip sits directly under
-                      the verdict heading. Was previously next to the
-                      price pill on the right, then briefly under a
-                      "N notes / N concerns" sub-line — May 4 2026
-                      late-PM the sub-line was retired entirely
-                      (visual noise; the verdict heading + the FIT
-                      CONCERNS section below already carry the
-                      "concerns count" signal) and the affordability
-                      chip moved up to occupy that slot. */}
-                  <AffordabilityIcon
-                    price={product.price}
-                    range={priceRange}
-                    size="sm"
-                    color={colors.textSecondary}
-                    style={styles.verdictAfford}
-                  />
                 </View>
                 {priceDisplay && (
                   <View style={styles.priceColumn}>
@@ -1313,6 +1309,22 @@ export default function FitResultScreen() {
                   </Text>
                 </View>
                 <Text style={styles.statLabel}>STOCK</Text>
+              </View>
+            )}
+            {/* BUDGET — 5th stat column, only rendered when the user
+                has a price range configured AND the product price's
+                currency matches that range. AffordabilityRing fills
+                1/3, 2/3, or 3/3 of the ring + colours warning when
+                over budget. May 4 2026 late-PM user direction:
+                "can option D fit into the existing stats panel". */}
+            {affordResult && (
+              <View style={styles.statCol} testID="fit-budget-stat">
+                <AffordabilityRing
+                  scale={affordResult.scale}
+                  overBudget={affordResult.overBudget}
+                  symbol={CURRENCY_SYMBOLS[priceRange.currency] ?? '$'}
+                />
+                <Text style={styles.statLabel}>BUDGET</Text>
               </View>
             )}
           </View>
@@ -1647,6 +1659,66 @@ function ConfidenceDonut({ level }: { level: 'high' | 'medium' | 'low' | null })
   );
 }
 
+/**
+ * AffordabilityRing — battery-style filled-arc ring for the 5th stat
+ * column ("BUDGET"). Mirrors `ConfidenceDonut` but the arc length
+ * encodes 1/3, 2/3, or 3/3 of the user's price range.
+ *   scale 1 → 1/3 arc (cheapest third)
+ *   scale 2 → 2/3 arc (middle third)
+ *   scale 3 → 3/3 arc (full ring, most expensive third — or
+ *             over-budget when `overBudget`)
+ *
+ * Centre glyph is the user's currency symbol (£ / $ / € / ₹) resolved
+ * from the configured price range. Over-budget renders the arc in
+ * `colors.warningDeep` and the symbol in the same warning hue —
+ * scannable at-a-glance "above your range" signal.
+ */
+function AffordabilityRing({
+  scale,
+  overBudget,
+  symbol,
+}: {
+  scale: 1 | 2 | 3;
+  overBudget: boolean;
+  symbol: string;
+}) {
+  const size = STAT_ICON_SIZE;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const percent = scale === 1 ? 0.333 : scale === 2 ? 0.667 : 1.0;
+  const colour = overBudget ? colors.warningDeep : colors.primary;
+  return (
+    <View style={styles.confidenceDonut}>
+      <Svg width={size} height={size}>
+        {/* Track ring — full circle at low alpha, same as the
+            confidence donut. */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={primaryAlpha.tintSm}
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        {/* Filled arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colour}
+          strokeWidth={stroke}
+          strokeDasharray={`${c * percent} ${c}`}
+          strokeLinecap="round"
+          fill="transparent"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text style={[styles.confidenceDonutLabel, { color: colour }]}>{symbol}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -1899,12 +1971,10 @@ const styles = StyleSheet.create({
   },
   // verdictSub style retired May 4 2026 late-PM along with the
   // "N notes / N concerns" sub-line ("actually remove that 'n note(s)'
-  // bit"). The affordability chip moved into that slot — see
-  // verdictAfford below.
-  verdictAfford: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
+  // bit"). The affordability chip briefly moved into that slot
+  // (verdictAfford) and was retired in turn — affordability now
+  // renders as the BUDGET column in the stats row (see
+  // AffordabilityRing above).
   // Holds just the price pill now that the affordability chip moved
   // up under the verdict heading (May 4 2026 late-PM). Single child
   // means flex layout no longer matters; left as a column for
