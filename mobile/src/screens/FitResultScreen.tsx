@@ -354,27 +354,36 @@ export default function FitResultScreen() {
     null;
   const heroBrightness = useImageBrightness(heroImageUri);
 
-  // Animated backdrop chip behind the brand+name. Transparent when
-  // expanded (so the hero text floats over the product image cleanly).
-  // Frosted pill when collapsed — dark on dark images, light on light
-  // images so the chip always READS the opposite of the text colour.
-  // Guarantees legibility on busy product images where the text
-  // shadow alone isn't enough.
+  // Frosted backdrop chip behind the brand+name. Renders in BOTH
+  // expanded and collapsed states (May 4 2026 PM user direction:
+  // "extend the opaque background treatment to the expanded state of
+  // the product fit screen too") — was previously transparent at
+  // expand. The expanded state uses a slightly looser padding so the
+  // chip reads as a deliberate label tag, not a tight pill.
+  // Brightness-driven hue: dark frosted pill on dark images, light
+  // frosted pill on light images, opposite of the text colour
+  // (heroBrand / heroName on-light overrides).
   //
   // The brightness branch is computed in JS (closure capture) so the
-  // worklet only animates numeric padding/alpha — keeps the worklet
-  // simple and avoids reading shared-value strings on the UI thread,
-  // which May 4 2026 PM live testing tied to a white-screen hang on
-  // dock collapse/expand. When `heroBrightness` later resolves the
+  // worklet only animates numeric padding — keeps the worklet simple
+  // and avoids reading shared-value strings on the UI thread, which
+  // May 4 2026 PM live testing tied to a white-screen hang on dock
+  // collapse/expand. When `heroBrightness` later resolves, the
   // component re-renders and useAnimatedStyle is recreated with the
   // new closure value (no shared-value mirroring needed).
   const heroChipR = heroBrightness === 'light' ? 255 : 20;
   const heroChipG = heroBrightness === 'light' ? 255 : 14;
   const heroChipB = heroBrightness === 'light' ? 255 : 28;
   const heroChipStyle = useAnimatedStyle(() => {
-    const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.45, 0]);
-    const padH = interpolate(collapseProgress.value, [0, 1], [14, 0]);
-    const padV = interpolate(collapseProgress.value, [0, 1], [6, 0]);
+    // Alpha runs 0.30 (expanded) → 0.50 (collapsed) — both values
+    // non-zero so the backdrop is always present, just slightly
+    // firmer in the docked "now playing" treatment.
+    const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.50, 0.30]);
+    // Padding runs 12 (expanded) → 14 (collapsed) horizontally,
+    // 6 → 8 vertically. Always non-zero so the chip never collapses
+    // to text-only.
+    const padH = interpolate(collapseProgress.value, [0, 1], [14, 12]);
+    const padV = interpolate(collapseProgress.value, [0, 1], [8, 6]);
     return {
       backgroundColor: `rgba(${heroChipR}, ${heroChipG}, ${heroChipB}, ${bgAlpha})`,
       paddingHorizontal: padH,

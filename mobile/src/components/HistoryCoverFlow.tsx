@@ -30,6 +30,7 @@ import Animated, {
   SharedValue,
   runOnJS,
   useReducedMotion,
+  withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -151,6 +152,7 @@ function CoverFlowCard({
   index,
   totalCount,
   scrollX,
+  endBounce,
   onTap,
   onDelete,
 }: {
@@ -161,6 +163,9 @@ function CoverFlowCard({
    *  the end" bounce. */
   totalCount: number;
   scrollX: SharedValue<number>;
+  /** End-of-deck rubber-band shared value, driven by the parent's
+   *  withSpring recoil. Only the last card animates off it. */
+  endBounce: SharedValue<number>;
   onTap: () => void;
   onDelete?: () => void;
 }) {
@@ -229,14 +234,22 @@ function CoverFlowCard({
     let endBounceTx = 0;
     let endBounceTilt = 0;
     if (index === totalCount - 1 && !reducedMotion) {
+      // Two parallel sources for the rubber-band:
+      //   1. Native overscroll (iOS bounces / Android with overScrollMode=
+      //      always — when the OS allows scrollX past maxOffset).
+      //   2. JS-driven `endBounce` recoil (parent triggers withSpring on
+      //      onScrollEndDrag at last card with forward velocity, for
+      //      cases where the OS clamps scrollX). Magnitude ≈ 22 px
+      //      stretch + 8° tilt at peak — felt without going off-screen.
       const maxOffset = (totalCount - 1) * ITEM_GAP;
       const overshoot = scrollX.value - maxOffset;
       if (overshoot > 0) {
-        // Cap the visible bounce — otherwise dragging far would tilt
-        // the card off-screen. ~24px of stretch is plenty to feel.
         const capped = Math.min(overshoot, 60);
         endBounceTx = -capped * 0.4;
         endBounceTilt = -capped * 0.15;
+      } else if (endBounce.value > 0) {
+        endBounceTx = -endBounce.value * 22;
+        endBounceTilt = -endBounce.value * 8;
       }
     }
     return {
@@ -392,6 +405,30 @@ export default function HistoryCoverFlow({
     }
   }, [entries.length, scrollX]);
 
+  // End-of-deck rubber-band, take 2 (May 4 2026 PM). The original
+  // approach in `CoverFlowCard.animatedStyle` reads `scrollX.value -
+  // maxOffset` and applies a stretch when positive. On Android the
+  // ScrollView with `snapToOffsets` clamps the contentOffset to the
+  // last snap, so `scrollX` never exceeds `maxOffset` and the bounce
+  // never fired (multiple builds with the user reporting it as
+  // missing). Fix: detect the "tried to scroll past" attempt with an
+  // onScrollEndDrag handler — when the user lifts the finger at the
+  // last index AND the drag was in the forward direction (positive
+  // scrollX velocity), trigger a separate `endBounce` shared value
+  // with a withSpring(0) recoil. CoverFlowCard reads `endBounce` and
+  // applies the stretch.
+  const endBounce = useSharedValue(0);
+  const lastBounceMs = useRef(0);
+  const triggerBounce = () => {
+    // De-dupe: don't replay if we just fired (multiple events can
+    // fire on a single fling — onEndDrag + onMomentumEnd).
+    const now = Date.now();
+    if (now - lastBounceMs.current < 400) return;
+    lastBounceMs.current = now;
+    endBounce.value = 1;
+    endBounce.value = withSpring(0, { damping: 9, stiffness: 130, mass: 0.6 });
+  };
+
   return (
     <View style={styles.root} testID="history-coverflow">
       <Animated.ScrollView
@@ -407,6 +444,25 @@ export default function HistoryCoverFlow({
         // so rapid scrolls don't trigger 15-card re-renders per snap
         // crossing during the glide.
         decelerationRate="fast"
+        // Allow overscroll past the last snap on both platforms — pairs
+        // with the JS-driven endBounce fallback for cases where the
+        // OS still clamps.
+        bounces
+        alwaysBounceHorizontal
+        overScrollMode="always"
+        // When the user lifts at the last card with forward velocity
+        // (or no velocity, having dragged into the gap), fire the
+        // rubber-band recoil. `vx` is in pixels/ms; positive = right.
+        onScrollEndDrag={(e) => {
+          const x = e.nativeEvent.contentOffset.x;
+          const vx = e.nativeEvent.velocity?.x ?? 0;
+          const maxOffset = (entries.length - 1) * ITEM_GAP;
+          // Already at or past the last snap, AND user was still
+          // dragging forward → trigger.
+          if (entries.length > 0 && x >= maxOffset - 4 && vx >= 0) {
+            triggerBounce();
+          }
+        }}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingLeft: SIDE_PAD, paddingRight: SIDE_PAD },
@@ -419,6 +475,7 @@ export default function HistoryCoverFlow({
             index={i}
             totalCount={entries.length}
             scrollX={scrollX}
+            endBounce={endBounce}
             onTap={() => onCardTap(entry)}
             onDelete={onCardDelete ? () => onCardDelete(entry) : undefined}
           />
