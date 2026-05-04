@@ -83,10 +83,11 @@ const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
 // to keep the verdict + stats row + material + availability readable
 // without scrolling. Iterative bumps: 200 → 204 (availability row
-// breathing) → 210 (per user feedback after the verdict block moved
-// out of ScrollView; the headerArea + visible dock content needs a
-// touch more vertical room to avoid clipping the stats labels).
-const COLLAPSED_H = 210;
+// breathing) → 210 → 213 (May 4 2026 user direction: "Increase
+// height of the docked overlay by 3px"). The +3 px gives the docked
+// "Fit concerns" meta row a hair more breathing room above the
+// stats chips before the bottom edge clips.
+const COLLAPSED_H = 213;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -301,35 +302,55 @@ export default function FitResultScreen() {
   // above but in smaller font."
   //
   // At progress=1 (expanded): translateY=0, scale=1 → hero sits at
-  //   its anchored top position (insets.top + spacing.xl).
+  //   its anchored top position (closer to dock per May 4 2026
+  //   feedback: "bring heading closer to the cards on product fit
+  //   card"). Top padding dropped from spacing.xl → spacing.md.
   // At progress=0 (collapsed): hero translates DOWN to a y-position
-  //   ~24px above the docked card's top edge, scales to ~58% so the
-  //   brand reads as a small eyebrow and the name as a single
-  //   condensed line. The translateOrigin sits at the hero's TOP
-  //   (default `transform-origin` for RN), so the scale shrinks
-  //   visually around its current top edge — perfect because we WANT
-  //   the bottom of the hero (which gets closer to the dock as we
-  //   collapse) to stay anchored ~24px above the dock.
+  //   ~24px above the docked card's top edge, scales to ~70% (lifted
+  //   from 0.58 May 4 2026 — user wanted the collapsed name to use
+  //   more horizontal width so a longer name ("Regular Drawstring
+  //   Shorts in Stripes") reads on a single line instead of being
+  //   shrunk + truncated mid-word).
   //
   // The COLLAPSED_H + insets.bottom math anchors the target position
   // to the same coordinates the dock uses (cardLayoutStyle, above).
   // SCREEN_H is computed once at module load — fine because the
   // FitResult screen is full-bleed and doesn't reflow on rotation.
-  const heroOriginTop = insets.top + spacing.xl;
+  const heroOriginTop = insets.top + spacing.md;
   const heroDockStyle = useAnimatedStyle(() => {
-    // Collapsed: hero base sits ~24px above the dock's top edge.
+    // Collapsed: hero base sits ~20px above the dock's top edge.
     //   dockTopWhenCollapsed = SCREEN_H - COLLAPSED_H
-    //   (cardLayoutStyle.bottom is 0 when collapsed, height is COLLAPSED_H)
-    const dockTopCollapsed = SCREEN_H - COLLAPSED_H;
-    const targetTopCollapsed = dockTopCollapsed - 56; // ~brand + name + 24px gap
+    //   (cardLayoutStyle.bottom is 2 when collapsed → use COLLAPSED_H + 2)
+    const dockTopCollapsed = SCREEN_H - COLLAPSED_H - 2;
+    const targetTopCollapsed = dockTopCollapsed - 60; // ~brand + name + 20px gap
     const translateY = interpolate(
       collapseProgress.value,
       [0, 1],
       [targetTopCollapsed - heroOriginTop, 0]
     );
-    const scale = interpolate(collapseProgress.value, [0, 1], [0.58, 1]);
+    const scale = interpolate(collapseProgress.value, [0, 1], [0.7, 1]);
     return {
       transform: [{ translateY }, { scale }],
+    };
+  });
+
+  // Animated backdrop chip behind the brand+name. Transparent when
+  // expanded (so the hero text floats over the product image cleanly).
+  // Dark frosted pill when collapsed — guarantees legibility on
+  // light/busy product images where the text shadow alone wasn't
+  // enough (May 4 2026 user feedback: "add some treatment to brand
+  // and product name on the product fit card.. that'll help make
+  // the text readable on images that are hard to read… when the card
+  // is docked"). Padding + borderRadius animate together so the chip
+  // feels like it's emerging from the text, not popping into being.
+  const heroChipStyle = useAnimatedStyle(() => {
+    const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.45, 0]);
+    const padH = interpolate(collapseProgress.value, [0, 1], [14, 0]);
+    const padV = interpolate(collapseProgress.value, [0, 1], [8, 0]);
+    return {
+      backgroundColor: `rgba(20, 14, 28, ${bgAlpha})`,
+      paddingHorizontal: padH,
+      paddingVertical: padV,
     };
   });
 
@@ -950,10 +971,16 @@ export default function FitResultScreen() {
   // CATEGORY (e.g. "Top" tag when category is already "Top") and the
   // MATERIAL (May 3 2026 — Cordstudio's `poem-dress` showed "100%
   // cotton" in both the MATERIAL row and the tag chip row).
+  // `strict: true` (May 4 2026) also requires every surviving tag to
+  // contain a known garment-attribute keyword (material, texture,
+  // colour, length, product type, fit, occasion). Marketing copy
+  // that the noise filter missed ("shop the look", "must have",
+  // "as seen on") is dropped.
   const visibleTags = filterUserFacingTags(
     enrichedProduct?.tags,
     displayCategory,
     displayMaterial,
+    { strict: true },
   );
   const showTags = visibleTags.length > 0;
 
@@ -1034,29 +1061,35 @@ export default function FitResultScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Brand + product name centred near the top of the image. Wrapped
-          in Animated.View so the hero translates DOWN with the dock as
-          it collapses (and shrinks ~58%), parking just above the dock
-          like a music-player now-playing strip. See `heroDockStyle`
-          above for the math. */}
+      {/* Brand + product name centred near the top of the image. Outer
+          wrapper is the absolute-positioned hero slot (animated by
+          heroDockStyle to translate + scale with the dock); inner
+          `heroChip` is the legibility chip that fades in a dark
+          frosted backdrop when collapsed, transparent when expanded.
+          Splitting them keeps the chip width tied to the inner text's
+          intrinsic size (so the backdrop is a tight pill behind the
+          brand+name, not a full-width band). See heroDockStyle +
+          heroChipStyle above for the interpolation math. */}
       <Animated.View
-        style={[styles.hero, { paddingTop: insets.top + spacing.xl }, heroDockStyle]}
+        style={[styles.hero, { paddingTop: insets.top + spacing.md }, heroDockStyle]}
         pointerEvents="none"
       >
-        {safeBrand ? (
-          <BrandHeading
-            brand={safeBrand}
-            height={20}
-            color="rgba(255,255,255,0.92)"
-            uppercase
-            style={{ alignSelf: 'center', marginBottom: 6 }}
-            textStyle={styles.heroBrand}
-            testID="hero-brand"
-          />
-        ) : null}
-        <Text style={styles.heroName} numberOfLines={2}>
-          {safeName || 'Product'}
-        </Text>
+        <Animated.View style={[styles.heroChip, heroChipStyle]}>
+          {safeBrand ? (
+            <BrandHeading
+              brand={safeBrand}
+              height={20}
+              color="rgba(255,255,255,0.95)"
+              uppercase
+              style={{ alignSelf: 'center', marginBottom: 6 }}
+              textStyle={styles.heroBrand}
+              testID="hero-brand"
+            />
+          ) : null}
+          <Text style={styles.heroName} numberOfLines={2}>
+            {safeName || 'Product'}
+          </Text>
+        </Animated.View>
         {/* Custom-fit brand spotlight — appears when the storefront
             advertises made-to-measure / bespoke / custom sizing. The
             badge sits between the product name and the glass card so
@@ -1623,20 +1656,39 @@ const styles = StyleSheet.create({
   },
 
   // --- Hero (brand + product name over image) ---
+  // Side padding dropped from SIDE_PAD → spacing.sm so the inner
+  // heroChip (which is sized to its content) can stretch to use
+  // ~94% of the viewport width when the chip is in its collapsed
+  // dark-pill mode. This is what gives a long product name like
+  // "Regular Drawstring Shorts in Stripes" room to read on a single
+  // line above the docked card (May 4 2026 user direction: "use more
+  // width than you are using right now to display product name").
   hero: {
     position: 'absolute',
     top: 0,
-    left: SIDE_PAD,
-    right: SIDE_PAD,
+    left: spacing.sm,
+    right: spacing.sm,
     alignItems: 'center',
+  },
+  // Inner pill wrapping brand + name. Padding + bg are animated by
+  // heroChipStyle. borderRadius stays static (pill shape) — when
+  // padding is 0 (expanded) the rounded corners are invisible.
+  heroChip: {
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
   },
   heroBrand: {
     ...typography.overline,
-    color: 'rgba(255,255,255,0.92)',
+    color: 'rgba(255,255,255,0.95)',
     marginBottom: 6,
-    textShadowColor: 'rgba(0,0,0,0.45)',
+    // Stronger shadow than before — the chip backdrop carries most
+    // of the legibility lift in collapsed mode, but in expanded mode
+    // the text floats over the raw product image, so a heavier
+    // shadow is the only safety net. Doubled radius + dropped vertical
+    // offset for an even halo around each glyph.
+    textShadowColor: 'rgba(0,0,0,0.65)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 6,
   },
   heroName: {
     ...typography.headingXL,
@@ -1646,9 +1698,15 @@ const styles = StyleSheet.create({
     fontFamily: 'ViaodaLibre-Regular',
     color: '#fff',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.55)',
+    // Heavier shadow to clear hard-to-read product backgrounds (May 4
+    // 2026 — was 0.55 alpha / 8 px radius; bumped to 0.75 / 12 px so
+    // the name reads on white-on-white shorts photos like the user
+    // flagged with "Regular Drawstring Shorts in Stripes" on RIO).
+    // Pairs with the heroChip's animated dark-pill backdrop in
+    // collapsed mode.
+    textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowRadius: 12,
   },
 
   // --- Custom-fit brand spotlight badge ---

@@ -20,6 +20,7 @@ import {
   borderRadius,
   whiteAlpha,
   fontFamily,
+  textAlpha,
 } from '../constants/theme';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
@@ -102,19 +103,23 @@ export default function BrandIntegrationScreen() {
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      {/* Custom back chevron — same pattern as FitResult / AvatarSetup
-          since the native stack header is hidden. Sits at the top-left
-          edge with a translucent dark fill so it reads above the
-          backgroundless screen content. */}
+      {/* Custom back chevron — quieted on May 4 2026 ("do we really
+          need a back icon on the top..??") by shrinking the surface
+          (28x28, was 36x36) and dropping it to a borderless tint so
+          it reads as ambient chrome rather than a primary action.
+          Kept (not removed) because Android lacks the iOS swipe-down-
+          to-dismiss for stack screens — a discoverable visual back
+          path is still the safer default until we have telemetry on
+          how often it's tapped. Hit-zone stays generous via hitSlop. */}
       <TouchableOpacity
         style={[styles.backBtn, { top: insets.top + spacing.sm }]}
         onPress={() => navigation.goBack()}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        activeOpacity={0.75}
+        hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+        activeOpacity={0.55}
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Feather name="chevron-left" size={22} color={colors.text} />
+        <Feather name="chevron-left" size={20} color={colors.textMuted} />
       </TouchableOpacity>
 
       <ScrollView
@@ -184,16 +189,27 @@ export default function BrandIntegrationScreen() {
             'Size charts with measurements per size',
             'Optional: model height and size worn for each product',
             'Optional: fit type tags (slim, regular, oversized)',
-          ].map((item, i) => (
-            <View key={i} style={styles.listItem}>
-              <Feather
-                name={i < 2 ? 'check-circle' : 'plus-circle'}
-                size={16}
-                color={i < 2 ? colors.primary : colors.textMuted}
-              />
-              <Text style={[styles.listText, i >= 2 && styles.listTextOptional]}>{item}</Text>
-            </View>
-          ))}
+          ].map((item, i) => {
+            // First "optional" item gets a small divider + extra
+            // top margin so the required → optional split reads as a
+            // visual group break, not a continuous list (May 4 2026
+            // user feedback: "add some spacing between, what we need
+            // from you & optional").
+            const isFirstOptional = i === 2;
+            return (
+              <View
+                key={i}
+                style={[styles.listItem, isFirstOptional && styles.listItemDivider]}
+              >
+                <Feather
+                  name={i < 2 ? 'check-circle' : 'plus-circle'}
+                  size={16}
+                  color={i < 2 ? colors.primary : colors.textMuted}
+                />
+                <Text style={[styles.listText, i >= 2 && styles.listTextOptional]}>{item}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* CTA */}
@@ -236,21 +252,18 @@ const styles = StyleSheet.create({
     // begins below the back chevron.
     paddingBottom: spacing.xxl,
   },
-  // Custom back chevron — same circular dark-fill style as the
-  // FitResult back button, but tinted for the light page bg here.
+  // Quieter back chevron (May 4 2026) — borderless, no shadow, just a
+  // muted glyph in a 28x28 tap zone. The hitSlop on the TouchableOpacity
+  // wrapping this widens the actual touch area to ≥ 44 px so a11y is
+  // unaffected.
   backBtn: {
     position: 'absolute',
     left: spacing.md,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: whiteAlpha.surfaceSolid,
-    borderWidth: 1,
-    borderColor: whiteAlpha.borderMid,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-    ...shadows.sm,
   },
   header: {
     marginBottom: spacing.xl,
@@ -368,6 +381,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
+  },
+  // Visual break between the required group (first 2 items) and the
+  // optional group (last 2). Top margin + a hair-line divider read
+  // as a soft section break inside the same card.
+  listItemDivider: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: textAlpha.divider,
   },
   listText: {
     ...typography.bodySmall,

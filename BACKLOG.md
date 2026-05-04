@@ -12,6 +12,36 @@ deleting them.
 
 ## P0 — pre-App-Store launch
 
+### "Get in touch" on the BrandIntegration page needs a real destination
+
+**Path:** `mobile/src/screens/BrandIntegrationScreen.tsx` →
+`PARTNER_INQUIRY_EMAIL` constant + `handleGetInTouch`.
+
+Currently the CTA opens a `mailto:ramsaptami@gmail.com` with a
+structured subject + body template (added May 3 2026 PM as a
+placeholder so the button at least *did* something). For v1 launch
+this needs:
+
+  1. A dedicated inbox alias (e.g. `partners@alate.app`) so
+     incoming inquiries don't mix with personal mail.
+  2. EITHER a follow-up rule that auto-replies + tags the thread
+     for triage, OR an in-app form posting to a new
+     `/api/partner-inquiry` endpoint that lands in a Supabase
+     `partner_inquiries` table (modelled on `brand_requests`).
+     The form path is more durable — gives us structured data
+     (brand name, storefront URL, catalogue size, contact)
+     queryable from a dashboard, doesn't depend on mailto
+     working on every device, and captures inquiries even when
+     the user has no mail client installed.
+  3. Update `PARTNER_INQUIRY_EMAIL` (or the form endpoint URL) and
+     consider gating the CTA behind an `isEnabled('PARTNER_INQUIRY')`
+     flag if the destination isn't ready by ship.
+
+User flagged May 4 2026: "setup 'get in touch' before v1 launch on
+brand connect page". Worth tracking the click-through count via
+Sentry breadcrumb (already wired) so we know whether the demand
+warrants the form-path investment over the mailto-path.
+
 ### ~~Privacy-policy entry + delete-my-data path for brand_requests.requester_email~~ — DONE 2026-05-02
 
 Local copies updated in this worktree:

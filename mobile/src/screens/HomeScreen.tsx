@@ -776,7 +776,13 @@ const styles = StyleSheet.create({
     // Dark text on the frosted card — WCAG AA passes on the 0.78
     // white-tint bg. Light text was failing contrast on the mid-
     // tone cards.
-    color: colors.textMuted,
+    //
+    // Was textMuted (#8a7e94, mid-grey-purple). Bumped to
+    // textSecondary (#4c4356, dark grey-purple) per May 4 2026 user
+    // direction: "change font colour to a slightly darker shade on
+    // brand name inside recent cards on the home screen". Now reads
+    // as a deliberate eyebrow rather than ambient muted text.
+    color: colors.textSecondary,
   },
   recentName: {
     fontFamily: 'Jost-Regular',

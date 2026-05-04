@@ -241,6 +241,65 @@ describe('filterUserFacingTags', () => {
     ]);
   });
 
+  it('strict mode keeps only garment-attribute tags', () => {
+    // May 4 2026: stricter filter mode that drops anything that
+    // doesn't match a known garment-attribute keyword (material,
+    // texture, colour, length, product type, fit, occasion). Per
+    // user direction: "tags are still showing bad reads. We need
+    // things like material, texture, colour, length, product type".
+    expect(
+      filterUserFacingTags(
+        ['floral', 'midi', 'cotton', 'breezy', 'easystyle', 'handcrafted', 'shop now', 'best of'],
+        undefined,
+        undefined,
+        { strict: true },
+      ),
+    ).toEqual(['floral', 'midi', 'cotton', 'breezy', 'easystyle', 'handcrafted']);
+  });
+
+  it('strict mode handles real-world Cordstudio + Genes tags cleanly', () => {
+    expect(
+      filterUserFacingTags(
+        // Cordstudio-style. "days12-14" is dropped by the existing
+        // SKU-shape noise pattern (4-letter + digits). "100% cotton"
+        // SURVIVES strict mode here because "cotton" is a known
+        // material keyword — when called from FitResult, the
+        // excludeMaterial argument drops it separately.
+        ['casual dress for summer', 'cotton dress for summer', 'days12-14', 'dress', '100% cotton'],
+        undefined,
+        undefined,
+        { strict: true },
+      ),
+    ).toEqual(['casual dress for summer', 'cotton dress for summer', 'dress', '100% cotton']);
+    expect(
+      filterUserFacingTags(
+        // Genes-style — all marketing noise, expect zero survivors
+        ['save 50%', 'spring summer 23', 'save upto 50%', 'onsale'],
+        undefined,
+        undefined,
+        { strict: true },
+      ),
+    ).toEqual([]);
+  });
+
+  it('strict mode drops verbose merchandising phrases the noise list misses', () => {
+    expect(
+      filterUserFacingTags(
+        ['shop the look', 'as seen on', 'must have', 'editor pick', 'cotton'],
+        undefined,
+        undefined,
+        { strict: true },
+      ),
+    ).toEqual(['cotton']);
+  });
+
+  it('strict mode is OFF by default (back-compat with existing callers)', () => {
+    // Without the strict flag, behaviour is unchanged — verbose
+    // marketing tags pass through if they don't match the noise
+    // patterns. Lock that so existing tests keep working.
+    expect(filterUserFacingTags(['shop the look', 'cotton'])).toEqual(['shop the look', 'cotton']);
+  });
+
   it('end-to-end on the Genes Le Coanet Hemant tag list', () => {
     // Verifies the full live-report tag list (May 3 2026 PM):
     // raw tags ["save 50%", "spring summer 23", "save upto 50%",

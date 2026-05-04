@@ -118,6 +118,84 @@ function dedupKey(tag: string): string {
   return tag.toLowerCase().replace(/[\s\-_]+/g, '');
 }
 
+// ─── STRICT-MODE WHITELIST ──────────────────────────────────────────
+// Garment-attribute keywords. In `strict` mode (May 4 2026, opt-in),
+// a tag is kept ONLY if its lowercased text contains one of these
+// substrings. Defends against marketing copy that slips past the
+// noise patterns ("shop the look", "must have", "editor pick", etc.)
+// by requiring the tag to look like a garment descriptor.
+//
+// Categories follow the user's spec ("material, texture, colour,
+// length, product type" + the natural extensions: fit/silhouette,
+// occasion, construction). Substring match (lowercased) so phrasing
+// variations ("cotton dress", "100% cotton") all hit "cotton" and
+// pass through. Conservative — better to under-show than to surface
+// noise the user has flagged twice.
+const GARMENT_ATTR_KEYWORDS: string[] = [
+  // Materials
+  'cotton', 'linen', 'silk', 'wool', 'polyester', 'viscose', 'rayon',
+  'nylon', 'elastane', 'spandex', 'lycra', 'denim', 'leather', 'suede',
+  'cashmere', 'merino', 'tencel', 'modal', 'jersey', 'knit', 'chiffon',
+  'satin', 'velvet', 'tweed', 'fleece', 'crepe', 'organza', 'tulle',
+  'lace', 'muslin', 'terry', 'corduroy', 'georgette', 'crepon', 'twill',
+  // Textures / surface treatments
+  'ribbed', 'textured', 'embroidered', 'pleated', 'smocked', 'quilted',
+  'sequin', 'beaded', 'fringed', 'crochet', 'cable', 'waffle', 'striped',
+  'printed', 'patterned', 'floral', 'polka', 'paisley', 'gingham',
+  'plaid', 'tartan', 'herringbone', 'houndstooth', 'jacquard', 'brocade',
+  'applique',
+  // Colours
+  'black', 'white', 'navy', 'beige', 'cream', 'ivory', 'grey', 'gray',
+  'tan', 'camel', 'sand', 'olive', 'mustard', 'burgundy', 'maroon',
+  'scarlet', 'crimson', 'cherry', 'coral', 'peach', 'salmon', 'nude',
+  'pink', 'rose', 'blush', 'magenta', 'fuchsia', 'red', 'orange',
+  'yellow', 'green', 'emerald', 'jade', 'mint', 'sage', 'teal',
+  'turquoise', 'aqua', 'blue', 'indigo', 'cobalt', 'royal', 'sky',
+  'pastel', 'lavender', 'lilac', 'purple', 'violet', 'plum', 'brown',
+  'chocolate', 'khaki', 'charcoal', 'metallic', 'gold', 'silver',
+  'bronze', 'copper',
+  // Lengths
+  'mini', 'midi', 'maxi', 'short', 'long', 'knee', 'ankle', 'floor',
+  'cropped', 'crop', 'tea',
+  // Product types
+  'dress', 'gown', 'skirt', 'shorts', 'trouser', 'pant', 'jean',
+  'legging', 'jumpsuit', 'playsuit', 'romper', 'top', 'tee', 'tshirt',
+  'tank', 'cami', 'camisole', 'blouse', 'shirt', 'tunic', 'sweatshirt',
+  'hoodie', 'sweater', 'jumper', 'cardigan', 'coat', 'jacket', 'blazer',
+  'vest', 'gilet', 'kimono', 'kaftan', 'caftan', 'kurta', 'kurti',
+  'saree', 'sari', 'dhoti', 'lehenga', 'salwar', 'coord', 'bralette',
+  'bodysuit', 'bra', 'swimsuit', 'bikini', 'loungewear', 'nightwear',
+  'pyjama', 'pajama',
+  // Fit / silhouette / construction
+  'slim', 'fitted', 'loose', 'relaxed', 'oversized', 'tailored', 'wide',
+  'straight', 'skinny', 'bootcut', 'flared', 'tapered', 'baggy', 'boxy',
+  'cinched', 'empire', 'sheath', 'shift', 'wrap', 'halter', 'strapless',
+  'sleeveless', 'backless', 'turtleneck', 'mockneck', 'vneck', 'crewneck',
+  'scoopneck', 'squareneck', 'boatneck', 'cowl',
+  // Occasion / vibe
+  'casual', 'formal', 'cocktail', 'evening', 'wedding', 'party',
+  'workwear', 'office', 'brunch', 'vacation', 'beach', 'resort',
+  'summer', 'winter', 'spring', 'fall', 'autumn', 'festive', 'minimal',
+  'easy', 'easystyle', 'breezy', 'flowy', 'breathable', 'lightweight',
+  'airy', 'heavyweight',
+  // Construction / craft
+  'handcrafted', 'handmade', 'handwoven', 'organic', 'sustainable',
+  'eco', 'recycled', 'natural',
+];
+
+function looksLikeGarmentAttr(tag: string): boolean {
+  const normalized = tag.toLowerCase();
+  return GARMENT_ATTR_KEYWORDS.some((kw) => normalized.includes(kw));
+}
+
+export interface FilterOptions {
+  /** Strict mode (May 4 2026): drop any tag that doesn't contain a
+   *  known garment-attribute keyword. Recommended for the FitResult
+   *  tags chip row. Default off so existing callers don't change
+   *  behaviour. */
+  strict?: boolean;
+}
+
 /**
  * Filter a list of raw Shopify tags down to user-facing ones.
  * Order is preserved. Empty / whitespace-only entries are dropped.
@@ -137,7 +215,8 @@ function dedupKey(tag: string): string {
 export function filterUserFacingTags(
   tags: string[] | undefined | null,
   excludeCategory?: string,
-  excludeMaterial?: string
+  excludeMaterial?: string,
+  options: FilterOptions = {}
 ): string[] {
   if (!tags || tags.length === 0) return [];
 
@@ -154,7 +233,11 @@ export function filterUserFacingTags(
     // noise filter but read as "internal label" with the underscores
     // intact. Normalize to spaces so they render as natural words on
     // the chip pill (April 29 2026 polish).
-    .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim());
+    .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim())
+    // Strict mode: drop anything that doesn't read as a garment
+    // attribute. Off by default to keep existing call sites' output
+    // unchanged.
+    .filter((t) => !options.strict || looksLikeGarmentAttr(t));
 
   // Dedupe: case + whitespace + separator-insensitive. Reistor (May 2
   // 2026) shipped both "organic cotton" and "organiccotton" — same
