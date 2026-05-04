@@ -69,6 +69,13 @@ import { inferCategory, inferMaterial } from '../utils/productInference';
 // `availableSizes` list (Shopify direct-fetch surfaces this) + the
 // user's recommended size. No separate backend call needed.
 import { computeAvailability, describeAvailability, AvailabilityStatus } from '../utils/availability';
+// Sample the dominant colour of the underlying product image so the
+// hero brand+name can flip to dark text on light photos (white-on-
+// white shorts, etc.) and stay white otherwise. May 4 2026 user
+// direction: "can you detect if the background is light and make
+// product fit screen brand and product name dark on a light
+// background and keep it white on the rest?"
+import { useImageBrightness } from '../utils/useImageBrightness';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -334,21 +341,47 @@ export default function FitResultScreen() {
     };
   });
 
+  // Sample dominant colour of the product image so the hero text +
+  // chip backdrop can flip on light photos. MUST be declared before
+  // any early-return guard (loading / scrapeError / !product) so the
+  // hook count stays stable across renders — regression #1 in
+  // project_anti_patterns.md (white-screen on conditional hooks).
+  // Hook handles `null` URI by returning `null` brightness, which we
+  // treat as "stay white" downstream.
+  const heroImageUri =
+    activeEntry?.productImage ??
+    routeProduct?.image ??
+    scrapedProduct?.image ??
+    null;
+  const heroBrightness = useImageBrightness(heroImageUri);
+
   // Animated backdrop chip behind the brand+name. Transparent when
   // expanded (so the hero text floats over the product image cleanly).
-  // Dark frosted pill when collapsed — guarantees legibility on
-  // light/busy product images where the text shadow alone wasn't
-  // enough (May 4 2026 user feedback: "add some treatment to brand
-  // and product name on the product fit card.. that'll help make
-  // the text readable on images that are hard to read… when the card
-  // is docked"). Padding + borderRadius animate together so the chip
-  // feels like it's emerging from the text, not popping into being.
+  // Frosted pill when collapsed — dark on dark images, light on light
+  // images so the chip always READS the opposite of the text colour
+  // (text colour is itself driven by image brightness — see the
+  // heroBrand/heroName style overrides below). Guarantees legibility
+  // on busy product images where the text shadow alone isn't enough.
+  // Padding interpolates with collapseProgress so the chip feels like
+  // it's emerging from the text, not popping in.
+  //
+  // brightnessSV mirrors the JS heroBrightness state into a shared
+  // value so the worklet inside useAnimatedStyle can read it without
+  // taking a stale closure value. (useAnimatedStyle re-runs only when
+  // its captured shared values change, not on JS state changes.)
+  const brightnessSV = useSharedValue<'light' | 'dark' | 'unknown'>('unknown');
+  useEffect(() => {
+    brightnessSV.value = heroBrightness ?? 'unknown';
+  }, [heroBrightness]);
   const heroChipStyle = useAnimatedStyle(() => {
     const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.45, 0]);
     const padH = interpolate(collapseProgress.value, [0, 1], [14, 0]);
     const padV = interpolate(collapseProgress.value, [0, 1], [8, 0]);
+    const isLight = brightnessSV.value === 'light';
     return {
-      backgroundColor: `rgba(20, 14, 28, ${bgAlpha})`,
+      backgroundColor: isLight
+        ? `rgba(255, 255, 255, ${bgAlpha})`
+        : `rgba(20, 14, 28, ${bgAlpha})`,
       paddingHorizontal: padH,
       paddingVertical: padV,
     };
@@ -1069,7 +1102,14 @@ export default function FitResultScreen() {
           Splitting them keeps the chip width tied to the inner text's
           intrinsic size (so the backdrop is a tight pill behind the
           brand+name, not a full-width band). See heroDockStyle +
-          heroChipStyle above for the interpolation math. */}
+          heroChipStyle above for the interpolation math.
+
+          Text colour adapts to the underlying image: dark on light
+          photos (white-shorts on white bg, etc.), white otherwise.
+          `heroBrightness` is `null` until the colour sampler resolves —
+          we treat null as "stay white" so the screen never blocks on
+          the sampler and falls through to the legacy behaviour on
+          failure. */}
       <Animated.View
         style={[styles.hero, { paddingTop: insets.top + spacing.md }, heroDockStyle]}
         pointerEvents="none"
@@ -1079,14 +1119,23 @@ export default function FitResultScreen() {
             <BrandHeading
               brand={safeBrand}
               height={20}
-              color="rgba(255,255,255,0.95)"
+              color={heroBrightness === 'light' ? colors.text : 'rgba(255,255,255,0.95)'}
               uppercase
               style={{ alignSelf: 'center', marginBottom: 6 }}
-              textStyle={styles.heroBrand}
+              textStyle={[
+                styles.heroBrand,
+                heroBrightness === 'light' && styles.heroBrandOnLight,
+              ]}
               testID="hero-brand"
             />
           ) : null}
-          <Text style={styles.heroName} numberOfLines={2}>
+          <Text
+            style={[
+              styles.heroName,
+              heroBrightness === 'light' && styles.heroNameOnLight,
+            ]}
+            numberOfLines={2}
+          >
             {safeName || 'Product'}
           </Text>
         </Animated.View>
@@ -1707,6 +1756,21 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
+  },
+  // Override applied when the underlying product image is detected as
+  // "light" (see useImageBrightness). Dark text + white halo so the
+  // brand wordmark + product name read on white-on-white photos.
+  heroBrandOnLight: {
+    color: colors.text,
+    textShadowColor: 'rgba(255,255,255,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
+  },
+  heroNameOnLight: {
+    color: colors.text,
+    textShadowColor: 'rgba(255,255,255,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
 
   // --- Custom-fit brand spotlight badge ---

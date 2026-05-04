@@ -7,7 +7,7 @@
  * drop it entirely rather than display a 3-letter prefix.
  */
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
+export const CURRENCY_SYMBOLS: Record<string, string> = {
   GBP: '£',
   USD: '$',
   EUR: '€',

@@ -67,12 +67,13 @@ export default function FitDetailBar({ entry }: Props) {
         {name}
       </Text>
 
-      {size && (
-        <View style={styles.sizeChip}>
-          <Text style={styles.sizeLabel}>SIZE {size}</Text>
-        </View>
-      )}
-
+      {/* Affordability chip moved BEFORE the size pill (May 4 2026)
+          per user direction: "on the history page… in that pill
+          design, currency should show up in between, not end". The
+          chip now sits between the product name and the size pill,
+          and renders in the user's actual currency symbol (£/₹/€/$)
+          rather than a hardcoded dollar — the symbol is resolved
+          inside AffordabilityIcon from the price-range's currency. */}
       <AffordabilityIcon
         price={entry.price}
         range={range}
@@ -81,6 +82,12 @@ export default function FitDetailBar({ entry }: Props) {
         warningColor="#ffc97a"
         style={styles.affordChip}
       />
+
+      {size && (
+        <View style={styles.sizeChip}>
+          <Text style={styles.sizeLabel}>SIZE {size}</Text>
+        </View>
+      )}
     </View>
   );
 }
