@@ -57,24 +57,11 @@ function App() {
   // fires, so the first visible frame renders in the real face, not a
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
-    // Viaoda Libre (Google Fonts, OFL) — display face for all heading
-    // tokens. Replaces DM Serif Display Italic.
-    //
-    // The ttf is bundled in TWO places:
-    //   - `mobile/assets/fonts/ViaodaLibre-Regular.ttf` — read by
-    //     expo-font's `useFonts` for iOS (and as a backup for Android).
-    //   - `mobile/android/app/src/main/assets/fonts/ViaodaLibre-Regular.ttf`
-    //     — read by React Native's Android typeface manager directly.
-    //     RN Android's font lookup checks `assets/fonts/<family>.ttf`
-    //     by file basename, which is the most reliable resolve path
-    //     on Android. Three earlier attempts trying to bind via
-    //     expo-font alone (key as 'ViaodaLibre', then 'Viaoda Libre',
-    //     then 'ViaodaLibre-Regular') all silently fell back to system
-    //     serif on the device — see project_regression_log.md.
-    //
-    // Both paths reference the SAME file basename + key, so JS can
-    // use `fontFamily: 'ViaodaLibre-Regular'` cross-platform.
-    'ViaodaLibre-Regular': require('./assets/fonts/ViaodaLibre-Regular.ttf'),
+    // Viaoda Libre retired May 4 2026 late-PM ("replace all VL font
+    // with jost please. I'm keeping only jost and tan nightingale").
+    // The ttf file is left on disk but no longer registered or
+    // referenced — Jost-Regular carries the display tier now and TAN
+    // Nightingale SVGs handle proper page-title chrome.
     // DM Sans (Google Fonts, OFL) — body / label / button face,
     // replacing the platform system serif (May 2 2026). Loaded as four
     // discrete weight files because RN Android's font weight resolution
