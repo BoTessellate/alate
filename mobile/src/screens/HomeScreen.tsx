@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     // typography token isn't affected — easy revert by removing this
     // line. -1pt from body so the sub-heading doesn't dominate the
     // hero verse above it.
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     fontSize: 16,
     // Was textHigh (0.85) — 16px = 12pt is "normal text" per WCAG, so
     // it needs 4.5:1. Sitting in the mid-zone of the gradient against
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
   // PM ("remove VL font on 'your body', keep it as jost"). The line
   // break is the only emphasis; matches the rest of the tagline.
   heroTaglineEmphasis: {
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     fontSize: 16,
     lineHeight: 21,
     color: whiteAlpha.textOpaque,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   },
   shareHint: {
     ...typography.caption,
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     color: whiteAlpha.textSecondary,
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -783,14 +783,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   recentName: {
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     fontSize: 14,
     fontWeight: '400',
     color: colors.text,
     lineHeight: 18,
   },
   recentSize: {
-    fontFamily: 'Jost-Regular',
+    fontFamily: 'Marcellus-Regular',
     fontSize: 11,
     color: colors.textMuted,
     lineHeight: 13,

@@ -69,23 +69,20 @@ const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: numb
 // content-bounds viewBox; if a new SVG replaces one of these, the
 // aspect will need to be re-measured.
 const SVG_ASPECTS: Record<Slot, number> = {
-  // viewBoxes re-tightened May 4 2026 PM. The original Canva exports
-  // shipped with a loose 0 0 450 450 viewBox (whole canvas, content
-  // sitting in a small region). The HeadingImage render path computes
-  // width = height * aspect — but `preserveAspectRatio="xMidYMid meet"`
-  // (the default) preserves the SVG's INTRINSIC viewBox aspect, so a
-  // 1:1 viewBox renders as a 1:1 square inside whatever box we ask
-  // for, leaving the text either tiny (fit to height-of-square) or
-  // letterboxed. Fixed by tightening each viewBox to its actual
-  // content bounds (sampled from M-command starts in the path data,
-  // padded ±10 px for curve overshoot). Aspects below match those
-  // tight viewBoxes so the registered aspect equals the SVG's
-  // intrinsic aspect — text now scales to the full requested height.
-  'home-verse': 325 / 275,        // viewBox "30 75 325 275"
-  history: 285 / 75,              // viewBox "95 170 285 75"
-  profile: 310 / 135,             // viewBox "45 125 310 135"
-  'body-profile': 335 / 65,       // viewBox "45 170 335 65"
-  'before-we-begin': 290 / 70,    // viewBox "80 178 290 70"
+  // viewBoxes re-measured May 4 2026 late-PM via svgpathtools' actual
+  // path-bbox parser (cubic curves + relative deltas all accounted
+  // for). Earlier values came from M-command-start sampling, which
+  // missed glyph widths past the start point — that's why home-verse
+  // was cropping its right edge ("truncated on the right" + "space
+  // left on the left"). The registered aspect MUST equal the SVG's
+  // intrinsic aspect because `preserveAspectRatio="xMidYMid meet"`
+  // (the default) preserves the SVG's intrinsic ratio when scaling
+  // into our render box.
+  'home-verse': 369 / 257,        // viewBox "39 84 369 257"
+  history: 265 / 74,              // viewBox "107 180 265 74"
+  profile: 332 / 118,             // viewBox "55 137 332 118"
+  'body-profile': 346 / 93,       // viewBox "54 152 346 93"
+  'before-we-begin': 289 / 65,    // viewBox "81 178 289 65"
   'great-fit': 2.17,
   'some-concerns': 3.51,
   'may-not-fit': 3.23,

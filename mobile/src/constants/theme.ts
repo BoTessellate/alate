@@ -41,25 +41,21 @@
 // have to change, but the rendered face is identical; visual hierarchy
 // has to come from size + colour + spacing instead of weight.
 //
-// May 4 2026 late-PM: Viaoda Libre retired entirely. User direction:
-// "replace all VL font with jost please. I'm keeping only jost and
-// tan nightingale". Display tier now resolves to Jost-Regular for
-// any token that mixes in `headingSerif` (see below). The actual
-// page-title chrome continues to render via the TAN Nightingale SVG
-// paths (HeadingImage); Jost is the styled-text fallback when an
-// SVG slot isn't registered.
+// May 4 2026 late-PM (round 2): Jost retired alongside the
+// already-retired Viaoda Libre. Back to a single-typeface trial —
+// Marcellus carries body AND display tier; page-title chrome still
+// renders via TAN Nightingale SVG paths (HeadingImage); Marcellus is
+// the styled-text fallback when an SVG slot isn't registered.
 //
-// Body / labels stay on Marcellus.
-//
-// Trade-off: Jost has a Regular variant loaded so the inherited
-// fontWeight: '400' is honoured natively — no synthetic-bold trap
-// like with single-weight VL.
+// Marcellus is single-weight (Regular only). All heading tokens MUST
+// stay at fontWeight: '400' — bumping to 700 silently falls back to
+// the system serif Bold on Android (anti-pattern #13).
 export const fontFamily = {
   primary: 'Marcellus-Regular',
   primaryMedium: 'Marcellus-Regular',
   primarySemiBold: 'Marcellus-Regular',
   primaryBold: 'Marcellus-Regular',
-  display: 'Jost-Regular',
+  display: 'Marcellus-Regular',
 };
 
 // Shared heading trait: every display/heading token mixes this in so

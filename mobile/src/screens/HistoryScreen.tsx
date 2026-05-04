@@ -14,7 +14,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, spacing, typography, borderRadius, ms, fontFamily, whiteAlpha, textAlpha } from '../constants/theme';
+import { colors, spacing, typography, borderRadius, ms, fontFamily, whiteAlpha, textAlpha, primaryAlpha } from '../constants/theme';
 import { useFitHistoryStore, FitHistoryEntry } from '../store/fitHistoryStore';
 import { usePriceRange } from '../store/priceRangeStore';
 import { computeAffordability } from '../utils/affordability';
@@ -205,17 +205,17 @@ export default function HistoryScreen() {
   if (entries.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        {/* Brand grey-purple ombre — same gradient as Home / Account
-            / FitResult hero. Per user direction April 29 2026: the
-            History tab read flat against the rest of the app's
-            atmospheric backdrop. May 3 2026 PM: angle flipped to
-            top-RIGHT light → bottom-LEFT deep so the `headerMeta`
-            line in the top-left passes WCAG contrast — see
-            HomeScreen for the full rationale. */}
+        <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+        {/* White-dominant gradient (May 4 2026 late-PM re-skin per
+            user direction "I want to make it more white than
+            purple"). Was the brand grey-purple ombre matching Home /
+            Account / FitResult; History now departs from that and
+            uses a near-white ramp with a soft purple-grey hint at
+            the bottom. All History text + icon colours flipped to
+            dark variants in step (StatusBar dark-content too). */}
         <LinearGradient
-          colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
-          locations={[0, 0.3, 0.6, 0.9]}
+          colors={['#ffffff', '#f5f3f7', '#e8e5ec', '#cdc7d3']}
+          locations={[0, 0.3, 0.65, 1]}
           start={{ x: 1, y: 0.05 }}
           end={{ x: 0.1, y: 0.95 }}
           style={StyleSheet.absoluteFill}
@@ -231,12 +231,12 @@ export default function HistoryScreen() {
             slot="history"
             fallback="History"
             height={56}
-            color="#fff"
+            color={colors.text}
             style={styles.emptyPageTitle}
             textStyle={styles.pageTitle}
           />
           <View style={styles.emptyIconContainer}>
-            <Feather name="clock" size={36} color="#fff" />
+            <Feather name="clock" size={36} color={colors.primary} />
           </View>
           <Text style={styles.emptyTitle}>No fit checks yet</Text>
           <Text style={styles.emptySubtitle}>
@@ -258,26 +258,33 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      {/* Same brand ombre as the empty state above (top-right light →
-          bottom-left deep, May 3 2026 PM). */}
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      {/* White-dominant gradient — see comment above the empty-state
+          gradient for the full rationale (May 4 2026 late-PM
+          re-skin: "more white than purple"). */}
       <LinearGradient
-        colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
-        locations={[0, 0.3, 0.6, 0.9]}
+        colors={['#ffffff', '#f5f3f7', '#e8e5ec', '#cdc7d3']}
+        locations={[0, 0.3, 0.65, 1]}
         start={{ x: 1, y: 0.05 }}
         end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
-        {/* Deck — flex:1 so it takes the upper area and centres the
-            cards vertically. The meta line + pill + clear-history
-            sit BELOW the deck as a single grouped footer (May 4 2026
-            PM user direction: "history page stats line, cards and
-            pill shaped needs to move a few pixels lower… group these
-            3 elements and center them"). The footer block is inline
-            (not absolute) so it consumes its own space and the deck
-            naturally compresses upward — no more empty void between
-            cards and pill. */}
+        {/* Reordered May 4 2026 late-PM:
+              meta line   — at TOP (was bottom of groupedFooter)
+              deck        — flex:1 in the middle
+              pill        — below deck
+              Clear-history — bottom, closer to navbar
+            Per user: "n items, n good fits...' needs to be on the top
+            of this page. This stats comes first then cards then the
+            pill. Move the clear history option even more lower than
+            it's at right now... a tad more". */}
+        <View style={styles.headerTop}>
+          <Text style={styles.headerMeta} testID="history-meta">
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
+          </Text>
+        </View>
+
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
@@ -285,11 +292,7 @@ export default function HistoryScreen() {
           onActiveIndexChange={setActiveIndex}
         />
 
-        <View style={styles.groupedFooter}>
-          <Text style={styles.headerMeta} testID="history-meta">
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
-          </Text>
-
+        <View style={styles.bottomFooter}>
           <View style={styles.detailBarWrap}>
             <FitDetailBar entry={activeEntry} />
           </View>
@@ -358,10 +361,10 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     ...typography.displayMedium,
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.15)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    // Was '#fff' (text on dark gradient). Flipped to dark for the
+    // white-dominant backdrop (May 4 2026 late-PM re-skin). Drop
+    // the dark text-shadow entirely — pointless on a near-white bg.
+    color: colors.text,
   },
   // Numbers in this header line ("3 items · 3 good fits") render in
   // Viaoda Libre per user direction April 29 2026 — the digits feel
@@ -369,21 +372,15 @@ const styles = StyleSheet.create({
   // display serif. Slightly larger size + tighter line height to
   // suit the heavier strokes.
   headerMeta: {
-    // Bumped 15 → 18 (May 3 2026): now the only header line, needs
-    // to carry the section on its own.
     fontFamily: fontFamily.display,
     fontSize: 18,
     lineHeight: 24,
-    // Was 0.85 white — even after the gradient angle flip the top
-    // half of the screen sits in the mid-tone region (~#71667c),
-    // and 0.85 white only clears 4.39:1 there. WCAG AA needs 4.5:1
-    // for 18px (≈ 13.5pt = normal text). Bumped to textOpaque (0.92)
-    // which clears 4.78:1. May 3 2026 PM contrast pass.
-    color: whiteAlpha.textOpaque,
+    // Flipped from white-on-dark → dark-on-white for the May 4 2026
+    // late-PM re-skin. textSecondary (#4c4356) on the near-white
+    // gradient stops clears WCAG AA easily and reads as a deliberate
+    // brand-tinted dark grey rather than full ink-black.
+    color: colors.textSecondary,
     marginTop: 4,
-    // Centred (May 4 2026) per user direction: the meta line carries
-    // the entire screen header on its own, so left-aligning it left
-    // a visible imbalance with the centred cover-flow deck below.
     textAlign: 'center',
   },
   list: {
@@ -546,29 +543,28 @@ const styles = StyleSheet.create({
   emptyPageTitle: {
     marginBottom: spacing.xl,
   },
-  // Empty-state icon ring — light frosted disc, readable on the
-  // brand-purple gradient (April 29 2026 backdrop change).
+  // Empty-state icon ring — light primary-tinted disc, readable on
+  // the white-dominant gradient (May 4 2026 late-PM re-skin). Was
+  // a frosted white disc on the dark gradient.
   emptyIconContainer: {
     width: ms(80),
     height: ms(80),
     borderRadius: ms(40),
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: primaryAlpha.tintSm,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   emptyTitle: {
-    // Bumped from headingM → headingXL to match the "are you a brand?"
-    // CTA on the Account tab — the empty-state title was reading too
-    // small against the gradient backdrop, especially on phones with
-    // larger screens.
     ...typography.headingXL,
-    color: '#fff',
+    // Was '#fff'. Flipped to dark text for the white-dominant
+    // backdrop (May 4 2026 late-PM).
+    color: colors.text,
     marginBottom: spacing.sm,
   },
   emptySubtitle: {
     ...typography.body,
-    color: 'rgba(255,255,255,0.85)',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   seedButton: {
@@ -586,22 +582,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Grouped footer (May 4 2026 PM) ---
-  // Replaces the prior absolute-positioned floatingFooter. Stacks
-  // [meta line, FitDetailBar pill, Clear-history link] inline as a
-  // single block UNDER the deck so the four elements (deck + meta +
-  // pill + link) read as ONE cohesive group, per user direction
-  // ("group these 3 elements and center them"). The deck above
-  // (HistoryCoverFlow flex:1) compresses to fill what remains so the
-  // overall composition vertically balances. paddingBottom clears
-  // the floating tab bar (~88 px = insets.bottom + 10 + 64) with
-  // breathing room — Clear-history now sits ~50-60 px above the
-  // navbar instead of the cramped ~30 px from the prior 130-bottom
-  // value. gap between rows controls breathing room within the group.
-  groupedFooter: {
+  // --- Top header (meta only) — May 4 2026 late-PM ---
+  // Was `groupedFooter` containing [meta, pill, clear-history] under
+  // the deck. User direction: "'n items, n good fits...' needs to be
+  // on the top of this page. This stats comes first then cards then
+  // the pill". Split into:
+  //   headerTop  — meta line at the very top
+  //   bottomFooter — pill + Clear-history at the bottom
+  headerTop: {
     alignItems: 'center',
     paddingTop: spacing.sm,
-    paddingBottom: 110,
+    paddingBottom: spacing.xs,
+  },
+  bottomFooter: {
+    alignItems: 'center',
+    // Was 110 in the groupedFooter. Dropped to 80 so Clear-history
+    // sits closer to the floating tab bar — user direction "Move
+    // the clear history option even more lower than it's at right
+    // now... a tad more". Floating tab bar is ~88 px from screen
+    // bottom (insets.bottom + 10 + 64); 80 px paddingBottom plus
+    // the link's own ~30 px height puts Clear-history ~30 px above
+    // the navbar, slightly more visible than before.
+    paddingBottom: 80,
     gap: spacing.sm,
   },
   detailBarWrap: {
@@ -623,11 +625,16 @@ const styles = StyleSheet.create({
   },
   clearLinkText: {
     ...typography.caption,
-    // Was colors.textSecondary (dark grey) on the dark gradient
-    // backdrop — invisible. Light text with moderate alpha so it
-    // reads as a quiet but legible link, not loud as the primary
-    // action.
-    color: whiteAlpha.textBody,
+    // Iterated twice on this colour:
+    //   v1 (May 3 2026): textMuted (dark) — invisible on the dark
+    //                    gradient.
+    //   v2 (May 3 PM):   whiteAlpha.textBody — readable white on
+    //                    dark.
+    //   v3 (May 4 PM):   textMuted again — back to dark text on
+    //                    the new white-dominant gradient. Reads as
+    //                    a quiet but legible link, not loud as a
+    //                    primary action.
+    color: colors.textMuted,
     textDecorationLine: 'underline',
     letterSpacing: 0.6,
   },
