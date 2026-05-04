@@ -13,8 +13,20 @@
  * Returns `null` (i.e. don't render the icon) when:
  *   - the user hasn't set a range
  *   - the product has no price
- *   - the price currency mismatches the range currency
  *   - the range has only one bound set (partial config)
+ *
+ * Currency mismatch handling (May 4 2026 late-PM): when the price's
+ * currency differs from the range's currency, we still bucket the
+ * raw amount (no FX conversion) and flag `currencyMismatch: true`.
+ * Earlier we returned null on mismatch, which surprised users
+ * ("changing currency in settings completely removed the
+ * affordability circle from product fit screen") — they'd switched
+ * their range currency and saw the indicator vanish on every
+ * product. Bucketing-without-conversion is imperfect (a ₹2000
+ * product in a £20-200 range will always read as overBudget) but
+ * still surfaces SOMETHING; the UI consumer can render a different
+ * tone for `currencyMismatch` results if it wants to soften the
+ * "over budget" verdict.
  */
 
 export type AffordabilityScale = 1 | 2 | 3;
@@ -33,6 +45,11 @@ export interface PriceShape {
 export interface AffordabilityResult {
   scale: AffordabilityScale;
   overBudget: boolean;
+  /** True when the price's currency doesn't match the range's
+   *  currency. Bucketed without conversion so the indicator still
+   *  renders; consumers can choose a softer visual treatment when
+   *  this is set. */
+  currencyMismatch: boolean;
 }
 
 export function computeAffordability(
@@ -43,24 +60,25 @@ export function computeAffordability(
   if (range.min === null || range.max === null) return null;
   if (!price) return null;
   if (typeof price.amount !== 'number' || !Number.isFinite(price.amount)) return null;
-  if (price.currency !== range.currency) return null;
+
+  const currencyMismatch = price.currency !== range.currency;
 
   const { min, max } = range;
   const amount = price.amount;
 
   // Above-budget: clamp to 3, flag.
   if (amount > max) {
-    return { scale: 3, overBudget: true };
+    return { scale: 3, overBudget: true, currencyMismatch };
   }
 
   // Below-min: clamp to 1, do NOT flag overBudget.
   if (amount < min) {
-    return { scale: 1, overBudget: false };
+    return { scale: 1, overBudget: false, currencyMismatch };
   }
 
   // Zero-width range — pin to middle for any price exactly at min===max.
   if (min === max) {
-    return { scale: 2, overBudget: false };
+    return { scale: 2, overBudget: false, currencyMismatch };
   }
 
   const span = max - min;
@@ -72,5 +90,5 @@ export function computeAffordability(
   if (amount < lowerCut) scale = 1;
   else if (amount >= upperCut) scale = 3;
 
-  return { scale, overBudget: false };
+  return { scale, overBudget: false, currencyMismatch };
 }

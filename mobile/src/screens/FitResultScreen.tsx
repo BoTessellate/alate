@@ -94,11 +94,11 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
 // to keep the verdict + stats row + material + availability readable
-// without scrolling. Iterative bumps: 200 → 204 → 210 → 213 → 215
-// (May 4 2026 PM, per "increase the height of the docked overlay by
-// 2 more pixels"). The +2 px gives the docked "Fit concerns" meta
-// row a hair more breathing room above the stats chips.
-const COLLAPSED_H = 215;
+// without scrolling. Iterative bumps: 200 → 204 → 210 → 213 → 215 →
+// 213 (May 4 2026 late-PM revert per user "actually, it's the docked
+// overlay that's become taller" — the 213 → 215 bump pushed the
+// dock high enough that the hero customFitBadge tucked under it).
+const COLLAPSED_H = 213;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -1786,14 +1786,14 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     alignItems: 'center',
   },
-  // Pill wrapping brand OR name. Subtle white-translucent fill —
-  // no BlurView, no tint layer, no border. See heroChipStyle JSDoc
-  // for the iteration history. Padding interpolates with
-  // collapseProgress; `backgroundColor` is static.
+  // Pill wrapping brand OR name. Backdrop retired May 4 2026 late-PM
+  // ("remove the background treatment you have for heading and
+  // subheading of the product fit page") — text now floats on the
+  // product image with text shadows alone. Kept as a styled wrapper
+  // to preserve the marginBottom between brand + name chips and
+  // the heroChipStyle padding animation.
   heroChip: {
     alignItems: 'center',
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   // Brand chip — sits ABOVE the name chip with a small gap so the
   // two pills read as separate beats when collapsed.

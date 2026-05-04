@@ -12,11 +12,17 @@ describe('AffordabilityIcon', () => {
     expect(toJSON()).toBeNull();
   });
 
-  it('renders nothing when price has different currency', () => {
-    const { toJSON } = render(
+  it('still renders when price currency differs from range (currencyMismatch)', () => {
+    // May 4 2026 late-PM: relaxed the currency-strict check in
+    // computeAffordability — surprised users when their indicator
+    // vanished after switching range currency. Component now
+    // renders a chip on mismatch (using the user's range currency
+    // symbol), buckets the raw amount with `currencyMismatch: true`.
+    const { getByText } = render(
       <AffordabilityIcon price={{ amount: 50, currency: 'USD' }} range={range} />
     );
-    expect(toJSON()).toBeNull();
+    // Range is GBP → symbol £, scale 2 (50 in [20,100] middle third).
+    expect(getByText('££')).toBeTruthy();
   });
 
   // The chip uses the user's price-range currency symbol (GBP → £)

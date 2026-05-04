@@ -591,7 +591,13 @@ const styles = StyleSheet.create({
   //   bottomFooter — pill + Clear-history at the bottom
   headerTop: {
     alignItems: 'center',
-    paddingTop: spacing.sm,
+    // Bumped sm (8) → xxl (48) on May 4 2026 late-PM per user
+    // direction "the history page placement is still off: bring the
+    // cards and top stats lower". The whole stack [meta, deck,
+    // pill, Clear-history] shifts down ~40 px so the meta line sits
+    // below the status bar with breathing room and the centred deck
+    // lands closer to the screen midline.
+    paddingTop: spacing.xxl,
     paddingBottom: spacing.xs,
   },
   bottomFooter: {
