@@ -1815,9 +1815,13 @@ const styles = StyleSheet.create({
   },
   heroName: {
     ...typography.headingXL,
-    // Was Viaoda Libre. Migrated to Jost-Regular May 4 2026 late-PM
-    // (user dropped VL from the trial entirely — keeping only Jost +
-    // TAN Nightingale).
+    // Size reduced May 4 2026 late-PM ("reduce the size of product
+    // name on the product fit screen"). headingXL is 28 px; dialed
+    // down to 22 px so the name reads as a sub-line on the hero
+    // rather than competing with the verdict heading inside the
+    // dock. Line-height shrinks proportionally.
+    fontSize: 22,
+    lineHeight: 28,
     fontFamily: 'Marcellus-Regular',
     color: '#fff',
     textAlign: 'center',
