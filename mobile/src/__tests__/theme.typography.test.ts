@@ -1,25 +1,24 @@
 /**
  * Theme typography tests.
  *
- * May 3 2026 PM (partial revert of the May-3 single-typeface trial):
- *   - Page headings (display* + headingXL/L/M) move BACK to Viaoda
- *     Libre per user direction. The display tier carries the brand
- *     voice on the hero verses ("paste anything"), page titles
- *     ("body profile", "profile"), and section titles.
- *   - Body / labels / caption / overline / headingS stay on Marcellus
- *     so the body voice the user has been A/B-ing isn't disturbed.
+ * May 4 2026 late-PM: Viaoda Libre retired entirely ("replace all VL
+ * font with jost please. I'm keeping only jost and tan nightingale").
+ *   - Display tier (display* + headingXL/L/M) renders in Jost-Regular.
+ *     Page-title chrome uses TAN Nightingale via the HeadingImage SVG
+ *     paths; Jost is the styled-text fallback when no SVG slot is
+ *     registered.
+ *   - Body / labels / caption / overline / headingS stay on Marcellus.
  *
- * Same single-weight constraint applies to Viaoda Libre — every
- * heading token MUST stay at fontWeight: '400'. See anti-pattern #13
- * for why bumping to 700 silently falls back to Noto Serif Bold on
- * Android. The non-heading tokens render in `Marcellus-Regular`,
- * which is also single-weight; the same constraint applies there too.
+ * Both Jost-Regular and Marcellus-Regular ship as single-weight files.
+ * Heading tokens stay at fontWeight: '400' so Android's typeface
+ * resolver doesn't try to synthesise a bold variant that doesn't
+ * exist (anti-pattern #13).
  */
 
 import { typography, fontFamily } from '../constants/theme';
 
 const MARCELLUS = 'Marcellus-Regular';
-const VIAODA = 'ViaodaLibre-Regular';
+const JOST = 'Jost-Regular';
 
 describe('theme — heading typography', () => {
   it('exposes the right family on every fontFamily token', () => {
@@ -27,8 +26,8 @@ describe('theme — heading typography', () => {
     expect(fontFamily.primaryMedium).toBe(MARCELLUS);
     expect(fontFamily.primarySemiBold).toBe(MARCELLUS);
     expect(fontFamily.primaryBold).toBe(MARCELLUS);
-    // Display tier flipped back to Viaoda Libre — see file header.
-    expect(fontFamily.display).toBe(VIAODA);
+    // Display tier — Jost-Regular as of May 4 2026 late-PM.
+    expect(fontFamily.display).toBe(JOST);
   });
 
   it('the fontFamily registry keeps the 5-key shape (no extra aliases)', () => {
@@ -44,7 +43,7 @@ describe('theme — heading typography', () => {
   });
 
   // Heading tokens that mix in `headingSerif` and therefore inherit
-  // `fontFamily.display` (Viaoda Libre).
+  // `fontFamily.display` (Jost-Regular).
   const headingKeys = [
     'displayLarge',
     'displayMedium',
@@ -54,15 +53,15 @@ describe('theme — heading typography', () => {
   ] as const;
 
   headingKeys.forEach((key) => {
-    it(`${key} uses Viaoda Libre (display tier)`, () => {
-      expect((typography as any)[key].fontFamily).toBe(VIAODA);
+    it(`${key} uses Jost (display tier)`, () => {
+      expect((typography as any)[key].fontFamily).toBe(JOST);
     });
 
     it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
 
-    it(`${key} stays at fontWeight: '400' (Viaoda Libre is single-weight; see anti-pattern #13)`, () => {
+    it(`${key} stays at fontWeight: '400' (single-weight font; see anti-pattern #13)`, () => {
       expect((typography as any)[key].fontWeight).toBe('400');
     });
   });

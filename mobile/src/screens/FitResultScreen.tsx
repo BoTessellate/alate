@@ -295,8 +295,10 @@ export default function FitResultScreen() {
   //   collapsed pulls a further ~20% (0.34) so the dock-strip mode
   //   reads as image-first; BlurView keeps legibility for verdict +
   //   stats at that lower alpha.
+  //   May 4 2026 late-PM: -2% across the board ("increase translucency
+  //   of overlay card by 2%"). Now 0.32 collapsed / 0.52 expanded.
   const cardTintStyle = useAnimatedStyle(() => {
-    const alpha = interpolate(collapseProgress.value, [0, 1], [0.34, 0.54]);
+    const alpha = interpolate(collapseProgress.value, [0, 1], [0.32, 0.52]);
     return {
       backgroundColor: `rgba(255, 255, 255, ${alpha})`,
     };
@@ -355,29 +357,14 @@ export default function FitResultScreen() {
   const heroBrightness = useImageBrightness(heroImageUri);
 
   // Frosted backdrop chip behind the brand+name. Renders in BOTH
-  // expanded and collapsed states (May 4 2026 PM user direction:
-  // "extend the opaque background treatment to the expanded state of
-  // the product fit screen too") — was previously transparent at
-  // expand. The expanded state uses a slightly looser padding so the
-  // chip reads as a deliberate label tag, not a tight pill.
-  // Brightness-driven hue: dark frosted pill on dark images, light
-  // frosted pill on light images, opposite of the text colour
-  // (heroBrand / heroName on-light overrides).
-  //
-  // The brightness branch is computed in JS (closure capture) so the
-  // worklet only animates numeric padding — keeps the worklet simple
-  // and avoids reading shared-value strings on the UI thread, which
-  // May 4 2026 PM live testing tied to a white-screen hang on dock
-  // collapse/expand. When `heroBrightness` later resolves, the
-  // component re-renders and useAnimatedStyle is recreated with the
-  // new closure value (no shared-value mirroring needed).
-  const heroChipR = heroBrightness === 'light' ? 255 : 20;
-  const heroChipG = heroBrightness === 'light' ? 255 : 14;
-  const heroChipB = heroBrightness === 'light' ? 255 : 28;
+  // expanded and collapsed states (alpha runs 0.50 → 0.30 with
+  // collapseProgress). Always a deep purple-black tint — the
+  // brightness-driven light-on-light variant was reverted May 4 2026
+  // late-PM ("keep product fit screen heading and subheading in
+  // white not this dark colour"); since text now stays white in both
+  // modes, the backdrop must stay dark to keep text legible on light
+  // photos.
   const heroChipStyle = useAnimatedStyle(() => {
-    // Alpha runs 0.30 (expanded) → 0.50 (collapsed) — both values
-    // non-zero so the backdrop is always present, just slightly
-    // firmer in the docked "now playing" treatment.
     const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.50, 0.30]);
     // Padding runs 12 (expanded) → 14 (collapsed) horizontally,
     // 6 → 8 vertically. Always non-zero so the chip never collapses
@@ -385,11 +372,11 @@ export default function FitResultScreen() {
     const padH = interpolate(collapseProgress.value, [0, 1], [14, 12]);
     const padV = interpolate(collapseProgress.value, [0, 1], [8, 6]);
     return {
-      backgroundColor: `rgba(${heroChipR}, ${heroChipG}, ${heroChipB}, ${bgAlpha})`,
+      backgroundColor: `rgba(20, 14, 28, ${bgAlpha})`,
       paddingHorizontal: padH,
       paddingVertical: padV,
     };
-  }, [heroChipR, heroChipG, heroChipB]);
+  });
 
   // Factory: every drag-target on the overlay (top header, tags region)
   // gets its own Pan instance built from the same recipe so they all
@@ -1132,25 +1119,16 @@ export default function FitResultScreen() {
             <BrandHeading
               brand={safeBrand}
               height={20}
-              color={heroBrightness === 'light' ? colors.text : 'rgba(255,255,255,0.95)'}
+              color="rgba(255,255,255,0.95)"
               uppercase
               style={{ alignSelf: 'center' }}
-              textStyle={[
-                styles.heroBrand,
-                heroBrightness === 'light' && styles.heroBrandOnLight,
-              ]}
+              textStyle={styles.heroBrand}
               testID="hero-brand"
             />
           </Animated.View>
         ) : null}
         <Animated.View style={[styles.heroChip, heroChipStyle]}>
-          <Text
-            style={[
-              styles.heroName,
-              heroBrightness === 'light' && styles.heroNameOnLight,
-            ]}
-            numberOfLines={2}
-          >
+          <Text style={styles.heroName} numberOfLines={2}>
             {safeName || 'Product'}
           </Text>
         </Animated.View>
@@ -1767,10 +1745,10 @@ const styles = StyleSheet.create({
   },
   heroName: {
     ...typography.headingXL,
-    // Viaoda Libre override per May 3 2026 trial — product name on
-    // the FitResult hero specifically rendered in the italic display
-    // serif. Inline override; global typography stays on Marcellus.
-    fontFamily: 'ViaodaLibre-Regular',
+    // Was Viaoda Libre. Migrated to Jost-Regular May 4 2026 late-PM
+    // (user dropped VL from the trial entirely — keeping only Jost +
+    // TAN Nightingale).
+    fontFamily: 'Jost-Regular',
     color: '#fff',
     textAlign: 'center',
     // Heavier shadow to clear hard-to-read product backgrounds (May 4
@@ -1783,21 +1761,11 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 12,
   },
-  // Override applied when the underlying product image is detected as
-  // "light" (see useImageBrightness). Dark text + white halo so the
-  // brand wordmark + product name read on white-on-white photos.
-  heroBrandOnLight: {
-    color: colors.text,
-    textShadowColor: 'rgba(255,255,255,0.85)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
-  },
-  heroNameOnLight: {
-    color: colors.text,
-    textShadowColor: 'rgba(255,255,255,0.85)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
-  },
+  // (heroBrandOnLight + heroNameOnLight overrides retired May 4 2026
+  // late-PM. The brightness-driven dark-text-on-light-image flip
+  // tested poorly on device — the user wanted white text everywhere.
+  // Legibility on light product photos is now carried by the
+  // permanent dark heroChip backdrop + text shadows.)
 
   // --- Custom-fit brand spotlight badge ---
   // Lavender-tinted pill in italic display serif. Sits below the

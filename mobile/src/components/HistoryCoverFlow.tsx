@@ -596,11 +596,9 @@ const styles = StyleSheet.create({
   // visual treatment (size, colour, shadow) here and let BrandHeading
   // own the typeface.
   folioBrand: {
-    // Viaoda Libre override (May 3 2026 trial) — brand name on
-    // history cards specifically renders in the italic display
-    // serif. textStyle overrides BrandHeading's internal
-    // fontFamily.display (Marcellus).
-    fontFamily: 'ViaodaLibre-Regular',
+    // Was Viaoda Libre (May 3 2026 trial). Migrated to Jost-Regular
+    // May 4 2026 late-PM ("keeping only jost and tan nightingale").
+    fontFamily: 'Jost-Regular',
     fontSize: 22,
     color: '#fff',
     letterSpacing: -0.5,
