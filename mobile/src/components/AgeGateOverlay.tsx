@@ -46,8 +46,8 @@ export default function AgeGateOverlay() {
         <LinearGradient
           colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
           locations={[0, 0.3, 0.6, 0.9]}
-          start={{ x: 0.15, y: 0.1 }}
-          end={{ x: 0.85, y: 1 }}
+          start={{ x: 1, y: 0.05 }}
+          end={{ x: 0.1, y: 0.95 }}
           style={StyleSheet.absoluteFill}
         />
         <View style={styles.content}>
@@ -78,9 +78,9 @@ export default function AgeGateOverlay() {
       <View style={styles.content}>
         <GlassCard style={styles.card}>
           <HeadingImage
-            slot="home-verse"
+            slot="before-we-begin"
             fallback="Before we begin"
-            height={72}
+            height={56}
             color={colors.text}
             textStyle={styles.title}
           />

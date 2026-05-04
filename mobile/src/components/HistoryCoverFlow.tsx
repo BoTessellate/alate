@@ -29,6 +29,8 @@ import Animated, {
   Extrapolation,
   SharedValue,
   runOnJS,
+  useReducedMotion,
+  withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -115,7 +117,13 @@ function CardFace({ entry }: { entry: FitHistoryEntry }) {
       <Feather
         name="shopping-bag"
         size={56}
-        color={whiteAlpha.iconLow}
+        // Was iconLow (0.20). On the placeholder card's primaryDark
+        // (#4c4356) background that gave a non-text-UI contrast of
+        // ~1.7:1 — fails WCAG 1.4.11 (3:1). Bumped to textSecondary
+        // (0.70 white) which clears 5:1+ on the same dark backdrop
+        // while keeping the icon's "this is a placeholder, not the
+        // hero" tone. May 3 2026 PM contrast pass.
+        color={whiteAlpha.textSecondary}
         style={styles.placeholderIcon}
       />
       {inner}
@@ -144,6 +152,7 @@ function CoverFlowCard({
   index,
   totalCount,
   scrollX,
+  endBounce,
   onTap,
   onDelete,
 }: {
@@ -154,9 +163,20 @@ function CoverFlowCard({
    *  the end" bounce. */
   totalCount: number;
   scrollX: SharedValue<number>;
+  /** End-of-deck rubber-band shared value, driven by the parent's
+   *  withSpring recoil. Only the last card animates off it. */
+  endBounce: SharedValue<number>;
   onTap: () => void;
   onDelete?: () => void;
 }) {
+  // Respect the OS-level "reduce motion" preference. When on, the
+  // end-of-deck rubber-band stretch is suppressed (the snap is still
+  // there — drag past the last card and it won't move; without the
+  // bounce the user just feels resistance). Vestibular-disorder users
+  // are particularly sensitive to spring-back overshoots, so this is
+  // worth the few extra branches. See accessibility-review #8 (May 3
+  // 2026 PM).
+  const reducedMotion = useReducedMotion();
   const animatedStyle = useAnimatedStyle(() => {
     // Distance from this card's snap point to the current scroll offset,
     // expressed in units of ITEM_GAP.
@@ -213,15 +233,23 @@ function CoverFlowCard({
     // ScrollView snaps back to the resting position.
     let endBounceTx = 0;
     let endBounceTilt = 0;
-    if (index === totalCount - 1) {
+    if (index === totalCount - 1 && !reducedMotion) {
+      // Two parallel sources for the rubber-band:
+      //   1. Native overscroll (iOS bounces / Android with overScrollMode=
+      //      always — when the OS allows scrollX past maxOffset).
+      //   2. JS-driven `endBounce` recoil (parent triggers withSpring on
+      //      onScrollEndDrag at last card with forward velocity, for
+      //      cases where the OS clamps scrollX). Magnitude ≈ 22 px
+      //      stretch + 8° tilt at peak — felt without going off-screen.
       const maxOffset = (totalCount - 1) * ITEM_GAP;
       const overshoot = scrollX.value - maxOffset;
       if (overshoot > 0) {
-        // Cap the visible bounce — otherwise dragging far would tilt
-        // the card off-screen. ~24px of stretch is plenty to feel.
         const capped = Math.min(overshoot, 60);
         endBounceTx = -capped * 0.4;
         endBounceTilt = -capped * 0.15;
+      } else if (endBounce.value > 0) {
+        endBounceTx = -endBounce.value * 22;
+        endBounceTilt = -endBounce.value * 8;
       }
     }
     return {
@@ -271,7 +299,13 @@ function CoverFlowCard({
     <Animated.View style={[styles.cardSlot, slotStyle]}>
       <View style={styles.cardPerspective}>
         <Animated.View style={[styles.cardAnim, animatedStyle]}>
-          <TouchableOpacity activeOpacity={0.9} onPress={onTap} style={styles.cardTouch}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={onTap}
+            style={styles.cardTouch}
+            accessibilityRole="button"
+            accessibilityLabel={`Open fit details for ${sanitize(entry.brand) || 'this product'}, ${sanitize(entry.productName) || 'product'}`}
+          >
             <CardFace entry={entry} />
           </TouchableOpacity>
           {onDelete && (
@@ -281,6 +315,8 @@ function CoverFlowCard({
               style={styles.deleteBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID={`history-card-delete-${entry.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${sanitize(entry.productName) || 'product'} from history`}
             >
               <Feather name="trash-2" size={14} color="#fff" />
             </TouchableOpacity>
@@ -369,6 +405,30 @@ export default function HistoryCoverFlow({
     }
   }, [entries.length, scrollX]);
 
+  // End-of-deck rubber-band, take 2 (May 4 2026 PM). The original
+  // approach in `CoverFlowCard.animatedStyle` reads `scrollX.value -
+  // maxOffset` and applies a stretch when positive. On Android the
+  // ScrollView with `snapToOffsets` clamps the contentOffset to the
+  // last snap, so `scrollX` never exceeds `maxOffset` and the bounce
+  // never fired (multiple builds with the user reporting it as
+  // missing). Fix: detect the "tried to scroll past" attempt with an
+  // onScrollEndDrag handler — when the user lifts the finger at the
+  // last index AND the drag was in the forward direction (positive
+  // scrollX velocity), trigger a separate `endBounce` shared value
+  // with a withSpring(0) recoil. CoverFlowCard reads `endBounce` and
+  // applies the stretch.
+  const endBounce = useSharedValue(0);
+  const lastBounceMs = useRef(0);
+  const triggerBounce = () => {
+    // De-dupe: don't replay if we just fired (multiple events can
+    // fire on a single fling — onEndDrag + onMomentumEnd).
+    const now = Date.now();
+    if (now - lastBounceMs.current < 400) return;
+    lastBounceMs.current = now;
+    endBounce.value = 1;
+    endBounce.value = withSpring(0, { damping: 9, stiffness: 130, mass: 0.6 });
+  };
+
   return (
     <View style={styles.root} testID="history-coverflow">
       <Animated.ScrollView
@@ -384,6 +444,25 @@ export default function HistoryCoverFlow({
         // so rapid scrolls don't trigger 15-card re-renders per snap
         // crossing during the glide.
         decelerationRate="fast"
+        // Allow overscroll past the last snap on both platforms — pairs
+        // with the JS-driven endBounce fallback for cases where the
+        // OS still clamps.
+        bounces
+        alwaysBounceHorizontal
+        overScrollMode="always"
+        // When the user lifts at the last card with forward velocity
+        // (or no velocity, having dragged into the gap), fire the
+        // rubber-band recoil. `vx` is in pixels/ms; positive = right.
+        onScrollEndDrag={(e) => {
+          const x = e.nativeEvent.contentOffset.x;
+          const vx = e.nativeEvent.velocity?.x ?? 0;
+          const maxOffset = (entries.length - 1) * ITEM_GAP;
+          // Already at or past the last snap, AND user was still
+          // dragging forward → trigger.
+          if (entries.length > 0 && x >= maxOffset - 4 && vx >= 0) {
+            triggerBounce();
+          }
+        }}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingLeft: SIDE_PAD, paddingRight: SIDE_PAD },
@@ -396,6 +475,7 @@ export default function HistoryCoverFlow({
             index={i}
             totalCount={entries.length}
             scrollX={scrollX}
+            endBounce={endBounce}
             onTap={() => onCardTap(entry)}
             onDelete={onCardDelete ? () => onCardDelete(entry) : undefined}
           />
@@ -408,6 +488,13 @@ export default function HistoryCoverFlow({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    // Centre the deck vertically in whatever space remains above the
+    // groupedFooter on HistoryScreen (May 4 2026 PM). Was flex-end
+    // with paddingBottom while the pill was absolute-positioned —
+    // now the pill is inline below this view in the parent's column,
+    // so the cards just need to centre in their own flex:1 region.
+    // No paddingBottom needed; the parent column handles all spacing
+    // explicitly via the groupedFooter style.
     justifyContent: 'center',
   },
   scrollContent: {

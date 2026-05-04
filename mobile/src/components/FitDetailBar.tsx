@@ -15,15 +15,22 @@ import { computeEffectiveFitScore, EffectiveFitScore } from '../utils/effectiveF
 import AffordabilityIcon from './AffordabilityIcon';
 import { usePriceRange } from '../store/priceRangeStore';
 
-const scoreMeta = (score: EffectiveFitScore) => {
+const scoreMeta = (score: EffectiveFitScore, noteCount: number) => {
   switch (score) {
     case 'great':
       return { dot: '#7de0a0', label: 'GREAT FIT' };
     case 'minor':
       // Same green dot as 'great' — the warning is informational, not
-      // a fit concern. The "with a note" suffix tells the user there's
-      // something to read on the full FitResult screen.
-      return { dot: '#7de0a0', label: 'GREAT FIT, WITH A NOTE' };
+      // a fit concern. The "with a note" / "with notes" suffix tells
+      // the user there's something to read on the full FitResult
+      // screen. Pluralises off the warnings count so the label agrees
+      // with the FitResult verdictSub line and the user doesn't see
+      // "WITH A NOTE" alongside "2 notes" elsewhere (May 3 2026 PM
+      // user feedback — see FitResultScreen.getScoreConfig).
+      return {
+        dot: '#7de0a0',
+        label: noteCount === 1 ? 'GREAT FIT, WITH A NOTE' : 'GREAT FIT, WITH NOTES',
+      };
     case 'moderate':
       return { dot: '#ffc97a', label: 'CONCERNS' };
     case 'poor':
@@ -39,7 +46,10 @@ export default function FitDetailBar({ entry }: Props) {
   const range = usePriceRange();
   if (!entry) return null;
 
-  const meta = scoreMeta(computeEffectiveFitScore(entry.warnings, entry.fitScore));
+  const meta = scoreMeta(
+    computeEffectiveFitScore(entry.warnings, entry.fitScore),
+    entry.warnings?.length ?? 0,
+  );
   const name = sanitize(entry.productName) || 'Unknown product';
   const size = entry.sizeRecommendation?.size;
 
@@ -57,12 +67,13 @@ export default function FitDetailBar({ entry }: Props) {
         {name}
       </Text>
 
-      {size && (
-        <View style={styles.sizeChip}>
-          <Text style={styles.sizeLabel}>SIZE {size}</Text>
-        </View>
-      )}
-
+      {/* Affordability chip moved BEFORE the size pill (May 4 2026)
+          per user direction: "on the history page… in that pill
+          design, currency should show up in between, not end". The
+          chip now sits between the product name and the size pill,
+          and renders in the user's actual currency symbol (£/₹/€/$)
+          rather than a hardcoded dollar — the symbol is resolved
+          inside AffordabilityIcon from the price-range's currency. */}
       <AffordabilityIcon
         price={entry.price}
         range={range}
@@ -71,6 +82,12 @@ export default function FitDetailBar({ entry }: Props) {
         warningColor="#ffc97a"
         style={styles.affordChip}
       />
+
+      {size && (
+        <View style={styles.sizeChip}>
+          <Text style={styles.sizeLabel}>SIZE {size}</Text>
+        </View>
+      )}
     </View>
   );
 }

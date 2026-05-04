@@ -119,12 +119,19 @@ const TAB_ICONS: Record<string, FeatherIconName> = {
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const iconName = TAB_ICONS[name] || 'circle';
+  // Inactive icon opacity bumped 0.45 → 0.7 (May 3 2026 PM contrast
+  // pass). At 0.45 the dark `colors.text` glyph blended with the
+  // light frosted tab-bar background to a mid-grey-on-mid-grey pair
+  // measuring ~2.5:1 — fails WCAG 1.4.11 (3:1 for non-text UI). At
+  // 0.7 the same icon clears 4:1 while still reading visibly less
+  // active than the focused tab (which sits at opacity 1 + the
+  // primary brand colour). Hierarchy preserved, contrast restored.
   return (
     <Feather
       name={iconName}
       size={22}
       color={focused ? colors.primary : colors.text}
-      style={{ opacity: focused ? 1 : 0.45 }}
+      style={{ opacity: focused ? 1 : 0.7 }}
     />
   );
 }
@@ -211,6 +218,10 @@ function MainTabs() {
           tabBarLabel: 'Check',
           tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
           tabBarButtonTestID: 'tab-home',
+          // Spell out the role for TalkBack — the visible "Check"
+          // label is just two syllables; the SR announcement should
+          // explain what tapping it does.
+          tabBarAccessibilityLabel: 'Check, paste a product link to check fit',
         }}
       />
       <Tab.Screen
@@ -220,6 +231,7 @@ function MainTabs() {
           tabBarLabel: 'History',
           tabBarIcon: ({ focused }) => <TabIcon name="History" focused={focused} />,
           tabBarButtonTestID: 'tab-history',
+          tabBarAccessibilityLabel: 'History, your saved fit checks',
         }}
       />
       <Tab.Screen
@@ -229,6 +241,7 @@ function MainTabs() {
           tabBarLabel: 'Profile',
           tabBarIcon: ({ focused }) => <TabIcon name="Account" focused={focused} />,
           tabBarButtonTestID: 'tab-account',
+          tabBarAccessibilityLabel: 'Profile, account and body measurements',
         }}
       />
     </Tab.Navigator>
@@ -408,10 +421,13 @@ export default function AppNavigator() {
           name="BrandIntegration"
           component={SafeBrandIntegration}
           options={{
-            title: 'For Brands',
-            // Native header gives users a back button + title without
-            // the screen needing to paint its own.
-            headerShown: true,
+            // Native header retired May 3 2026 PM per user feedback:
+            // (a) the title "For Brands" duplicated the in-screen
+            // wordmark in the top header AND made content scroll
+            // under the bar; (b) the screen now paints its own
+            // back chevron in the brand purple. Same pattern as
+            // FitResult / AvatarSetup.
+            headerShown: false,
             presentation: 'modal',
           }}
         />

@@ -183,6 +183,28 @@ jest.mock('@react-native-firebase/app', () => ({
   },
 }), { virtual: true });
 
+// react-native-image-colors hits native pickers (UIImage on iOS,
+// Palette on Android) — neither is available under jest. Stub to a
+// resolved promise so `useImageBrightness` paths through cleanly in
+// component tests. Mid-grey colour resolves to "dark" via the
+// luminance threshold, exercising the default-text-stays-white path.
+jest.mock('react-native-image-colors', () => ({
+  __esModule: true,
+  getColors: jest.fn(() =>
+    Promise.resolve({
+      platform: 'android',
+      dominant: '#444444',
+      average: '#444444',
+      vibrant: '#444444',
+      darkVibrant: '#222222',
+      lightVibrant: '#666666',
+      darkMuted: '#333333',
+      lightMuted: '#555555',
+      muted: '#444444',
+    })
+  ),
+}), { virtual: true });
+
 // Silence console warnings during tests
 global.console = {
   ...console,

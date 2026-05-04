@@ -182,14 +182,22 @@ export default function HomeScreen() {
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      {/* Full-bleed gradient backdrop — same visual as fit-analysis hero
-          screens per user direction. Radial-style angle from the top-left
-          light edge through brand purple to the deep purple base. */}
+      {/* Full-bleed gradient backdrop — diagonal from the top-RIGHT light
+          edge to the bottom-LEFT deep base. Per user direction (May 3
+          2026): "tilt the gradient such that there's a darker colour on
+          the top left corner and lighter on the top right corner". The
+          previous diagonal (top-left light → bottom-right deep) was
+          failing white-text contrast at the upper edge of every screen
+          — see accessibility-review #1, #3 in `MEMORY.md`. Anchoring the
+          lightest stop at the top-RIGHT pulls the deeper #8a7e94 /
+          #6a5f75 stops up into the top-LEFT corner, which lifts contrast
+          for white headings (HistoryScreen `headerMeta`, HomeScreen
+          eyebrow + verse) without losing the brand's atmospheric ombre. */}
       <LinearGradient
         colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
         locations={[0, 0.3, 0.6, 0.9]}
-        start={{ x: 0.15, y: 0.1 }}
-        end={{ x: 0.85, y: 1 }}
+        start={{ x: 1, y: 0.05 }}
+        end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
       <KeyboardAvoidingView
@@ -223,7 +231,8 @@ export default function HomeScreen() {
               textStyle={styles.heroVerse}
             />
             <Text style={styles.heroTagline}>
-              From any store.{'\n'}Dresses, denim, knitwear — we read the brand's size chart against your body.
+              From any store.{'\n'}We read the size chart against{'\n'}
+              <Text style={styles.heroTaglineEmphasis}>your body</Text>.
             </Text>
           </View>
 
@@ -323,7 +332,9 @@ export default function HomeScreen() {
                     testID="recent-see-all"
                     onPress={() => navigation.navigate('History')}
                     activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="See all fit checks in history"
                   >
                     <Text style={styles.recentSeeAll}>See all</Text>
                   </TouchableOpacity>
@@ -414,8 +425,18 @@ function RecentCard({ entry, onPress }: { entry: FitHistoryEntry; onPress: () =>
       ? { bg: statusAlpha.warningMed, fg: colors.warningDeep, label: 'Check' }
       : { bg: statusAlpha.errorMed, fg: colors.errorDeep, label: 'Concerns' };
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <GlassCard style={styles.recentCard}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`Re-open fit check for ${entry.brand || 'product'}, ${entry.productName || 'product'}, ${label}`}
+    >
+      {/* `noBorder` suppresses GlassCard's internal hairline so the
+          caller's own border (much fainter on the dark gradient — see
+          recentCard.borderColor) is the only edge. Without this the
+          two borders stacked into a doubled white ring that the user
+          flagged as too loud (May 3 2026 PM). */}
+      <GlassCard style={styles.recentCard} noBorder>
         {entry.productImage ? (
           <Image source={{ uri: entry.productImage }} style={styles.recentThumb} />
         ) : (
@@ -467,13 +488,17 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: spacing.lg,
     paddingTop: spacing.xl,
-    // Trimmed from 280 → 140 (May 3 2026): the prior 280 reserved
-    // empty space below the RECENT list so it could fade into the
-    // dark zone before reaching the floating pill, but on devices
-    // with a small history this read as a big empty void below the
-    // last card. 140 still clears the nav pill (~96px + breathing
-    // room) and lets the fade gradient kick in just above it.
-    paddingBottom: 140,
+    // Bumped 140 → 220 (May 3 2026 PM): the floating bottom-fade
+    // (see `bottomFade` below) is 220px tall and ramps to ~70%
+    // opacity at the 22% mark, which was darkening the bottom of
+    // the third Recent card. Pushing the scroll content up so the
+    // last card finishes ABOVE the dark portion of the fade — user
+    // feedback: "There needs to be a bit more gap here so the
+    // overlay does not shadow recent cards". Fade height also
+    // reduced (was 320 → 220) so the dark zone is contained to the
+    // strip directly behind the floating tab pill, not climbing
+    // up into the card area.
+    paddingBottom: 220,
   },
   // Empty-history variant — only enough bottom padding to clear the
   // floating tab pill (~96px). The big 280px reservation in `content`
@@ -526,10 +551,24 @@ const styles = StyleSheet.create({
     // hero verse above it.
     fontFamily: 'Jost-Regular',
     fontSize: 16,
-    color: whiteAlpha.textHigh,
+    // Was textHigh (0.85) — 16px = 12pt is "normal text" per WCAG, so
+    // it needs 4.5:1. Sitting in the mid-zone of the gradient against
+    // ~#717085 only got it to 3.55:1. Bumped to textOpaque (0.92)
+    // which clears 4.5:1 across the whole gradient. May 3 2026 PM.
+    color: whiteAlpha.textOpaque,
     marginTop: 14,
     maxWidth: 300,
     lineHeight: 21,
+  },
+  // "your body" — typographically pulled out of the tagline onto its
+  // own line. Stays in Jost-Regular per user direction May 4 2026
+  // PM ("remove VL font on 'your body', keep it as jost"). The line
+  // break is the only emphasis; matches the rest of the tagline.
+  heroTaglineEmphasis: {
+    fontFamily: 'Jost-Regular',
+    fontSize: 16,
+    lineHeight: 21,
+    color: whiteAlpha.textOpaque,
   },
 
   // --- Input section — glass pill + CTA + share hint ---
@@ -694,11 +733,20 @@ const styles = StyleSheet.create({
     // Lightened from surfaceCard (0.78) → surfaceCardGlass (0.32)
     // per user feedback May 3 2026: the cards read too opaque and
     // sat as flat panels rather than glass. Lower alpha lets the
-    // gradient bleed through. Border alpha dropped in step so the
-    // edge doesn't look harsh against the softer fill.
+    // gradient bleed through.
     backgroundColor: whiteAlpha.surfaceCardGlass,
+    // Border alphas walked down twice over May 3 2026:
+    //   AM: surfaceCard (0.78) → surfaceCardGlass (0.32)
+    //   PM: borderSoft (0.50) + GlassCard hairline (borderMid 0.60)
+    //   stacked into a doubled outline that read as a hard white
+    //   ring on the dark gradient (user feedback: "I see a white
+    //   border on the recent cards — it's too noticable, fix it").
+    //   GlassCard's inner hairline is now suppressed via the
+    //   `noBorder` prop on the caller; this single outer border
+    //   uses borderFaint (0.30) so the edge is just present
+    //   enough to define the card without being loud.
     borderWidth: 1,
-    borderColor: whiteAlpha.borderSoft,
+    borderColor: whiteAlpha.borderFaint,
   },
   recentThumb: {
     width: 44,
@@ -726,7 +774,13 @@ const styles = StyleSheet.create({
     // Dark text on the frosted card — WCAG AA passes on the 0.78
     // white-tint bg. Light text was failing contrast on the mid-
     // tone cards.
-    color: colors.textMuted,
+    //
+    // Was textMuted (#8a7e94, mid-grey-purple). Bumped to
+    // textSecondary (#4c4356, dark grey-purple) per May 4 2026 user
+    // direction: "change font colour to a slightly darker shade on
+    // brand name inside recent cards on the home screen". Now reads
+    // as a deliberate eyebrow rather than ambient muted text.
+    color: colors.textSecondary,
   },
   recentName: {
     fontFamily: 'Jost-Regular',
@@ -766,15 +820,18 @@ const styles = StyleSheet.create({
   },
 
   // Bottom-edge fade — sits over the ScrollView, under the floating
-  // tab bar. Bumped to 320px so the dark zone reaches further up the
-  // viewport and Recent cards wash into the darkness well before they
-  // get anywhere near the floating nav pill.
+  // tab bar. Trimmed 320 → 220 (May 3 2026 PM) per user feedback:
+  // "the overlay does not shadow recent cards". The fade now only
+  // covers the strip behind the floating tab pill (insets.bottom +
+  // ~10 + 64 + breathing room) instead of climbing up into the
+  // Recent-card area. Paired with the +80 paddingBottom bump on
+  // `content` so the cards finish above the fade entirely.
   bottomFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 320,
+    height: 220,
     zIndex: 1,
   },
 });

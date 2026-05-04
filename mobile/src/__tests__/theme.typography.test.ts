@@ -1,29 +1,34 @@
 /**
  * Theme typography tests.
  *
- * May 3 2026 trial: collapse to a SINGLE typeface across the whole
- * app — Marcellus (Google Fonts, OFL). Single-weight serif: every
- * fontFamily token (primary / primaryMedium / primarySemiBold /
- * primaryBold / display) points at the same `Marcellus-Regular`
- * file. The weight-named tokens stay in the registry so call sites
- * don't have to change, but the rendered face is identical;
- * hierarchy comes from size + colour + spacing instead of weight.
+ * May 3 2026 PM (partial revert of the May-3 single-typeface trial):
+ *   - Page headings (display* + headingXL/L/M) move BACK to Viaoda
+ *     Libre per user direction. The display tier carries the brand
+ *     voice on the hero verses ("paste anything"), page titles
+ *     ("body profile", "profile"), and section titles.
+ *   - Body / labels / caption / overline / headingS stay on Marcellus
+ *     so the body voice the user has been A/B-ing isn't disturbed.
  *
- * Revert to the prior DM Sans + Viaoda Libre setup if the uniform
- * weight reads flat.
+ * Same single-weight constraint applies to Viaoda Libre — every
+ * heading token MUST stay at fontWeight: '400'. See anti-pattern #13
+ * for why bumping to 700 silently falls back to Noto Serif Bold on
+ * Android. The non-heading tokens render in `Marcellus-Regular`,
+ * which is also single-weight; the same constraint applies there too.
  */
 
 import { typography, fontFamily } from '../constants/theme';
 
 const MARCELLUS = 'Marcellus-Regular';
+const VIAODA = 'ViaodaLibre-Regular';
 
 describe('theme — heading typography', () => {
-  it('exposes Marcellus on every fontFamily token (single typeface trial)', () => {
+  it('exposes the right family on every fontFamily token', () => {
     expect(fontFamily.primary).toBe(MARCELLUS);
     expect(fontFamily.primaryMedium).toBe(MARCELLUS);
     expect(fontFamily.primarySemiBold).toBe(MARCELLUS);
     expect(fontFamily.primaryBold).toBe(MARCELLUS);
-    expect(fontFamily.display).toBe(MARCELLUS);
+    // Display tier flipped back to Viaoda Libre — see file header.
+    expect(fontFamily.display).toBe(VIAODA);
   });
 
   it('the fontFamily registry keeps the 5-key shape (no extra aliases)', () => {
@@ -38,6 +43,8 @@ describe('theme — heading typography', () => {
     ]);
   });
 
+  // Heading tokens that mix in `headingSerif` and therefore inherit
+  // `fontFamily.display` (Viaoda Libre).
   const headingKeys = [
     'displayLarge',
     'displayMedium',
@@ -47,17 +54,20 @@ describe('theme — heading typography', () => {
   ] as const;
 
   headingKeys.forEach((key) => {
-    it(`${key} uses Marcellus`, () => {
-      expect((typography as any)[key].fontFamily).toBe(MARCELLUS);
+    it(`${key} uses Viaoda Libre (display tier)`, () => {
+      expect((typography as any)[key].fontFamily).toBe(VIAODA);
     });
 
     it(`${key} no longer forces lowercase (April 29 2026: title-case page headings)`, () => {
       expect((typography as any)[key].textTransform).toBeUndefined();
     });
+
+    it(`${key} stays at fontWeight: '400' (Viaoda Libre is single-weight; see anti-pattern #13)`, () => {
+      expect((typography as any)[key].fontWeight).toBe('400');
+    });
   });
 
-  // All non-heading tokens render in the same Marcellus file. The
-  // weight-named token references stay so callers can express intent.
+  // Body tier — stays in Marcellus.
   const nonHeadingKeys = [
     'body', 'bodyLarge', 'bodySmall', 'caption', 'banner',
     'label', 'labelLarge', 'labelSmall',

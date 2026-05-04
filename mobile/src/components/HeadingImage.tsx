@@ -22,39 +22,45 @@ import React from 'react';
 import { Text, StyleProp, TextStyle, View, StyleSheet, ViewStyle } from 'react-native';
 import { typography, colors } from '../constants/theme';
 
-// ── Slot → SVG module registry ───────────────────────────────────
-// TAN Nightingale headings exported from Canva Pro (SVG, transparent
-// background). Each slot corresponds to one screen-level heading.
-// Metro's `react-native-svg-transformer` (wired in metro.config.js)
-// compiles the default export as a React.FC<SvgProps>.
+// TAN Nightingale headings — exported from Canva Pro as SVG with the
+// font's glyphs already rasterised to <path>s (transparent bg). We
+// don't ship the font itself; the SVG IS the font, baked into shapes.
+import HomeVerseSvg from '../../assets/images/headings/home-verse.svg';
+import HistorySvg from '../../assets/images/headings/history.svg';
+import ProfileSvg from '../../assets/images/headings/profile.svg';
+import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
+import BeforeWeBeginSvg from '../../assets/images/headings/before-we-begin.svg';
 
-// April 29 2026 — every heading slot is now rendered as styled text in
-// Viaoda Libre, NOT via the Canva-exported SVGs sitting in
-// `mobile/assets/images/headings/`. The SVGs survived a couple of
-// optimisation passes (svgo flatten + viewBox normalize) but Android's
-// react-native-svg / Skia stack still rasterised them with horizontal
-// banding artefacts visible across every slot ("tabbed display" per
-// the user). Bypassing the SVG render path entirely + falling through
-// to the styled-text path below gives clean rendering in the same
-// italic display serif (Viaoda Libre IS the fallback face), so the
-// visual voice is preserved.
+// ── Slot → SVG module registry ───────────────────────────────────
+// May 4 2026 — TAN Nightingale SVG path re-enabled per user direction
+// ("Bring back Tan Nightingale.. Nothing seems to fit quite like that
+// one"). The April 29 banding regression on Android Skia was the
+// reason this registry was emptied; re-enabling now pairs with a
+// fresh device check. If the banding artefacts return on Pixel 2 XL,
+// flip the slots back to undefined here and the styled-text fallback
+// (Viaoda Libre via typography.display tokens) takes over again — no
+// other code change needed.
 //
-// The SVG files are kept on disk for now so the v2 release (or a
-// future TAN Nightingale licence) can re-enable the SVG path with
-// freshly-exported assets. Re-enabling = put entries back into
-// SVG_BY_SLOT below and verify on a real device.
+// The fit-result slots ('great-fit', 'some-concerns', 'may-not-fit')
+// stay text-only. Their SVGs were deleted in commit c2c34a5
+// (`feat(v2): story-share + gender + tummy + font + ...`); when those
+// assets get re-exported they'd plug into the same registry shape.
 type Slot =
   | 'home-verse'     // "paste anything. / we'll tell you / if it fits."
   | 'history'        // "your history"
   | 'profile'        // "profile"
   | 'body-profile'   // "body profile"
+  | 'before-we-begin' // "Before we begin" — AgeGateOverlay
   | 'great-fit'      // text-only
   | 'some-concerns'  // text-only
   | 'may-not-fit';   // text-only
 
 const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: number }>>> = {
-  // Intentionally empty — see comment above. Every slot falls through
-  // to the styled-text fallback so headings render in Viaoda Libre.
+  'home-verse': HomeVerseSvg,
+  history: HistorySvg,
+  profile: ProfileSvg,
+  'body-profile': BodyProfileSvg,
+  'before-we-begin': BeforeWeBeginSvg,
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
@@ -63,10 +69,23 @@ const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: numb
 // content-bounds viewBox; if a new SVG replaces one of these, the
 // aspect will need to be re-measured.
 const SVG_ASPECTS: Record<Slot, number> = {
-  'home-verse': 1.47,
-  history: 2.84,
-  profile: 1.93,
-  'body-profile': 3.39,
+  // viewBoxes re-tightened May 4 2026 PM. The original Canva exports
+  // shipped with a loose 0 0 450 450 viewBox (whole canvas, content
+  // sitting in a small region). The HeadingImage render path computes
+  // width = height * aspect — but `preserveAspectRatio="xMidYMid meet"`
+  // (the default) preserves the SVG's INTRINSIC viewBox aspect, so a
+  // 1:1 viewBox renders as a 1:1 square inside whatever box we ask
+  // for, leaving the text either tiny (fit to height-of-square) or
+  // letterboxed. Fixed by tightening each viewBox to its actual
+  // content bounds (sampled from M-command starts in the path data,
+  // padded ±10 px for curve overshoot). Aspects below match those
+  // tight viewBoxes so the registered aspect equals the SVG's
+  // intrinsic aspect — text now scales to the full requested height.
+  'home-verse': 325 / 275,        // viewBox "30 75 325 275"
+  history: 285 / 75,              // viewBox "95 170 285 75"
+  profile: 310 / 135,             // viewBox "45 125 310 135"
+  'body-profile': 335 / 65,       // viewBox "45 170 335 65"
+  'before-we-begin': 290 / 70,    // viewBox "80 178 290 70"
   'great-fit': 2.17,
   'some-concerns': 3.51,
   'may-not-fit': 3.23,

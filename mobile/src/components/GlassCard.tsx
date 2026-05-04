@@ -28,6 +28,14 @@ export interface GlassCardProps {
   tint?: 'light' | 'dark' | 'default' | 'extraLight' | 'systemMaterial' | 'systemUltraThinMaterial' | 'systemThinMaterial' | 'systemMaterialLight' | 'systemUltraThinMaterialLight' | 'systemThinMaterialLight' | 'systemMaterialDark' | 'systemUltraThinMaterialDark' | 'systemThinMaterialDark';
   /** Disable the elevation shadow (use when nested inside another shadowed card) */
   noShadow?: boolean;
+  /** Suppress the internal hairline border — useful when the caller
+   *  already paints its own edge (or when the card sits on a busy
+   *  backdrop where the white hairline reads as noise).
+   *  Added May 3 2026 PM for the Home `RecentCard`, where the
+   *  combination of caller-set `borderWidth: 1` + this internal
+   *  hairline produced a doubled white outline that read as too
+   *  loud against the dark gradient. */
+  noBorder?: boolean;
   /** Accessibility id forwarded to the outer View for E2E selectors */
   testID?: string;
   accessibilityLabel?: string;
@@ -39,6 +47,7 @@ export default function GlassCard({
   intensity = 60,
   tint = 'light',
   noShadow = false,
+  noBorder = false,
   testID,
   accessibilityLabel,
 }: GlassCardProps) {
@@ -60,8 +69,11 @@ export default function GlassCard({
       />
       {/* Frosted white tint over the blur for warmth */}
       <View style={[StyleSheet.absoluteFill, styles.tint]} pointerEvents="none" />
-      {/* Hairline highlight border */}
-      <View style={[StyleSheet.absoluteFill, styles.border]} pointerEvents="none" />
+      {/* Hairline highlight border. Suppressed when the caller passes
+          `noBorder` — see prop docs above. */}
+      {!noBorder && (
+        <View style={[StyleSheet.absoluteFill, styles.border]} pointerEvents="none" />
+      )}
       {/* Children render directly — they inherit flexDirection/alignItems from the
           caller's `style` on the outer View, so `flexDirection: 'row'` works. */}
       {children}

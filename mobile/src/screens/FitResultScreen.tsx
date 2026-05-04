@@ -37,7 +37,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, fontFamily } from '../constants/theme';
+import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, whiteAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
@@ -69,6 +69,13 @@ import { inferCategory, inferMaterial } from '../utils/productInference';
 // `availableSizes` list (Shopify direct-fetch surfaces this) + the
 // user's recommended size. No separate backend call needed.
 import { computeAvailability, describeAvailability, AvailabilityStatus } from '../utils/availability';
+// Sample the dominant colour of the underlying product image so the
+// hero brand+name can flip to dark text on light photos (white-on-
+// white shorts, etc.) and stay white otherwise. May 4 2026 user
+// direction: "can you detect if the background is light and make
+// product fit screen brand and product name dark on a light
+// background and keep it white on the rest?"
+import { useImageBrightness } from '../utils/useImageBrightness';
 
 type FitResultRouteProp = RouteProp<RootStackParamList, 'FitResult'>;
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -82,11 +89,11 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
 // to keep the verdict + stats row + material + availability readable
-// without scrolling. Iterative bumps: 200 → 204 (availability row
-// breathing) → 210 (per user feedback after the verdict block moved
-// out of ScrollView; the headerArea + visible dock content needs a
-// touch more vertical room to avoid clipping the stats labels).
-const COLLAPSED_H = 210;
+// without scrolling. Iterative bumps: 200 → 204 → 210 → 213 → 215
+// (May 4 2026 PM, per "increase the height of the docked overlay by
+// 2 more pixels"). The +2 px gives the docked "Fit concerns" meta
+// row a hair more breathing room above the stats chips.
+const COLLAPSED_H = 215;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -260,7 +267,13 @@ export default function FitResultScreen() {
     bottom: interpolate(
       collapseProgress.value,
       [0, 1],
-      [0, insets.bottom + SIDE_PAD]
+      // Raised the docked-state bottom from 0 → 2 (May 3 2026 PM
+      // user feedback: "raise docked overlay by 2px"). Tiny visual
+      // breathing room between the dock's bottom edge and the device
+      // screen edge — reads less like the dock is fused to the
+      // chrome. Expanded state's bottom is unchanged
+      // (insets.bottom + SIDE_PAD) so the floating treatment stays.
+      [2, insets.bottom + SIDE_PAD]
     ),
     borderBottomLeftRadius: interpolate(
       collapseProgress.value,
@@ -288,6 +301,95 @@ export default function FitResultScreen() {
       backgroundColor: `rgba(255, 255, 255, ${alpha})`,
     };
   });
+
+  // Hero brand+name follows the dock as it collapses (May 3 2026 PM).
+  // User direction: "on pulling the overlay into a dock, drag the
+  // brand name and product name with the overlay and place it right
+  // above but in smaller font."
+  //
+  // At progress=1 (expanded): translateY=0, scale=1 → hero sits at
+  //   its anchored top position (closer to dock per May 4 2026
+  //   feedback: "bring heading closer to the cards on product fit
+  //   card"). Top padding dropped from spacing.xl → spacing.md.
+  // At progress=0 (collapsed): hero translates DOWN to a y-position
+  //   ~24px above the docked card's top edge, scales to ~70% (lifted
+  //   from 0.58 May 4 2026 — user wanted the collapsed name to use
+  //   more horizontal width so a longer name ("Regular Drawstring
+  //   Shorts in Stripes") reads on a single line instead of being
+  //   shrunk + truncated mid-word).
+  //
+  // The COLLAPSED_H + insets.bottom math anchors the target position
+  // to the same coordinates the dock uses (cardLayoutStyle, above).
+  // SCREEN_H is computed once at module load — fine because the
+  // FitResult screen is full-bleed and doesn't reflow on rotation.
+  const heroOriginTop = insets.top + spacing.md;
+  const heroDockStyle = useAnimatedStyle(() => {
+    // Collapsed: hero base sits ~20px above the dock's top edge.
+    //   dockTopWhenCollapsed = SCREEN_H - COLLAPSED_H
+    //   (cardLayoutStyle.bottom is 2 when collapsed → use COLLAPSED_H + 2)
+    const dockTopCollapsed = SCREEN_H - COLLAPSED_H - 2;
+    const targetTopCollapsed = dockTopCollapsed - 60; // ~brand + name + 20px gap
+    const translateY = interpolate(
+      collapseProgress.value,
+      [0, 1],
+      [targetTopCollapsed - heroOriginTop, 0]
+    );
+    const scale = interpolate(collapseProgress.value, [0, 1], [0.7, 1]);
+    return {
+      transform: [{ translateY }, { scale }],
+    };
+  });
+
+  // Sample dominant colour of the product image so the hero text +
+  // chip backdrop can flip on light photos. MUST be declared before
+  // any early-return guard (loading / scrapeError / !product) so the
+  // hook count stays stable across renders — regression #1 in
+  // project_anti_patterns.md (white-screen on conditional hooks).
+  // Hook handles `null` URI by returning `null` brightness, which we
+  // treat as "stay white" downstream.
+  const heroImageUri =
+    activeEntry?.productImage ??
+    routeProduct?.image ??
+    scrapedProduct?.image ??
+    null;
+  const heroBrightness = useImageBrightness(heroImageUri);
+
+  // Frosted backdrop chip behind the brand+name. Renders in BOTH
+  // expanded and collapsed states (May 4 2026 PM user direction:
+  // "extend the opaque background treatment to the expanded state of
+  // the product fit screen too") — was previously transparent at
+  // expand. The expanded state uses a slightly looser padding so the
+  // chip reads as a deliberate label tag, not a tight pill.
+  // Brightness-driven hue: dark frosted pill on dark images, light
+  // frosted pill on light images, opposite of the text colour
+  // (heroBrand / heroName on-light overrides).
+  //
+  // The brightness branch is computed in JS (closure capture) so the
+  // worklet only animates numeric padding — keeps the worklet simple
+  // and avoids reading shared-value strings on the UI thread, which
+  // May 4 2026 PM live testing tied to a white-screen hang on dock
+  // collapse/expand. When `heroBrightness` later resolves, the
+  // component re-renders and useAnimatedStyle is recreated with the
+  // new closure value (no shared-value mirroring needed).
+  const heroChipR = heroBrightness === 'light' ? 255 : 20;
+  const heroChipG = heroBrightness === 'light' ? 255 : 14;
+  const heroChipB = heroBrightness === 'light' ? 255 : 28;
+  const heroChipStyle = useAnimatedStyle(() => {
+    // Alpha runs 0.30 (expanded) → 0.50 (collapsed) — both values
+    // non-zero so the backdrop is always present, just slightly
+    // firmer in the docked "now playing" treatment.
+    const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.50, 0.30]);
+    // Padding runs 12 (expanded) → 14 (collapsed) horizontally,
+    // 6 → 8 vertically. Always non-zero so the chip never collapses
+    // to text-only.
+    const padH = interpolate(collapseProgress.value, [0, 1], [14, 12]);
+    const padV = interpolate(collapseProgress.value, [0, 1], [8, 6]);
+    return {
+      backgroundColor: `rgba(${heroChipR}, ${heroChipG}, ${heroChipB}, ${bgAlpha})`,
+      paddingHorizontal: padH,
+      paddingVertical: padV,
+    };
+  }, [heroChipR, heroChipG, heroChipB]);
 
   // Factory: every drag-target on the overlay (top header, tags region)
   // gets its own Pan instance built from the same recipe so they all
@@ -765,13 +867,18 @@ export default function FitResultScreen() {
           text: 'Great Fit!',
         };
       case 'minor':
-        // Same icon + colour as 'great' — a single minor note isn't
-        // a fit warning, it's a sizing tip. The note itself appears
-        // below in the FIT CONCERNS section.
+        // Same icon + colour as 'great' — a minor note isn't a fit
+        // warning, it's a sizing tip. The note itself appears below
+        // in the FIT CONCERNS section. Copy pluralises off the
+        // warnings count so the verdict line agrees with the
+        // sub-line ("Great Fit, with a note" + "1 note" /
+        // "Great Fit, with notes" + "2 notes"). The mismatch was a
+        // user-flagged regression on May 3 2026 PM ("it says, 'great
+        // fit with a note' but right under it says, '2 notes'").
         return {
           color: colors.successDeep,
           icon: '✓',
-          text: 'Great Fit, with a note',
+          text: warnings.length === 1 ? 'Great Fit, with a note' : 'Great Fit, with notes',
         };
       case 'moderate':
         return {
@@ -897,9 +1004,21 @@ export default function FitResultScreen() {
 
   // Tags pass through the noise filter before render — keeps things
   // like "april26-sale-10" / "DROP XXIV-1" / "best seller" out of the
-  // user-facing chip row. Also strips a tag that duplicates the
-  // category (e.g. "Top" tag when category is already "Top").
-  const visibleTags = filterUserFacingTags(enrichedProduct?.tags, displayCategory);
+  // user-facing chip row. Also strips tags that duplicate the
+  // CATEGORY (e.g. "Top" tag when category is already "Top") and the
+  // MATERIAL (May 3 2026 — Cordstudio's `poem-dress` showed "100%
+  // cotton" in both the MATERIAL row and the tag chip row).
+  // `strict: true` (May 4 2026) also requires every surviving tag to
+  // contain a known garment-attribute keyword (material, texture,
+  // colour, length, product type, fit, occasion). Marketing copy
+  // that the noise filter missed ("shop the look", "must have",
+  // "as seen on") is dropped.
+  const visibleTags = filterUserFacingTags(
+    enrichedProduct?.tags,
+    displayCategory,
+    displayMaterial,
+    { strict: true },
+  );
   const showTags = visibleTags.length > 0;
 
   const confidenceLabel = sizeRec
@@ -932,7 +1051,11 @@ export default function FitResultScreen() {
         <Image source={{ uri: product.image }} style={styles.bgImage} resizeMode="cover" />
       ) : (
         <View style={[styles.bgImage, styles.bgPlaceholder]}>
-          <Feather name="shopping-bag" size={96} color="rgba(255,255,255,0.25)" />
+          {/* Was 0.25 white — only ~1.9:1 contrast on the
+              primaryDark (#4c4356) bg. WCAG 1.4.11 needs 3:1 for
+              non-text UI. Bumped to textSecondary (0.70 white) to
+              clear 5:1+ on the same backdrop. May 3 2026 PM. */}
+          <Feather name="shopping-bag" size={96} color={whiteAlpha.textSecondary} />
         </View>
       )}
 
@@ -950,6 +1073,8 @@ export default function FitResultScreen() {
         onPress={() => navigation.goBack()}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
         <Feather name="chevron-left" size={22} color="#fff" />
       </TouchableOpacity>
@@ -966,27 +1091,69 @@ export default function FitResultScreen() {
           onPress={() => setPendingDelete(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Remove from history"
         >
           <Feather name="trash-2" size={18} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* Brand + product name centred near the top of the image */}
-      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]} pointerEvents="none">
+      {/* Brand + product name centred near the top of the image. Outer
+          wrapper is the absolute-positioned hero slot (animated by
+          heroDockStyle to translate + scale with the dock); inner
+          `heroChip` is the legibility chip that fades in a dark
+          frosted backdrop when collapsed, transparent when expanded.
+          Splitting them keeps the chip width tied to the inner text's
+          intrinsic size (so the backdrop is a tight pill behind the
+          brand+name, not a full-width band). See heroDockStyle +
+          heroChipStyle above for the interpolation math.
+
+          Text colour adapts to the underlying image: dark on light
+          photos (white-shorts on white bg, etc.), white otherwise.
+          `heroBrightness` is `null` until the colour sampler resolves —
+          we treat null as "stay white" so the screen never blocks on
+          the sampler and falls through to the legacy behaviour on
+          failure. */}
+      <Animated.View
+        style={[styles.hero, { paddingTop: insets.top + spacing.md }, heroDockStyle]}
+        pointerEvents="none"
+      >
+        {/* Brand and product name each live in their OWN chip pill so
+            in collapsed mode they read as two distinct beats stacked
+            above the dock — like a music-player "artist" chip + "song
+            title" chip — instead of one wide pill containing both
+            (May 4 2026 PM user direction: "on collapsing to a dock,
+            the brand name should be in it's own opaque background and
+            the product name in it's own"). Both share heroChipStyle:
+            transparent + zero padding when expanded, frosted pill
+            with padding when collapsed. */}
         {safeBrand ? (
-          <BrandHeading
-            brand={safeBrand}
-            height={20}
-            color="rgba(255,255,255,0.92)"
-            uppercase
-            style={{ alignSelf: 'center', marginBottom: 6 }}
-            textStyle={styles.heroBrand}
-            testID="hero-brand"
-          />
+          <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle]}>
+            <BrandHeading
+              brand={safeBrand}
+              height={20}
+              color={heroBrightness === 'light' ? colors.text : 'rgba(255,255,255,0.95)'}
+              uppercase
+              style={{ alignSelf: 'center' }}
+              textStyle={[
+                styles.heroBrand,
+                heroBrightness === 'light' && styles.heroBrandOnLight,
+              ]}
+              testID="hero-brand"
+            />
+          </Animated.View>
         ) : null}
-        <Text style={styles.heroName} numberOfLines={2}>
-          {safeName || 'Product'}
-        </Text>
+        <Animated.View style={[styles.heroChip, heroChipStyle]}>
+          <Text
+            style={[
+              styles.heroName,
+              heroBrightness === 'light' && styles.heroNameOnLight,
+            ]}
+            numberOfLines={2}
+          >
+            {safeName || 'Product'}
+          </Text>
+        </Animated.View>
         {/* Custom-fit brand spotlight — appears when the storefront
             advertises made-to-measure / bespoke / custom sizing. The
             badge sits between the product name and the glass card so
@@ -1001,7 +1168,7 @@ export default function FitResultScreen() {
             </Text>
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Glass info card — expanded = 70% screen + symmetric side/bottom
           padding, collapsed = screen-wide dock anchored to the bottom.
@@ -1072,15 +1239,20 @@ export default function FitResultScreen() {
                 </View>
                 {priceDisplay && (
                   <View style={styles.priceColumn}>
-                    <View style={styles.pricePill}>
-                      <Text style={styles.priceText}>{priceDisplay}</Text>
-                    </View>
+                    {/* Affordability $ sits BEFORE the price (May 4
+                        2026 PM): the user reads "£ — £42" or
+                        "££ — £42" left-to-right where the $ chip
+                        sets up the budget context, then the actual
+                        price lands. Was vertically stacked above. */}
                     <AffordabilityIcon
                       price={product.price}
                       range={priceRange}
                       size="sm"
                       color={colors.textSecondary}
                     />
+                    <View style={styles.pricePill}>
+                      <Text style={styles.priceText}>{priceDisplay}</Text>
+                    </View>
                   </View>
                 )}
               </View>
@@ -1257,13 +1429,37 @@ export default function FitResultScreen() {
             </GestureDetector>
           )}
 
-          {/* Meta rows — Material always survives the dock's minimum-
-              info treatment (most-asked spec when shopping fabric-
-              first); Category appears only when expanded. Both rows
-              fall back to "—" when the scrape didn't surface the
-              field, so the panel structure stays consistent across
-              cards even when the source storefront is sparse. */}
-          {(showMaterial || isExpanded) && (
+          {/* Meta rows.
+              - Collapsed (dock): a single "Fit concerns" preview line
+                replaces the Material row. The verdict + stats already
+                handle the high-level "does it fit", but a one-line
+                concerns summary is the actionable detail a shopper
+                wants to see WITHOUT expanding the dock — Material is
+                still in the expanded view and on the history card.
+                User direction May 3 2026 PM: "replace material bit
+                with fit concerns bit (keep the rest of the
+                interactions/design the same)".
+              - Expanded: full Material + Category rows as before
+                (Concerns themselves render in their own section
+                above this one). */}
+          {!isExpanded && (
+            <View style={styles.metaSection}>
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Fit concerns</Text>
+                <Text
+                  style={warnings.length > 0 ? styles.metaValue : styles.metaPlaceholder}
+                  numberOfLines={1}
+                >
+                  {warnings.length === 0
+                    ? 'None — fits comfortably'
+                    : warnings.length === 1
+                    ? `1 ${effectiveScore === 'minor' ? 'note' : 'concern'}`
+                    : `${warnings.length} ${effectiveScore === 'minor' ? 'notes' : 'concerns'}`}
+                </Text>
+              </View>
+            </View>
+          )}
+          {isExpanded && (showMaterial || isExpanded) && (
             <View style={styles.metaSection}>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Material</Text>
@@ -1271,14 +1467,12 @@ export default function FitResultScreen() {
                   {showMaterial ? displayMaterial : '—'}
                 </Text>
               </View>
-              {isExpanded && (
-                <View style={styles.metaRow}>
-                  <Text style={styles.metaLabel}>Category</Text>
-                  <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
-                    {showCategory ? displayCategory : '—'}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Category</Text>
+                <Text style={showCategory ? styles.metaValue : styles.metaPlaceholder}>
+                  {showCategory ? displayCategory : '—'}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -1531,20 +1725,45 @@ const styles = StyleSheet.create({
   },
 
   // --- Hero (brand + product name over image) ---
+  // Side padding dropped from SIDE_PAD → spacing.sm so the inner
+  // heroChip (which is sized to its content) can stretch to use
+  // ~94% of the viewport width when the chip is in its collapsed
+  // dark-pill mode. This is what gives a long product name like
+  // "Regular Drawstring Shorts in Stripes" room to read on a single
+  // line above the docked card (May 4 2026 user direction: "use more
+  // width than you are using right now to display product name").
   hero: {
     position: 'absolute',
     top: 0,
-    left: SIDE_PAD,
-    right: SIDE_PAD,
+    left: spacing.sm,
+    right: spacing.sm,
     alignItems: 'center',
+  },
+  // Inner pill wrapping brand OR name (two separate chips per the
+  // May 4 2026 PM split). Padding + bg are animated by heroChipStyle.
+  // borderRadius stays static (pill shape) — when padding is 0
+  // (expanded) the rounded corners are invisible.
+  heroChip: {
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+  },
+  // Brand chip — sits ABOVE the name chip with a small gap so the
+  // two pills read as separate beats when collapsed.
+  heroChipBrand: {
+    marginBottom: 4,
   },
   heroBrand: {
     ...typography.overline,
-    color: 'rgba(255,255,255,0.92)',
+    color: 'rgba(255,255,255,0.95)',
     marginBottom: 6,
-    textShadowColor: 'rgba(0,0,0,0.45)',
+    // Stronger shadow than before — the chip backdrop carries most
+    // of the legibility lift in collapsed mode, but in expanded mode
+    // the text floats over the raw product image, so a heavier
+    // shadow is the only safety net. Doubled radius + dropped vertical
+    // offset for an even halo around each glyph.
+    textShadowColor: 'rgba(0,0,0,0.65)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 6,
   },
   heroName: {
     ...typography.headingXL,
@@ -1554,8 +1773,29 @@ const styles = StyleSheet.create({
     fontFamily: 'ViaodaLibre-Regular',
     color: '#fff',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.55)',
+    // Heavier shadow to clear hard-to-read product backgrounds (May 4
+    // 2026 — was 0.55 alpha / 8 px radius; bumped to 0.75 / 12 px so
+    // the name reads on white-on-white shorts photos like the user
+    // flagged with "Regular Drawstring Shorts in Stripes" on RIO).
+    // Pairs with the heroChip's animated dark-pill backdrop in
+    // collapsed mode.
+    textShadowColor: 'rgba(0,0,0,0.75)',
     textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
+  },
+  // Override applied when the underlying product image is detected as
+  // "light" (see useImageBrightness). Dark text + white halo so the
+  // brand wordmark + product name read on white-on-white photos.
+  heroBrandOnLight: {
+    color: colors.text,
+    textShadowColor: 'rgba(255,255,255,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
+  },
+  heroNameOnLight: {
+    color: colors.text,
+    textShadowColor: 'rgba(255,255,255,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
 
@@ -1677,22 +1917,33 @@ const styles = StyleSheet.create({
     // hero. Matches the visual weight of the size pill + stat row sitting
     // beside it.
     ...typography.headingM,
-    // Viaoda Libre override (May 3 2026 trial) — verdict text
-    // ('Great Fit', 'Some Concerns', etc.) reads in the italic
-    // display serif while the rest of the screen stays on Marcellus.
-    fontFamily: 'ViaodaLibre-Regular',
+    // Was Viaoda Libre (May 3 2026 trial). Flipped to Jost-Regular per
+    // May 4 2026 user direction: verdict text ('Great Fit', 'Some
+    // Concerns', 'May Not Fit Well') now reads in the geometric
+    // humanist sans for clarity at a glance — the italic display
+    // serif felt too editorial for what is functionally a status
+    // label. Jost is one of two faces we ship alongside VL (loaded
+    // in App.tsx as Jost-Regular / Jost-Light).
+    fontFamily: 'Jost-Regular',
+    // Drop the headingM fontWeight (400) lookup pressure — Jost has
+    // a Regular variant loaded so the inherited '400' is honoured
+    // natively, no synthetic-bold trap. Spelled out explicitly to
+    // make the reviewer's job easier.
+    fontWeight: '400',
   },
   verdictSub: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: 2,
   },
-  // Vertical stack: price pill on top, $/$$/$$$ chip beneath. Lets us
-  // surface affordability without competing with the verdict label for
-  // horizontal real-estate.
+  // Horizontal row (May 4 2026 PM): $/$$/$$$ chip → price pill,
+  // reading L-to-R as "budget context → actual price". Was a vertical
+  // stack until the user flipped it ("budget indicator $ shows up
+  // below price. It should show up right before the price tag").
   priceColumn: {
-    alignItems: 'flex-end',
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginLeft: spacing.sm,
   },
   pricePill: {

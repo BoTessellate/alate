@@ -21,6 +21,7 @@ import { computeAffordability } from '../utils/affordability';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
+import HeadingImage from '../components/HeadingImage';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -208,16 +209,32 @@ export default function HistoryScreen() {
         {/* Brand grey-purple ombre — same gradient as Home / Account
             / FitResult hero. Per user direction April 29 2026: the
             History tab read flat against the rest of the app's
-            atmospheric backdrop. */}
+            atmospheric backdrop. May 3 2026 PM: angle flipped to
+            top-RIGHT light → bottom-LEFT deep so the `headerMeta`
+            line in the top-left passes WCAG contrast — see
+            HomeScreen for the full rationale. */}
         <LinearGradient
           colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
           locations={[0, 0.3, 0.6, 0.9]}
-          start={{ x: 0.15, y: 0.1 }}
-          end={{ x: 0.85, y: 1 }}
+          start={{ x: 1, y: 0.05 }}
+          end={{ x: 0.1, y: 0.95 }}
           style={StyleSheet.absoluteFill}
         />
         <View testID="history-screen" style={styles.emptyContainer}>
-          <Text style={[styles.pageTitle, styles.emptyPageTitle]}>History</Text>
+          {/* TAN Nightingale heading SVG. Per user direction May 4 2026
+              PM ("history does not have an svg title, still using
+              font") — switched from styled Text to HeadingImage so
+              the empty-state title renders in the same display face
+              as the other page titles. Falls back to Marcellus text
+              if the SVG asset is missing. */}
+          <HeadingImage
+            slot="history"
+            fallback="History"
+            height={56}
+            color="#fff"
+            style={styles.emptyPageTitle}
+            textStyle={styles.pageTitle}
+          />
           <View style={styles.emptyIconContainer}>
             <Feather name="clock" size={36} color="#fff" />
           </View>
@@ -242,29 +259,25 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      {/* Same brand ombre as the empty state above. */}
+      {/* Same brand ombre as the empty state above (top-right light →
+          bottom-left deep, May 3 2026 PM). */}
       <LinearGradient
         colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
         locations={[0, 0.3, 0.6, 0.9]}
-        start={{ x: 0.15, y: 0.1 }}
-        end={{ x: 0.85, y: 1 }}
+        start={{ x: 1, y: 0.05 }}
+        end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
-        {/* Sub-heading meta is now the only header line (the "History"
-            display title was retired May 3 2026 — felt redundant since
-            the tab nav already labels the screen). Sub-heading bumped
-            +3pt so it carries the section on its own without the
-            display title above it. */}
-        <View style={styles.header}>
-          <Text style={styles.headerMeta} testID="history-meta">
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
-          </Text>
-        </View>
-
-        {/* Vision Pro song-shuffle-style deck — occupies the full area below
-            the header. Detail bar + clear link FLOAT on top of it so they
-            don't steal vertical space that the elongated cards need. */}
+        {/* Deck — flex:1 so it takes the upper area and centres the
+            cards vertically. The meta line + pill + clear-history
+            sit BELOW the deck as a single grouped footer (May 4 2026
+            PM user direction: "history page stats line, cards and
+            pill shaped needs to move a few pixels lower… group these
+            3 elements and center them"). The footer block is inline
+            (not absolute) so it consumes its own space and the deck
+            naturally compresses upward — no more empty void between
+            cards and pill. */}
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
@@ -272,11 +285,11 @@ export default function HistoryScreen() {
           onActiveIndexChange={setActiveIndex}
         />
 
-        {/* Floating footer: detail pill + clear link. Absolute-positioned so
-            the cover flow underneath uses the full height, and card images
-            don't get cropped to make room. `pointerEvents="box-none"` lets
-            scroll gestures pass through the empty area around the pill. */}
-        <View style={styles.floatingFooter} pointerEvents="box-none">
+        <View style={styles.groupedFooter}>
+          <Text style={styles.headerMeta} testID="history-meta">
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
+          </Text>
+
           <View style={styles.detailBarWrap}>
             <FitDetailBar entry={activeEntry} />
           </View>
@@ -361,8 +374,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.display,
     fontSize: 18,
     lineHeight: 24,
-    color: 'rgba(255,255,255,0.85)',
+    // Was 0.85 white — even after the gradient angle flip the top
+    // half of the screen sits in the mid-tone region (~#71667c),
+    // and 0.85 white only clears 4.39:1 there. WCAG AA needs 4.5:1
+    // for 18px (≈ 13.5pt = normal text). Bumped to textOpaque (0.92)
+    // which clears 4.78:1. May 3 2026 PM contrast pass.
+    color: whiteAlpha.textOpaque,
     marginTop: 4,
+    // Centred (May 4 2026) per user direction: the meta line carries
+    // the entire screen header on its own, so left-aligning it left
+    // a visible imbalance with the centred cover-flow deck below.
+    textAlign: 'center',
   },
   list: {
     padding: spacing.md,
@@ -564,18 +586,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Floating footer overlay (pill + clear link above the floating
-  //     tab bar). Dropped 100 → 72 so the detail pill isn't directly
-  //     touching the bottom of the product card — there's a visible gap
-  //     between the cover-flow card edge and the pill now, per user
-  //     feedback. Still sits clearly above the tab pill (which starts
-  //     at insets.bottom + 24 + 64 ≈ 88 from the bottom). ---
-  floatingFooter: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 72,
+  // --- Grouped footer (May 4 2026 PM) ---
+  // Replaces the prior absolute-positioned floatingFooter. Stacks
+  // [meta line, FitDetailBar pill, Clear-history link] inline as a
+  // single block UNDER the deck so the four elements (deck + meta +
+  // pill + link) read as ONE cohesive group, per user direction
+  // ("group these 3 elements and center them"). The deck above
+  // (HistoryCoverFlow flex:1) compresses to fill what remains so the
+  // overall composition vertically balances. paddingBottom clears
+  // the floating tab bar (~88 px = insets.bottom + 10 + 64) with
+  // breathing room — Clear-history now sits ~50-60 px above the
+  // navbar instead of the cramped ~30 px from the prior 130-bottom
+  // value. gap between rows controls breathing room within the group.
+  groupedFooter: {
     alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: 110,
+    gap: spacing.sm,
   },
   detailBarWrap: {
     paddingBottom: spacing.xs,
@@ -585,8 +612,14 @@ const styles = StyleSheet.create({
   //     reserved for the confirmation Alert, not the surface styling. ---
   clearLink: {
     alignSelf: 'center',
-    paddingVertical: spacing.sm,
+    // Bumped paddingVertical sm (8) → md (16) so the visible tap zone
+    // is ≥ 44px tall on its own (16 + 19px line-height + 16 = 51px),
+    // not just after the hitSlop. Cleaner for users with cognitive
+    // accessibility needs who rely on the visible target. May 3 2026
+    // PM accessibility-review #7.
+    paddingVertical: spacing.md,
     paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   clearLinkText: {
     ...typography.caption,
@@ -594,7 +627,7 @@ const styles = StyleSheet.create({
     // backdrop — invisible. Light text with moderate alpha so it
     // reads as a quiet but legible link, not loud as the primary
     // action.
-    color: 'rgba(255,255,255,0.75)',
+    color: whiteAlpha.textBody,
     textDecorationLine: 'underline',
     letterSpacing: 0.6,
   },

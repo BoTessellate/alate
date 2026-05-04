@@ -292,7 +292,14 @@ function PriceRangeSection() {
               value={draftMin}
               onChangeText={setDraftMin}
               onBlur={commit}
-              placeholder="0"
+              // Was placeholder="0" — on Marcellus the lone "0" glyph
+              // rendered as a near-perfect circle in the muted grey,
+              // which read as a placeholder bullet rather than "no
+              // value set yet" (May 4 2026 user feedback). The em-dash
+              // matches the rest of the app's "field is empty"
+              // convention (FitResult Material / Category rows use
+              // the same character).
+              placeholder="—"
               placeholderTextColor={colors.textMuted}
               returnKeyType="next"
             />
@@ -309,7 +316,14 @@ function PriceRangeSection() {
               value={draftMax}
               onChangeText={setDraftMax}
               onBlur={commit}
-              placeholder="0"
+              // Was placeholder="0" — on Marcellus the lone "0" glyph
+              // rendered as a near-perfect circle in the muted grey,
+              // which read as a placeholder bullet rather than "no
+              // value set yet" (May 4 2026 user feedback). The em-dash
+              // matches the rest of the app's "field is empty"
+              // convention (FitResult Material / Category rows use
+              // the same character).
+              placeholder="—"
               placeholderTextColor={colors.textMuted}
               returnKeyType="done"
             />
@@ -378,12 +392,15 @@ export default function AccountScreen() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       {/* Full-bleed gradient backdrop — same treatment as Home, matches
-          the fit-analysis hero screens. */}
+          the fit-analysis hero screens. May 3 2026 PM: angle flipped
+          to top-RIGHT light → bottom-LEFT deep so white text in the
+          top-left passes WCAG contrast (see HomeScreen for full
+          rationale). */}
       <LinearGradient
         colors={['#b4afbb', '#8a7e94', '#6a5f75', '#4c4356']}
         locations={[0, 0.3, 0.6, 0.9]}
-        start={{ x: 0.15, y: 0.1 }}
-        end={{ x: 0.85, y: 1 }}
+        start={{ x: 1, y: 0.05 }}
+        end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -410,8 +427,15 @@ export default function AccountScreen() {
             style={styles.editPill}
             onPress={() => navigation.navigate('AvatarSetup')}
             activeOpacity={0.75}
+            // a11y #6: extend the tap zone to ≥44×44 without enlarging
+            // the visual pill. paddingVertical 5 + 11pt text ≈ 24px
+            // tall; +20 of slop on top/bottom + ~8 on sides clears
+            // WCAG 2.5.5 with margin to spare.
+            hitSlop={{ top: 20, bottom: 20, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={avatar ? 'Edit body profile' : 'Set up body profile'}
           >
-            <Feather name="edit-2" size={11} color={colors.primary} />
+            <Feather name="edit-2" size={11} color={colors.primary} importantForAccessibility="no" />
             <Text style={styles.editPillText}>{avatar ? 'Edit' : 'Set up'}</Text>
           </TouchableOpacity>
         </View>
@@ -427,13 +451,15 @@ export default function AccountScreen() {
               activeOpacity={0.6}
               onPress={() => navigation.navigate('AvatarSetup', { focusKey: 'height' })}
               style={styles.profileRow}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit height, currently ${Math.floor(avatar.height_cm / 30.48)} feet ${Math.round((avatar.height_cm / 2.54) % 12)} inches`}
             >
               <Text style={styles.profileLabel}>Height</Text>
               <View style={styles.profileValueRow}>
                 <Text style={styles.profileValue}>
                   {Math.floor(avatar.height_cm / 30.48)}′{Math.round((avatar.height_cm / 2.54) % 12)}″
                 </Text>
-                <Feather name="chevron-right" size={14} color={colors.textMuted} />
+                <Feather name="chevron-right" size={14} color={colors.textMuted} importantForAccessibility="no" />
               </View>
             </TouchableOpacity>
             {(
@@ -452,11 +478,13 @@ export default function AccountScreen() {
                 activeOpacity={0.6}
                 onPress={() => navigation.navigate('AvatarSetup', { focusKey })}
                 style={[styles.profileRow, i === arr.length - 1 && styles.profileRowLast]}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${MEASUREMENT_LABELS[key].toLowerCase()}, currently ${capitalize(avatar[key] ?? '') || 'not set'}`}
               >
                 <Text style={styles.profileLabel}>{MEASUREMENT_LABELS[key]}</Text>
                 <View style={styles.profileValueRow}>
                   <Text style={styles.profileValue}>{capitalize(avatar[key] ?? '')}</Text>
-                  <Feather name="chevron-right" size={14} color={colors.textMuted} />
+                  <Feather name="chevron-right" size={14} color={colors.textMuted} importantForAccessibility="no" />
                 </View>
               </TouchableOpacity>
             ))}
@@ -549,11 +577,23 @@ export default function AccountScreen() {
           style={styles.brandCta}
           onPress={() => navigation.navigate('BrandIntegration')}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Are you a brand? Learn how to integrate alate with your store"
         >
           <Text style={styles.brandCtaTitle}>are you a brand?</Text>
           <Text style={styles.brandCtaSubtitle}>
             Run an online store? Want to give your customers a better way to check size, and reduce return headaches? Plug your sizing into alate — your shoppers see fit confidence before they buy, and you see fewer "doesn't fit" returns.
           </Text>
+          {/* Explicit visible button affordance (May 3 2026 PM
+              accessibility-review #9). Long-form CTA copy was
+              ambiguous about whether the whole block was tappable —
+              the pill makes the interaction obvious for cognitive
+              accessibility AND gives screen-reader users a clear
+              "this is the action" anchor. Sits below the body so
+              the title still leads visually. */}
+          <View style={styles.brandCtaButton}>
+            <Text style={styles.brandCtaButtonText}>Learn more →</Text>
+          </View>
         </TouchableOpacity>
       </ScrollView>
 
@@ -762,6 +802,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    // Visual size unchanged so the pill still reads as a small chip;
+    // the touch target is widened via `hitSlop` on the TouchableOpacity
+    // (44×44 minimum per WCAG 2.5.5). See accessibility-review #6
+    // (May 3 2026 PM).
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: borderRadius.pill,
@@ -793,7 +837,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    // Bumped 6 → 12 (May 3 2026 PM) to bring the row's tap target to
+    // ~44px (12 + 12 + 18px label line-height). Below that floor,
+    // WCAG 2.5.5 fails — see accessibility-review #5. The label /
+    // value type sizes are unchanged so the visual density barely
+    // shifts; just the tap zone grows.
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: textAlpha.divider,
@@ -998,11 +1047,38 @@ const styles = StyleSheet.create({
   },
   brandCtaSubtitle: {
     fontFamily: fontFamily.primary,
+    // 13pt at textMuted (0.65 white) on the mid-stop of the gradient
+    // failed WCAG AA (3.31:1 vs 4.5:1 required for normal text). Bumped
+    // alpha to textBody (0.75) which clears 4.5:1 across the whole
+    // gradient. See accessibility-review #2 (May 3 2026 PM).
     fontSize: 13,
     lineHeight: 19,
-    color: whiteAlpha.textMuted,
+    color: whiteAlpha.textBody,
     textAlign: 'center',
     maxWidth: 320,
+    marginBottom: spacing.md,
+  },
+
+  // Explicit "Learn more →" button under the brand CTA copy. Pill
+  // matches the rest of the app's primary actions (rounded, primary
+  // brand fill, white text) so the affordance reads as "tap me" at a
+  // glance. Visual size also clears the 44px touch-target floor on
+  // its own — the wrapping TouchableOpacity covers the whole CTA
+  // already, but a sub-region that LOOKS like a button matters for
+  // cognitive a11y (May 3 2026 PM accessibility-review #9).
+  brandCtaButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    borderRadius: borderRadius.pill,
+    alignSelf: 'center',
+  },
+  brandCtaButtonText: {
+    fontFamily: fontFamily.primarySemiBold,
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#fff',
+    letterSpacing: 0.4,
   },
 
   // Bottom-edge fade — 280px tall for a heavier horizon effect.

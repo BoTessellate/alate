@@ -30,6 +30,15 @@ const NOISE_PATTERNS: RegExp[] = [
   // Word-boundary on the LEFT only — anchoring right with \b would
   // miss "salex" (which is what bit us in Reistor testing May 2 2026).
   /\bsale(?:s|x|item)?\b/i,
+  // Fused sale flags with no word-boundary on the left:
+  // "onsale" / "on-sale" / "on_sale" — Genes Le Coanet Hemant
+  // (May 3 2026 PM) shipped these as discrete tags. Don't bound on
+  // the left so the literal "onsale" matches.
+  /\b(?:on[\s_-]?sale|onsale)\b/i,
+  // "save 50%" / "save up to 50%" / "save upto 50%" — discount-amount
+  // labels (Genes Le Coanet Hemant, May 3 2026 PM). Allow optional
+  // "up(\s)?to" between "save" and the percentage.
+  /\bsave\s+(?:up\s*to\s+)?\d{1,3}\s*%/i,
   // Date-bounded marketing tags: "april26-sale-10", "spring2026"
   /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\d/i,
   // Pricing labels — "Full Price", "20% off", "new price", "regular
@@ -55,6 +64,13 @@ const NOISE_PATTERNS: RegExp[] = [
   // existing season-prefix pattern; merchants extend the same naming
   // scheme to non-spring/fall lines.
   /\b(resort|cruise|holiday|festive|capsule)\W?\d{2,4}\b/i,
+  // Long-form season-year labels: "spring summer 23", "spring/summer
+  // 2023", "fall winter 24", "autumn winter 2024". Mirrors the
+  // SS24 / AW2024 pattern but for spelled-out season names. A SECOND
+  // season is optional (handles single-season lines like "spring
+  // 2023" too). YEAR is REQUIRED so a bare "summer" tag still passes
+  // the filter — that's a legit garment tag.
+  /\b(spring|summer|fall|autumn|winter)(?:[\s\/]+(spring|summer|fall|autumn|winter))?[\s\/]*\d{2,4}\b/i,
   /\bcollection\s*\d+/i,
   // Sizes (already shown in the size pill, redundant as tags)
   /^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|4xl|one\s*size)$/i,
@@ -102,32 +118,126 @@ function dedupKey(tag: string): string {
   return tag.toLowerCase().replace(/[\s\-_]+/g, '');
 }
 
+// ─── STRICT-MODE WHITELIST ──────────────────────────────────────────
+// Garment-attribute keywords. In `strict` mode (May 4 2026, opt-in),
+// a tag is kept ONLY if its lowercased text contains one of these
+// substrings. Defends against marketing copy that slips past the
+// noise patterns ("shop the look", "must have", "editor pick", etc.)
+// by requiring the tag to look like a garment descriptor.
+//
+// Categories follow the user's spec ("material, texture, colour,
+// length, product type" + the natural extensions: fit/silhouette,
+// occasion, construction). Substring match (lowercased) so phrasing
+// variations ("cotton dress", "100% cotton") all hit "cotton" and
+// pass through. Conservative — better to under-show than to surface
+// noise the user has flagged twice.
+const GARMENT_ATTR_KEYWORDS: string[] = [
+  // Materials
+  'cotton', 'linen', 'silk', 'wool', 'polyester', 'viscose', 'rayon',
+  'nylon', 'elastane', 'spandex', 'lycra', 'denim', 'leather', 'suede',
+  'cashmere', 'merino', 'tencel', 'modal', 'jersey', 'knit', 'chiffon',
+  'satin', 'velvet', 'tweed', 'fleece', 'crepe', 'organza', 'tulle',
+  'lace', 'muslin', 'terry', 'corduroy', 'georgette', 'crepon', 'twill',
+  // Textures / surface treatments
+  'ribbed', 'textured', 'embroidered', 'pleated', 'smocked', 'quilted',
+  'sequin', 'beaded', 'fringed', 'crochet', 'cable', 'waffle', 'striped',
+  'printed', 'patterned', 'floral', 'polka', 'paisley', 'gingham',
+  'plaid', 'tartan', 'herringbone', 'houndstooth', 'jacquard', 'brocade',
+  'applique',
+  // Colours
+  'black', 'white', 'navy', 'beige', 'cream', 'ivory', 'grey', 'gray',
+  'tan', 'camel', 'sand', 'olive', 'mustard', 'burgundy', 'maroon',
+  'scarlet', 'crimson', 'cherry', 'coral', 'peach', 'salmon', 'nude',
+  'pink', 'rose', 'blush', 'magenta', 'fuchsia', 'red', 'orange',
+  'yellow', 'green', 'emerald', 'jade', 'mint', 'sage', 'teal',
+  'turquoise', 'aqua', 'blue', 'indigo', 'cobalt', 'royal', 'sky',
+  'pastel', 'lavender', 'lilac', 'purple', 'violet', 'plum', 'brown',
+  'chocolate', 'khaki', 'charcoal', 'metallic', 'gold', 'silver',
+  'bronze', 'copper',
+  // Lengths
+  'mini', 'midi', 'maxi', 'short', 'long', 'knee', 'ankle', 'floor',
+  'cropped', 'crop', 'tea',
+  // Product types
+  'dress', 'gown', 'skirt', 'shorts', 'trouser', 'pant', 'jean',
+  'legging', 'jumpsuit', 'playsuit', 'romper', 'top', 'tee', 'tshirt',
+  'tank', 'cami', 'camisole', 'blouse', 'shirt', 'tunic', 'sweatshirt',
+  'hoodie', 'sweater', 'jumper', 'cardigan', 'coat', 'jacket', 'blazer',
+  'vest', 'gilet', 'kimono', 'kaftan', 'caftan', 'kurta', 'kurti',
+  'saree', 'sari', 'dhoti', 'lehenga', 'salwar', 'coord', 'bralette',
+  'bodysuit', 'bra', 'swimsuit', 'bikini', 'loungewear', 'nightwear',
+  'pyjama', 'pajama',
+  // Fit / silhouette / construction
+  'slim', 'fitted', 'loose', 'relaxed', 'oversized', 'tailored', 'wide',
+  'straight', 'skinny', 'bootcut', 'flared', 'tapered', 'baggy', 'boxy',
+  'cinched', 'empire', 'sheath', 'shift', 'wrap', 'halter', 'strapless',
+  'sleeveless', 'backless', 'turtleneck', 'mockneck', 'vneck', 'crewneck',
+  'scoopneck', 'squareneck', 'boatneck', 'cowl',
+  // Occasion / vibe
+  'casual', 'formal', 'cocktail', 'evening', 'wedding', 'party',
+  'workwear', 'office', 'brunch', 'vacation', 'beach', 'resort',
+  'summer', 'winter', 'spring', 'fall', 'autumn', 'festive', 'minimal',
+  'easy', 'easystyle', 'breezy', 'flowy', 'breathable', 'lightweight',
+  'airy', 'heavyweight',
+  // Construction / craft
+  'handcrafted', 'handmade', 'handwoven', 'organic', 'sustainable',
+  'eco', 'recycled', 'natural',
+];
+
+function looksLikeGarmentAttr(tag: string): boolean {
+  const normalized = tag.toLowerCase();
+  return GARMENT_ATTR_KEYWORDS.some((kw) => normalized.includes(kw));
+}
+
+export interface FilterOptions {
+  /** Strict mode (May 4 2026): drop any tag that doesn't contain a
+   *  known garment-attribute keyword. Recommended for the FitResult
+   *  tags chip row. Default off so existing callers don't change
+   *  behaviour. */
+  strict?: boolean;
+}
+
 /**
  * Filter a list of raw Shopify tags down to user-facing ones.
  * Order is preserved. Empty / whitespace-only entries are dropped.
  *
- * Optionally pass `excludeCategory` to also strip a tag matching the
- * product's own category (e.g. don't show "Top" as a tag when the
- * category field is already "Top").
+ * Optionally pass:
+ *   - `excludeCategory`: strip a tag matching the product's own
+ *     category (e.g. don't show "Top" as a tag when the category
+ *     field is already "Top").
+ *   - `excludeMaterial`: strip a tag matching the product's own
+ *     material (May 3 2026 — Cordstudio's `poem-dress-f22-pnd-rt`
+ *     surfaced "100% cotton" both in the MATERIAL row and as a tag
+ *     chip below; user feedback flagged the redundancy). Comparison
+ *     uses the same normalisation as dedupKey (case + whitespace +
+ *     hyphen + underscore insensitive) so "100% cotton" matches
+ *     "100%cotton" / "100%COTTON" / "100% Cotton".
  */
 export function filterUserFacingTags(
   tags: string[] | undefined | null,
-  excludeCategory?: string
+  excludeCategory?: string,
+  excludeMaterial?: string,
+  options: FilterOptions = {}
 ): string[] {
   if (!tags || tags.length === 0) return [];
 
   const lowerCategory = (excludeCategory || '').trim().toLowerCase();
+  const materialKey = excludeMaterial ? dedupKey(excludeMaterial) : '';
 
   const cleaned = tags
     .map((t) => (typeof t === 'string' ? t.trim() : ''))
     .filter((t) => t.length > 0)
     .filter((t) => !NOISE_PATTERNS.some((p) => p.test(t)))
     .filter((t) => t.toLowerCase() !== lowerCategory)
+    .filter((t) => !materialKey || dedupKey(t) !== materialKey)
     // Snake_case slugs ("yoga_pilates", "working_out") survive the
     // noise filter but read as "internal label" with the underscores
     // intact. Normalize to spaces so they render as natural words on
     // the chip pill (April 29 2026 polish).
-    .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim());
+    .map((t) => t.replace(/_/g, ' ').replace(/\s+/g, ' ').trim())
+    // Strict mode: drop anything that doesn't read as a garment
+    // attribute. Off by default to keep existing call sites' output
+    // unchanged.
+    .filter((t) => !options.strict || looksLikeGarmentAttr(t));
 
   // Dedupe: case + whitespace + separator-insensitive. Reistor (May 2
   // 2026) shipped both "organic cotton" and "organiccotton" — same

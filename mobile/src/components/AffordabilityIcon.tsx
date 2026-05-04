@@ -16,6 +16,7 @@ import {
   PriceRangeShape,
   PriceShape,
 } from '../utils/affordability';
+import { CURRENCY_SYMBOLS } from '../utils/currency';
 
 interface AffordabilityIconProps {
   price: PriceShape | undefined | null;
@@ -26,6 +27,12 @@ interface AffordabilityIconProps {
   color?: string;
   /** Override the warning hue used when overBudget. */
   warningColor?: string;
+  /** Override the affordability symbol — defaults to "$" for back-compat
+   *  but should be overridden with the user's actual currency symbol so
+   *  the chip reads as "£/££/£££" or "₹/₹₹/₹₹₹" instead of always "$".
+   *  May 4 2026 user direction: on the History pill, the affordability
+   *  chip should reflect the actual currency, not a hardcoded dollar. */
+  symbol?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
@@ -36,6 +43,7 @@ export default function AffordabilityIcon({
   size = 'sm',
   color = colors.textSecondary,
   warningColor = colors.warningDeep,
+  symbol,
   style,
   testID,
 }: AffordabilityIconProps) {
@@ -46,18 +54,46 @@ export default function AffordabilityIcon({
   const padV = size === 'sm' ? 2 : 4;
   const padH = size === 'sm' ? 6 : 8;
 
-  const symbols = '$'.repeat(result.scale);
+  // Resolve the per-chip symbol. Priority:
+  //   1. Caller-provided `symbol` prop (explicit override).
+  //   2. Symbol of the user's price-range currency (passed via the
+  //      computed result's range — falls back to the price's own
+  //      currency when the price is in-range and the range exists).
+  //   3. "$" (legacy default — kept so callers that don't pass a
+  //      symbol render unchanged).
+  // Using `range.currency` (not `price.currency`) so the chip always
+  // reads in the user's chosen denomination, even on cards where the
+  // product was scraped in a different currency (the comparison is
+  // currency-strict so this only fires when both match anyway).
+  const resolvedSymbol =
+    symbol ??
+    (range?.currency ? CURRENCY_SYMBOLS[range.currency] : undefined) ??
+    '$';
+  const symbols = resolvedSymbol.repeat(result.scale);
   const tone = result.overBudget ? warningColor : color;
+
+  // Single-$ chips render as a perfect circle. Earlier minWidth-only
+  // attempt left the chip oblong-tall because the labelSmall mixin
+  // sets lineHeight: 18, making total height ~22 px while the
+  // computed minWidth was ~19 (May 4 2026 PM live test). Forcing both
+  // explicit width and height for the single-symbol case sidesteps
+  // RN's text-flow sizing entirely and guarantees a circle. For 2-/
+  // 3-symbol counts the text intrinsic width exceeds the chip height,
+  // so we drop back to natural padding-based sizing — the chip
+  // stretches into a horizontal pill, which is the correct shape for
+  // "$$" / "$$$".
+  const isSingleSymbol = result.scale === 1;
+  const chipDim = Math.round(padV * 2 + fontSize + 8); // height ≈ width for circle
+  const sizingStyle = isSingleSymbol
+    ? { width: chipDim, height: chipDim, paddingVertical: 0, paddingHorizontal: 0 }
+    : { paddingVertical: padV, paddingHorizontal: padH };
 
   return (
     <View
       style={[
         styles.chip,
-        {
-          paddingVertical: padV,
-          paddingHorizontal: padH,
-          borderColor: result.overBudget ? warningColor : tone,
-        },
+        sizingStyle,
+        { borderColor: result.overBudget ? warningColor : tone },
         style,
       ]}
       testID={testID ?? `affordability-${result.scale}${result.overBudget ? '-over' : ''}`}
@@ -86,10 +122,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     alignSelf: 'flex-start',
     flexDirection: 'row',
+    // Center BOTH axes — required for the single-$ circular variant
+    // (where width === height) so the glyph sits dead-centre instead
+    // of nudging top-right because of text baseline offset.
     alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
-    ...typography.labelSmall,
+    // Don't spread `typography.labelSmall` — its lineHeight: 18 was
+    // pushing the chip total height beyond the square-circle
+    // calculation. Specify only what we need.
+    fontFamily: typography.labelSmall.fontFamily,
+    fontWeight: typography.labelSmall.fontWeight,
     letterSpacing: 0.6,
+    textAlign: 'center',
   },
 });
