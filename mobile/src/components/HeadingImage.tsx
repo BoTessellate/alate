@@ -29,6 +29,7 @@ import HomeVerseSvg from '../../assets/images/headings/home-verse.svg';
 import HistorySvg from '../../assets/images/headings/history.svg';
 import ProfileSvg from '../../assets/images/headings/profile.svg';
 import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
+import BeforeWeBeginSvg from '../../assets/images/headings/before-we-begin.svg';
 
 // ── Slot → SVG module registry ───────────────────────────────────
 // May 4 2026 — TAN Nightingale SVG path re-enabled per user direction
@@ -49,6 +50,7 @@ type Slot =
   | 'history'        // "your history"
   | 'profile'        // "profile"
   | 'body-profile'   // "body profile"
+  | 'before-we-begin' // "Before we begin" — AgeGateOverlay
   | 'great-fit'      // text-only
   | 'some-concerns'  // text-only
   | 'may-not-fit';   // text-only
@@ -58,6 +60,7 @@ const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: numb
   history: HistorySvg,
   profile: ProfileSvg,
   'body-profile': BodyProfileSvg,
+  'before-we-begin': BeforeWeBeginSvg,
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
@@ -70,6 +73,11 @@ const SVG_ASPECTS: Record<Slot, number> = {
   history: 2.84,
   profile: 1.93,
   'body-profile': 3.39,
+  // before-we-begin: viewBox tightened from 0 0 450 450 → 80 178 290 70
+  // (svgo flattened the file from 30 KB → 11 KB, then a manual viewBox
+  // crop to the actual content bounds — paths span x∈[83, 365],
+  // y baseline ≈ 222 with ascender / descender extension).
+  'before-we-begin': 290 / 70,
   'great-fit': 2.17,
   'some-concerns': 3.51,
   'may-not-fit': 3.23,
