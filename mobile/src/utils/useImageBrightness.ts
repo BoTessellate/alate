@@ -26,7 +26,7 @@
 
 import { useEffect, useState } from 'react';
 import { getColors } from 'react-native-image-colors';
-import { Platform } from 'react-native';
+import { InteractionManager, Platform } from 'react-native';
 
 export type Brightness = 'light' | 'dark';
 
@@ -71,31 +71,44 @@ export function useImageBrightness(uri: string | null | undefined): Brightness |
     }
 
     setBrightness(null);
-    getColors(uri, {
-      cache: true,
-      key: uri,
-      fallback: '#000000',
-      // Android-only — bigger spacing = faster sample, fine for the
-      // top-of-image hero region where exact precision doesn't matter.
-      pixelSpacing: Platform.OS === 'android' ? 8 : undefined,
-      quality: 'low',
-    } as any)
-      .then((result) => {
-        if (cancelled) return;
-        const hex = pickColor(result);
-        if (!hex) {
+    // Defer the native bridge call until after the first render +
+    // any in-flight transitions land. Sampling is a non-critical
+    // enhancement — text falls back to white-on-default-shadow until
+    // the colour resolves — so blocking the initial mount on a
+    // native-bridge round-trip is wasteful and contributes to
+    // perceived nav-switch lag (May 4 2026 PM live testing). Wrapping
+    // in `InteractionManager.runAfterInteractions` lets React
+    // Navigation's transition animations finish before we start the
+    // color extraction.
+    const handle = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) return;
+      getColors(uri, {
+        cache: true,
+        key: uri,
+        fallback: '#000000',
+        // Android-only — bigger spacing = faster sample, fine for the
+        // top-of-image hero region where exact precision doesn't matter.
+        pixelSpacing: Platform.OS === 'android' ? 8 : undefined,
+        quality: 'low',
+      } as any)
+        .then((result) => {
+          if (cancelled) return;
+          const hex = pickColor(result);
+          if (!hex) {
+            setBrightness(null);
+            return;
+          }
+          setBrightness(hexLuminance(hex) >= 0.55 ? 'light' : 'dark');
+        })
+        .catch(() => {
+          if (cancelled) return;
           setBrightness(null);
-          return;
-        }
-        setBrightness(hexLuminance(hex) >= 0.55 ? 'light' : 'dark');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setBrightness(null);
-      });
+        });
+    });
 
     return () => {
       cancelled = true;
+      handle.cancel?.();
     };
   }, [uri]);
 

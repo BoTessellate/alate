@@ -89,12 +89,11 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
 // Collapsed dock height — tight enough to feel like a dock, wide enough
 // to keep the verdict + stats row + material + availability readable
-// without scrolling. Iterative bumps: 200 → 204 (availability row
-// breathing) → 210 → 213 (May 4 2026 user direction: "Increase
-// height of the docked overlay by 3px"). The +3 px gives the docked
-// "Fit concerns" meta row a hair more breathing room above the
-// stats chips before the bottom edge clips.
-const COLLAPSED_H = 213;
+// without scrolling. Iterative bumps: 200 → 204 → 210 → 213 → 215
+// (May 4 2026 PM, per "increase the height of the docked overlay by
+// 2 more pixels"). The +2 px gives the docked "Fit concerns" meta
+// row a hair more breathing room above the stats chips.
+const COLLAPSED_H = 215;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -358,34 +357,30 @@ export default function FitResultScreen() {
   // Animated backdrop chip behind the brand+name. Transparent when
   // expanded (so the hero text floats over the product image cleanly).
   // Frosted pill when collapsed — dark on dark images, light on light
-  // images so the chip always READS the opposite of the text colour
-  // (text colour is itself driven by image brightness — see the
-  // heroBrand/heroName style overrides below). Guarantees legibility
-  // on busy product images where the text shadow alone isn't enough.
-  // Padding interpolates with collapseProgress so the chip feels like
-  // it's emerging from the text, not popping in.
+  // images so the chip always READS the opposite of the text colour.
+  // Guarantees legibility on busy product images where the text
+  // shadow alone isn't enough.
   //
-  // brightnessSV mirrors the JS heroBrightness state into a shared
-  // value so the worklet inside useAnimatedStyle can read it without
-  // taking a stale closure value. (useAnimatedStyle re-runs only when
-  // its captured shared values change, not on JS state changes.)
-  const brightnessSV = useSharedValue<'light' | 'dark' | 'unknown'>('unknown');
-  useEffect(() => {
-    brightnessSV.value = heroBrightness ?? 'unknown';
-  }, [heroBrightness]);
+  // The brightness branch is computed in JS (closure capture) so the
+  // worklet only animates numeric padding/alpha — keeps the worklet
+  // simple and avoids reading shared-value strings on the UI thread,
+  // which May 4 2026 PM live testing tied to a white-screen hang on
+  // dock collapse/expand. When `heroBrightness` later resolves the
+  // component re-renders and useAnimatedStyle is recreated with the
+  // new closure value (no shared-value mirroring needed).
+  const heroChipR = heroBrightness === 'light' ? 255 : 20;
+  const heroChipG = heroBrightness === 'light' ? 255 : 14;
+  const heroChipB = heroBrightness === 'light' ? 255 : 28;
   const heroChipStyle = useAnimatedStyle(() => {
     const bgAlpha = interpolate(collapseProgress.value, [0, 1], [0.45, 0]);
     const padH = interpolate(collapseProgress.value, [0, 1], [14, 0]);
-    const padV = interpolate(collapseProgress.value, [0, 1], [8, 0]);
-    const isLight = brightnessSV.value === 'light';
+    const padV = interpolate(collapseProgress.value, [0, 1], [6, 0]);
     return {
-      backgroundColor: isLight
-        ? `rgba(255, 255, 255, ${bgAlpha})`
-        : `rgba(20, 14, 28, ${bgAlpha})`,
+      backgroundColor: `rgba(${heroChipR}, ${heroChipG}, ${heroChipB}, ${bgAlpha})`,
       paddingHorizontal: padH,
       paddingVertical: padV,
     };
-  });
+  }, [heroChipR, heroChipG, heroChipB]);
 
   // Factory: every drag-target on the overlay (top header, tags region)
   // gets its own Pan instance built from the same recipe so they all
@@ -1114,21 +1109,32 @@ export default function FitResultScreen() {
         style={[styles.hero, { paddingTop: insets.top + spacing.md }, heroDockStyle]}
         pointerEvents="none"
       >
-        <Animated.View style={[styles.heroChip, heroChipStyle]}>
-          {safeBrand ? (
+        {/* Brand and product name each live in their OWN chip pill so
+            in collapsed mode they read as two distinct beats stacked
+            above the dock — like a music-player "artist" chip + "song
+            title" chip — instead of one wide pill containing both
+            (May 4 2026 PM user direction: "on collapsing to a dock,
+            the brand name should be in it's own opaque background and
+            the product name in it's own"). Both share heroChipStyle:
+            transparent + zero padding when expanded, frosted pill
+            with padding when collapsed. */}
+        {safeBrand ? (
+          <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle]}>
             <BrandHeading
               brand={safeBrand}
               height={20}
               color={heroBrightness === 'light' ? colors.text : 'rgba(255,255,255,0.95)'}
               uppercase
-              style={{ alignSelf: 'center', marginBottom: 6 }}
+              style={{ alignSelf: 'center' }}
               textStyle={[
                 styles.heroBrand,
                 heroBrightness === 'light' && styles.heroBrandOnLight,
               ]}
               testID="hero-brand"
             />
-          ) : null}
+          </Animated.View>
+        ) : null}
+        <Animated.View style={[styles.heroChip, heroChipStyle]}>
           <Text
             style={[
               styles.heroName,
@@ -1224,15 +1230,20 @@ export default function FitResultScreen() {
                 </View>
                 {priceDisplay && (
                   <View style={styles.priceColumn}>
-                    <View style={styles.pricePill}>
-                      <Text style={styles.priceText}>{priceDisplay}</Text>
-                    </View>
+                    {/* Affordability $ sits BEFORE the price (May 4
+                        2026 PM): the user reads "£ — £42" or
+                        "££ — £42" left-to-right where the $ chip
+                        sets up the budget context, then the actual
+                        price lands. Was vertically stacked above. */}
                     <AffordabilityIcon
                       price={product.price}
                       range={priceRange}
                       size="sm"
                       color={colors.textSecondary}
                     />
+                    <View style={styles.pricePill}>
+                      <Text style={styles.priceText}>{priceDisplay}</Text>
+                    </View>
                   </View>
                 )}
               </View>
@@ -1719,12 +1730,18 @@ const styles = StyleSheet.create({
     right: spacing.sm,
     alignItems: 'center',
   },
-  // Inner pill wrapping brand + name. Padding + bg are animated by
-  // heroChipStyle. borderRadius stays static (pill shape) — when
-  // padding is 0 (expanded) the rounded corners are invisible.
+  // Inner pill wrapping brand OR name (two separate chips per the
+  // May 4 2026 PM split). Padding + bg are animated by heroChipStyle.
+  // borderRadius stays static (pill shape) — when padding is 0
+  // (expanded) the rounded corners are invisible.
   heroChip: {
     alignItems: 'center',
     borderRadius: borderRadius.lg,
+  },
+  // Brand chip — sits ABOVE the name chip with a small gap so the
+  // two pills read as separate beats when collapsed.
+  heroChipBrand: {
+    marginBottom: 4,
   },
   heroBrand: {
     ...typography.overline,
@@ -1910,12 +1927,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  // Vertical stack: price pill on top, $/$$/$$$ chip beneath. Lets us
-  // surface affordability without competing with the verdict label for
-  // horizontal real-estate.
+  // Horizontal row (May 4 2026 PM): $/$$/$$$ chip → price pill,
+  // reading L-to-R as "budget context → actual price". Was a vertical
+  // stack until the user flipped it ("budget indicator $ shows up
+  // below price. It should show up right before the price tag").
   priceColumn: {
-    alignItems: 'flex-end',
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginLeft: spacing.sm,
   },
   pricePill: {

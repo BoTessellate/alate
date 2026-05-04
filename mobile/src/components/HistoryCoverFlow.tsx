@@ -431,20 +431,14 @@ export default function HistoryCoverFlow({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    // History deck sits flex-end (cards anchored toward the bottom of
-    // the available area) with a paddingBottom that floats them just
-    // above the FitDetailBar pill on HistoryScreen. paddingBottom is
-    // hand-tuned to ≈ (pill bottom-offset + pill height + small gap),
-    // so the deck appears to dock onto the pill like Vision Pro's
-    // cover-flow + now-playing bar.
-    //
-    // Bumped 200 → 240 (May 4 2026) in tandem with the pill's bottom
-    // 130 → 155 lift — keeps the gap between deck-bottom and pill-top
-    // tight (~15-20 px) and pulls the cards' visual centre slightly
-    // higher into the viewport so they read as deliberately framed
-    // rather than slumped against the pill.
-    justifyContent: 'flex-end',
-    paddingBottom: 240,
+    // Centre the deck vertically in whatever space remains above the
+    // groupedFooter on HistoryScreen (May 4 2026 PM). Was flex-end
+    // with paddingBottom while the pill was absolute-positioned —
+    // now the pill is inline below this view in the parent's column,
+    // so the cards just need to centre in their own flex:1 region.
+    // No paddingBottom needed; the parent column handles all spacing
+    // explicitly via the groupedFooter style.
+    justifyContent: 'center',
   },
   scrollContent: {
     alignItems: 'center',

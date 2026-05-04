@@ -269,20 +269,15 @@ export default function HistoryScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View testID="history-screen" style={styles.container}>
-        {/* Sub-heading meta is now the only header line (the "History"
-            display title was retired May 3 2026 — felt redundant since
-            the tab nav already labels the screen). Sub-heading bumped
-            +3pt so it carries the section on its own without the
-            display title above it. */}
-        <View style={styles.header}>
-          <Text style={styles.headerMeta} testID="history-meta">
-            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
-          </Text>
-        </View>
-
-        {/* Vision Pro song-shuffle-style deck — occupies the full area below
-            the header. Detail bar + clear link FLOAT on top of it so they
-            don't steal vertical space that the elongated cards need. */}
+        {/* Deck — flex:1 so it takes the upper area and centres the
+            cards vertically. The meta line + pill + clear-history
+            sit BELOW the deck as a single grouped footer (May 4 2026
+            PM user direction: "history page stats line, cards and
+            pill shaped needs to move a few pixels lower… group these
+            3 elements and center them"). The footer block is inline
+            (not absolute) so it consumes its own space and the deck
+            naturally compresses upward — no more empty void between
+            cards and pill. */}
         <HistoryCoverFlow
           entries={entries}
           onCardTap={handleCardTap}
@@ -290,11 +285,11 @@ export default function HistoryScreen() {
           onActiveIndexChange={setActiveIndex}
         />
 
-        {/* Floating footer: detail pill + clear link. Absolute-positioned so
-            the cover flow underneath uses the full height, and card images
-            don't get cropped to make room. `pointerEvents="box-none"` lets
-            scroll gestures pass through the empty area around the pill. */}
-        <View style={styles.floatingFooter} pointerEvents="box-none">
+        <View style={styles.groupedFooter}>
+          <Text style={styles.headerMeta} testID="history-meta">
+            {entries.length} {entries.length === 1 ? 'item' : 'items'} · {goodFits} good {goodFits === 1 ? 'fit' : 'fits'}{rangeConfigured ? ` · ${withinBudget} within budget` : ''}
+          </Text>
+
           <View style={styles.detailBarWrap}>
             <FitDetailBar entry={activeEntry} />
           </View>
@@ -591,25 +586,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // --- Floating footer overlay (pill + clear link above the floating
-  //     tab bar).
-  //     History bottom-offset history:
-  //       72 (May 3 AM) — too far from deck, gap looked accidental
-  //       130 (May 3 PM) — closer, but Clear-history sat too near
-  //                        the navbar (~30 px gap, felt cramped)
-  //       155 (May 4 round 2) — Clear-history now ~55-60 px above
-  //                        the navbar, comfortable; cover-flow's
-  //                        paddingBottom in HistoryCoverFlow.root
-  //                        bumped in step so the deck still meets
-  //                        the pill with a small, intentional gap
-  //                        ("look like they are part of the same
-  //                        interface" — user feedback).
-  floatingFooter: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 155,
+  // --- Grouped footer (May 4 2026 PM) ---
+  // Replaces the prior absolute-positioned floatingFooter. Stacks
+  // [meta line, FitDetailBar pill, Clear-history link] inline as a
+  // single block UNDER the deck so the four elements (deck + meta +
+  // pill + link) read as ONE cohesive group, per user direction
+  // ("group these 3 elements and center them"). The deck above
+  // (HistoryCoverFlow flex:1) compresses to fill what remains so the
+  // overall composition vertically balances. paddingBottom clears
+  // the floating tab bar (~88 px = insets.bottom + 10 + 64) with
+  // breathing room — Clear-history now sits ~50-60 px above the
+  // navbar instead of the cramped ~30 px from the prior 130-bottom
+  // value. gap between rows controls breathing room within the group.
+  groupedFooter: {
     alignItems: 'center',
+    paddingTop: spacing.sm,
+    paddingBottom: 110,
+    gap: spacing.sm,
   },
   detailBarWrap: {
     paddingBottom: spacing.xs,

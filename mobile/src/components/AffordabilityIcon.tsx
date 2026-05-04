@@ -72,24 +72,28 @@ export default function AffordabilityIcon({
   const symbols = resolvedSymbol.repeat(result.scale);
   const tone = result.overBudget ? warningColor : color;
 
-  // Approx chip height: padV*2 + lineHeight (~fontSize * 1.4). Use
-  // that as a minWidth so a single-$ chip renders as a circle / soft
-  // square rather than an oblong (May 4 2026 user feedback: "single
-  // $ shows up in an oblong shaped element"). For 2-/3-$ counts the
-  // intrinsic text width exceeds this floor and the chip flexes
-  // wider — pill shape preserved.
-  const minWidth = Math.round(padV * 2 + fontSize * 1.4);
+  // Single-$ chips render as a perfect circle. Earlier minWidth-only
+  // attempt left the chip oblong-tall because the labelSmall mixin
+  // sets lineHeight: 18, making total height ~22 px while the
+  // computed minWidth was ~19 (May 4 2026 PM live test). Forcing both
+  // explicit width and height for the single-symbol case sidesteps
+  // RN's text-flow sizing entirely and guarantees a circle. For 2-/
+  // 3-symbol counts the text intrinsic width exceeds the chip height,
+  // so we drop back to natural padding-based sizing — the chip
+  // stretches into a horizontal pill, which is the correct shape for
+  // "$$" / "$$$".
+  const isSingleSymbol = result.scale === 1;
+  const chipDim = Math.round(padV * 2 + fontSize + 8); // height ≈ width for circle
+  const sizingStyle = isSingleSymbol
+    ? { width: chipDim, height: chipDim, paddingVertical: 0, paddingHorizontal: 0 }
+    : { paddingVertical: padV, paddingHorizontal: padH };
 
   return (
     <View
       style={[
         styles.chip,
-        {
-          paddingVertical: padV,
-          paddingHorizontal: padH,
-          minWidth,
-          borderColor: result.overBudget ? warningColor : tone,
-        },
+        sizingStyle,
+        { borderColor: result.overBudget ? warningColor : tone },
         style,
       ]}
       testID={testID ?? `affordability-${result.scale}${result.overBudget ? '-over' : ''}`}
@@ -118,10 +122,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     alignSelf: 'flex-start',
     flexDirection: 'row',
+    // Center BOTH axes — required for the single-$ circular variant
+    // (where width === height) so the glyph sits dead-centre instead
+    // of nudging top-right because of text baseline offset.
     alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
-    ...typography.labelSmall,
+    // Don't spread `typography.labelSmall` — its lineHeight: 18 was
+    // pushing the chip total height beyond the square-circle
+    // calculation. Specify only what we need.
+    fontFamily: typography.labelSmall.fontFamily,
+    fontWeight: typography.labelSmall.fontWeight,
     letterSpacing: 0.6,
+    textAlign: 'center',
   },
 });
