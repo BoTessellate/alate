@@ -523,10 +523,13 @@ const styles = StyleSheet.create({
     letterSpacing: 2.2,
   },
   heroVerseWrap: {
-    // Tightened 14 → 4 so ALATE and the verse read as a single
-    // hero unit. Verse is the dominant element; the eyebrow is just
-    // a tag above it.
-    marginTop: 4,
+    // ALATE → verse spacing iteration:
+    //   14 (initial) — too far apart
+    //   4 (May 2 2026)  — read as a single hero unit
+    //   6 (May 4 late-PM) — bumped +2 px per user direction "Give
+    //                       some more space between Alate and 'paste
+    //                       anything...' by 2px on the home screen".
+    marginTop: 6,
   },
   heroVerse: {
     ...typography.displayLarge,

@@ -208,7 +208,16 @@ function MainTabs() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text,
-        tabBarItemStyle: { opacity: 1 },
+        // Transparent active-tab background so React Navigation's
+        // platform default (a translucent white pill behind the
+        // focused icon on Android) doesn't draw inside the floating
+        // tab bar. Showed up as a "white block" mid-height of the
+        // navbar on the History page (May 4 2026 late-PM, where the
+        // page bg is now white-dominant — the platform indicator
+        // was previously hidden by the dark gradient).
+        tabBarActiveBackgroundColor: 'transparent',
+        tabBarInactiveBackgroundColor: 'transparent',
+        tabBarItemStyle: { opacity: 1, backgroundColor: 'transparent' },
       }}
     >
       <Tab.Screen

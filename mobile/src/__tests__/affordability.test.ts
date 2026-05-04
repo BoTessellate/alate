@@ -12,10 +12,24 @@ describe('computeAffordability', () => {
     expect(computeAffordability(null as any, range)).toBeNull();
   });
 
-  it('returns null when price currency mismatches range currency', () => {
-    expect(
-      computeAffordability({ amount: 50, currency: 'USD' }, range)
-    ).toBeNull();
+  it('returns a result with currencyMismatch=true when currencies differ', () => {
+    // May 4 2026 late-PM behaviour change: was returning null on
+    // currency mismatch, which surprised users when they switched
+    // their range currency in settings ("changing currency in
+    // settings completely removed the affordability circle from
+    // product fit screen"). Now we still bucket the raw amount
+    // (no FX conversion) and flag `currencyMismatch: true` so the
+    // UI can render a softer treatment if it wants.
+    const result = computeAffordability({ amount: 50, currency: 'USD' }, range);
+    expect(result).not.toBeNull();
+    expect(result?.currencyMismatch).toBe(true);
+    // 50 sits in the middle third of [20, 100] → scale 2.
+    expect(result?.scale).toBe(2);
+  });
+
+  it('flags currencyMismatch=false when currencies match', () => {
+    const result = computeAffordability({ amount: 50, currency: 'GBP' }, range);
+    expect(result?.currencyMismatch).toBe(false);
   });
 
   it('returns 1 ($) for prices at or below min', () => {

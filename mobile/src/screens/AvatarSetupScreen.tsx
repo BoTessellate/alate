@@ -268,7 +268,13 @@ const chipStyles = StyleSheet.create({
   chipLabel: {
     ...typography.labelLarge,
     color: colors.text,
-    fontSize: 12,
+    // Bumped 12 → 15 on May 4 2026 late-PM ("increase font size of
+    // all options on the body profile page. Not headings or anything
+    // else, only headings of what's inside the pill boxes. Leave the
+    // description of these headings the same size"). Description
+    // (chipDescription below) stays at 10 — only the option heading
+    // moves.
+    fontSize: 15,
   },
   chipLabelSelected: {
     color: colors.primary,
@@ -717,8 +723,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: fontFamily.primary,
-    fontSize: 12,
-    lineHeight: 17,
+    // Was 12 / lineHeight 17. Bumped to 14 / 19 on May 4 2026 late-PM
+    // ("body profile subheading needs to increase in font size -
+    // same as the subheading for 'Gender'. The 'how do you shop'
+    // text"). Now matches `sectionSubtitle` (typography.caption =
+    // 14 / 19).
+    fontSize: 14,
+    lineHeight: 19,
     color: colors.textMuted,
   },
   progressContainer: {
