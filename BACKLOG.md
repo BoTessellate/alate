@@ -125,6 +125,94 @@ Investigation steps:
      `.toString()` before scraping, OR `.trim()` + strip fragments
      before the `isValidUrl` check.
 
+### Apple-TV-style "expand from card" transition for History → FitResult
+
+User direction May 5 2026 PM: "history → fit screen transition is
+currently a slide right (?) effect, it needs to be expand like how
+Apple TV does it to be precise". Currently the global Stack
+screenOptions sets `animation: 'slide_from_right'` (iOS-style on
+both iOS + Android). Apple TV's "expand from card" is a
+shared-element transition — the tapped card morphs in place, scales
+up to fill the screen, and the destination's hero image continues
+that scale.
+
+**Why deferred:** native-stack alone can't do this. Needs
+`react-native-reanimated` v3 shared transitions (or
+`react-native-shared-element`), bound elements on both sides
+(history coverflow card + FitResult hero image), and a layout
+animator that crossfades the chrome around the morphing image.
+Estimated half-day implementation + risk of regressions in the
+already-tuned cover-flow animation.
+
+**Implementation plan:**
+
+  1. **Library check.** We're on `react-native-reanimated` v4 per
+     the May 4 worklets-mock comment in `jest.setup.js`. v3+ ships
+     shared-element transitions out of the box (no `react-native-
+     shared-element` dependency required). Confirm the API surface
+     hasn't changed in v4 vs the v3 docs.
+
+  2. **Tag both ends with the same `sharedTransitionTag`:**
+       - **History side** (`HistoryCoverFlow.tsx`,
+         `CoverFlowCard`'s `<Image source={{uri: entry.productImage}}>`
+         per-card): wrap in `<Animated.Image>` with
+         `sharedTransitionTag={\`hero-image-${entry.id}\`}`.
+       - **FitResult side** (`FitResultScreen.tsx`'s product image
+         backdrop, line ~1042 `<Image source={{uri: product.image}}>`):
+         same wrap + same tag computed from `activeEntry?.id` (or
+         `historyEntryId` route param).
+
+  3. **Override the per-screen animation.** Stack default is
+     `slide_from_right`. Override on `FitResult`'s screen options:
+     `animation: 'fade'` (or `'none'`) so the shared-transition
+     drives the visual instead of the stack slide. The
+     fade-on-other-elements + image-morph-in-place is what reads
+     as "expand from card".
+
+  4. **Tune the spring.** Pass
+     `sharedTransitionStyle={(values) => 'worklet'; ...}` if the
+     default spring overshoots — Apple TV's expand is critically
+     damped, no bounce. Likely `{ damping: 24, stiffness: 220 }`.
+
+  5. **Reverse path.** Going BACK from FitResult to History: the
+     same shared element animates in reverse (hero image shrinks
+     back into the cover-flow slot). Reanimated handles this
+     automatically when the source tag is still mounted.
+
+  6. **Edge cases:**
+       - **History entry deleted while FitResult is open.** Source
+         tag unmounts — reanimated will fall back to a cross-fade.
+         Acceptable.
+       - **FitResult opened from Home (URL-paste flow), not
+         History.** No source tag to morph from; default fade
+         transition runs. Acceptable.
+       - **Cover-flow rubber-band animation**. The card-tap fires
+         `navigation.navigate`; reanimated captures the source's
+         current transform. Confirm rubber-band overshoot doesn't
+         leave the source mid-spring when the tag is captured.
+
+  7. **Test plan.**
+       - History → tap card → FitResult: image morphs.
+       - Back from FitResult: image morphs back.
+       - History → tap → FitResult → swipe-sift to sibling → back:
+         image morph back to original card (or new sibling card —
+         decide UX).
+       - Home → paste URL → FitResult: standard fade in (no
+         source).
+       - Reduce-motion enabled: shared transitions must be
+         skipped (set sharedTransitionStyle to a no-op when
+         `useReducedMotion()` returns true).
+
+  8. **Files touched:**
+       - `mobile/src/components/HistoryCoverFlow.tsx` — wrap card
+         image with `Animated.Image` + tag.
+       - `mobile/src/screens/FitResultScreen.tsx` — wrap hero
+         image with `Animated.Image` + tag, plus per-screen
+         `animation: 'fade'` override in route options OR in
+         `mobile/src/navigation/AppNavigator.tsx`.
+       - Optional: `mobile/src/utils/useReducedMotion.ts` (if
+         not already there) for the a11y guard.
+
 ## P1 — near-term polish
 
 ### Apply the Supabase migration for `blocked_brands`
