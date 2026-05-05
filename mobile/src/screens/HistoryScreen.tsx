@@ -21,7 +21,6 @@ import { computeAffordability } from '../utils/affordability';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import HistoryCoverFlow from '../components/HistoryCoverFlow';
 import FitDetailBar from '../components/FitDetailBar';
-import HeadingImage from '../components/HeadingImage';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -221,20 +220,15 @@ export default function HistoryScreen() {
           style={StyleSheet.absoluteFill}
         />
         <View testID="history-screen" style={styles.emptyContainer}>
-          {/* TAN Nightingale heading SVG. Per user direction May 4 2026
-              PM ("history does not have an svg title, still using
-              font") — switched from styled Text to HeadingImage so
-              the empty-state title renders in the same display face
-              as the other page titles. Falls back to Marcellus text
-              if the SVG asset is missing. */}
-          <HeadingImage
-            slot="history"
-            fallback="History"
-            height={56}
-            color={colors.text}
-            style={styles.emptyPageTitle}
-            textStyle={styles.pageTitle}
-          />
+          {/* No page-title heading on the empty state — the populated
+              History (deck view) renders no heading either, and showing
+              one only on the empty state created an inconsistency the
+              user flagged in the Play Store screenshot review (May 5
+              2026 PM: "history page doesn't have a heading, why is it
+              showing up on the screenshots"). Removed the HeadingImage
+              ("your history" SVG) along with its `emptyPageTitle` +
+              `pageTitle` styles. The "No fit checks yet" inner heading
+              still anchors the empty state. */}
           <View style={styles.emptyIconContainer}>
             <Feather name="clock" size={36} color={colors.primary} />
           </View>
@@ -358,13 +352,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: 0,
-  },
-  pageTitle: {
-    ...typography.displayMedium,
-    // Was '#fff' (text on dark gradient). Flipped to dark for the
-    // white-dominant backdrop (May 4 2026 late-PM re-skin). Drop
-    // the dark text-shadow entirely — pointless on a near-white bg.
-    color: colors.text,
   },
   // Numbers in this header line ("3 items · 3 good fits") render in
   // Viaoda Libre per user direction April 29 2026 — the digits feel
@@ -539,13 +526,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
-  },
-  // Empty-state "History" heading. The shared pageTitle style sits
-  // flush against the icon ring below it (centred container has no
-  // intrinsic gap). Add breathing room so the heading reads as the
-  // page title, not as a label glued to the icon.
-  emptyPageTitle: {
-    marginBottom: spacing.xl,
   },
   // Empty-state icon ring — light primary-tinted disc, readable on
   // the white-dominant gradient (May 4 2026 late-PM re-skin). Was

@@ -82,6 +82,7 @@ export default function AgeGateOverlay() {
             fallback="Before we begin"
             height={56}
             color={colors.text}
+            style={styles.titleSvgWrap}
             textStyle={styles.title}
           />
           <Text style={styles.body}>
@@ -132,6 +133,15 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignItems: 'center',
     gap: spacing.md,
+  },
+  // `alignSelf: 'center'` overrides HeadingImage.styles.wrap's default
+  // `alignSelf: 'flex-start'` (which left-aligned the SVG inside the
+  // centred card — user feedback May 5 2026 PM: "for all instances,
+  // 'before we begin' needs to be centered like the text beneath").
+  // Same pattern as AccountScreen.brandCtaTitleSvgWrap fixed for
+  // 'are you a brand?' on May 5 2026 earlier in the day.
+  titleSvgWrap: {
+    alignSelf: 'center',
   },
   title: {
     ...typography.displayMedium,
