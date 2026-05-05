@@ -375,11 +375,15 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.display,
     fontSize: 18,
     lineHeight: 24,
-    // Flipped from white-on-dark → dark-on-white for the May 4 2026
-    // late-PM re-skin. textSecondary (#4c4356) on the near-white
-    // gradient stops clears WCAG AA easily and reads as a deliberate
-    // brand-tinted dark grey rather than full ink-black.
-    color: colors.textSecondary,
+    // Iteration:
+    //   v1 (May 4 PM):   textSecondary (#4c4356) — user said "appears
+    //                    almost black on the device", wanted more
+    //                    purple-tinted.
+    //   v2 (May 5 AM):   colors.primary (#6a5f75) — mid-grey-purple
+    //                    that reads as a deliberate brand tint, still
+    //                    clears 4.5:1 against the white-dominant
+    //                    gradient stops.
+    color: colors.primary,
     marginTop: 4,
     textAlign: 'center',
   },
