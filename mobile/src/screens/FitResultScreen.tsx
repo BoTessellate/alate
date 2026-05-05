@@ -92,13 +92,17 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 // the verdict + price + stats row; fit concerns are hidden at that
 // point. The user drags the handle up/down to switch.
 const EXPANDED_H = Math.round(SCREEN_H * 0.7);
-// Collapsed dock height — tight enough to feel like a dock, wide enough
-// to keep the verdict + stats row + material + availability readable
-// without scrolling. Iterative bumps: 200 → 204 → 210 → 213 → 215 →
-// 213 (May 4 2026 late-PM revert per user "actually, it's the docked
-// overlay that's become taller" — the 213 → 215 bump pushed the
-// dock high enough that the hero customFitBadge tucked under it).
-const COLLAPSED_H = 213;
+// Collapsed dock height. Iteratively tuned: 200 → 204 → 210 → 213 →
+// 215 → 213 → 232 (May 5 2026 PM, +19 to fit a NEW divider beneath
+// statsRow). User direction: "the overlay must be visible from the
+// top to 2px below this line" — 'this line' is the new divider
+// separating statsRow from the concerns / meta region. Math:
+//   handle (8) + verdict header (~60) + divider1 (17) + stats (~64)
+//   + divider2 (17) + 2 px buffer = ~168 visible content + dock
+//   padding ≈ 232. If on-device the line still gets cut, bump in 2-3
+//   px increments — the dock's `overflow: hidden` clips precisely
+//   at this constant.
+const COLLAPSED_H = 232;
 const SIDE_PAD = spacing.lg;
 const SWIPE_THRESHOLD = 80; // px of horizontal drag before sift fires
 
@@ -405,7 +409,10 @@ export default function FitResultScreen() {
   // respectively" — large = expanded (was 4 → 2, -2 px), docked
   // (was 4 → 3, -1 px).
   const heroChipBrandStyle = useAnimatedStyle(() => {
-    const m = interpolate(collapseProgress.value, [0, 1], [3, 2]);
+    // Tightened May 5 2026 PM ("brand and product name must appear
+    // slightly tighter (bring brand name closer)"). Was [3, 2]
+    // (collapsed=3, expanded=2). Now [2, 1] — both down 1 px.
+    const m = interpolate(collapseProgress.value, [0, 1], [2, 1]);
     return { marginBottom: m };
   });
 
@@ -533,6 +540,20 @@ export default function FitResultScreen() {
     new Date(activeEntry.checkedAt).getTime() <
       new Date(lastChangedAt).getTime();
 
+  // Mirror `reevaluating` into a ref so useFocusEffect's callback can
+  // read it without being part of the dep array. Including
+  // `reevaluating` in deps caused the callback to re-create on every
+  // toggle, which under react-navigation's useFocusEffect re-runs the
+  // effect → re-fires runReevaluation → toggle again → loop.
+  // Stronger blink than the prior sift-only flicker (May 5 2026 user
+  // report: "Reevaluate blinking has become stronger on this build.
+  // Loading state of the button and banner flashes in and out of
+  // animation"). Ref break + smaller dep set fixes the loop.
+  const reevaluatingRef = useRef(false);
+  useEffect(() => {
+    reevaluatingRef.current = reevaluating;
+  }, [reevaluating]);
+
   useFocusEffect(
     useCallback(() => {
       const cameBackFromAvatarSetup =
@@ -541,14 +562,14 @@ export default function FitResultScreen() {
       if (cameBackFromAvatarSetup || isStale) {
         prevAvatarRef.current = avatar;
         wentToAvatarSetup.current = false;
-        if (!reevaluating && historyEntryId) {
+        if (!reevaluatingRef.current && (activeEntry?.id || historyEntryId)) {
           runReevaluation();
         }
       }
       // `lastChangedAt` deliberately included — when a user edits the
       // avatar in another tab, returning to this screen sees the new
       // timestamp and triggers stale-reeval without needing a button.
-    }, [avatar, lastChangedAt, isStale, reevaluating, historyEntryId])
+    }, [avatar, lastChangedAt, isStale, historyEntryId, activeEntry?.id])
   );
 
   useEffect(() => {
@@ -742,7 +763,18 @@ export default function FitResultScreen() {
    * preserved even if the storefront briefly 503'd.
    */
   const runReevaluation = async () => {
-    if (!avatar || !historyEntryId) return;
+    // Target the CURRENTLY-VISIBLE card, not the route's entry —
+    // when the user has sifted to a sibling, runReevaluation should
+    // refresh THAT card, not the original. Was causing two bugs
+    // before May 5 2026:
+    //   1. Re-eval ran scrape against the route URL (always card-A)
+    //      but the user was looking at card-B → wrong product.
+    //   2. updateEntry wrote back to historyEntryId (card-A's id),
+    //      so card-B's `checkedAt` never refreshed → isStale stayed
+    //      true → useFocusEffect kept re-firing → blinking banner.
+    const targetId = activeEntry?.id || historyEntryId;
+    const targetUrl = activeEntry?.url || url;
+    if (!avatar || !targetId) return;
     setReevaluating(true);
     try {
       // Step 1 — refresh product data from the URL. Price + sizes +
@@ -752,9 +784,9 @@ export default function FitResultScreen() {
       // we silently fall through to the cached data.
       let workingProduct = product;
       const enrichedFromScrape: { category?: string; material?: string; tags?: string[] } = {};
-      if (url) {
+      if (targetUrl) {
         try {
-          const scrapeResult = await scrapeProduct(url);
+          const scrapeResult = await scrapeProduct(targetUrl);
           if (scrapeResult.success && scrapeResult.data) {
             workingProduct = scrapeResult.data;
             // Surface the freshly-scraped product to the rest of the
@@ -781,7 +813,7 @@ export default function FitResultScreen() {
       const calibration = averageCalibration(calibrationGarments);
       const fitResult = await checkFit(
         {
-          id: historyEntryId,
+          id: targetId,
           product_name: workingProduct?.name || 'Unknown',
           category:
             enrichedFromScrape.category ||
@@ -819,7 +851,7 @@ export default function FitResultScreen() {
         // stale (unsanitised) brand even after a successful re-eval
         // on the History coverflow path. (April 29 2026 fix.)
         const refreshedBrand = sanitize(workingProduct?.brand);
-        updateEntry(historyEntryId, {
+        updateEntry(targetId, {
           warnings: newWarnings,
           fitScore: newScore,
           sizeRecommendation: newSizeRec
@@ -848,10 +880,10 @@ export default function FitResultScreen() {
         // regression fix).
         const refreshed = useFitHistoryStore
           .getState()
-          .entries.find((e) => e.id === historyEntryId);
+          .entries.find((e) => e.id === targetId);
         if (refreshed) {
           setSiblings((prev) =>
-            prev.map((s) => (s.id === historyEntryId ? refreshed : s))
+            prev.map((s) => (s.id === targetId ? refreshed : s))
           );
         }
       }
@@ -1353,6 +1385,13 @@ export default function FitResultScreen() {
               </View>
             )}
           </View>
+
+          {/* Hairline divider directly under the stats row. May 5 2026
+              PM user direction: "the line is missing when there's
+              some content (there should be a line)". Pairs with the
+              COLLAPSED_H bump so the dock cuts exactly 2 px past
+              this line — the user's snap-point breakpoint. */}
+          <View style={styles.divider} />
 
           {/* Re-eval banners — expanded only. Status indicators belong
               with the rest of the analysis detail; the dock should

@@ -128,9 +128,27 @@ function AccountCardView({
             <Feather name="log-in" size={18} color={colors.white} />
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
-          <Text style={styles.signInOptionalNote}>
-            Optional — your body profile and fit history work without signing in.
-          </Text>
+          {/* Sign-up promo — three brand benefits inline (May 5 2026
+              PM, replacing the prior "Optional — body profile and
+              history work without signing in" line). User direction
+              "promote signing up for an account like the one in the
+              screenshot. But keep it succinct. One lined like you
+              have put down right now". Lives INSIDE the white
+              GlassCard so the icon hue is brand-purple (`primary`)
+              for legibility — pure white icons on the near-white
+              card surface would be invisible. If a separate
+              dark-bg variant is wanted later, this row can move
+              outside the card. */}
+          <View style={styles.signInPromoRow}>
+            <Feather name="refresh-cw" size={12} color={colors.primary} />
+            <Text style={styles.signInPromoText}>Sync</Text>
+            <Text style={styles.signInPromoDot}>·</Text>
+            <Feather name="clock" size={12} color={colors.primary} />
+            <Text style={styles.signInPromoText}>History</Text>
+            <Text style={styles.signInPromoDot}>·</Text>
+            <Feather name="lock" size={12} color={colors.primary} />
+            <Text style={styles.signInPromoText}>Private</Text>
+          </View>
         </View>
       )}
     </GlassCard>
@@ -702,6 +720,31 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     paddingHorizontal: spacing.sm,
   },
+  // Sign-up promo row: icon · text · dot · icon · text · dot · …
+  // Single-line, succinct (per May 5 2026 PM user direction).
+  // Lives inside the white sign-in card; icons in brand-purple
+  // (`primary`) for legibility on the near-white surface.
+  signInPromoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  signInPromoText: {
+    fontFamily: fontFamily.primary,
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginLeft: 1,
+  },
+  signInPromoDot: {
+    fontFamily: fontFamily.primary,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginHorizontal: 2,
+  },
   googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1048,8 +1091,13 @@ const styles = StyleSheet.create({
   // Wrapper for the are-you-brand SVG (renders via HeadingImage).
   // marginBottom replaces the brandCtaTitle's previous marginBottom
   // since the SVG needs a non-text wrapper for spacing.
+  // `alignSelf: 'center'` overrides HeadingImage.styles.wrap's
+  // default `alignSelf: 'flex-start'` (which left-aligned the SVG
+  // inside the centred parent — user feedback May 5 2026 PM:
+  // "'are you a brand' needed to be centered like it's body text").
   brandCtaTitleSvgWrap: {
     marginBottom: spacing.sm,
+    alignSelf: 'center',
   },
   brandCtaTitle: {
     // Used as the styled-text fallback inside HeadingImage when the
