@@ -580,7 +580,14 @@ export default function AccountScreen() {
           accessibilityRole="button"
           accessibilityLabel="Are you a brand? Learn how to integrate alate with your store"
         >
-          <Text style={styles.brandCtaTitle}>are you a brand?</Text>
+          <HeadingImage
+            slot="are-you-brand"
+            fallback="are you a brand?"
+            height={36}
+            color="#fff"
+            style={styles.brandCtaTitleSvgWrap}
+            textStyle={styles.brandCtaTitle}
+          />
           <Text style={styles.brandCtaSubtitle}>
             Run an online store? Want to give your customers a better way to check size, and reduce return headaches? Plug your sizing into alate — your shoppers see fit confidence before they buy, and you see fewer "doesn't fit" returns.
           </Text>
@@ -674,10 +681,13 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  // Google account card
+  // Google account card. marginTop +2 px May 5 2026 ("lower position
+  // of the signin 'continue with..' container by 2px") — pushes the
+  // card slightly further from the page header.
   accountCard: {
     borderRadius: borderRadius.xl,
     padding: spacing.md,
+    marginTop: 2,
     marginBottom: spacing.lg,
   },
   signedOutWrap: {
@@ -1035,15 +1045,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     alignItems: 'center',
   },
+  // Wrapper for the are-you-brand SVG (renders via HeadingImage).
+  // marginBottom replaces the brandCtaTitle's previous marginBottom
+  // since the SVG needs a non-text wrapper for spacing.
+  brandCtaTitleSvgWrap: {
+    marginBottom: spacing.sm,
+  },
   brandCtaTitle: {
+    // Used as the styled-text fallback inside HeadingImage when the
+    // are-you-brand SVG asset isn't available (build pre-May 5 2026
+    // or asset bundling failed).
     ...typography.headingXL,
     color: '#fff',
     textAlign: 'center',
-    marginBottom: spacing.sm,
-    // No underline on the heading — user reverted that direction
-    // (April 29 2026, two passes apart): the underline at this size
-    // and weight on Viaoda Libre read clunky against the body. The
-    // sub-copy + tap target carry the "interactive" cue instead.
   },
   brandCtaSubtitle: {
     fontFamily: fontFamily.primary,

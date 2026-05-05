@@ -267,8 +267,12 @@ export default function FitResultScreen() {
   // expand.
   const cardLayoutStyle = useAnimatedStyle(() => ({
     height: interpolate(collapseProgress.value, [0, 1], [COLLAPSED_H, EXPANDED_H]),
-    left: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
-    right: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD]),
+    // SIDE_PAD - 1 each side: +2 px total overlay width vs. SIDE_PAD
+    // alone (May 5 2026 user direction "increase width of the
+    // product fit overlay by 2px"). Collapsed value stays at 0
+    // (full-bleed dock — unchanged).
+    left: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD - 1]),
+    right: interpolate(collapseProgress.value, [0, 1], [0, SIDE_PAD - 1]),
     bottom: interpolate(
       collapseProgress.value,
       [0, 1],
@@ -382,6 +386,15 @@ export default function FitResultScreen() {
       paddingHorizontal: padH,
       paddingVertical: padV,
     };
+  });
+  // Brand-chip marginBottom: 3 px when docked, 2 px when expanded.
+  // Per user direction May 5 2026 "bring the brand name closer by
+  // 2px and 1px to the product name in large and docked style
+  // respectively" — large = expanded (was 4 → 2, -2 px), docked
+  // (was 4 → 3, -1 px).
+  const heroChipBrandStyle = useAnimatedStyle(() => {
+    const m = interpolate(collapseProgress.value, [0, 1], [3, 2]);
+    return { marginBottom: m };
   });
 
   // Factory: every drag-target on the overlay (top header, tags region)
@@ -1128,7 +1141,7 @@ export default function FitResultScreen() {
             transparent + zero padding when expanded, frosted pill
             with padding when collapsed. */}
         {safeBrand ? (
-          <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle]}>
+          <Animated.View style={[styles.heroChip, styles.heroChipBrand, heroChipStyle, heroChipBrandStyle]}>
             <BrandHeading
               brand={safeBrand}
               height={20}
@@ -1363,7 +1376,17 @@ export default function FitResultScreen() {
               of real fit checks] have different analyzed information
               — which makes the app appear unreliable". The fix is
               consistent layout across cards. */}
-          {isExpanded && (
+          {/* Fit concerns section.
+              May 5 2026 user direction: "when docked, fit concerns
+              only reads a summary - this shouldn't be the case -
+              display the whole fit concern section but keep the
+              current copy for when fit is perfect..".
+              So:
+                - warnings.length > 0  → full section in BOTH states
+                - warnings.length === 0 → only the meta-row "None —
+                  fits comfortably" line in the collapsed state, plus
+                  the "No concerns flagged…" reassurance in expanded. */}
+          {(isExpanded || warnings.length > 0) && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>FIT CONCERNS</Text>
               {warnings.length > 0 ? (
@@ -1429,7 +1452,7 @@ export default function FitResultScreen() {
               - Expanded: full Material + Category rows as before
                 (Concerns themselves render in their own section
                 above this one). */}
-          {!isExpanded && (
+          {!isExpanded && warnings.length === 0 && (
             <View style={styles.metaSection}>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Fit concerns</Text>
@@ -1795,10 +1818,12 @@ const styles = StyleSheet.create({
   heroChip: {
     alignItems: 'center',
   },
-  // Brand chip — sits ABOVE the name chip with a small gap so the
-  // two pills read as separate beats when collapsed.
+  // Brand chip — sits ABOVE the name chip. marginBottom is animated
+  // at runtime via heroChipBrandStyle (2 px expanded → 3 px docked).
+  // Static value here is just the fallback when animations haven't
+  // initialised; same magnitude as the animated low-end.
   heroChipBrand: {
-    marginBottom: 4,
+    marginBottom: 2,
   },
   heroBrand: {
     ...typography.overline,
@@ -2271,9 +2296,15 @@ const styles = StyleSheet.create({
   },
 
   // --- Actions ---
+  // paddingHorizontal 1 (May 5 2026, "bring the buttons in by say
+  // half a pixel - if possible") — RN doesn't honour sub-pixel
+  // values reliably across Android densities, so 1 px each side
+  // (= 2 px total) is the closest-we-can-get-to-half-pixel-each-
+  // side without weird rounding.
   actionsSection: {
     gap: spacing.sm,
     marginTop: spacing.md,
+    paddingHorizontal: 1,
     width: '100%',
   },
   primaryButton: {

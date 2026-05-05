@@ -166,15 +166,13 @@ function MainTabs() {
           // side. 24+insets on bottom.
           left: 40,
           right: 40,
-          // Bottom offset reduced from +24 → +10 so the pill sits
-          // closer to the device gesture-bar without crowding it.
-          // Per user direction "drop the placement of the floating
-          // nav bar by a few more pixels, it floats a little too
-          // high right now". 10px clears the edge on phones with no
-          // home indicator; on devices with insets.bottom > 0 the
-          // safe-area inset already covers the gesture-bar so the
-          // +10 is pure breathing room.
-          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 10,
+          // Bottom offset history: +24 → +10 → +2 (May 5 2026, "can
+          // the nav bar go lower? place it as low as you can"). On
+          // phones with insets.bottom = 0 (no home indicator), the
+          // pill now sits 2 px from the screen edge. On indicator
+          // phones, insets.bottom keeps it clear of the system
+          // gesture bar.
+          bottom: (insets.bottom > 0 ? insets.bottom : 0) + 2,
           height: 64,
           // Rounded rectangle (May 3 2026) — matches the search-pill
           // and Recent card corner radius (borderRadius.xl = 16) on

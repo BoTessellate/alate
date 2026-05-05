@@ -1,12 +1,9 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   StatusBar,
   Image,
   ScrollView,
@@ -75,69 +72,41 @@ type NavigationProp = CompositeNavigationProp<
 export default function HomeScreen() {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
-  const [url, setUrl] = useState('');
-  // HomeScreen is now a pure URL-capture surface. Scrape, enrich,
-  // fit-check, brand-nudge, and blocked-brand UX have all moved into
-  // FitResult so the user only ever sees ONE loading screen between
-  // "I pasted a URL" and "here's the verdict". The Check Fit button
-  // has been removed too — the 700ms paste-debounce is the only
-  // trigger now. No validation state is needed because invalid URLs
-  // simply don't fire the auto-trigger.
+  // HomeScreen is now a "tap to read clipboard" surface. The URL
+  // TextInput + paste-debounce + auto-clipboard combo were retired
+  // May 5 2026 ("major bug alert! on page load, app automatically
+  // picks up clipboard and runs a scraper. it should only do it on
+  // trigger"). Scrape / enrich / fit-check still happen inside
+  // FitResult under a single FitLoader — we just navigate there with
+  // the URL.
   const { avatar } = useAvatarStore();
   const { entries: historyEntries } = useFitHistoryStore();
   // Most recent 3 for the "Recent" list per Claude Design mockup
   const recent = historyEntries.slice(0, 3);
   // Preserves URL across navigation to AvatarSetup so it auto-triggers on return
   const pendingUrlRef = useRef<string | null>(null);
-  // Auto-trigger debounce on paste
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track whether we've already consumed a clipboard URL this session,
-  // so a single product URL on the user's clipboard auto-fires once
-  // (when they open the app) but doesn't keep re-triggering on every
-  // tab focus. The "ref" not "state" pattern keeps the auto-fire path
-  // out of the render cycle.
-  const consumedClipboardUrlRef = useRef<string | null>(null);
+  // Status banner — shown briefly when the clipboard tap fails (no
+  // URL there, malformed URL, etc.). Auto-dismisses after 3s.
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      // If we just came back from AvatarSetup with a pending URL, auto-trigger
+      // If we just came back from AvatarSetup with a pending URL, auto-trigger.
+      // The pending-URL path is the ONLY auto-trigger left after May 5 2026
+      // ("major bug alert! on page load, app automatically picks up clipboard
+      // and runs a scraper. it should only do it on trigger") — the previous
+      // useFocusEffect that read the clipboard on every tab focus has been
+      // retired. Clipboard read now only fires when the user taps the
+      // explicit "Copy from clipboard" button below.
       if (pendingUrlRef.current && avatar) {
         const saved = pendingUrlRef.current;
         pendingUrlRef.current = null;
-        setUrl(saved);
         runCheck(saved);
         return;
       }
-      // Normal focus — reset the input so a stale paste doesn't sit
-      // there from a previous session.
-      setUrl('');
-
-      // Auto-clipboard pickup on tab focus (re-enabled May 3 2026).
-      // Reads the clipboard once per session; if it holds a valid URL
-      // that looks like a product page, it auto-fires the fit-check.
-      // The `consumedClipboardUrlRef` guard means a single URL only
-      // fires once — toggling tabs won't re-trigger the same URL.
-      //
-      // Was removed April 29 2026 over false-positive concerns (URL
-      // sitting in clipboard from a previous session). The product
-      // call has flipped: speed-of-paste matters more than the rare
-      // accidental fire, which the user can always back out of.
-      (async () => {
-        if (!avatar) return;
-        try {
-          const text = await Clipboard.getStringAsync();
-          if (!text) return;
-          if (consumedClipboardUrlRef.current === text) return;
-          if (!isValidUrl(text) || !looksLikeProductUrl(text)) return;
-          consumedClipboardUrlRef.current = text;
-          setUrl(text);
-          runCheck(text);
-        } catch {
-          // Clipboard access can fail on Android in restricted contexts;
-          // silently skip — the manual paste path still works.
-        }
-      })();
+      // Normal focus — clear any stale clipboard banner.
+      setClipboardError(null);
     }, [avatar])
   );
 
@@ -157,17 +126,43 @@ export default function HomeScreen() {
     navigation.navigate('FitResult', { url: targetUrl });
   }, [avatar, navigation]);
 
-  const handleUrlChange = (text: string) => {
-    setUrl(text);
-    // Auto-trigger on valid URL paste (debounced 700ms). Invalid /
-    // empty inputs simply don't fire — there's no submit button to
-    // gate against.
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    const trimmed = text.trim();
-    if (trimmed && isValidUrl(trimmed)) {
-      debounceTimer.current = setTimeout(() => runCheck(trimmed), 700);
+  // Explicit clipboard-button handler. Replaces the prior auto-pickup
+  // useFocusEffect AND the URL TextInput — per user direction May 5
+  // 2026 ("Instead of an input box, turn it into a button that reads,
+  // 'copy from clipboard'"). The button reads the clipboard when
+  // tapped, validates the URL, and fires runCheck. On failure it
+  // surfaces a short banner instead of silently doing nothing.
+  const handleCopyFromClipboard = useCallback(async () => {
+    setClipboardError(null);
+    let text = '';
+    try {
+      text = (await Clipboard.getStringAsync()) ?? '';
+    } catch {
+      setClipboardError("Couldn't read your clipboard. Try again.");
+      return;
     }
-  };
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setClipboardError('Your clipboard is empty.');
+      return;
+    }
+    if (!isValidUrl(trimmed)) {
+      setClipboardError('Clipboard text is not a valid URL.');
+      return;
+    }
+    if (!looksLikeProductUrl(trimmed)) {
+      setClipboardError("That doesn't look like a product page URL.");
+      return;
+    }
+    runCheck(trimmed);
+  }, [runCheck]);
+
+  // Auto-dismiss the banner after 3 s.
+  useEffect(() => {
+    if (!clipboardError) return;
+    const t = setTimeout(() => setClipboardError(null), 3000);
+    return () => clearTimeout(t);
+  }, [clipboardError]);
 
   // NOTE — earlier iteration showed a full-screen FitLoader on
   // HomeScreen during the scrape. That created a duplicate-loader
@@ -200,10 +195,9 @@ export default function HomeScreen() {
         end={{ x: 0.1, y: 0.95 }}
         style={StyleSheet.absoluteFill}
       />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* KeyboardAvoidingView retired May 5 2026 — there's no longer
+          a TextInput to avoid the keyboard for. */}
+      <View style={styles.container}>
         <ScrollView
           style={styles.container}
           // Tight bottom padding when the RECENT list is empty —
@@ -236,23 +230,31 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* Glass pill input + Check fit button — matches the design's
-              single-line input (no wrapping card) + pill CTA + share hint. */}
+          {/* "Copy from clipboard" button + share hint. Replaced the
+              prior URL TextInput + auto-clipboard-pickup combo on
+              May 5 2026 ("major bug alert! on page load, app
+              automatically picks up clipboard and runs a scraper. it
+              should only do it on trigger. And I'm changing this
+              trigger. Instead of an input box, turn it into a button
+              that reads, 'copy from clipboard'"). Privacy + UX win:
+              clipboard is only read when the user explicitly taps. */}
           <View style={styles.inputSection}>
-            <GlassCard style={styles.inputPill}>
-              <Feather name="link-2" size={18} color={colors.primary} style={styles.inputIcon} />
-              <TextInput
-                testID="url-input"
-                style={styles.inputField}
-                placeholder="paste a product url…"
-                placeholderTextColor={colors.textMuted}
-                value={url}
-                onChangeText={handleUrlChange}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-              />
-            </GlassCard>
+            <TouchableOpacity
+              testID="copy-from-clipboard"
+              style={styles.clipboardButton}
+              onPress={handleCopyFromClipboard}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Paste a product URL from your clipboard and check fit"
+            >
+              <Feather name="clipboard" size={18} color="#fff" />
+              <Text style={styles.clipboardButtonText}>Copy from clipboard</Text>
+            </TouchableOpacity>
+            {clipboardError && (
+              <View style={styles.clipboardError} testID="clipboard-error">
+                <Text style={styles.clipboardErrorText}>{clipboardError}</Text>
+              </View>
+            )}
 
             {/* Check Fit button intentionally removed. The 700ms paste-
                 debounce auto-triggers fit-check on any valid URL — a
@@ -377,7 +379,7 @@ export default function HomeScreen() {
             </View>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Bottom-edge fade — content "disappears into the darkness" where
           it meets the floating tab bar. Makes the glass tab bar read as
@@ -554,47 +556,65 @@ const styles = StyleSheet.create({
     // hero verse above it.
     fontFamily: 'Marcellus-Regular',
     fontSize: 16,
-    // Was textHigh (0.85) — 16px = 12pt is "normal text" per WCAG, so
-    // it needs 4.5:1. Sitting in the mid-zone of the gradient against
-    // ~#717085 only got it to 3.55:1. Bumped to textOpaque (0.92)
-    // which clears 4.5:1 across the whole gradient. May 3 2026 PM.
+    // textOpaque (0.92) clears WCAG AA on the dark gradient. Pre-May 3
+    // value was textHigh (0.85) which only got 3.55:1 at the gradient
+    // mid-zone.
     color: whiteAlpha.textOpaque,
     marginTop: 14,
     maxWidth: 300,
-    lineHeight: 21,
+    // Line distance bumped 21 → 26 May 5 2026 ("increase line
+    // distance of sub-heading on the home page"). Verse-to-tagline
+    // distance unchanged via marginTop above ("Keep the current
+    // distance between home verse and sub-heading. I like this..").
+    lineHeight: 26,
   },
-  // "your body" — typographically pulled out of the tagline onto its
-  // own line. Stays in Jost-Regular per user direction May 4 2026
-  // PM ("remove VL font on 'your body', keep it as jost"). The line
-  // break is the only emphasis; matches the rest of the tagline.
+  // "your body" — pulled onto its own line. Marcellus, line-break
+  // is the only emphasis (matches the rest of the tagline).
   heroTaglineEmphasis: {
     fontFamily: 'Marcellus-Regular',
     fontSize: 16,
-    lineHeight: 21,
+    lineHeight: 26,
     color: whiteAlpha.textOpaque,
   },
 
-  // --- Input section — glass pill + CTA + share hint ---
+  // --- Clipboard section (May 5 2026 rework) — solid button +
+  //     transient error banner. Replaces the prior URL TextInput +
+  //     auto-clipboard pickup. The button reads the clipboard only
+  //     when the user explicitly taps (privacy + UX).
   inputSection: {
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
-  inputPill: {
+  clipboardButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    justifyContent: 'center',
     gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderRadius: borderRadius.xl,
+    backgroundColor: colors.primary,
+    ...shadows.md,
   },
-  inputIcon: {
-    flexShrink: 0,
+  clipboardButtonText: {
+    fontFamily: fontFamily.primarySemiBold,
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#fff',
+    letterSpacing: 0.3,
   },
-  inputField: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingVertical: 0,
+  clipboardError: {
+    backgroundColor: 'rgba(255, 200, 122, 0.18)',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignSelf: 'center',
+    maxWidth: 320,
+  },
+  clipboardErrorText: {
+    ...typography.caption,
+    color: whiteAlpha.textOpaque,
+    textAlign: 'center',
   },
   shareHint: {
     ...typography.caption,

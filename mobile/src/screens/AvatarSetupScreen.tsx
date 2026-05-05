@@ -284,7 +284,12 @@ const chipStyles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     textAlign: 'center',
-    fontSize: 10,
+    // Bumped 10 → 13 May 5 2026 ("increasing size of sub-text on
+    // body profile sub-options (<160cm, a-b cup...)"). The earlier
+    // direction "Leave the description of these headings the same
+    // size" was reversed after device-testing — at 10 px the sub-
+    // descriptions read as illegible micro-print.
+    fontSize: 13,
   },
   chipDescriptionSelected: {
     color: colors.primary,
