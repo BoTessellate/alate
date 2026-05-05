@@ -229,6 +229,17 @@ export default function FitResultScreen() {
 
   // Sync local fit-result state whenever the sift index changes. Skip on
   // first mount — the lazy useState initialisers already handled that.
+  //
+  // Also CLEAR `reevaluating` + `reevaluated` here — the previous card's
+  // banner state must not bleed into the new card's view. May 5 2026 user
+  // report: "if I scroll too fast or back and forth a lot then
+  // 'reevaluating...' gets stuck and starts blinking in and out". Root
+  // cause: runReevaluation is async and writes setReevaluating(false) at
+  // the end; if the user sifts mid-flight, the now-stale `reevaluating`
+  // state stays true on the NEW card, then resolves later → flicker.
+  // Clearing on sift breaks the race: any in-flight reeval still runs
+  // (and persists its result to the store), but its visible banner is
+  // forgotten when the user navigates away.
   const mountedRef = useRef(false);
   useEffect(() => {
     if (!mountedRef.current) {
@@ -244,6 +255,7 @@ export default function FitResultScreen() {
       material: activeEntry.material,
       tags: activeEntry.tags,
     });
+    setReevaluating(false);
     setReevaluated(false);
   }, [localIndex]);
 

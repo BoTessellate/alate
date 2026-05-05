@@ -392,6 +392,16 @@ export default function AppNavigator() {
           contentStyle: {
             backgroundColor: colors.background,
           },
+          // iOS-style horizontal slide on every push, applied uniformly
+          // across iOS + Android. May 5 2026 user direction "can you
+          // make transitions smooth like how Apple does it?". Native
+          // stack already uses UIKit transitions on iOS; this prop
+          // forces the same slide_from_right on Android (Android's
+          // default is a fade + small Y shift). Native animation, no
+          // perceptible runtime cost. Modal screens (AvatarSetup +
+          // BrandIntegration) keep their slide-up behaviour because
+          // `presentation: 'modal'` overrides this default.
+          animation: 'slide_from_right',
         }}
       >
         <Stack.Screen
