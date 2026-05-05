@@ -59,6 +59,16 @@ jest.mock('../services/api', () => ({
   }),
 }));
 
+// Clipboard mock — overridable per-test via mockClipboard().
+const mockClipboard = (value: string) => {
+  const Clipboard = require('expo-clipboard');
+  Clipboard.getStringAsync.mockResolvedValueOnce(value);
+};
+jest.mock('expo-clipboard', () => ({
+  getStringAsync: jest.fn().mockResolvedValue(''),
+  setStringAsync: jest.fn(),
+}));
+
 // safe-area inset hook — return zeros for test env.
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -125,41 +135,63 @@ describe('HomeScreen', () => {
     expect(queryByText('Set up your body profile')).toBeNull();
   });
 
-  // The Check Fit button was removed in favour of the 700ms paste-
-  // debounce auto-trigger. The empty-input validation error is gone
-  // along with it (no submit path to validate anything against).
-  // Navigation tests below exercise the same flow via the auto-trigger.
+  // May 5 2026: TextInput retired; clipboard read happens only when
+  // the user taps the explicit "Copy from clipboard" button. Tests
+  // mock expo-clipboard to seed what the button finds.
 
-  it('routes to AvatarSetup when avatar missing + URL pasted', async () => {
+  it('routes to AvatarSetup when avatar missing + clipboard URL is valid', async () => {
+    mockClipboard('https://asos.com/products/foo');
     const { getByTestId } = render(<HomeScreen />);
     await act(async () => {
-      fireEvent.changeText(getByTestId('url-input'), 'https://asos.com/p/1');
+      fireEvent.press(getByTestId('copy-from-clipboard'));
     });
-    await act(async () => {
-      jest.advanceTimersByTime(750);
-    });
-    expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup');
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('AvatarSetup')
+    );
   });
 
-  it('auto-triggers navigation after 700ms debounce when user pastes a valid URL', async () => {
+  it('navigates to FitResult on clipboard tap with a valid product URL', async () => {
     setAvatar(true);
+    mockClipboard('https://zara.com/products/foo');
     const { getByTestId } = render(<HomeScreen />);
-    fireEvent.changeText(getByTestId('url-input'), 'https://zara.com/p/1');
 
-    // Before debounce fires nothing should have happened.
+    // Before tap: no nav fired.
     expect(mockNavigate).not.toHaveBeenCalledWith('FitResult', expect.anything());
 
     await act(async () => {
-      jest.advanceTimersByTime(750);
+      fireEvent.press(getByTestId('copy-from-clipboard'));
     });
 
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith(
         'FitResult',
-        expect.objectContaining({ url: 'https://zara.com/p/1' })
+        expect.objectContaining({ url: 'https://zara.com/products/foo' })
       )
     );
-    // No scrape call from HomeScreen — that lives in FitResult now.
+    // No scrape call from HomeScreen — FitResult owns scraping.
     expect(api.scrapeProduct).not.toHaveBeenCalled();
+  });
+
+  it('shows an error banner when the clipboard is empty', async () => {
+    setAvatar(true);
+    mockClipboard('');
+    const { getByTestId, findByTestId } = render(<HomeScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('copy-from-clipboard'));
+    });
+    const banner = await findByTestId('clipboard-error');
+    expect(banner).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('shows an error banner when clipboard text is not a URL', async () => {
+    setAvatar(true);
+    mockClipboard('hello world');
+    const { getByTestId, findByTestId } = render(<HomeScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('copy-from-clipboard'));
+    });
+    expect(await findByTestId('clipboard-error')).toBeTruthy();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

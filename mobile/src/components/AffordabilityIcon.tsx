@@ -72,27 +72,26 @@ export default function AffordabilityIcon({
   const symbols = resolvedSymbol.repeat(result.scale);
   const tone = result.overBudget ? warningColor : color;
 
-  // Single-$ chips render as a perfect circle. Earlier minWidth-only
-  // attempt left the chip oblong-tall because the labelSmall mixin
-  // sets lineHeight: 18, making total height ~22 px while the
-  // computed minWidth was ~19 (May 4 2026 PM live test). Forcing both
-  // explicit width and height for the single-symbol case sidesteps
-  // RN's text-flow sizing entirely and guarantees a circle. For 2-/
-  // 3-symbol counts the text intrinsic width exceeds the chip height,
-  // so we drop back to natural padding-based sizing — the chip
-  // stretches into a horizontal pill, which is the correct shape for
-  // "$$" / "$$$".
-  const isSingleSymbol = result.scale === 1;
-  const chipDim = Math.round(padV * 2 + fontSize + 8); // height ≈ width for circle
-  const sizingStyle = isSingleSymbol
-    ? { width: chipDim, height: chipDim, paddingVertical: 0, paddingHorizontal: 0 }
-    : { paddingVertical: padV, paddingHorizontal: padH };
+  // ALL three variants ($, $$, $$$) render as the same-size circle.
+  // User said the single-$ subtle circle reads well; making 2/3-$
+  // variants match means scaling the FONT down so multiple glyphs
+  // fit in the same circle (May 5 2026: "I really like the subtle
+  // design of the single $ … $$ and $$$ inside a circle instead of
+  // an oblong shape"). letterSpacing pulls glyphs tight.
+  const chipDim = Math.round(padV * 2 + fontSize + 8); // ~circle dim
+  const scaledFontSize =
+    result.scale === 1
+      ? fontSize        // 1 char — full font size
+      : result.scale === 2
+      ? Math.round(fontSize * 0.78) // 2 chars — slight shrink so they fit
+      : Math.round(fontSize * 0.6); // 3 chars — tighter shrink
+  const tightLetterSpacing = result.scale > 1 ? -0.6 : 0;
 
   return (
     <View
       style={[
         styles.chip,
-        sizingStyle,
+        { width: chipDim, height: chipDim, paddingVertical: 0, paddingHorizontal: 0 },
         { borderColor: result.overBudget ? warningColor : tone },
         style,
       ]}
@@ -106,7 +105,12 @@ export default function AffordabilityIcon({
       <Text
         style={[
           styles.text,
-          { fontSize, color: tone, fontWeight: result.overBudget ? '700' : '600' },
+          {
+            fontSize: scaledFontSize,
+            letterSpacing: tightLetterSpacing,
+            color: tone,
+            fontWeight: result.overBudget ? '700' : '600',
+          },
         ]}
       >
         {symbols}

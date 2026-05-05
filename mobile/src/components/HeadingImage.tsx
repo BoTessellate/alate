@@ -30,6 +30,7 @@ import HistorySvg from '../../assets/images/headings/history.svg';
 import ProfileSvg from '../../assets/images/headings/profile.svg';
 import BodyProfileSvg from '../../assets/images/headings/body-profile.svg';
 import BeforeWeBeginSvg from '../../assets/images/headings/before-we-begin.svg';
+import AreYouBrandSvg from '../../assets/images/headings/are-you-brand.svg';
 
 // ── Slot → SVG module registry ───────────────────────────────────
 // May 4 2026 — TAN Nightingale SVG path re-enabled per user direction
@@ -51,6 +52,7 @@ type Slot =
   | 'profile'        // "profile"
   | 'body-profile'   // "body profile"
   | 'before-we-begin' // "Before we begin" — AgeGateOverlay
+  | 'are-you-brand'  // "are you a brand?" — AccountScreen brand CTA
   | 'great-fit'      // text-only
   | 'some-concerns'  // text-only
   | 'may-not-fit';   // text-only
@@ -61,6 +63,7 @@ const SVG_BY_SLOT: Partial<Record<Slot, React.FC<{ width?: number; height?: numb
   profile: ProfileSvg,
   'body-profile': BodyProfileSvg,
   'before-we-begin': BeforeWeBeginSvg,
+  'are-you-brand': AreYouBrandSvg,
 };
 
 // ── Per-slot intrinsic aspect ratios (from tightened viewBoxes) ──
@@ -78,11 +81,19 @@ const SVG_ASPECTS: Record<Slot, number> = {
   // intrinsic aspect because `preserveAspectRatio="xMidYMid meet"`
   // (the default) preserves the SVG's intrinsic ratio when scaling
   // into our render box.
-  'home-verse': 369 / 257,        // viewBox "39 84 369 257"
+  // home-verse: re-measured May 5 2026 after the SVG was replaced
+  // (74 KB new export). Tightened to zero left-padding to fix the
+  // "tiny gap on the left" the user flagged ("very tiny gap on the
+  // left in the home verse svg which is causing mild visual
+  // disharmony"). Right padding kept symmetric.
+  'home-verse': 363 / 243,        // viewBox "42 90 363 243"
   history: 265 / 74,              // viewBox "107 180 265 74"
   profile: 332 / 118,             // viewBox "55 137 332 118"
   'body-profile': 346 / 93,       // viewBox "54 152 346 93"
   'before-we-begin': 289 / 65,    // viewBox "81 178 289 65"
+  // are-you-brand: new May 5 2026, replaces the styled-text "are you
+  // a brand?" CTA on the AccountScreen brand-CTA tile.
+  'are-you-brand': 457 / 85,      // viewBox "-1 180 457 85"
   'great-fit': 2.17,
   'some-concerns': 3.51,
   'may-not-fit': 3.23,

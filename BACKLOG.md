@@ -66,6 +66,65 @@ change needed.
 Rest of launch readiness — see `project_anti_patterns.md` checklist
 in memory.
 
+### Fabric / material extraction misses on certain storefronts
+
+User-flagged May 5 2026 — material/fabric details aren't being
+surfaced on the FitResult `MATERIAL` row for these representative
+URLs:
+
+- `https://www.armani.com/en-in/emporio-armani/short-sleeved-jumper-with-perforated-knit-cod-EW004675-AF25815-F1054/`
+  (Armani — likely a non-Shopify storefront with bespoke product
+  schema. The product name itself contains "perforated knit" so the
+  signal exists; we just don't extract it.)
+- `https://oshinsarin.in/products/felled-seam-set` (Oshin — Shopify;
+  the JSON product payload may not surface a `material` key, or
+  ours sits in a `tags` field we're not scanning for material hints.)
+
+Investigation steps when picked up:
+  1. Hit each URL via `scrapeProduct()` directly and inspect the
+     returned `material` field — null vs missing vs empty.
+  2. If null, check whether `inferMaterial({ title, tags })` in
+     `mobile/src/utils/productInference.ts` would catch the
+     keywords ("knit", "linen", "silk", "felled" etc.). The
+     keyword table may need extending.
+  3. For Armani specifically — the URL handle has the fabric type
+     baked in (`perforated-knit`), so a URL-handle pass in the
+     same inference step should be cheap to add.
+  4. Add the URLs as fixtures to `productInference.test.ts` so a
+     regression doesn't reintroduce empty material on these pages.
+
+Related but separate: user also reports that an Armani link sometimes
+fails via the share-route while pasting the same link works. That's
+a share-intent debounce / dedup question, NOT a scraper question;
+filed as its own backlog item below.
+
+### Share-intent route fails where direct paste succeeds (Armani)
+
+User-flagged May 5 2026: shared an Emporio Armani product link to
+the app via the system share-sheet → "this brand isn't on the
+platform" error. Pasted the SAME URL into the Home search bar →
+went through and rendered a fit card. Different code path, same
+URL.
+
+Hypothesis: `useShareIntentContext` may be passing a slightly
+different URL string (trailing whitespace, unwrapped fragment,
+URL-shortener redirect not yet followed). Or the share-intent
+handler's `isValidUrl()` check is rejecting on an edge case the
+direct-paste path doesn't reject on.
+
+Investigation steps:
+  1. Add a `captureMessage` (or console.log gated to __DEV__) at
+     the share-intent entry point in
+     `mobile/src/navigation/AppNavigator.tsx`'s `handleSharedUrl`
+     to capture the EXACT URL string + bytes (look for trailing
+     `\r`, whitespace, `?utm_*` differences vs the paste path).
+  2. Check the URL the home-paste path receives for the same
+     product — diff against share-intent's input.
+  3. If the share-intent URL has trailing whitespace / fragments
+     that the scrape rejects, normalise via `URL` constructor +
+     `.toString()` before scraping, OR `.trim()` + strip fragments
+     before the `isValidUrl` check.
+
 ## P1 — near-term polish
 
 ### Apply the Supabase migration for `blocked_brands`
