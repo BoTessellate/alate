@@ -145,19 +145,30 @@ const TORSO_OPTIONS: { label: string; value: TorsoType; description: string }[] 
 // example). Bust copy is generated dynamically from `genderToBustLabel`
 // at render time so the heading reads "Bust" / "Chest" depending on
 // the gender chip the user just tapped.
+//
+// Subtitles include posture context (May 5 2026 PM user direction:
+// "how would you describe your thighs needs to state that the person
+// is in standing position with their feet together/shoulder width
+// apart"). The chip descriptions reference contact / curvature that
+// only make sense from a specific stance — calling that out up
+// front avoids the user guessing.
 const STEPS = [
   { key: 'gender', title: 'Gender', subtitle: 'How do you shop?' },
   { key: 'height', title: 'Height', subtitle: 'How tall are you?' },
-  { key: 'shoulders', title: 'Shoulders', subtitle: 'How would you describe your shoulders?' },
+  {
+    key: 'shoulders',
+    title: 'Shoulders',
+    subtitle: 'Standing relaxed, arms by your side.',
+  },
   { key: 'bust', title: 'Bust', subtitle: 'What best describes your bust size?' },
-  { key: 'waist', title: 'Waist', subtitle: 'How defined is your waist?' },
+  { key: 'waist', title: 'Waist', subtitle: 'Standing relaxed — how defined is the curve?' },
   // Tummy slots between waist (silhouette curve) and hips (lower
   // body) so the flow reads top-to-bottom on the body.
   // Critical for non-stretch fabric fit — high-rise trousers,
   // pencil skirts, fitted shirts. Added beta April 29 2026.
   { key: 'tummy', title: 'Tummy', subtitle: 'How does your stomach sit when relaxed?' },
-  { key: 'hips', title: 'Hips', subtitle: 'How would you describe your hips?' },
-  { key: 'thighs', title: 'Thighs', subtitle: 'How would you describe your thighs?' },
+  { key: 'hips', title: 'Hips', subtitle: 'Standing with feet together.' },
+  { key: 'thighs', title: 'Thighs', subtitle: 'Standing with feet together.' },
   { key: 'torso', title: 'Torso Length', subtitle: 'How long is your torso relative to your legs?' },
 ];
 
@@ -371,6 +382,45 @@ export default function AvatarSetupScreen() {
   ).length;
 
   const canContinue = allFieldsFilled && !isProcessing;
+
+  // Auto-save (May 5 2026 PM): persist the avatar the moment ALL fields
+  // are filled, without waiting for a button tap. User direction: "it
+  // shouldn't be necessary for the user to tap the save button at the
+  // end. Detecting some change should be plenty enough". The store's
+  // `setAvatar` is no-op on identical inputs (deep-equal guard inside
+  // avatarStore), so this useEffect doesn't re-fire reevaluations on
+  // every chip tap once the values stabilise.
+  //
+  // Partial profiles aren't persisted — the Avatar type requires every
+  // field to be a definite value, and the stale-detection logic in
+  // FitResult depends on `setAvatar` writing only when the avatar is
+  // structurally complete.
+  useEffect(() => {
+    if (!allFieldsFilled) return;
+    setAvatar({
+      gender: gender!,
+      height_cm: height!,
+      shoulders: shoulders!,
+      bust: bust!,
+      waist: waist!,
+      tummy: tummy!,
+      hips: hips!,
+      thighs: thighs!,
+      torso_length: torso!,
+    });
+  }, [
+    allFieldsFilled,
+    gender,
+    height,
+    shoulders,
+    bust,
+    waist,
+    tummy,
+    hips,
+    thighs,
+    torso,
+    setAvatar,
+  ]);
 
   const handleContinue = async () => {
     if (!allFieldsFilled) return;
@@ -639,22 +689,36 @@ export default function AvatarSetupScreen() {
             />
           </View>
 
-          {/* Save Button */}
-          <TouchableOpacity
-            style={[styles.button, !canContinue && styles.buttonDisabled]}
-            onPress={handleContinue}
-            disabled={!canContinue}
-            testID="continue-button"
-            activeOpacity={0.8}
-          >
-            {isProcessing ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>
-                {pendingUrl ? 'Save & Check Fit' : 'Save Profile'}
-              </Text>
-            )}
-          </TouchableOpacity>
+          {/* Action button — May 5 2026 PM: profile auto-saves on
+              change (see useEffect on `allFieldsFilled` above). The
+              button is now CONTEXTUAL:
+                - pendingUrl flow (came in from share / paste with a
+                  product URL waiting): button reads "Check Fit Now"
+                  and navigates to FitResult on tap. Can't auto-
+                  navigate because the user might still be tweaking
+                  measurements before the fit check fires.
+                - edit flow (came in from Account → Edit profile or
+                  AppNavigator share intent): no explicit button
+                  needed. User taps the back chevron to return; the
+                  profile is already persisted. We render an empty
+                  spacer so the form keeps its bottom breathing room. */}
+          {pendingUrl ? (
+            <TouchableOpacity
+              style={[styles.button, !canContinue && styles.buttonDisabled]}
+              onPress={handleContinue}
+              disabled={!canContinue}
+              testID="continue-button"
+              activeOpacity={0.8}
+            >
+              {isProcessing ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Check Fit Now</Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.bottomSpacer} />
+          )}
 
           {!allFieldsFilled && (
             <Text style={styles.remainingNote}>
@@ -805,6 +869,12 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  // Empty spacer where the button used to live in edit-mode (no
+  // pendingUrl flow). Keeps the form's bottom breathing room
+  // consistent regardless of whether the action button renders.
+  bottomSpacer: {
+    height: spacing.xl,
   },
   buttonText: {
     ...typography.button,
