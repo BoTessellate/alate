@@ -1078,10 +1078,10 @@ const styles = StyleSheet.create({
   },
 
   // "are you a brand?" CTA — sits below the legal footer. Heading
-  // matches the rest of the heading typography (Viaoda Libre italic
-  // display serif at heading-XL weight) so the brand voice carries.
-  // Sub copy is body-small over the same dark gradient backdrop as
-  // the policy links above.
+  // matches the rest of the heading typography (display serif at
+  // heading-XL size) so the brand voice carries. Sub copy is
+  // body-small over the same dark gradient backdrop as the policy
+  // links above.
   brandCta: {
     marginTop: spacing.xxl,
     marginBottom: spacing.lg,

@@ -114,9 +114,8 @@ export default function BrandHeading({
     );
   }
 
-  // Fallback — Viaoda Libre via theme tokens. The italic-style display
-  // serif we use whenever the SVG path doesn't fire (no slug match, V2
-  // off in production, etc.).
+  // Fallback — display serif via theme tokens. Used whenever the SVG
+  // path doesn't fire (no slug match, V2 off in production, etc.).
   return (
     <Text
       accessibilityLabel={brand}

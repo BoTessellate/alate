@@ -548,12 +548,8 @@ const styles = StyleSheet.create({
   },
   heroTagline: {
     ...typography.body,
-    // Jost trial (May 3 2026): Home body text uses Jost (geometric
-    // humanist sans) while the rest of the app stays on Marcellus
-    // (roman serif). Override the family inline so the global
-    // typography token isn't affected — easy revert by removing this
-    // line. -1pt from body so the sub-heading doesn't dominate the
-    // hero verse above it.
+    // -1pt from body so the sub-heading doesn't dominate the hero
+    // verse above it.
     fontFamily: 'Marcellus-Regular',
     fontSize: 16,
     // textOpaque (0.92) clears WCAG AA on the dark gradient. Pre-May 3
@@ -787,10 +783,9 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   // Recent-card brand label — DELIBERATELY no fontFamily / fontWeight
-  // overrides: BrandHeading owns the typeface (Viaoda Libre via the
-  // SVG path or styled-text fallback) and 400 weight. We only set the
-  // visual treatment (size, letter-spacing, colour). Same lesson as
-  // HistoryCoverFlow.folioBrand — see comment there.
+  // overrides: BrandHeading owns the typeface (SVG path or styled-text
+  // fallback) and 400 weight. We only set the visual treatment (size,
+  // letter-spacing, colour). Same lesson as HistoryCoverFlow.folioBrand.
   recentBrand: {
     fontSize: 10,
     letterSpacing: 0.5,
