@@ -25,11 +25,11 @@ asking for a download.
 
 ## Account hygiene checklist (before posting)
 
-- [ ] Account age ≥ 3 months
-- [ ] Comment karma ≥ 100 (post in 5+ unrelated subs, build tone first)
-- [ ] Username is not `alate_team` / `try_alate` / etc.
-- [ ] No deleted/removed posts in last 30 days
-- [ ] Bio doesn't read like a press kit
+- [y] Account age ≥ 3 months
+- [y] Comment karma ≥ 100 (post in 5+ unrelated subs, build tone first)
+- [y] Username is not `alate_team` / `try_alate` / etc.
+- [y] No deleted/removed posts in last 30 days
+- [y] Bio doesn't read like a press kit
 
 ## Target subs — tier 1 (high signal, strict rules)
 
