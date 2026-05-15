@@ -18,11 +18,29 @@ export interface GoogleAuthConfig {
   iosClientId?: string;
 }
 
+/**
+ * Trim stray whitespace — including CR / LF — off an OAuth client ID.
+ *
+ * Why this exists (regression 2026-05-06): a client ID copy-pasted into
+ * a CI secret (GitHub Actions / EAS env) can pick up a trailing carriage
+ * return. babel-preset-expo then inlines `…googleusercontent.com\r` into
+ * the bundle verbatim, the auth request sends `client_id=…com%0D`, and
+ * Google rejects it with "OAuth client was not found / invalid_client".
+ * The `\r` is invisible in every UI that shows the secret, so it kept
+ * surviving "fixes". Trimming at the point of read makes the app immune
+ * regardless of secret hygiene. Returns `undefined` for empty / all-
+ * whitespace input so callers' `!!cfg.clientId` checks still work.
+ */
+export function sanitizeClientId(raw: string | undefined): string | undefined {
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 export function getGoogleAuthConfig(): GoogleAuthConfig {
   return {
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    clientId: sanitizeClientId(process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID),
+    androidClientId: sanitizeClientId(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID),
+    iosClientId: sanitizeClientId(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
   };
 }
 
