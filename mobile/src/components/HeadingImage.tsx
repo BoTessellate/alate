@@ -39,7 +39,7 @@ import AreYouBrandSvg from '../../assets/images/headings/are-you-brand.svg';
 // reason this registry was emptied; re-enabling now pairs with a
 // fresh device check. If the banding artefacts return on Pixel 2 XL,
 // flip the slots back to undefined here and the styled-text fallback
-// (Viaoda Libre via typography.display tokens) takes over again — no
+// (display serif via typography.display tokens) takes over again — no
 // other code change needed.
 //
 // The fit-result slots ('great-fit', 'some-concerns', 'may-not-fit')

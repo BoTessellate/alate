@@ -1938,11 +1938,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   customFitBadgeText: {
-    // Was 'DMSerifDisplay-Italic' — that font was retired when we
-    // moved to Viaoda Libre, then again when we moved to Marcellus.
-    // Reference was orphaned (silently fell back to system serif,
-    // making this badge read in a different face from everything
-    // else on the screen). Now routed through the registry.
+    // Route through the registry so the badge stays in the app face —
+    // a hardcoded fontFamily string silently falls back to system
+    // serif if it ever drifts from the bundled font.
     fontFamily: fontFamily.display,
     fontSize: 13,
     color: '#fff',
@@ -2035,18 +2033,9 @@ const styles = StyleSheet.create({
     // hero. Matches the visual weight of the size pill + stat row sitting
     // beside it.
     ...typography.headingM,
-    // Was Viaoda Libre (May 3 2026 trial). Flipped to Jost-Regular per
-    // May 4 2026 user direction: verdict text ('Great Fit', 'Some
-    // Concerns', 'May Not Fit Well') now reads in the geometric
-    // humanist sans for clarity at a glance — the italic display
-    // serif felt too editorial for what is functionally a status
-    // label. Jost is one of two faces we ship alongside VL (loaded
-    // in App.tsx as Jost-Regular / Jost-Light).
     fontFamily: 'Marcellus-Regular',
-    // Drop the headingM fontWeight (400) lookup pressure — Jost has
-    // a Regular variant loaded so the inherited '400' is honoured
-    // natively, no synthetic-bold trap. Spelled out explicitly to
-    // make the reviewer's job easier.
+    // Marcellus is Regular-only — keep '400' so Android doesn't
+    // synthesise fake bold (see anti-pattern #13).
     fontWeight: '400',
   },
   // verdictSub style retired May 4 2026 late-PM along with the
@@ -2139,9 +2128,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   statIconText: {
-    // No 900-weight DM Sans cut — use Bold (700) which is the heaviest
-    // we ship. The fontWeight: '900' below is preserved as a hint to
-    // RN's text engine but the actual face is Bold.
+    // Single-weight font — fontWeight stays '400' (anti-pattern #13).
     fontFamily: fontFamily.primaryBold,
     fontSize: 18,
     fontWeight: '400',
@@ -2209,9 +2196,8 @@ const styles = StyleSheet.create({
   // Section label — darkest text (`colors.text`) so the small-caps
   // overline visually OWNS the section above its body. The body
   // content underneath then drops to textSecondary or textMuted,
-  // creating a three-tier colour ramp. Lean on COLOUR for hierarchy
-  // since Viaoda Libre body weight options are limited and we want
-  // the same hierarchy logic to apply across heading-fonted regions.
+  // creating a three-tier colour ramp. Hierarchy leans on COLOUR
+  // since the app is single-weight (Marcellus Regular only).
   sectionLabel: {
     ...typography.overline,
     color: colors.text,

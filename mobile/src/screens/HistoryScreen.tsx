@@ -354,10 +354,9 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
   // Numbers in this header line ("3 items · 3 good fits") render in
-  // Viaoda Libre per user direction April 29 2026 — the digits feel
-  // editorial-deck instead of utilitarian when they're in the
-  // display serif. Slightly larger size + tighter line height to
-  // suit the heavier strokes.
+  // the display serif — the digits feel editorial-deck instead of
+  // utilitarian. Slightly larger size + tighter line height to suit
+  // the heavier strokes.
   headerMeta: {
     fontFamily: fontFamily.display,
     fontSize: 18,

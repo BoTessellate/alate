@@ -57,42 +57,13 @@ function App() {
   // fires, so the first visible frame renders in the real face, not a
   // fallback that would then snap over.
   const [fontsLoaded] = useFonts({
-    // Viaoda Libre retired May 4 2026 late-PM ("replace all VL font
-    // with jost please. I'm keeping only jost and tan nightingale").
-    // The ttf file is left on disk but no longer registered or
-    // referenced — Jost-Regular carries the display tier now and TAN
-    // Nightingale SVGs handle proper page-title chrome.
-    // DM Sans (Google Fonts, OFL) — body / label / button face,
-    // replacing the platform system serif (May 2 2026). Loaded as four
-    // discrete weight files because RN Android's font weight resolution
-    // is unreliable across sub-families (Medium and SemiBold register
-    // as their own family per the ttf name table — `'DM Sans Medium'`,
-    // `'DM Sans SemiBold'`). Reference each weight by its expo-font
-    // key directly in styles (`fontFamily: 'DMSans-Medium'`) instead of
-    // relying on the family + fontWeight resolver — same defensive
-    // pattern as Viaoda Libre.
-    //
-    // Each ttf is also bundled into
-    // `android/app/src/main/assets/fonts/` so RN Android's typeface
-    // manager can resolve by file basename — same belt-and-braces as
-    // Viaoda Libre (see project_regression_log.md font-binding saga).
-    'DMSans-Regular': require('./assets/fonts/DMSans-Regular.ttf'),
-    'DMSans-Medium': require('./assets/fonts/DMSans-Medium.ttf'),
-    'DMSans-SemiBold': require('./assets/fonts/DMSans-SemiBold.ttf'),
-    'DMSans-Bold': require('./assets/fonts/DMSans-Bold.ttf'),
-    // Marcellus (Google Fonts, OFL) — single-weight roman serif. Trial
-    // swap May 3 2026: replaces DM Sans on body / labels AND Viaoda
-    // Libre on headings to put the entire app on a single typographic
-    // voice. Font is single-weight (Regular only) so the
-    // medium/semibold/bold tokens point at the same file — Android
-    // synthesises bolder strokes where needed; expect uniform weight
-    // visually.
+    // Marcellus (Google Fonts, OFL) — single-weight roman serif. The
+    // app's only bundled font: body, labels, buttons AND headings all
+    // render in it (see theme.ts). Single-weight (Regular only) so
+    // every weight token points at this one file — Android synthesises
+    // bolder strokes where needed. Page-title chrome renders via TAN
+    // Nightingale SVG paths (HeadingImage), not a bundled face.
     'Marcellus-Regular': require('./assets/fonts/Marcellus-Regular.ttf'),
-    // Jost retired May 4 2026 late-PM ("replace all jost text with
-    // marcellus"). The ttf files (Jost-Regular.ttf, Jost-Light.ttf)
-    // are left on disk but no longer registered or referenced. Body
-    // + display tier all render in Marcellus-Regular now; page-title
-    // chrome continues to render via TAN Nightingale SVG paths.
   });
 
   const onLayoutReady = useCallback(() => {

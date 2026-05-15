@@ -4,48 +4,17 @@
  */
 
 // =============================================================================
-// FONT FAMILIES — two faces, four weights.
+// FONT FAMILIES — one face.
 // =============================================================================
-// The app uses two faces:
-//   - `primary*`: DM Sans (Google Fonts, OFL). Geometric humanist
-//     sans-serif. Replaces the platform system serif (May 2 2026)
-//     because the system serif rendered inconsistently across phones
-//     and read clinical against the Viaoda Libre display headings.
-//     Loaded as four discrete weight files (Regular / Medium /
-//     SemiBold / Bold) bundled via `useFonts` in App.tsx.
+// The app ships a single bundled font: Marcellus-Regular (Google
+// Fonts, OFL), a single-weight roman serif. It carries the entire
+// app — body, labels, buttons AND headings. Page-title chrome renders
+// via TAN Nightingale SVG paths (HeadingImage), not a bundled face.
 //
-//     Why four named tokens instead of one + fontWeight: RN Android's
-//     font weight resolver only walks within a single family, but DM
-//     Sans static ttfs split Medium and SemiBold into their own
-//     families per the name table (`'DM Sans Medium'`, `'DM Sans
-//     SemiBold'`) — so `fontFamily: 'DM Sans' + fontWeight: '500'`
-//     silently falls back to Regular or Bold. Solution: name each
-//     weight by its expo-font key (matches its file basename + ttf
-//     PostScript name) and pick the right token per role.
-//
-//   - `display`: Viaoda Libre (Google Fonts, OFL). Bundled via
-//     `useFonts` in App.tsx. Used for page titles + hero verses.
-//     Family name MUST be the exact string the ttf's name table
-//     reports for NameID 1, including the space — see anti-pattern
-//     #12 in `project_anti_patterns.md`.
-//
-// History: prior to May 2 2026 `primary` was `'serif'` (system serif).
-// Earlier still, the registry also exported `accent` (Georgia), `mono`
-// (system monospace), `fallback` (duplicate of primary), and
-// `displayLegacy` (DM Serif Display Italic — ttf deleted when we
-// moved to Viaoda Libre). None had any callsites; all were dropped
-// April 29 2026. Adding a new face needs an explicit reason.
-// May 3 2026 trial: collapse to a single typeface across the entire
-// app (Marcellus). Single-weight serif — every token points at the
-// same file. Bold/medium tokens stay in the registry so callers don't
-// have to change, but the rendered face is identical; visual hierarchy
-// has to come from size + colour + spacing instead of weight.
-//
-// May 4 2026 late-PM (round 2): Jost retired alongside the
-// already-retired Viaoda Libre. Back to a single-typeface trial —
-// Marcellus carries body AND display tier; page-title chrome still
-// renders via TAN Nightingale SVG paths (HeadingImage); Marcellus is
-// the styled-text fallback when an SVG slot isn't registered.
+// Every token below points at the same file. The medium/semibold/bold
+// names are kept so callers don't have to change, but the rendered
+// face is identical — visual hierarchy comes from size + colour +
+// spacing, not weight.
 //
 // Marcellus is single-weight (Regular only). All heading tokens MUST
 // stay at fontWeight: '400' — bumping to 700 silently falls back to
@@ -62,24 +31,14 @@ export const fontFamily = {
 // the serif display face stays consistent across the app.
 //
 // CRITICAL: heading tokens MUST NOT set `fontWeight: '700'` (or any
-// non-400 weight). Viaoda Libre is shipped as Regular only — when
-// styles request weight 700, Android's font manager fails the lookup
-// (no `ViaodaLibre-Regular_bold.ttf` exists) and silently falls back
-// to the system serif Bold (Noto Serif Bold), which produced the
-// "headings render in plain serif bold, not Viaoda Libre" regression
-// of April 29 2026 (~5 install cycles spent chasing it). Keep all
-// heading tokens at `fontWeight: '400'`. The Viaoda Libre face has
-// enough display character on its own; synthetic bold is a trap.
+// non-400 weight). Marcellus is shipped as Regular only — when styles
+// request weight 700, Android's font manager fails the lookup and
+// silently falls back to the system serif Bold (Noto Serif Bold).
+// That class of bug cost ~5 install cycles to chase down once. Keep
+// all heading tokens at `fontWeight: '400'`; synthetic bold is a trap.
 //
-// History: earlier versions forced `textTransform: 'lowercase'` for
-// an editorial feel, but the user moved to title-case page headings
-// (April 29 2026 — "Camel case page headings"). Whatever case the
-// source string uses is what renders. Page titles in title case;
-// poetic / phrase headings in sentence case.
-// Headings now render in Marcellus too (May 3 2026 trial — single
-// typeface across the whole app). Same single-weight constraint
-// (Marcellus is Regular-only) so heading tokens stay at
-// fontWeight: '400'; visual hierarchy comes from size + spacing.
+// Whatever case the source string uses is what renders — page titles
+// in title case, poetic / phrase headings in sentence case.
 const headingSerif = {
   fontFamily: fontFamily.display,
 };
@@ -238,10 +197,9 @@ export const typography = {
     fontFamily: fontFamily.primarySemiBold,
     fontSize: 16,
     // Marcellus is single-weight (Regular only). fontWeight: '600'
-    // forced Android to synthesise a fake bold on top of the Regular
-    // file — read as "thick" headings on the fit hero (May 3 2026
-    // user feedback). Drop to '400' so the rendered face is the
-    // designed regular. Restore to '600' if we revert to DM Sans.
+    // forces Android to synthesise a fake bold on top of the Regular
+    // file — reads as "thick" headings on the fit hero. Keep '400'
+    // so the rendered face is the designed regular.
     fontWeight: '400' as const,
     lineHeight: 24,
   },
@@ -272,9 +230,8 @@ export const typography = {
     lineHeight: 21,
   },
 
-  // Labels & Buttons — fontWeight dropped to '400' during the
-  // Marcellus trial so Android doesn't synthesise fake medium on a
-  // single-weight font. Restore to '500' if reverting to DM Sans.
+  // Labels & Buttons — fontWeight stays '400' so Android doesn't
+  // synthesise fake medium on the single-weight font.
   labelLarge: {
     fontFamily: fontFamily.primaryMedium,
     fontSize: 17,

@@ -589,15 +589,11 @@ const styles = StyleSheet.create({
   // Folio brand — text style overrides applied to the BrandHeading
   // fallback path (the wrap when no SVG is registered for this slug).
   // Critical: NO `fontFamily` or `fontWeight` here — that would stomp
-  // BrandHeading's Viaoda Libre + 400 weight and force the brand
-  // name into system serif, which is the wrong voice for this
-  // surface. Per April 29 2026 user feedback ("SUMMER AWAY rendered
-  // as bold sans-serif on the History card") — the fix is to keep
-  // visual treatment (size, colour, shadow) here and let BrandHeading
-  // own the typeface.
+  // BrandHeading's app face + 400 weight and force the brand name
+  // into system serif, which is the wrong voice for this surface.
+  // Keep visual treatment (size, colour, shadow) here and let
+  // BrandHeading own the typeface.
   folioBrand: {
-    // Was Viaoda Libre (May 3 2026 trial). Migrated to Jost-Regular
-    // May 4 2026 late-PM ("keeping only jost and tan nightingale").
     fontFamily: 'Marcellus-Regular',
     fontSize: 22,
     color: '#fff',
@@ -607,13 +603,11 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
-  // Folio price — Viaoda Libre per user direction April 29 2026.
-  // Display serif on the digit makes the price read as editorial
-  // not utilitarian. Drop fontWeight to 400 (single-weight font;
-  // anything else falls back to system serif bold and we lose the
-  // display character — same trap as headings, see anti-pattern
-  // #12 in project_anti_patterns.md). Slightly larger and tighter
-  // letterSpacing for the heavier glyphs.
+  // Folio price — display serif on the digit makes the price read as
+  // editorial not utilitarian. fontWeight stays 400 (single-weight
+  // font; anything else falls back to system serif bold and loses the
+  // display character — see anti-pattern #13). Slightly larger and
+  // tighter letterSpacing for the heavier glyphs.
   folioPrice: {
     fontFamily: fontFamily.display,
     fontSize: 16,
