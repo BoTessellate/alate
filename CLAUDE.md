@@ -1,5 +1,26 @@
 # Alate — Claude Code Instructions
 
+## How to communicate with me — ALWAYS (unless I say otherwise)
+
+Every reply must be structured in this exact order:
+
+1. **What is needed** — in plain, simple words. No technical jargon.
+   Save the jargon for the PR description or any document you're asked
+   to prepare.
+2. **What needs to be done by me** — the actions only the user can take.
+3. **What can be done by you** — the actions Claude can do and take off
+   the user's hands.
+4. **Summary of what was done / needs doing** — brief, only if a task
+   was assigned.
+5. **Summary of documents updated / to be updated, and why** — brief,
+   only if a task was assigned.
+
+## Security — OWASP is non-negotiable
+
+Follow OWASP guidance at all times. Any violation of OWASP is, by
+definition, an anti-pattern — treat it with the same weight as the
+rules in `project_anti_patterns.md`.
+
 ## Project
 React Native Android app (Expo 55, RN 0.81.5, React 19). Monorepo: `/mobile` (app) + `/backend` (Vercel API).
 
