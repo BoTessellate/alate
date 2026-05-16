@@ -20,12 +20,16 @@ Steps marked 🔴 are yours to do.
 | 🟢 | Fresh upload keystore generated (`67:6B:08:…:93:FE`) | done |
 | 🟢 | CI secrets updated (`ANDROID_KEYSTORE`, `KEYSTORE_PASSWORD`, `KEY_PASSWORD`) | done |
 | 🟢 | Certificate for Google exported (`upload_certificate.pem`) | done |
+| 🟢 | `.aab` built + signed with the new key (CI run 25961723942) | done |
 | 🟢 | Google SSO CRLF bug fixed (`sanitizeClientId`, PR #117) | done |
 | 🔴 | **Step 1** — submit the cert for upload key reset | YOU |
-| 🔴 | **Step 2** — distribute the stopgap APK to testers | YOU |
-| 🔴 | **Step 3** — register SHA-1s in Google Cloud Console | YOU |
-| 🔴 | **Step 4** — confirm closed-testing tester list | YOU |
-| 🔴 | **Step 5** — after reset clears: rebuild + upload `.aab` | YOU + Claude |
+| 🔴 | **Step 2** — register SHA-1s in Google Cloud Console | YOU |
+| 🔴 | **Step 3** — confirm closed-testing tester list | YOU |
+| 🔴 | **Step 4** — after reset clears: upload the `.aab` to closed testing | YOU |
+
+**No rebuild needed** — the `.aab` from CI run 25961723942 is already
+signed with the new upload key. Once the reset clears, that exact file
+uploads straight to closed testing.
 
 ---
 
@@ -37,7 +41,7 @@ Steps marked 🔴 are yours to do.
 | New upload keystore (BACK THIS UP) | `C:\Users\mailt\Documents\alate-keystore\alate-upload.keystore` |
 | Keystore password | `C:\Users\mailt\Documents\alate-keystore\keystore-password.txt` — **move into your password manager, then delete this file** |
 | New upload key SHA-1 | `67:6B:08:6B:53:6D:5B:04:33:71:E8:87:D0:70:07:E8:F0:41:93:FE` |
-| Stopgap APK for testers | `C:\Users\mailt\Documents\alate-tester-apk\alate-1.0.0-test.apk` |
+| `.aab` to upload to closed testing | `C:\Users\mailt\Documents\alate-release\app-release.aab` |
 | Package name | `com.tessellate.alate` |
 
 ---
@@ -65,29 +69,7 @@ You'll get an email when it's done. Nothing else can be done to speed it.
 
 ---
 
-## Step 2 — 🔴 Give testers the stopgap APK (do this now, don't wait)
-
-The closed-testing track is blocked until Step 1 clears. To get testers
-moving immediately, send them the APK to sideload directly:
-
-1. File: `C:\Users\mailt\Documents\alate-tester-apk\alate-1.0.0-test.apk`
-2. Send it to testers (Drive link, WhatsApp, email — any channel).
-3. Tester instructions:
-   - Open the file on the phone.
-   - Allow **"Install unknown apps"** for the app they opened it with
-     (Files / Chrome / WhatsApp).
-   - Install. Done.
-
-This APK has the Google SSO CRLF fix and all current changes. It is the
-same code that will go to the Play closed-testing track.
-
-**Note:** when testers later move to the Play closed-testing build, they
-must **uninstall** this sideloaded APK first (signature differs — Play
-re-signs with Google's app-signing key). One-time, per tester.
-
----
-
-## Step 3 — 🔴 Register SSO signing fingerprints (Google Cloud Console)
+## Step 2 — 🔴 Register SSO signing fingerprints (Google Cloud Console)
 
 So Google Sign-In works on every install variant. Open **Google Cloud
 Console → APIs & Services → Credentials → the Android OAuth client**
@@ -101,7 +83,8 @@ Add these SHA-1 fingerprints (the field accepts multiple):
 | *App signing key SHA-1* | Play Console → App integrity → App signing → **"App signing key certificate"** | Play-Store-delivered installs |
 
 Copy the **App signing key** SHA-1 straight off that Play Console page.
-Save in Cloud Console — propagates in minutes.
+Save in Cloud Console — propagates in minutes. Can be done any time, in
+parallel with Step 1.
 
 > This is belt-and-suspenders. The CRLF fix already repairs the observed
 > 401. Whether the browser-based sign-in flow strictly enforces SHA-1 is
@@ -109,11 +92,12 @@ Save in Cloud Console — propagates in minutes.
 
 ---
 
-## Step 4 — 🔴 Confirm the closed-testing tester list
+## Step 3 — 🔴 Confirm the closed-testing tester list
 
 Play Console → **Test and release → Testing → Closed testing → your
 track → Testers**. Add testers by email list or Google Group. Needs to
-exist before Step 5's build goes live to anyone.
+exist before the Step 4 release can reach anyone. Can be done any time,
+in parallel with Step 1.
 
 > **Production gate (later, not now):** if your Play developer account is
 > post-Nov-2023, promoting to *production* requires 12+ testers running
@@ -123,18 +107,18 @@ exist before Step 5's build goes live to anyone.
 
 ---
 
-## Step 5 — 🔴 After the reset email arrives: rebuild + upload
+## Step 4 — 🔴 After the reset email arrives: upload the `.aab`
 
-1. Tell Claude (or trigger it yourself): **"reset cleared, rebuild"** →
-   GitHub Actions → run the **Build Android APK** workflow on `master`.
-   It produces a fresh `.aab` signed with the new upload key.
-2. Download the `alate-release.aab` artifact from the workflow run.
-3. Play Console → **Closed testing → Create new release → Upload** the
-   `.aab`. It will be accepted now (key matches).
-4. Roll out the release. Testers on the track get it; they uninstall the
-   sideloaded stopgap APK and install from Play.
+1. Play Console → **Test and release → Testing → Closed testing → your
+   track → Create new release**.
+2. **Upload** the `.aab`: `C:\Users\mailt\Documents\alate-release\app-release.aab`
+   — it is already signed with the new upload key, so it is accepted now
+   that the reset has cleared.
+3. Fill in release notes, **Save**, **Review release**, **Roll out**.
+4. Closed testing is live. Testers on the track get the build from Play.
 
-Done. Closed testing is live.
+> Only rebuild if code changes after this point. The current `.aab`
+> already carries the Google SSO CRLF fix + all current changes.
 
 ---
 
