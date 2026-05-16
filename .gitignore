@@ -70,3 +70,13 @@ tmpclaude-*-cwd
 /*.jpg
 /*.jpeg
 /ui.xml
+
+# Android signing keystores — NEVER commit a signing key (OWASP).
+# The real upload keystore lives OUTSIDE the repo at
+# C:\Users\mailt\Documents\alate-keystore\ on purpose. These patterns
+# are defensive: if a keystore ever gets copied into the repo, git
+# refuses to stage it.
+*.keystore
+*.jks
+keystore-password.txt
+alate-keystore/
