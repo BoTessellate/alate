@@ -12,6 +12,42 @@ deleting them.
 
 ## P0 — pre-App-Store launch
 
+### Move `googleUser` from AsyncStorage to `expo-secure-store`
+
+**Path:** `mobile/src/store/accountStore.ts` — the `account-storage`
+zustand `persist` currently uses `createJSONStorage(() => AsyncStorage)`.
+
+`googleUser` (`{ id, email, name, picture }`) is persisted in
+**plaintext AsyncStorage**. The OAuth access token is NOT persisted
+(used transiently in `GoogleSignInCardConfigured` then discarded —
+keep it that way), so this is the only signed-in artefact at rest.
+
+**Severity:** low. It's the user's own email/name on the user's own
+device; the genuinely sensitive data (body measurements) is already
+device-local by design (anti-pattern #4). Flagged during the OWASP
+review of the sign-in path (2026-05-06) under **Mobile M9 — Insecure
+Data Storage**. Acceptable for closed testing; tighten before public
+launch.
+
+**Fix:** swap the persist storage adapter to a thin
+`expo-secure-store`-backed implementation (Keychain on iOS, Keystore
+on Android). `expo-secure-store` has a per-item size cap (~2 KB) but
+the `googleUser` object is far under it. Adapter shape:
+
+```ts
+import * as SecureStore from 'expo-secure-store';
+const secureStorage = {
+  getItem: (k: string) => SecureStore.getItemAsync(k),
+  setItem: (k: string, v: string) => SecureStore.setItemAsync(k, v),
+  removeItem: (k: string) => SecureStore.deleteItemAsync(k),
+};
+```
+
+TDD: extend `accountStore.test.ts` to assert the secure adapter is
+used and round-trips. Note migration — existing testers signed in
+under the AsyncStorage key will appear signed-out once after the
+swap; acceptable (sign-in is optional, one re-tap).
+
 ### "Get in touch" on the BrandIntegration page needs a real destination
 
 **Path:** `mobile/src/screens/BrandIntegrationScreen.tsx` →
