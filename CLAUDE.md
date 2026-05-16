@@ -21,6 +21,13 @@ Follow OWASP guidance at all times. Any violation of OWASP is, by
 definition, an anti-pattern — treat it with the same weight as the
 rules in `project_anti_patterns.md`.
 
+## User-facing docs — use the template
+
+Any step-by-step / runbook / how-to doc prepared for the user must
+follow [`docs/_USER_DOC_TEMPLATE.md`](./docs/_USER_DOC_TEMPLATE.md):
+plain-language "what this is" → numbered "what you need to do" with real
+links → "how to verify it worked". No jargon in the instructions.
+
 ## Project
 React Native Android app (Expo 55, RN 0.81.5, React 19). Monorepo: `/mobile` (app) + `/backend` (Vercel API).
 
