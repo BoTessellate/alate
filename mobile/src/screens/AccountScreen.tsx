@@ -34,7 +34,9 @@ import { useAccountStore, GoogleUser } from '../store/accountStore';
 import { usePriceRangeStore } from '../store/priceRangeStore';
 import { RootStackParamList, MainTabParamList } from '../navigation/AppNavigator';
 import { captureError } from '../utils/sentry';
-import FitCalibrationCard from '../components/FitCalibrationCard';
+// FitCalibrationCard import removed — the "calibrate from a garment you
+// own" feature is parked for v2 (2026-05-17). The card was imported here
+// but never rendered; see BACKLOG.md and FitCalibrationCard.tsx.
 import GlassCard from '../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import HeadingImage from '../components/HeadingImage';

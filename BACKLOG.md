@@ -344,6 +344,42 @@ Out of scope for v1 — purely a query layer on the v1 table.
 
 ## P2 — features planned for v2
 
+### "Calibrate from a garment you own" — parked for v2
+
+**Status:** parked 2026-05-17. Code kept on disk, not deleted.
+
+The feature: the user records garments they already own that fit well
+(brand + size + perfect/tight/loose); the app estimates their real cm
+measurements and averages them into the calibration data used on every
+fit check — a strong size-recommendation signal.
+
+**Why parked:**
+- The UI (`mobile/src/components/FitCalibrationCard.tsx`) was already
+  not rendered anywhere — the feature was dark.
+- The backend `calibrate-garment` action sends body measurements to a
+  third-party AI (Claude). That conflicts with the "body data doesn't
+  go to third parties" posture (anti-pattern #4) and would have to be
+  disclosed in the privacy policy + Play Data Safety form.
+
+**What's on disk (dormant, commented as PARKED):**
+- `mobile/src/components/FitCalibrationCard.tsx` — the UI card.
+- `calibrateGarment` in `mobile/src/services/api.ts` — the API call.
+- `handleCalibrateGarment` in `backend/api/ai.ts` — the endpoint.
+- `mobile/src/store/calibrationStore.ts` — still wired into `checkFit`
+  (passes calibration data when present); harmless while empty.
+
+**Before un-parking in v2:**
+1. Decide whether calibration must use an AI at all — a non-AI option
+   is a generic size-chart table (size + gender → standard cm, adjusted
+   for fit feedback). Cheaper, no third-party body-data transfer, but
+   less brand-specific. See the 2026-05-17 analysis in chat / regression
+   log.
+2. If it keeps the AI: update the privacy policy + Play Data Safety
+   declaration to disclose body measurements going to the AI provider,
+   and reconcile with anti-pattern #4.
+3. Re-render `FitCalibrationCard` (re-add the import + JSX in
+   `AccountScreen`).
+
 ### ~~Shopify availability section on the fit card~~ — SHIPPED v1.1
 
 Done — `mobile/src/utils/availability.ts` + persisted on
