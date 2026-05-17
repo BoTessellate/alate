@@ -40,9 +40,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors, spacing, typography, shadows, borderRadius, glass, primaryAlpha, textAlpha, statusAlpha, whiteAlpha, fontFamily } from '../constants/theme';
 import { sanitize } from '../utils/sanitize';
 import { computeEffectiveFitScore } from '../utils/effectiveFitScore';
-// `enrichProduct` import removed — enrichment is paused (2026-05-17);
-// see the ENRICH PAUSED comment in the fit-check flow below.
-import { checkFit, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
+import { checkFit, enrichProduct, extractBrandFromUrl, scrapeProduct, ScrapedProduct, FitWarning } from '../services/api';
 import { useAvatarStore } from '../store/avatarStore';
 import { useFitHistoryStore } from '../store/fitHistoryStore';
 import { usePriceRange } from '../store/priceRangeStore';
@@ -659,16 +657,39 @@ export default function FitResultScreen() {
           tags: workingProduct.tags,
         });
       } else {
-        // ENRICH PAUSED — 2026-05-17, user direction. The Claude-based
-        // enrichment that filled category / material / tags for
-        // non-Shopify-structured scrapes is paused to cut AI cost.
-        // `enrichedData` stays null here, so the checkFit call below
-        // falls back to a generic `category: 'clothing'` with no
-        // material/tag-aware warnings. The backend
-        // /api/ai?action=enrich endpoint is also short-circuited — see
-        // backend/api/ai.ts (ENRICH_PAUSED). To resume: restore the
-        // enrichProduct call here, re-add `enrichProduct` to the import
-        // from '../services/api', and flip ENRICH_PAUSED in the backend.
+        // RESILIENCE STEP — do not remove to "save a call". The scrape
+        // did NOT return structured category/tags (non-Shopify-style
+        // storefront), so without enrichment the checkFit below would
+        // fall back to a generic `category: 'clothing'` and lose all
+        // material/tag-aware warnings. Enrichment asks Claude/Gemini to
+        // fill those gaps so the fit check stays accurate for the long
+        // tail of stores. See backend/api/ai.ts handleEnrich for the
+        // full rationale + the 2026-05-17 pause/restore history.
+        try {
+          const enrichResult = await enrichProduct({
+            name: workingProduct.name || 'Unknown Product',
+            image_url: workingProduct.image,
+            description: workingProduct.description,
+            price: workingProduct.price?.amount,
+            currency: workingProduct.price?.currency,
+          });
+          if (enrichResult.success && enrichResult.product) {
+            setEnrichedProduct(enrichResult.product);
+            enrichedData = enrichResult.product;
+          } else {
+            captureError(new Error('Enrichment returned success:false'), {
+              feature: 'product-enrichment',
+              productName: workingProduct.name,
+              url,
+            });
+          }
+        } catch (enrichError) {
+          captureError(enrichError, {
+            feature: 'product-enrichment',
+            productName: workingProduct.name,
+            url,
+          });
+        }
       }
 
       const calibration = averageCalibration(calibrationGarments);
