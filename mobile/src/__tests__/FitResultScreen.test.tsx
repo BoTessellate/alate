@@ -4,8 +4,10 @@
  * This screen has two branches the user can hit:
  *
  *   1. "Live" mode — we just scraped a product on HomeScreen and pushed here.
- *      On mount it calls enrichProduct + checkFit, shows a loader, then renders
- *      the score card + size recommendation + action buttons.
+ *      On mount it calls checkFit, shows a loader, then renders the score
+ *      card + size recommendation + action buttons. (Claude enrichment is
+ *      paused as of 2026-05-17 — the screen no longer calls enrichProduct;
+ *      non-structured scrapes fall back to a generic category.)
  *
  *   2. "History" mode — user tapped a row in HistoryScreen. The precomputed
  *      fit result is passed via route params so no network calls are made.
@@ -293,8 +295,10 @@ describe('FitResultScreen', () => {
       expect(entry.fitScore).toBe('great');
     });
 
-    it('does not crash if enrichProduct rejects', async () => {
-      (api.enrichProduct as jest.Mock).mockRejectedValueOnce(new Error('enrich down'));
+    it('renders the moderate verdict on a non-structured scrape (enrich paused)', async () => {
+      // Enrichment is paused (2026-05-17) — a scrape without structured
+      // category/tags goes straight to checkFit with a generic category.
+      // This exercises that path and the moderate-verdict rendering.
       (api.checkFit as jest.Mock).mockResolvedValueOnce({
         success: true,
         fit_score: 'moderate',

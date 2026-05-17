@@ -37,6 +37,31 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Product name is required' });
   }
 
+  // ── ENRICH PAUSED — 2026-05-17, user direction ───────────────────
+  // The Claude/Gemini product enrichment is paused to cut AI cost.
+  // We short-circuit HERE (server-side) rather than only removing the
+  // mobile caller, so that already-installed app versions — which
+  // still hit this endpoint — also stop incurring AI spend.
+  //
+  // The product is returned unchanged. Downstream `check-fit` degrades
+  // gracefully: FitResultScreen falls back to `category: 'clothing'`
+  // with no material/tag-aware warnings when those fields are absent.
+  //
+  // To resume: set ENRICH_PAUSED to false. The original enrichment
+  // body below is untouched and runs again when the flag flips.
+  const ENRICH_PAUSED = true;
+  if (ENRICH_PAUSED) {
+    return res.status(200).json({
+      success: true,
+      product,
+      model_used: 'enrich-paused',
+      color_extraction: 'none',
+      color_hex_codes: [],
+      saved_to_db: false,
+    });
+  }
+  // ── end ENRICH PAUSED ────────────────────────────────────────────
+
   try {
     const enrichedProduct = await enrichProduct(product as EnricherRawProduct, {
       demoMode: DEMO_MODE
@@ -213,7 +238,17 @@ async function handleFitCheck(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-/** Calibrate user measurements from a garment they own */
+/**
+ * Calibrate user measurements from a garment they own.
+ *
+ * PARKED FOR V2 — 2026-05-17, user direction. The mobile UI for this
+ * feature (`FitCalibrationCard`) is not rendered anywhere, so this
+ * endpoint has no live caller. It is also the only path that would
+ * send body measurements to a third-party AI (Claude) — keeping it
+ * dormant keeps body data off third parties. Left in place (not
+ * deleted) for the planned v2 pickup; see BACKLOG.md. Do not wire a
+ * caller back in without revisiting the privacy policy first.
+ */
 async function handleCalibrateGarment(req: VercelRequest, res: VercelResponse) {
   const { brand, size, fit, avatar } = req.body as {
     brand: string;

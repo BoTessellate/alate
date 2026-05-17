@@ -1,6 +1,15 @@
 /**
  * FitCalibrationCard
  *
+ * ⚠️ PARKED FOR V2 — 2026-05-17, user direction.
+ * This component is NOT rendered anywhere (its import was removed from
+ * AccountScreen). The "calibrate from a garment you own" feature is
+ * deferred to v2. It is kept on disk — not deleted — for that pickup.
+ * Note for v2: `calibrate-garment` sends body measurements to a
+ * third-party AI (Claude); re-enabling it means revisiting the privacy
+ * policy + Play Data Safety declaration first. See BACKLOG.md.
+ *
+ * --- Original intent (for v2) ---
  * Lives on the Account screen, below Body Profile. Lets the user record
  * garments they own that fit them well — each entry is sent to the backend's
  * `calibrate-garment` action which uses Claude to estimate the user's actual

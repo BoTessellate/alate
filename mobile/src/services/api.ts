@@ -231,7 +231,13 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
 }
 
 /**
- * Enrich a product with AI-generated metadata
+ * Enrich a product with AI-generated metadata.
+ *
+ * ⚠️ PAUSED — 2026-05-17. FitResultScreen no longer calls this, and the
+ * backend /api/ai?action=enrich endpoint is short-circuited (see
+ * backend/api/ai.ts, ENRICH_PAUSED) to cut AI cost. The function is
+ * kept so it can be restored cleanly. To resume: flip ENRICH_PAUSED in
+ * the backend and re-add the call in FitResultScreen.
  */
 export async function enrichProduct(product: {
   name: string;
@@ -387,6 +393,14 @@ export async function checkFit(
 
 /**
  * Estimate the user's body measurements (in cm) from a garment they own.
+ *
+ * ⚠️ PARKED FOR V2 — 2026-05-17. The only caller, FitCalibrationCard, is
+ * not rendered anywhere, so this is dormant. It is also the only path
+ * that sends body measurements to a third-party AI (Claude) — keeping
+ * it parked keeps body data off third parties. See BACKLOG.md. Kept on
+ * disk (not deleted) for the v2 pickup; revisit the privacy policy +
+ * Play Data Safety declaration before re-wiring a caller.
+ *
  * Calls the backend Claude-powered calibration endpoint. The result is stored
  * in the calibration store and averaged across all entries when checking fit.
  */
