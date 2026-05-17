@@ -11,6 +11,23 @@ import { API_BASE_URL } from '../constants/api';
 import { Avatar } from '../store/avatarStore';
 import { useDeviceStore } from '../store/deviceStore';
 
+/** Brand-pushed size chart from Mood Layer's composed-product endpoint.
+ *  Mirrors the shape exported by `@tessellate/enrichment-types`; once that
+ *  package is wired into mobile/package.json, swap to `import type`.
+ *  See SizeChartSheet.tsx for the rendering. */
+export interface ScrapedSizeRow {
+  label: string;
+  body_measurements?: Record<string, number | undefined>;
+  garment_measurements?: Record<string, number | undefined>;
+}
+export interface ScrapedSizeChart {
+  id: string;
+  name: string;
+  unit: 'cm' | 'in';
+  rows: ScrapedSizeRow[];
+  notes?: string | null;
+}
+
 export interface ScrapedProduct {
   name?: string;
   image?: string;
@@ -33,6 +50,12 @@ export interface ScrapedProduct {
   // hero. Ephemeral per scrape (anti-pattern #1: don't persist scraped
   // brand metadata into a shared catalog).
   customFit?: { available: boolean; label?: string };
+  /** Brand-pushed size chart from Mood Layer (composed-product endpoint).
+   *  Optional — present only when Mood Layer is wired and the brand has
+   *  published a chart for this product / its collection / shop-wide.
+   *  Until the proxy endpoint ships, this stays undefined and the
+   *  size-guide CTA is hidden. */
+  sizeChart?: ScrapedSizeChart;
 }
 
 export interface FitWarning {

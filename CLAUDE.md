@@ -84,3 +84,11 @@ Every screen is wrapped in `ScreenErrorBoundary` (see `AppNavigator.tsx`). If yo
 - Do not add GradientBackground — the app uses solid `colors.background` (#e4e2e9)
 - Glass cards use `rgba(255,255,255,0.75)` with subtle shadow on the solid bg
 - Package ID: `com.tessellate.alate`
+
+## Source-of-Truth Anti-Pattern (Mood Layer split)
+Mood Layer (the brand-side Shopify embedded app, separate `Tessellate/mood-layer` repo) and Alate (this repo, the consumer app) own different data:
+- **Shopify** owns catalog (title, description, images), price, inventory, shipping zones — read live via Storefront API at view time. **Never persist these in Mood Layer's DB.**
+- **Mood Layer** owns enrichments keyed to Shopify product IDs: AI tags, vision colors/textures, brand-pushed size charts / regional lead-times / customization options.
+- **Alate** consumes a single composed endpoint on Mood Layer (`GET /api/products/:id`) that fans out to Shopify Storefront API + Mood Layer enrichments DB and returns a merged payload.
+
+When working in this repo, do not add columns to `enriched_products` (or any successor table) that shadow Shopify-owned fields. If you need catalog/inventory/price, fetch via the composed endpoint, not via local DB.

@@ -58,6 +58,10 @@ import FitResultErrorCard from '../components/FitResultErrorCard';
 import HeadingImage from '../components/HeadingImage';
 import ConfirmDialog from '../components/ConfirmDialog';
 import BrandHeading from '../components/BrandHeading';
+// Brand-pushed size chart from Mood Layer (composed-product endpoint).
+// Hidden when product.sizeChart is undefined — i.e. always, until the
+// proxy endpoint ships. See plans/easy-customization-accuracy-zany-hartmanis.md.
+import SizeChartSheet from '../components/SizeChartSheet';
 import { captureError } from '../utils/sentry';
 import { formatRelativeTime, displayHostname } from '../utils/relativeTime';
 // Currency formatting shared with HistoryCoverFlow so the same symbol
@@ -153,6 +157,10 @@ export default function FitResultScreen() {
   //   2. routeProduct (history-mode direct nav, share-intent post-scrape)
   //   3. scrapedProduct (live URL-paste flow — set by analyzeFit)
   const [scrapedProduct, setScrapedProduct] = useState<ScrapedProduct | null>(null);
+
+  // Brand-pushed size-chart sheet visibility. Hidden by default; the CTA
+  // only renders when product.sizeChart is present (Mood Layer wired).
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
 
   // Optional inline error card — shown when the internal scrape fails
   // (brand we can't read, network error, blocked origin). Replaces the
@@ -1489,7 +1497,8 @@ export default function FitResultScreen() {
                 interactions/design the same)".
               - Expanded: full Material + Category rows as before
                 (Concerns themselves render in their own section
-                above this one). */}
+                above this one). The Size guide row also appears here
+                when the brand has published a chart via Mood Layer. */}
           {!isExpanded && warnings.length === 0 && (
             <View style={styles.metaSection}>
               <View style={styles.metaRow}>
@@ -1521,7 +1530,35 @@ export default function FitResultScreen() {
                   {showCategory ? displayCategory : '—'}
                 </Text>
               </View>
+              {/* Size guide CTA — only when the brand has published a
+                  chart via Mood Layer. product.sizeChart stays undefined
+                  until the composed-product endpoint ships, so this row
+                  is invisible in production today. */}
+              {product?.sizeChart && (
+                <TouchableOpacity
+                  testID="size-guide-cta"
+                  style={styles.metaRow}
+                  onPress={() => setSizeChartOpen(true)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.metaLabel}>Size guide</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.metaValue}>{product.sizeChart.name}</Text>
+                    <Feather name="chevron-right" size={16} color={colors.textSecondary} />
+                  </View>
+                </TouchableOpacity>
+              )}
             </View>
+          )}
+
+          {/* Size chart bottom sheet — rendered as a sibling so the
+              modal overlays the entire dock. */}
+          {product?.sizeChart && (
+            <SizeChartSheet
+              visible={sizeChartOpen}
+              chart={product.sizeChart}
+              onClose={() => setSizeChartOpen(false)}
+            />
           )}
 
           {/* Action buttons — expanded only. The dock should stay
