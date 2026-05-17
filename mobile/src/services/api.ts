@@ -256,11 +256,13 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
 /**
  * Enrich a product with AI-generated metadata.
  *
- * ⚠️ PAUSED — 2026-05-17. FitResultScreen no longer calls this, and the
- * backend /api/ai?action=enrich endpoint is short-circuited (see
- * backend/api/ai.ts, ENRICH_PAUSED) to cut AI cost. The function is
- * kept so it can be restored cleanly. To resume: flip ENRICH_PAUSED in
- * the backend and re-add the call in FitResultScreen.
+ * RESILIENCE STEP in the fit-check pipeline — called by FitResultScreen
+ * when a scrape returns no structured category/material/tags, so the
+ * fit check doesn't fall back to a generic `category: 'clothing'`. See
+ * backend/api/ai.ts handleEnrich for the full rationale. (Was briefly
+ * paused for AI cost on 2026-05-17 and restored the same day — do not
+ * silence it without weighing the fit-quality hit on non-Shopify
+ * stores; see regression log 2026-05-17.)
  */
 export async function enrichProduct(product: {
   name: string;

@@ -37,30 +37,21 @@ async function handleEnrich(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Product name is required' });
   }
 
-  // ── ENRICH PAUSED — 2026-05-17, user direction ───────────────────
-  // The Claude/Gemini product enrichment is paused to cut AI cost.
-  // We short-circuit HERE (server-side) rather than only removing the
-  // mobile caller, so that already-installed app versions — which
-  // still hit this endpoint — also stop incurring AI spend.
+  // ── WHY THIS EXISTS — do NOT silence without weighing the impact ──
+  // Enrichment is a RESILIENCE STEP in the fit-check pipeline, not an
+  // optional extra. When a storefront scrape returns no structured
+  // category / material / tags — i.e. anything that is NOT a Shopify /
+  // WooCommerce / JSON-LD direct fetch — the fit check would otherwise
+  // run on a generic `category: 'clothing'` with no material/tag
+  // signal, producing a markedly weaker prediction. This handler asks
+  // Claude/Gemini to fill those gaps so the fit check stays accurate
+  // for the long tail of non-structured stores.
   //
-  // The product is returned unchanged. Downstream `check-fit` degrades
-  // gracefully: FitResultScreen falls back to `category: 'clothing'`
-  // with no material/tag-aware warnings when those fields are absent.
-  //
-  // To resume: set ENRICH_PAUSED to false. The original enrichment
-  // body below is untouched and runs again when the flag flips.
-  const ENRICH_PAUSED = true;
-  if (ENRICH_PAUSED) {
-    return res.status(200).json({
-      success: true,
-      product,
-      model_used: 'enrich-paused',
-      color_extraction: 'none',
-      color_hex_codes: [],
-      saved_to_db: false,
-    });
-  }
-  // ── end ENRICH PAUSED ────────────────────────────────────────────
+  // History: briefly paused for AI cost on 2026-05-17 and RESTORED the
+  // same day once that pipeline role was understood (see regression
+  // log 2026-05-17). If AI cost needs managing, prefer a per-device
+  // usage cap or a cheaper model over silencing this flow — silencing
+  // it silently degrades every non-Shopify fit check.
 
   try {
     const enrichedProduct = await enrichProduct(product as EnricherRawProduct, {
