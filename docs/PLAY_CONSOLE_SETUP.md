@@ -140,7 +140,7 @@ handling → Preview. Here is exactly what to select for alate, and why.
 
 | Not declared | Reason |
 |---|---|
-| Health and fitness / body measurements | Your body profile is sent to **our own** backend only **transiently** to compute a fit check — used in memory, never stored, never logged. Google's rules allow data that is **processed ephemerally** to be left undeclared. (See the double-check note below.) |
+| Health and fitness / body measurements | Your body profile is sent to **our own** backend only **transiently** to compute a fit check — used in memory, never stored, never logged. Google's rules allow data that is **processed ephemerally** to be left undeclared. (Confirmed — see the body-measurements note below.) |
 | Pasted product URLs | Same — scraped in real time and discarded, never stored against your identity. Ephemeral. |
 | Fit history, in-app activity | Stored **only on the device** — never sent off it, so not "collected". |
 | Location, financial info, messages, photos, contacts, calendar | alate does not touch any of these. |

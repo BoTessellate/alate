@@ -7,7 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "alate",
+    "scheme": [
+      "alate",
+      "com.googleusercontent.apps.275682496009-od0lkccf0vbd429lcc992hh8g1lmbf8n"
+    ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",

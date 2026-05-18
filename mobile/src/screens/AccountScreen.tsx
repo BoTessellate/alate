@@ -167,6 +167,14 @@ function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: ()
   const [signInError, setSignInError] = useState(false);
 
   const cfg = getGoogleAuthConfig();
+  // LOAD-BEARING — do not remove the reverse-client-id from app.json's
+  // `scheme` array. On Android this Google flow redirects back via the
+  // custom scheme `com.googleusercontent.apps.<android-client-id>:/...`.
+  // app.json registers that scheme so the OS routes the post-sign-in
+  // redirect into the app; without it, sign-in completes in the browser
+  // but the user lands on google.com and the app never receives the
+  // token (2026-05-18 — see regression log). The Android OAuth client
+  // in Google Cloud Console must also have "Custom URI scheme" enabled.
   const [, response, promptAsync] = Google.useAuthRequest({
     clientId: cfg.clientId,
     androidClientId: cfg.androidClientId,
