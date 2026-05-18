@@ -167,14 +167,16 @@ function GoogleSignInCardConfigured({ onRequestSignOut }: { onRequestSignOut: ()
   const [signInError, setSignInError] = useState(false);
 
   const cfg = getGoogleAuthConfig();
-  // LOAD-BEARING — do not remove the reverse-client-id from app.json's
-  // `scheme` array. On Android this Google flow redirects back via the
-  // custom scheme `com.googleusercontent.apps.<android-client-id>:/...`.
-  // app.json registers that scheme so the OS routes the post-sign-in
-  // redirect into the app; without it, sign-in completes in the browser
-  // but the user lands on google.com and the app never receives the
-  // token (2026-05-18 — see regression log). The Android OAuth client
-  // in Google Cloud Console must also have "Custom URI scheme" enabled.
+  // LOAD-BEARING — `com.tessellate.alate` MUST stay in app.json's
+  // `scheme` array. expo-auth-session's Google provider builds the
+  // post-sign-in redirect URI as `${applicationId}:/oauthredirect`
+  // (verified in node_modules/expo-auth-session/.../providers/Google.js
+  // — it is the package name, NOT the reverse-client-id). app.json
+  // registers `com.tessellate.alate` so the OS routes that redirect
+  // back into the app; without it, sign-in completes in the browser but
+  // dead-ends on google.com and the app never receives the token
+  // (2026-05-18 — see regression log). The Android OAuth client in
+  // Google Cloud Console must also have "Custom URI scheme" enabled.
   const [, response, promptAsync] = Google.useAuthRequest({
     clientId: cfg.clientId,
     androidClientId: cfg.androidClientId,
