@@ -12,6 +12,29 @@ deleting them.
 
 ## P0 — pre-App-Store launch
 
+### Set up email aliases on the `tessellate.co.in` domain
+
+**Status:** not done — `tessellate.co.in` is owned by Tessellate but has
+no mail configured yet.
+
+The app and its published docs reference addresses on this domain that
+must actually receive mail before / shortly after launch:
+
+| Address | Used by | Why it must work |
+|---|---|---|
+| `contact@tessellate.co.in` | Play Console → Store listing → Contact details (`mobile/store-listing.md`) | Google and users contact the app here; the listing field needs a real address |
+| `privacy@tessellate.co.in` | Privacy policy (live at `app_privacy_policy/alate/privacy-policy.html`, v3.2) | Already **published** as the data-deletion / data-access request address — a user emailing it today would bounce. Compliance gap until fixed. |
+
+**What to do:** create catch-all or per-name aliases on `tessellate.co.in`
+(e.g. via the domain registrar's email-forwarding, or Google Workspace /
+Zoho Mail) so both addresses deliver to a monitored inbox. Plan per the
+owner: lightweight aliases now, dedicated domain + mailboxes once the app
+scales.
+
+**Related:** the BrandIntegration "Get in touch" P0 item below also needs
+a real destination — fold a `partners@tessellate.co.in` alias into the
+same setup if that route stays email-based.
+
 ### Move `googleUser` from AsyncStorage to `expo-secure-store`
 
 **Path:** `mobile/src/store/accountStore.ts` — the `account-storage`

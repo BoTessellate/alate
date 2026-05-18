@@ -56,3 +56,20 @@ fit check, clothing fit, online shopping, size guide, body type, fashion, fit pr
 
 ## Content Rating
 Expected: Everyone (no objectionable content)
+
+## Contact details
+
+Goes in Play Console → Store listing → Contact details.
+
+- **Email:** `contact@tessellate.co.in`
+  - This is the app's contact address. It's an alias on the
+    `tessellate.co.in` domain (owned by Tessellate). **The mailbox is
+    not set up yet** — tracked as a P0 task in `BACKLOG.md`. Interim
+    address until a dedicated domain / mail is set up once the app
+    scales.
+- **Website:** none yet (optional in Play Console)
+- **Phone:** none (optional)
+
+Related address already published: the privacy policy uses
+`privacy@tessellate.co.in` for data-deletion / data-access requests —
+that alias must work too (same BACKLOG task).
