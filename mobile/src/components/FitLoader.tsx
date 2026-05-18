@@ -4,13 +4,14 @@
  * Matches the Claude Design ScreenLoading mockup:
  *   - Glass URL pill at the top (link icon + truncated URL, if known)
  *   - Centered gradient hero circle (140 wide) with a spinning inner
- *     ring (110 wide, 2px white-top border rotating)
+ *     ring (110 wide, 2px white-top border rotating) and the white
+ *     alate wordmark resting still at its centre
  *   - Italic serif headline "reading the size chart…"
  *   - Plain-body helper copy underneath
  */
 
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -90,6 +91,15 @@ export default function FitLoader({
           style={styles.gradientCircle}
         >
           <Spinner />
+          {/* alate wordmark sits still at the centre while the ring
+              spins around it. White asset on transparent ground, so
+              it reads cleanly against the purple orb. */}
+          <Image
+            source={require('../../assets/logo-wordmark-white.png')}
+            style={styles.logo}
+            resizeMode="contain"
+            testID="fit-loader-logo"
+          />
         </LinearGradient>
 
         <Text style={styles.title}>{title}</Text>
@@ -145,7 +155,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  logo: {
+    width: 88,
+    height: 88,
+  },
   spinner: {
+    // Absolute so it overlays the centred wordmark instead of pushing
+    // it sideways in the gradient circle's flex row.
+    position: 'absolute',
     width: 110,
     height: 110,
     borderRadius: 55,
