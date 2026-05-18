@@ -76,4 +76,9 @@ describe('FitLoader', () => {
     const { getByText } = render(<FitLoader />);
     expect(getByText(/reading the size chart/i)).toBeTruthy();
   });
+
+  it('shows the alate wordmark inside the loading circle', () => {
+    const { getByTestId } = render(<FitLoader />);
+    expect(getByTestId('fit-loader-logo')).toBeTruthy();
+  });
 });

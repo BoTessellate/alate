@@ -12,7 +12,7 @@
       "com.googleusercontent.apps.275682496009-od0lkccf0vbd429lcc992hh8g1lmbf8n"
     ],
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
