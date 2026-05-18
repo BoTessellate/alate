@@ -61,7 +61,7 @@ Expected: Everyone (no objectionable content)
 
 Goes in Play Console → Store listing → Contact details.
 
-- **Email:** `contact@tessellate.co.in`
+- **Email:** `connect@tessellate.co.in`
   - This is the app's contact address. It's an alias on the
     `tessellate.co.in` domain (owned by Tessellate). **The mailbox is
     not set up yet** — tracked as a P0 task in `BACKLOG.md`. Interim
