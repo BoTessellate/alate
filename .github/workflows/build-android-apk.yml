@@ -76,6 +76,22 @@ jobs:
           echo "$GOOGLE_SERVICES_JSON_B64" | base64 -d > google-services.json
           echo "google-services.json restored ($(wc -c < google-services.json) bytes)"
 
+      - name: Set Android versionCode from the build run number
+        # app.json deliberately pins no `android.versionCode`, so Expo
+        # prebuild emits `versionCode 1` on every build — and Play
+        # Console rejects re-uploading an already-seen code ("version 1
+        # is already taken", plus the "no upgrade path" / "no new app
+        # bundle" errors that cascade from it). github.run_number is
+        # unique and monotonically increasing per workflow run, so
+        # injecting it into app.json BEFORE prebuild gives every build a
+        # fresh, higher code with zero manual bumps. Written into
+        # app.json (not the generated build.gradle) so Expo stays the
+        # single source of truth for the Android manifest. The edit is
+        # ephemeral — it lives only in this CI checkout, never committed.
+        run: |
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('app.json'));j.expo.android=j.expo.android||{};j.expo.android.versionCode=${{ github.run_number }};fs.writeFileSync('app.json',JSON.stringify(j,null,2)+'\n');"
+          echo "Android versionCode set to ${{ github.run_number }}"
+
       - name: Expo prebuild
         # All EXPO_PUBLIC_* vars must be present at this step (and at
         # the gradle build below) — babel-preset-expo inlines them at
