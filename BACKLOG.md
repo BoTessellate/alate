@@ -22,7 +22,7 @@ must actually receive mail before / shortly after launch:
 
 | Address | Used by | Why it must work |
 |---|---|---|
-| `contact@tessellate.co.in` | Play Console → Store listing → Contact details (`mobile/store-listing.md`) | Google and users contact the app here; the listing field needs a real address |
+| `connect@tessellate.co.in` | Play Console → Store listing → Contact details (`mobile/store-listing.md`) | Google and users contact the app here; the listing field needs a real address |
 | `privacy@tessellate.co.in` | Privacy policy (live at `app_privacy_policy/alate/privacy-policy.html`, v3.2) | Already **published** as the data-deletion / data-access request address — a user emailing it today would bounce. Compliance gap until fixed. |
 
 **What to do:** create catch-all or per-name aliases on `tessellate.co.in`
