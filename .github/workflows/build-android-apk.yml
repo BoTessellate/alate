@@ -114,43 +114,55 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Setup release signing keystore
+        # Restore the release/upload keystore from secrets, and FAIL
+        # CLOSED if any signing secret is missing. The old version had
+        # an `else` branch that, on a missing ANDROID_KEYSTORE,
+        # generated a throwaway keystore, signed it with a hardcoded
+        # password, and printed the key (base64) straight into the
+        # build log. That leaks the signing key the instant the repo is
+        # public — and the artifact is useless anyway (Play Console
+        # rejects an AAB signed with an unrecognised key). Bootstrapping
+        # a NEW upload keystore is a deliberate, local, one-off action;
+        # CI must never do it silently. Incident: 2026-04, two runs
+        # leaked a keystore this way — see anti-pattern #19.
+        #
+        # Secrets are read via `env:`, never inlined as `${{ }}` in the
+        # script body, so a shell trace cannot surface the value.
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE }}" ]; then
-            echo "Using stored keystore from secret"
-            echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 -d > android/app/alate-release.keystore
-          else
-            echo "No ANDROID_KEYSTORE secret found — generating a new keystore"
-            keytool -genkeypair -v \
-              -keystore android/app/alate-release.keystore \
-              -alias alate \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Alate,OU=Mobile,O=Tessellate,L=London,S=England,C=GB" \
-              -storepass "${{ secrets.KEYSTORE_PASSWORD || 'alate_dev_2024' }}" \
-              -keypass "${{ secrets.KEY_PASSWORD || 'alate_dev_2024' }}" 2>&1
-            echo ""
-            echo "========================================================"
-            echo "ACTION REQUIRED: Save the following as GitHub secret ANDROID_KEYSTORE"
-            echo "so all future builds use the same certificate:"
-            echo "========================================================"
-            base64 -w 0 android/app/alate-release.keystore
-            echo ""
-            echo "========================================================"
+          missing=
+          if [ -z "$ANDROID_KEYSTORE" ];  then missing="$missing ANDROID_KEYSTORE"; fi
+          if [ -z "$KEYSTORE_PASSWORD" ]; then missing="$missing KEYSTORE_PASSWORD"; fi
+          if [ -z "$KEY_PASSWORD" ];      then missing="$missing KEY_PASSWORD"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required signing secret(s):$missing"
+            echo "::error::Set them under Settings → Secrets and variables → Actions. CI does not generate keystores."
+            exit 1
           fi
+          echo "$ANDROID_KEYSTORE" | base64 -d > android/app/alate-release.keystore
+          echo "Release keystore restored from secret ($(wc -c < android/app/alate-release.keystore) bytes)"
 
       - name: Patch build.gradle to use release keystore
+        # Passwords come straight from secrets — no hardcoded fallback.
+        # The old 'alate_dev_2024' default that lived here was a public,
+        # guessable signing password (anti-pattern #19). The keystore
+        # step above already fails the build if these secrets are
+        # absent, so they are guaranteed present by this point.
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          STOREPASS="${{ secrets.KEYSTORE_PASSWORD }}"
-          KEYPASS="${{ secrets.KEY_PASSWORD }}"
-          STOREPASS="${STOREPASS:-alate_dev_2024}"
-          KEYPASS="${KEYPASS:-alate_dev_2024}"
           cat >> android/app/build.gradle << EOF
 
           android.signingConfigs {
             release {
               storeFile = file("alate-release.keystore")
-              storePassword = "$STOREPASS"
+              storePassword = "$KEYSTORE_PASSWORD"
               keyAlias = "alate"
-              keyPassword = "$KEYPASS"
+              keyPassword = "$KEY_PASSWORD"
             }
           }
           android.buildTypes.release.signingConfig = android.signingConfigs.release
