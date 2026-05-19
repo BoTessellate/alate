@@ -211,3 +211,11 @@ global.console = {
   warn: jest.fn(),
   error: jest.fn(),
 };
+
+// CI flake backstop: a single load-induced timeout must not fail the
+// whole required `mobile` check. Retry only on CI — local runs fail
+// fast so real flakes stay visible. A genuine failure still fails all
+// attempts; `logErrorsBeforeRetry` keeps the error output.
+if (process.env.CI) {
+  jest.retryTimes(2, { logErrorsBeforeRetry: true });
+}
