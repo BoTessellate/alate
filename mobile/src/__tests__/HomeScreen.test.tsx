@@ -116,7 +116,11 @@ function setAvatar(set: boolean) {
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
+    // `advanceTimers: true` — without it, fake timers freeze the clock
+    // that `waitFor`/`findBy*` poll on, so async assertions race the
+    // mock-promise microtasks and flake under CI load. Auto-advancing
+    // keeps component timers controllable while letting waitFor resolve.
+    jest.useFakeTimers({ advanceTimers: true });
     setAvatar(false);
   });
 
