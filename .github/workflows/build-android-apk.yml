@@ -124,7 +124,7 @@ jobs:
         # rejects an AAB signed with an unrecognised key). Bootstrapping
         # a NEW upload keystore is a deliberate, local, one-off action;
         # CI must never do it silently. Incident: 2026-04, two runs
-        # leaked a keystore this way — see anti-pattern #17.
+        # leaked a keystore this way — see anti-pattern #19.
         #
         # Secrets are read via `env:`, never inlined as `${{ }}` in the
         # script body, so a shell trace cannot surface the value.
@@ -148,7 +148,7 @@ jobs:
       - name: Patch build.gradle to use release keystore
         # Passwords come straight from secrets — no hardcoded fallback.
         # The old 'alate_dev_2024' default that lived here was a public,
-        # guessable signing password (anti-pattern #17). The keystore
+        # guessable signing password (anti-pattern #19). The keystore
         # step above already fails the build if these secrets are
         # absent, so they are guaranteed present by this point.
         env:
