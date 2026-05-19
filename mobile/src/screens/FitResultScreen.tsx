@@ -1521,7 +1521,7 @@ export default function FitResultScreen() {
                 above this one). The Size guide row also appears here
                 when the brand has published a chart via Mood Layer. */}
           {!isExpanded && warnings.length === 0 && (
-            <View style={styles.metaSection}>
+            <View style={styles.metaSectionFlush}>
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Fit concerns</Text>
                 <Text
@@ -2317,6 +2317,16 @@ const styles = StyleSheet.create({
   metaSection: {
     borderTopWidth: 1,
     borderTopColor: textAlpha.tintSm,
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  // Collapsed-dock "Fit concerns" preview variant. It renders directly
+  // below the stats-row hairline `divider`, which already separates it
+  // from the stat dots. metaSection's own borderTop would stack a
+  // SECOND hairline under the stats — the docked double-line bug
+  // (regression log 2026-05-18). Same paddingTop/marginBottom as
+  // metaSection so the iteratively-tuned COLLAPSED_H stays correct.
+  metaSectionFlush: {
     paddingTop: spacing.md,
     marginBottom: spacing.md,
   },
