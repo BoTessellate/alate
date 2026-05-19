@@ -236,7 +236,10 @@ describe('FitResultErrorCard — notify-me flow', () => {
     await waitFor(() => {
       expect(queryByTestId('fit-result-error-notify-confirm')).toBeTruthy();
     });
-  });
+    // 15s timeout (default 5s): this test chains three `waitFor`s over a
+    // mount fetch + expand + submit + confirm, which exceeds 5s under CI
+    // load and flaked the required `mobile` check.
+  }, 15000);
 
   it('does not submit when email is invalid', () => {
     const { getByTestId } = render(
