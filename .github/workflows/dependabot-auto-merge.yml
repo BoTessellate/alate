@@ -45,7 +45,6 @@ jobs:
           # required checks pass. `--auto` is a no-op if required checks
           # are not configured — falls back to leaving the PR approved
           # and ready for the human to click Merge.
-          gh pr review --approve "$PR_URL" -b "Auto-approved: $(echo ${{ steps.meta.outputs.update-type }})."
           gh pr merge --auto --squash "$PR_URL"
 
       - name: Flag major bumps for human review
