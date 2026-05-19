@@ -19,7 +19,7 @@
     "@notionhq/client": "^5.17.0",
     "@pinecone-database/pinecone": "^7.1.0",
     "@sentry/node": "^10.47.0",
-    "@sparticuz/chromium": "^143.0.4",
+    "@sparticuz/chromium": "^147.0.2",
     "@supabase/supabase-js": "^2.93.0",
     "@types/cors": "^2.8.19",
     "@types/uuid": "^11.0.0",
