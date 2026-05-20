@@ -125,37 +125,39 @@ change needed.
 Rest of launch readiness — see `project_anti_patterns.md` checklist
 in memory.
 
-### Fabric / material extraction misses on certain storefronts
+### ~~Fabric / material extraction misses on certain storefronts~~ — Armani PARTIAL-LANDED 2026-05-20, Oshin still open
 
-User-flagged May 5 2026 — material/fabric details aren't being
+**Files:** [`mobile/src/utils/productInference.ts`](mobile/src/utils/productInference.ts),
+  [`mobile/src/screens/FitResultScreen.tsx`](mobile/src/screens/FitResultScreen.tsx),
+  [`mobile/src/__tests__/productInference.test.ts`](mobile/src/__tests__/productInference.test.ts)
+
+User-flagged 2026-05-05 — material/fabric details weren't being
 surfaced on the FitResult `MATERIAL` row for these representative
 URLs:
 
 - `https://www.armani.com/en-in/emporio-armani/short-sleeved-jumper-with-perforated-knit-cod-EW004675-AF25815-F1054/`
-  (Armani — likely a non-Shopify storefront with bespoke product
-  schema. The product name itself contains "perforated knit" so the
-  signal exists; we just don't extract it.)
-- `https://oshinsarin.in/products/felled-seam-set` (Oshin — Shopify;
-  the JSON product payload may not surface a `material` key, or
-  ours sits in a `tags` field we're not scanning for material hints.)
+- `https://oshinsarin.in/products/felled-seam-set`
 
-Investigation steps when picked up:
-  1. Hit each URL via `scrapeProduct()` directly and inspect the
-     returned `material` field — null vs missing vs empty.
-  2. If null, check whether `inferMaterial({ title, tags })` in
-     `mobile/src/utils/productInference.ts` would catch the
-     keywords ("knit", "linen", "silk", "felled" etc.). The
-     keyword table may need extending.
-  3. For Armani specifically — the URL handle has the fabric type
-     baked in (`perforated-knit`), so a URL-handle pass in the
-     same inference step should be cheap to add.
-  4. Add the URLs as fixtures to `productInference.test.ts` so a
-     regression doesn't reintroduce empty material on these pages.
+**Armani — fixed 2026-05-20.** `inferMaterial` now reads the URL
+handle (last path segment, hyphens → spaces) as a third signal
+alongside title and tags, and `MATERIAL_KEYWORDS` recognises
+"knit"/"knitted" as a generic fabric (placed last so a specific
+fibre like "merino knit" still wins). Two regression fixtures —
+Armani handle returns "Knit", Oshin handle returns undefined —
+locked into `productInference.test.ts`. Full suite green (401/401).
 
-Related but separate: user also reports that an Armani link sometimes
-fails via the share-route while pasting the same link works. That's
-a share-intent debounce / dedup question, NOT a scraper question;
-filed as its own backlog item below.
+History note: this fix was first written 2026-05-16 on the orphan
+branch `claude/unruffled-leakey-dacdab` (commit 74c88be) and was
+incorrectly recorded as shipped in regression log row #34. It only
+actually landed on master on 2026-05-20 — see the row's correction.
+
+**Oshin — still open.** `felled-seam-set` is a construction term,
+not a fabric word, so the inference fallback can't recover it.
+This needs a backend-side fix: either extend the Shopify scrape to
+read the `material` metafield (if Oshin populates one), or extend
+the Gemini enrichment prompt to recognise saree/textile-specific
+fabric terms ("mul", "kota", "linen-silk", etc.) for Indian
+storefronts. Track follow-up here when picked up.
 
 ### Share-intent route fails where direct paste succeeds (Armani)
 
