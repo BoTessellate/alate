@@ -1071,7 +1071,7 @@ export default function FitResultScreen() {
   const enrichedMaterial = enrichedProduct?.material || undefined;
   const inferredMaterial = enrichedMaterial
     ? undefined
-    : inferMaterial({ title: product.name, tags: enrichedProduct?.tags });
+    : inferMaterial({ url, title: product.name, tags: enrichedProduct?.tags });
   const displayMaterial = enrichedMaterial ?? inferredMaterial;
   const showMaterial = !!displayMaterial;
 

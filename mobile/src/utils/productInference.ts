@@ -76,6 +76,8 @@ const MATERIAL_KEYWORDS: Array<[RegExp, string]> = [
   [/\b(chiffon)\b/i, 'Chiffon'],
   [/\b(jersey)\b/i, 'Jersey'],
   [/\b(crepe)\b/i, 'Crepe'],
+  // Generic knit — last so a specific fibre ("merino knit") wins.
+  [/\bknit(ted)?\b/i, 'Knit'],
 ];
 
 interface InferenceContext {
@@ -110,11 +112,27 @@ export function inferCategory(ctx: InferenceContext): string | undefined {
   return undefined;
 }
 
-/** Pick a fabric from title / tags. URL is intentionally NOT in
- *  the haystack here — handles rarely carry fabric words and we
- *  don't want false positives off the path slug. */
+/** Extract the product handle (last path segment) from a URL, with
+ *  hyphen/underscore separators turned into spaces — e.g.
+ *  `/products/perforated-knit-jumper` → "perforated knit jumper".
+ *  Returns "" when the URL is missing or unparseable. */
+function urlHandle(url?: string): string {
+  if (!url) return '';
+  try {
+    const seg = new URL(url).pathname.split('/').filter(Boolean).pop() ?? '';
+    return seg.replace(/[-_]+/g, ' ');
+  } catch {
+    return '';
+  }
+}
+
+/** Pick a fabric from title, tags, and the URL handle. Only the
+ *  handle (last path segment) is searched — not the whole URL —
+ *  because handles often bake the fabric in (`…-perforated-knit-…`)
+ *  when a bespoke storefront schema drops the material field, while
+ *  the rest of the path is just brand/category noise. */
 export function inferMaterial(ctx: InferenceContext): string | undefined {
-  const haystack = [ctx.title, ...(ctx.tags ?? [])]
+  const haystack = [ctx.title, urlHandle(ctx.url), ...(ctx.tags ?? [])]
     .filter(Boolean)
     .join(' ');
   if (!haystack.trim()) return undefined;
