@@ -157,32 +157,30 @@ fails via the share-route while pasting the same link works. That's
 a share-intent debounce / dedup question, NOT a scraper question;
 filed as its own backlog item below.
 
-### Share-intent route fails where direct paste succeeds (Armani)
+### ~~Share-intent route fails where direct paste succeeds (Armani)~~ — LANDED 2026-05-20
 
-User-flagged May 5 2026: shared an Emporio Armani product link to
-the app via the system share-sheet → "this brand isn't on the
-platform" error. Pasted the SAME URL into the Home search bar →
-went through and rendered a fit card. Different code path, same
-URL.
+**Files:** [`mobile/src/utils/shareIntent.ts`](mobile/src/utils/shareIntent.ts),
+  [`mobile/src/navigation/AppNavigator.tsx`](mobile/src/navigation/AppNavigator.tsx),
+  [`mobile/src/__tests__/shareIntent.test.ts`](mobile/src/__tests__/shareIntent.test.ts)
 
-Hypothesis: `useShareIntentContext` may be passing a slightly
-different URL string (trailing whitespace, unwrapped fragment,
-URL-shortener redirect not yet followed). Or the share-intent
-handler's `isValidUrl()` check is rejecting on an edge case the
-direct-paste path doesn't reject on.
+User-flagged 2026-05-05: shared an Emporio Armani product link via
+the system share-sheet → "this brand isn't on the platform". Pasted
+the SAME URL into Home → fit card. Two code paths, same URL.
 
-Investigation steps:
-  1. Add a `captureMessage` (or console.log gated to __DEV__) at
-     the share-intent entry point in
-     `mobile/src/navigation/AppNavigator.tsx`'s `handleSharedUrl`
-     to capture the EXACT URL string + bytes (look for trailing
-     `\r`, whitespace, `?utm_*` differences vs the paste path).
-  2. Check the URL the home-paste path receives for the same
-     product — diff against share-intent's input.
-  3. If the share-intent URL has trailing whitespace / fragments
-     that the scrape rejects, normalise via `URL` constructor +
-     `.toString()` before scraping, OR `.trim()` + strip fragments
-     before the `isValidUrl` check.
+Root cause confirmed: share-sheet payloads carry whitespace, wrapper
+text around the URL, and/or a `#fragment` that the scrape rejects.
+The home-paste path normalised; the share-intent path didn't.
+
+**Fixed:** new `extractSharedUrl()` in `shareIntent.ts` trims, pulls
+the first `http(s)` token out of a longer blob, and strips trailing
+punctuation + `#fragment`. `AppNavigator`'s share-intent effect
+calls it; the dead local `isValidUrl` helper is gone. 10 new tests
+in `shareIntent.test.ts`; full suite 407/407 green.
+
+History note: this fix was first written 2026-05-16 on the orphan
+branch `claude/unruffled-leakey-dacdab` (commit b9269e4) and was
+incorrectly recorded as shipped in regression log row #35. It only
+actually landed on master on 2026-05-20.
 
 ### Apple-TV-style "expand from card" transition for History → FitResult
 

@@ -10,7 +10,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useShareIntentContext } from '../utils/shareIntent';
+import { useShareIntentContext, extractSharedUrl } from '../utils/shareIntent';
 
 import { colors, spacing, typography, fontFamily, whiteAlpha, borderRadius } from '../constants/theme';
 import { isEnabled } from '../constants/featureFlags';
@@ -255,16 +255,6 @@ function MainTabs() {
   );
 }
 
-// URL validation helper
-function isValidUrl(text: string): boolean {
-  try {
-    const url = new URL(text);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 // Root Stack Navigator with Share Intent Handler
 export default function AppNavigator() {
   const { shareIntent, hasShareIntent, resetShareIntent } = useShareIntentContext();
@@ -301,8 +291,11 @@ export default function AppNavigator() {
     if (!ageConfirmedAt) return;
     if (!hasShareIntent || processingRef.current) return;
 
-    const url = shareIntent?.webUrl || shareIntent?.text;
-    if (!url || !isValidUrl(url)) {
+    // Normalise before handing off — share-sheet payloads can carry
+    // whitespace, wrapper text, or a #fragment that the scrape path
+    // rejects even though the same link works when pasted directly.
+    const url = extractSharedUrl(shareIntent?.webUrl || shareIntent?.text);
+    if (!url) {
       resetShareIntent();
       return;
     }
