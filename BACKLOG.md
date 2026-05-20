@@ -274,15 +274,23 @@ already-tuned cover-flow animation.
 
 ## P1 — near-term polish
 
-### Apply the Supabase migration for `blocked_brands`
+### ~~Apply the Supabase migration for `blocked_brands`~~ — ALREADY APPLIED, verified 2026-05-20
 **Path:** `backend/supabase/migrations/blocked_brands.sql`
 
-Migration file exists but hasn't been applied to the live Supabase
-instance. Copy the SQL into the Supabase SQL editor or run via your
-migration runner. Until applied, the `/api/brand-optout` endpoint
-returns 500 and the scraper's blocklist check fails open (no-op). Not
-a blocker — safe default is "nothing gets blocked" — but needed
-before the opt-out feature is real.
+Verified live on project `alate` (`ancuwmmivgdvommzigwv`) via MCP
+`list_tables`: `public.blocked_brands` exists with the expected
+columns (`origin PK`, `reason`, `requested_by_email`, `notes`,
+`blocked_at`), RLS enabled, "Brands that have opted out…" comment
+in place, "Service role only" policy active.
+
+Provenance note: the project's `supabase_migrations.schema_migrations`
+table only tracks one migration row (`20250707123502`), so
+`list_migrations` did not surface this one — `blocked_brands` was
+applied via the SQL editor (or an early manual apply) and isn't
+recorded in the migrations table. **Trust `list_tables` over
+`list_migrations` when verifying applied state on this project.**
+Same caveat applies to `brand_requests` (also live, 6 rows, not in
+the migrations list).
 
 ### ~~Brand-nudge UX inside FitResult error card (email-the-brand version)~~ — REJECTED 2026-05-02
 
