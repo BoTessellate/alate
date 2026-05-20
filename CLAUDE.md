@@ -28,6 +28,46 @@ follow [`docs/_USER_DOC_TEMPLATE.md`](./docs/_USER_DOC_TEMPLATE.md):
 plain-language "what this is" → numbered "what you need to do" with real
 links → "how to verify it worked". No jargon in the instructions.
 
+## Branch placement — AUTOMATIC, do not ask
+
+When the user assigns a task whose changes do NOT belong on the
+currently checked-out branch, cut a new branch off `master`
+automatically. **Do not ask.** Signals that a fix doesn't belong on
+the current branch:
+- Current branch name implies a different scope (e.g. `ci/...`,
+  `docs/...`, `chore/...`) while the task is a feature/fix.
+- The current branch has unrelated uncommitted edits already in
+  flight.
+- The fix would mix concerns across PR boundaries.
+
+Default branch naming: `fix/<short-slug>`, `feat/<short-slug>`,
+`docs/<short-slug>`, `chore/<short-slug>`. Cut from `master`, not
+the current branch. Use `git worktree add` when the current branch
+has uncommitted work that must be preserved.
+
+Within the new branch, separate code commits from doc commits
+(`feedback_work_style` memory). Run the full `npx jest --no-coverage`
+before either commit.
+
+## Orphan-branch fixes — port AUTOMATICALLY, do not ask
+
+If a regression-log entry, BACKLOG entry, or audit reveals that a
+fix already exists as a commit on an unmerged/orphan branch
+(typically `claude/<adjective>-<noun>-<hash>` from a prior session)
+and the current task requires that fix, port the commit to a fresh
+branch off `master` (per "Branch placement" above) **without
+asking**. Verify the regression log and BACKLOG entries that
+referenced the old commit get corrected — a logged fix's SHA must
+be reachable from `master` (`git branch --contains <sha>` lists
+`master`) before the entry is marked shipped.
+
+When porting:
+1. Cherry-pick or replay the diff on the new branch.
+2. Run `npx jest --no-coverage` — the orphan-branch tests should
+   pass on master too; if they don't, fix forward, don't skip.
+3. Update BACKLOG.md / regression log to reference the new
+   merged SHA, not the orphan one.
+
 ## Project
 React Native Android app (Expo 55, RN 0.81.5, React 19). Monorepo: `/mobile` (app) + `/backend` (Vercel API).
 

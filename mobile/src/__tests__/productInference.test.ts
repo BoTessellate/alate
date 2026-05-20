@@ -140,6 +140,39 @@ describe('inferMaterial', () => {
     expect(inferMaterial({ title: 'cashmere shawl' })).toBe('Cashmere');
   });
 
+  it('catches "knit" / "knitted" as a material', () => {
+    expect(inferMaterial({ title: 'perforated knit jumper' })).toBe('Knit');
+    expect(inferMaterial({ title: 'ribbed knitted top' })).toBe('Knit');
+  });
+
+  it('prefers a specific fibre over the generic "knit" label', () => {
+    // "merino knit" should report Merino Wool, not Knit — the fibre
+    // is the more useful fit signal.
+    expect(inferMaterial({ title: 'merino knit jumper' })).toBe('Merino Wool');
+  });
+
+  it('extracts the fabric from the URL handle (Armani regression)', () => {
+    // Armani's bespoke storefront schema drops the material field, but
+    // the product handle bakes the fabric in: `…-with-perforated-knit-…`.
+    expect(
+      inferMaterial({
+        url: 'https://www.armani.com/en-in/emporio-armani/short-sleeved-jumper-with-perforated-knit-cod-EW004675-AF25815-F1054/',
+      })
+    ).toBe('Knit');
+  });
+
+  it('returns undefined when no signal is in the handle (Oshin regression)', () => {
+    // `felled-seam-set` is a construction term, not a fabric — inference
+    // cannot recover Oshin's material from the handle. This documents
+    // that the Oshin miss needs a backend tag/JSON fix, not inference.
+    expect(
+      inferMaterial({
+        url: 'https://oshinsarin.in/products/felled-seam-set',
+        title: 'Felled Seam Set',
+      })
+    ).toBeUndefined();
+  });
+
   it('returns undefined for empty / missing inputs', () => {
     expect(inferMaterial({})).toBeUndefined();
   });
